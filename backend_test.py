@@ -752,6 +752,122 @@ class HireabbleAPITester:
             
         return success1 and success2 and success3
 
+    def test_profile_completeness_endpoint(self):
+        """Test profile completeness endpoint (new feature)"""
+        if not self.seeker_token:
+            print("❌ No seeker token available for profile completeness test")
+            return False
+            
+        headers = {"Authorization": f"Bearer {self.seeker_token}"}
+        success, response = self.run_test(
+            "Profile Completeness Check",
+            "GET",
+            "profile/completeness",
+            200,
+            headers=headers
+        )
+        
+        if success:
+            # Verify required fields are present
+            required_fields = ['percentage', 'missing_fields', 'is_complete']
+            for field in required_fields:
+                if field not in response:
+                    print(f"   ❌ Missing field in response: {field}")
+                    return False
+                    
+            print(f"   ✅ Profile completeness: {response['percentage']}%")
+            print(f"   ✅ Missing fields: {response['missing_fields']}")
+            print(f"   ✅ Is complete (80%+): {response['is_complete']}")
+            
+            # Test that completeness is calculated correctly
+            if response['percentage'] >= 80 and not response['is_complete']:
+                print("   ❌ Profile marked as incomplete despite 80%+ completion")
+                return False
+                
+        return success
+
+    def test_resume_download_endpoint(self):
+        """Test resume PDF download endpoint (new feature)"""
+        if not self.seeker_token:
+            print("❌ No seeker token available for resume download test")
+            return False
+            
+        print("🔍 Testing Resume PDF Download...")
+        
+        headers = {"Authorization": f"Bearer {self.seeker_token}"}
+        
+        try:
+            url = f"{self.base_url}/resume/download"
+            response = requests.get(url, headers=headers, timeout=30)
+            
+            self.tests_run += 1
+            
+            if response.status_code == 200:
+                # Check content type
+                content_type = response.headers.get('content-type', '')
+                if 'application/pdf' in content_type:
+                    content_length = len(response.content)
+                    print(f"✅ Resume PDF downloaded successfully - Size: {content_length} bytes")
+                    
+                    # Basic PDF validation (should start with %PDF)
+                    if response.content.startswith(b'%PDF'):
+                        print("   ✅ Valid PDF file format detected")
+                        self.tests_passed += 1
+                        return True
+                    else:
+                        print("   ❌ Invalid PDF format")
+                        return False
+                else:
+                    print(f"❌ Wrong content type: {content_type}")
+                    return False
+            else:
+                print(f"❌ Failed - Status: {response.status_code}")
+                try:
+                    error_data = response.json()
+                    print(f"   Error: {error_data}")
+                except:
+                    print(f"   Error: {response.text[:200]}")
+                return False
+                
+        except Exception as e:
+            print(f"❌ Failed - Error: {str(e)}")
+            self.tests_run += 1
+            return False
+
+    def test_websocket_endpoint_accessibility(self):
+        """Test WebSocket endpoint accessibility (new feature)"""
+        if not self.seeker_token:
+            print("❌ No seeker token available for WebSocket test")
+            return False
+            
+        print("🔍 Testing WebSocket Endpoint Accessibility...")
+        
+        try:
+            # Test WebSocket endpoint by attempting HTTP connection (should return upgrade required)
+            ws_url = f"{self.base_url.replace('/api', '')}/ws/{self.seeker_token}"
+            response = requests.get(ws_url, timeout=10)
+            
+            self.tests_run += 1
+            
+            # WebSocket endpoints return specific errors for HTTP requests
+            if response.status_code in [400, 426, 404]:
+                if response.status_code == 404:
+                    print("❌ WebSocket endpoint not found (404)")
+                    return False
+                else:
+                    print(f"✅ WebSocket endpoint exists (got expected error: {response.status_code})")
+                    print("   ✅ Endpoint properly rejects non-WebSocket connections")
+                    self.tests_passed += 1
+                    return True
+            else:
+                print(f"❌ Unexpected response from WebSocket endpoint: {response.status_code}")
+                return False
+                
+        except Exception as e:
+            print(f"❌ Failed to test WebSocket endpoint: {str(e)}")
+            self.tests_run += 1
+            return False
+
 def main():
     print("🚀 Starting Hireabble API Test Suite")
     print("=" * 50)
@@ -767,6 +883,9 @@ def main():
         ("Auth Me", tester.test_auth_me),
         ("Onboarding Status", tester.test_onboarding_status),
         ("Complete Seeker Onboarding", tester.test_complete_seeker_onboarding),
+        ("Profile Completeness", tester.test_profile_completeness_endpoint),  # NEW
+        ("Resume Download", tester.test_resume_download_endpoint),  # NEW  
+        ("WebSocket Endpoint", tester.test_websocket_endpoint_accessibility),  # NEW
         ("Job Creation", tester.test_job_creation),
         ("Get Jobs (Seeker)", tester.test_get_jobs_for_seeker),
         ("Get Jobs (Recruiter)", tester.test_get_recruiter_jobs),

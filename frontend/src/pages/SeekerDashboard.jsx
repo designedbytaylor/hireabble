@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence, useMotionValue, useTransform } from 'framer-motion';
-import { X, Heart, Star, Briefcase, MapPin, DollarSign, Building2, Clock, ChevronDown, Filter, SlidersHorizontal } from 'lucide-react';
+import { X, Heart, Star, Briefcase, MapPin, DollarSign, Building2, Clock, ChevronDown, Filter, SlidersHorizontal, Zap, CheckCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
@@ -35,6 +35,7 @@ export default function SeekerDashboard() {
   const [matchData, setMatchData] = useState(null);
   const [expandedCard, setExpandedCard] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
+  const [profileComplete, setProfileComplete] = useState(false);
   const [filters, setFilters] = useState({
     job_type: '',
     experience_level: '',
@@ -46,6 +47,7 @@ export default function SeekerDashboard() {
   useEffect(() => {
     fetchJobs();
     fetchStats();
+    fetchProfileCompleteness();
   }, []);
 
   useEffect(() => {
@@ -53,6 +55,17 @@ export default function SeekerDashboard() {
     const count = Object.values(filters).filter(v => v !== '').length;
     setActiveFiltersCount(count);
   }, [filters]);
+
+  const fetchProfileCompleteness = async () => {
+    try {
+      const response = await axios.get(`${API}/profile/completeness`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setProfileComplete(response.data.is_complete);
+    } catch (error) {
+      console.error('Failed to fetch profile completeness:', error);
+    }
+  };
 
   const fetchJobs = async (filterParams = filters) => {
     setLoading(true);
@@ -197,6 +210,18 @@ export default function SeekerDashboard() {
               <div className="text-xs text-muted-foreground">Matches</div>
             </div>
           </div>
+          {/* Quick Apply Badge */}
+          {profileComplete && (
+            <div className="glass-card rounded-2xl px-5 py-3 flex items-center gap-3 whitespace-nowrap border-success/30 bg-success/5">
+              <div className="w-10 h-10 rounded-xl bg-success/20 flex items-center justify-center">
+                <Zap className="w-5 h-5 text-success" />
+              </div>
+              <div>
+                <div className="text-sm font-bold text-success">Quick Apply</div>
+                <div className="text-xs text-muted-foreground">Profile Ready</div>
+              </div>
+            </div>
+          )}
         </div>
       </header>
 

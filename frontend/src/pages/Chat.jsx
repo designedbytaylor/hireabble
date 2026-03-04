@@ -1,12 +1,13 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Send, Briefcase, User } from 'lucide-react';
+import { ArrowLeft, Send, Briefcase, User, Wifi, WifiOff } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
+const WS_URL = process.env.REACT_APP_BACKEND_URL?.replace('https://', 'wss://').replace('http://', 'ws://');
 
 export default function Chat() {
   const { matchId } = useParams();
@@ -17,66 +18,117 @@ export default function Chat() {
   const [match, setMatch] = useState(null);
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
+  const [wsConnected, setWsConnected] = useState(false);
   const messagesEndRef = useRef(null);
-  const pollInterval = useRef(null);
+  const wsRef = useRef(null);
+  const reconnectTimeoutRef = useRef(null);
 
+  const scrollToBottom = useCallback(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, []);
+
+  // WebSocket connection
+  const connectWebSocket = useCallback(() => {
+    if (!token || wsRef.current?.readyState === WebSocket.OPEN) return;
+
+    try {
+      wsRef.current = new WebSocket(`${WS_URL}/ws/${token}`);
+
+      wsRef.current.onopen = () => {
+        console.log('WebSocket connected');
+        setWsConnected(true);
+      };
+
+      wsRef.current.onclose = () => {
+        console.log('WebSocket disconnected');
+        setWsConnected(false);
+        // Reconnect after 3 seconds
+        reconnectTimeoutRef.current = setTimeout(connectWebSocket, 3000);
+      };
+
+      wsRef.current.onerror = (error) => {
+        console.error('WebSocket error:', error);
+      };
+
+      wsRef.current.onmessage = (event) => {
+        const data = JSON.parse(event.data);
+        
+        if (data.type === 'new_message' && data.message.match_id === matchId) {
+          setMessages(prev => [...prev, data.message]);
+          scrollToBottom();
+        } else if (data.type === 'message_sent' && data.message.match_id === matchId) {
+          setMessages(prev => [...prev, data.message]);
+          scrollToBottom();
+        }
+      };
+    } catch (error) {
+      console.error('Failed to connect WebSocket:', error);
+    }
+  }, [token, matchId, scrollToBottom]);
+
+  // Fetch initial data
   useEffect(() => {
-    fetchMatchAndMessages();
-    // Poll for new messages every 3 seconds
-    pollInterval.current = setInterval(fetchMessages, 3000);
-    return () => clearInterval(pollInterval.current);
-  }, [matchId]);
+    const fetchData = async () => {
+      try {
+        const [matchesRes, messagesRes] = await Promise.all([
+          axios.get(`${API}/matches`, { headers: { Authorization: `Bearer ${token}` } }),
+          axios.get(`${API}/messages/${matchId}`, { headers: { Authorization: `Bearer ${token}` } })
+        ]);
+        
+        const currentMatch = matchesRes.data.find(m => m.id === matchId);
+        setMatch(currentMatch);
+        setMessages(messagesRes.data);
+      } catch (error) {
+        console.error('Failed to fetch:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+    connectWebSocket();
+
+    return () => {
+      if (wsRef.current) {
+        wsRef.current.close();
+      }
+      if (reconnectTimeoutRef.current) {
+        clearTimeout(reconnectTimeoutRef.current);
+      }
+    };
+  }, [matchId, token, connectWebSocket]);
 
   useEffect(() => {
     scrollToBottom();
-  }, [messages]);
-
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  };
-
-  const fetchMatchAndMessages = async () => {
-    try {
-      const [matchesRes, messagesRes] = await Promise.all([
-        axios.get(`${API}/matches`, { headers: { Authorization: `Bearer ${token}` } }),
-        axios.get(`${API}/messages/${matchId}`, { headers: { Authorization: `Bearer ${token}` } })
-      ]);
-      
-      const currentMatch = matchesRes.data.find(m => m.id === matchId);
-      setMatch(currentMatch);
-      setMessages(messagesRes.data);
-    } catch (error) {
-      console.error('Failed to fetch:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const fetchMessages = async () => {
-    try {
-      const response = await axios.get(`${API}/messages/${matchId}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      setMessages(response.data);
-    } catch (error) {
-      console.error('Failed to fetch messages:', error);
-    }
-  };
+  }, [messages, scrollToBottom]);
 
   const handleSend = async (e) => {
     e.preventDefault();
     if (!newMessage.trim() || sending) return;
 
+    const messageContent = newMessage.trim();
+    setNewMessage('');
     setSending(true);
+
     try {
-      await axios.post(`${API}/messages`, 
-        { match_id: matchId, content: newMessage.trim() },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      setNewMessage('');
-      fetchMessages();
+      // Try WebSocket first
+      if (wsRef.current?.readyState === WebSocket.OPEN) {
+        wsRef.current.send(JSON.stringify({
+          type: 'message',
+          match_id: matchId,
+          content: messageContent
+        }));
+      } else {
+        // Fallback to HTTP
+        const response = await axios.post(`${API}/messages`, 
+          { match_id: matchId, content: messageContent },
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        setMessages(prev => [...prev, response.data]);
+      }
     } catch (error) {
       console.error('Failed to send message:', error);
+      setNewMessage(messageContent); // Restore message on error
     } finally {
       setSending(false);
     }
@@ -120,6 +172,15 @@ export default function Chat() {
             <h2 className="font-bold font-['Outfit']">{otherPerson?.name}</h2>
             <p className="text-xs text-muted-foreground">{otherPerson?.subtitle}</p>
           </div>
+        </div>
+
+        {/* Connection status */}
+        <div className={`p-2 rounded-lg ${wsConnected ? 'bg-success/10' : 'bg-muted'}`}>
+          {wsConnected ? (
+            <Wifi className="w-4 h-4 text-success" />
+          ) : (
+            <WifiOff className="w-4 h-4 text-muted-foreground" />
+          )}
         </div>
       </header>
 

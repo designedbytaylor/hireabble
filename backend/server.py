@@ -1,6 +1,7 @@
-from fastapi import FastAPI, APIRouter, HTTPException, Depends, status, UploadFile, File
+from fastapi import FastAPI, APIRouter, HTTPException, Depends, status, UploadFile, File, WebSocket, WebSocketDisconnect
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.staticfiles import StaticFiles
+from fastapi.responses import StreamingResponse
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
@@ -8,12 +9,25 @@ import os
 import logging
 from pathlib import Path
 from pydantic import BaseModel, Field, ConfigDict, EmailStr
-from typing import List, Optional
+from typing import List, Optional, Dict
 import uuid
 from datetime import datetime, timezone, timedelta
 import jwt
 import bcrypt
-import base64
+import asyncio
+import json
+import io
+
+# PDF Generation
+from reportlab.lib.pagesizes import letter
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.units import inch
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+from reportlab.lib import colors
+from reportlab.lib.enums import TA_CENTER, TA_LEFT
+
+# Email
+import resend
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -32,6 +46,12 @@ JWT_SECRET = os.environ.get('JWT_SECRET', 'jobswipe_secret_key_2024')
 JWT_ALGORITHM = "HS256"
 JWT_EXPIRATION_HOURS = 24
 
+# Email Configuration
+RESEND_API_KEY = os.environ.get('RESEND_API_KEY')
+SENDER_EMAIL = os.environ.get('SENDER_EMAIL', 'onboarding@resend.dev')
+if RESEND_API_KEY:
+    resend.api_key = RESEND_API_KEY
+
 # Create the main app
 app = FastAPI(title="Hireabble API")
 
@@ -41,6 +61,34 @@ app.mount("/uploads", StaticFiles(directory=str(UPLOADS_DIR)), name="uploads")
 # Create a router with the /api prefix
 api_router = APIRouter(prefix="/api")
 security = HTTPBearer()
+
+# WebSocket connection manager
+class ConnectionManager:
+    def __init__(self):
+        self.active_connections: Dict[str, List[WebSocket]] = {}
+    
+    async def connect(self, websocket: WebSocket, user_id: str):
+        await websocket.accept()
+        if user_id not in self.active_connections:
+            self.active_connections[user_id] = []
+        self.active_connections[user_id].append(websocket)
+    
+    def disconnect(self, websocket: WebSocket, user_id: str):
+        if user_id in self.active_connections:
+            if websocket in self.active_connections[user_id]:
+                self.active_connections[user_id].remove(websocket)
+            if not self.active_connections[user_id]:
+                del self.active_connections[user_id]
+    
+    async def send_to_user(self, user_id: str, message: dict):
+        if user_id in self.active_connections:
+            for connection in self.active_connections[user_id]:
+                try:
+                    await connection.send_json(message)
+                except:
+                    pass
+
+manager = ConnectionManager()
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -494,7 +542,7 @@ async def respond_to_application(response: RecruiterAction, current_user: dict =
         {"$set": {"recruiter_action": response.action, "is_matched": is_matched}}
     )
     
-    # If matched, create a match record
+    # If matched, create a match record and send notifications
     if is_matched:
         job = await db.jobs.find_one({"id": application["job_id"]}, {"_id": 0})
         match_doc = {
@@ -511,6 +559,26 @@ async def respond_to_application(response: RecruiterAction, current_user: dict =
             "created_at": datetime.now(timezone.utc).isoformat()
         }
         await db.matches.insert_one(match_doc)
+        
+        # Send WebSocket notification to seeker
+        await manager.send_to_user(application["seeker_id"], {
+            "type": "new_match",
+            "match": {k: v for k, v in match_doc.items() if k != "_id"}
+        })
+        
+        # Send email notification to seeker
+        seeker = await db.users.find_one({"id": application["seeker_id"]}, {"_id": 0, "email": 1})
+        if seeker and seeker.get("email"):
+            asyncio.create_task(send_email_notification(
+                seeker["email"],
+                f"You matched with {job['company'] if job else 'a company'} on Hireabble!",
+                get_match_email_html(
+                    job["title"] if job else "Unknown",
+                    job["company"] if job else "Unknown",
+                    current_user["name"],
+                    is_seeker=True
+                )
+            ))
     
     return {"message": "Response recorded", "is_matched": is_matched}
 
@@ -708,6 +776,329 @@ async def get_unread_count(current_user: dict = Depends(get_current_user)):
     })
     
     return {"unread_count": unread_count}
+
+# ==================== EMAIL HELPERS ====================
+
+async def send_email_notification(to_email: str, subject: str, html_content: str):
+    """Send email notification asynchronously"""
+    if not RESEND_API_KEY:
+        logger.warning("RESEND_API_KEY not configured, skipping email")
+        return None
+    
+    try:
+        params = {
+            "from": SENDER_EMAIL,
+            "to": [to_email],
+            "subject": subject,
+            "html": html_content
+        }
+        result = await asyncio.to_thread(resend.Emails.send, params)
+        logger.info(f"Email sent to {to_email}: {result.get('id')}")
+        return result
+    except Exception as e:
+        logger.error(f"Failed to send email to {to_email}: {str(e)}")
+        return None
+
+def get_match_email_html(job_title: str, company: str, other_name: str, is_seeker: bool):
+    """Generate match notification email HTML"""
+    if is_seeker:
+        message = f"Great news! {company} has accepted your application for <strong>{job_title}</strong>."
+        cta = "Log in to Hireabble to start chatting with the recruiter."
+    else:
+        message = f"<strong>{other_name}</strong> has matched with your job posting for <strong>{job_title}</strong>."
+        cta = "Log in to Hireabble to view their profile and start a conversation."
+    
+    return f"""
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+        <div style="text-align: center; margin-bottom: 30px;">
+            <h1 style="color: #6366f1; margin: 0;">Hireabble</h1>
+        </div>
+        <div style="background: linear-gradient(135deg, #6366f1 0%, #d946ef 100%); padding: 30px; border-radius: 16px; text-align: center; color: white;">
+            <h2 style="margin: 0 0 10px 0;">It's a Match! 🎉</h2>
+            <p style="margin: 0; font-size: 18px;">{message}</p>
+        </div>
+        <div style="padding: 30px 0; text-align: center;">
+            <p style="color: #666; font-size: 16px;">{cta}</p>
+            <a href="https://hireabble.com/matches" style="display: inline-block; background: #6366f1; color: white; padding: 12px 30px; border-radius: 25px; text-decoration: none; font-weight: bold; margin-top: 15px;">View Match</a>
+        </div>
+        <div style="border-top: 1px solid #eee; padding-top: 20px; text-align: center; color: #999; font-size: 12px;">
+            <p>You received this email because you have notifications enabled on Hireabble.</p>
+        </div>
+    </div>
+    """
+
+def get_message_email_html(sender_name: str, message_preview: str, job_title: str):
+    """Generate new message notification email HTML"""
+    return f"""
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+        <div style="text-align: center; margin-bottom: 30px;">
+            <h1 style="color: #6366f1; margin: 0;">Hireabble</h1>
+        </div>
+        <div style="background: #f8f9fa; padding: 25px; border-radius: 16px; border-left: 4px solid #6366f1;">
+            <h3 style="margin: 0 0 10px 0; color: #333;">New message from {sender_name}</h3>
+            <p style="margin: 0 0 15px 0; color: #666; font-size: 14px;">Regarding: {job_title}</p>
+            <p style="margin: 0; color: #333; font-style: italic;">"{message_preview[:150]}{'...' if len(message_preview) > 150 else ''}"</p>
+        </div>
+        <div style="padding: 25px 0; text-align: center;">
+            <a href="https://hireabble.com/matches" style="display: inline-block; background: #6366f1; color: white; padding: 12px 30px; border-radius: 25px; text-decoration: none; font-weight: bold;">Reply Now</a>
+        </div>
+        <div style="border-top: 1px solid #eee; padding-top: 20px; text-align: center; color: #999; font-size: 12px;">
+            <p>You received this email because you have notifications enabled on Hireabble.</p>
+        </div>
+    </div>
+    """
+
+# ==================== PDF RESUME GENERATION ====================
+
+@api_router.get("/resume/download")
+async def download_resume(current_user: dict = Depends(get_current_user)):
+    """Generate and download PDF resume for job seeker"""
+    if current_user["role"] != "seeker":
+        raise HTTPException(status_code=403, detail="Only job seekers can download resumes")
+    
+    # Create PDF buffer
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=letter, rightMargin=0.75*inch, leftMargin=0.75*inch, topMargin=0.75*inch, bottomMargin=0.75*inch)
+    
+    # Styles
+    styles = getSampleStyleSheet()
+    title_style = ParagraphStyle('Title', parent=styles['Heading1'], fontSize=24, textColor=colors.HexColor('#6366f1'), alignment=TA_CENTER, spaceAfter=6)
+    subtitle_style = ParagraphStyle('Subtitle', parent=styles['Normal'], fontSize=12, textColor=colors.gray, alignment=TA_CENTER, spaceAfter=20)
+    section_style = ParagraphStyle('Section', parent=styles['Heading2'], fontSize=14, textColor=colors.HexColor('#6366f1'), spaceBefore=15, spaceAfter=8, borderPadding=(0, 0, 3, 0))
+    body_style = ParagraphStyle('Body', parent=styles['Normal'], fontSize=11, textColor=colors.black, spaceAfter=6)
+    
+    elements = []
+    
+    # Header - Name and Title
+    elements.append(Paragraph(current_user.get("name", ""), title_style))
+    
+    title_parts = []
+    if current_user.get("title"):
+        title_parts.append(current_user["title"])
+    if current_user.get("location"):
+        title_parts.append(current_user["location"])
+    if title_parts:
+        elements.append(Paragraph(" | ".join(title_parts), subtitle_style))
+    
+    # Contact
+    contact_info = []
+    if current_user.get("email"):
+        contact_info.append(current_user["email"])
+    if contact_info:
+        elements.append(Paragraph(" • ".join(contact_info), ParagraphStyle('Contact', parent=styles['Normal'], fontSize=10, alignment=TA_CENTER, spaceAfter=20)))
+    
+    elements.append(Spacer(1, 10))
+    
+    # Professional Summary / Bio
+    if current_user.get("bio"):
+        elements.append(Paragraph("PROFESSIONAL SUMMARY", section_style))
+        elements.append(Paragraph(current_user["bio"], body_style))
+    
+    # Experience
+    if current_user.get("current_employer") or current_user.get("previous_employers"):
+        elements.append(Paragraph("EXPERIENCE", section_style))
+        if current_user.get("current_employer"):
+            exp_years = current_user.get("experience_years", "")
+            exp_text = f"<b>Current:</b> {current_user['current_employer']}"
+            if exp_years:
+                exp_text += f" ({exp_years}+ years)"
+            elements.append(Paragraph(exp_text, body_style))
+        if current_user.get("previous_employers"):
+            for employer in current_user["previous_employers"]:
+                elements.append(Paragraph(f"• {employer}", body_style))
+    
+    # Education
+    if current_user.get("school") or current_user.get("degree"):
+        elements.append(Paragraph("EDUCATION", section_style))
+        edu_text = ""
+        if current_user.get("degree"):
+            degree_map = {
+                "high_school": "High School Diploma",
+                "some_college": "Some College",
+                "associates": "Associate's Degree",
+                "bachelors": "Bachelor's Degree",
+                "masters": "Master's Degree",
+                "phd": "PhD / Doctorate",
+                "bootcamp": "Professional Certification",
+                "self_taught": "Self-Taught",
+                "no_degree": ""
+            }
+            edu_text = degree_map.get(current_user["degree"], current_user["degree"])
+        if current_user.get("school"):
+            if edu_text:
+                edu_text += f" - {current_user['school']}"
+            else:
+                edu_text = current_user["school"]
+        if edu_text:
+            elements.append(Paragraph(edu_text, body_style))
+    
+    # Skills
+    if current_user.get("skills"):
+        elements.append(Paragraph("SKILLS", section_style))
+        skills_text = " • ".join(current_user["skills"])
+        elements.append(Paragraph(skills_text, body_style))
+    
+    # Certifications
+    if current_user.get("certifications"):
+        elements.append(Paragraph("CERTIFICATIONS", section_style))
+        for cert in current_user["certifications"]:
+            elements.append(Paragraph(f"• {cert}", body_style))
+    
+    # Preferences
+    prefs = []
+    if current_user.get("work_preference"):
+        pref_map = {"remote": "Remote", "onsite": "On-site", "hybrid": "Hybrid", "flexible": "Flexible"}
+        prefs.append(f"Work Style: {pref_map.get(current_user['work_preference'], current_user['work_preference'])}")
+    if current_user.get("available_immediately"):
+        prefs.append("Available Immediately")
+    if prefs:
+        elements.append(Paragraph("PREFERENCES", section_style))
+        elements.append(Paragraph(" | ".join(prefs), body_style))
+    
+    # Build PDF
+    doc.build(elements)
+    buffer.seek(0)
+    
+    # Generate filename
+    filename = f"{current_user.get('name', 'resume').replace(' ', '_')}_Resume.pdf"
+    
+    return StreamingResponse(
+        buffer,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )
+
+# ==================== PROFILE COMPLETENESS ====================
+
+@api_router.get("/profile/completeness")
+async def get_profile_completeness(current_user: dict = Depends(get_current_user)):
+    """Calculate profile completeness percentage"""
+    if current_user["role"] != "seeker":
+        return {"percentage": 100, "missing_fields": []}
+    
+    # Define fields and their weights
+    fields = {
+        "photo_url": {"weight": 15, "label": "Profile Photo"},
+        "title": {"weight": 20, "label": "Job Title"},
+        "experience_years": {"weight": 15, "label": "Years of Experience"},
+        "current_employer": {"weight": 10, "label": "Current Employer"},
+        "school": {"weight": 10, "label": "Education"},
+        "skills": {"weight": 20, "label": "Skills"},
+        "location": {"weight": 10, "label": "Location"},
+    }
+    
+    total = 0
+    missing = []
+    
+    for field, info in fields.items():
+        value = current_user.get(field)
+        if value and (not isinstance(value, list) or len(value) > 0):
+            total += info["weight"]
+        else:
+            missing.append(info["label"])
+    
+    return {
+        "percentage": total,
+        "missing_fields": missing,
+        "is_complete": total >= 80
+    }
+
+# ==================== WEBSOCKET ====================
+
+@app.websocket("/ws/{token}")
+async def websocket_endpoint(websocket: WebSocket, token: str):
+    """WebSocket endpoint for real-time messaging"""
+    try:
+        # Verify token
+        payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+        user_id = payload.get("user_id")
+        if not user_id:
+            await websocket.close(code=4001)
+            return
+        
+        await manager.connect(websocket, user_id)
+        logger.info(f"WebSocket connected for user {user_id}")
+        
+        try:
+            while True:
+                # Keep connection alive and handle incoming messages
+                data = await websocket.receive_text()
+                message_data = json.loads(data)
+                
+                if message_data.get("type") == "ping":
+                    await websocket.send_json({"type": "pong"})
+                elif message_data.get("type") == "message":
+                    # Handle new message
+                    match_id = message_data.get("match_id")
+                    content = message_data.get("content")
+                    
+                    if not match_id or not content:
+                        continue
+                    
+                    # Verify match and get recipient
+                    match = await db.matches.find_one({"id": match_id})
+                    if not match or user_id not in [match["seeker_id"], match["recruiter_id"]]:
+                        continue
+                    
+                    # Get sender info
+                    sender = await db.users.find_one({"id": user_id}, {"_id": 0, "name": 1, "avatar": 1, "photo_url": 1})
+                    
+                    # Create message
+                    message_id = str(uuid.uuid4())
+                    message_doc = {
+                        "id": message_id,
+                        "match_id": match_id,
+                        "sender_id": user_id,
+                        "sender_name": sender.get("name", "Unknown"),
+                        "sender_avatar": sender.get("photo_url") or sender.get("avatar"),
+                        "content": content,
+                        "created_at": datetime.now(timezone.utc).isoformat(),
+                        "is_read": False
+                    }
+                    await db.messages.insert_one(message_doc)
+                    
+                    # Update match last_message
+                    await db.matches.update_one(
+                        {"id": match_id},
+                        {"$set": {
+                            "last_message": content[:100],
+                            "last_message_at": message_doc["created_at"],
+                            "last_message_sender": user_id
+                        }}
+                    )
+                    
+                    # Get recipient ID
+                    recipient_id = match["recruiter_id"] if user_id == match["seeker_id"] else match["seeker_id"]
+                    
+                    # Send to recipient via WebSocket
+                    await manager.send_to_user(recipient_id, {
+                        "type": "new_message",
+                        "message": {k: v for k, v in message_doc.items() if k != "_id"}
+                    })
+                    
+                    # Send confirmation to sender
+                    await websocket.send_json({
+                        "type": "message_sent",
+                        "message": {k: v for k, v in message_doc.items() if k != "_id"}
+                    })
+                    
+                    # Send email notification (non-blocking)
+                    recipient = await db.users.find_one({"id": recipient_id}, {"_id": 0, "email": 1, "name": 1})
+                    if recipient and recipient.get("email"):
+                        asyncio.create_task(send_email_notification(
+                            recipient["email"],
+                            f"New message from {sender.get('name', 'Someone')} on Hireabble",
+                            get_message_email_html(sender.get("name", "Someone"), content, match.get("job_title", "your match"))
+                        ))
+                        
+        except WebSocketDisconnect:
+            manager.disconnect(websocket, user_id)
+            logger.info(f"WebSocket disconnected for user {user_id}")
+    except jwt.InvalidTokenError:
+        await websocket.close(code=4001)
+    except Exception as e:
+        logger.error(f"WebSocket error: {str(e)}")
+        await websocket.close(code=4000)
 
 # Root endpoint
 @api_router.get("/")
