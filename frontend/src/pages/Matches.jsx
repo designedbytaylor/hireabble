@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Heart, MessageCircle, Briefcase, Building2, Calendar } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Heart, MessageCircle, Briefcase, Building2, Calendar, ChevronRight } from 'lucide-react';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import Navigation from '../components/Navigation';
@@ -7,6 +8,7 @@ import Navigation from '../components/Navigation';
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
 export default function Matches() {
+  const navigate = useNavigate();
   const { user, token } = useAuth();
   const [matches, setMatches] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -26,6 +28,10 @@ export default function Matches() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleOpenChat = (matchId) => {
+    navigate(`/chat/${matchId}`);
   };
 
   if (loading) {
@@ -58,7 +64,8 @@ export default function Matches() {
               {matches.map((match) => (
                 <div 
                   key={match.id}
-                  className="glass-card rounded-2xl p-5 hover:border-primary/30 transition-colors"
+                  onClick={() => handleOpenChat(match.id)}
+                  className="glass-card rounded-2xl p-5 hover:border-primary/30 transition-colors cursor-pointer"
                   data-testid={`match-${match.id}`}
                 >
                   <div className="flex items-start gap-4">
@@ -81,7 +88,7 @@ export default function Matches() {
                     </div>
 
                     {/* Match Info */}
-                    <div className="flex-1">
+                    <div className="flex-1 min-w-0">
                       {user?.role === 'seeker' ? (
                         <>
                           <h3 className="font-bold font-['Outfit'] text-lg">{match.job_title}</h3>
@@ -93,6 +100,14 @@ export default function Matches() {
                           <p className="text-muted-foreground text-sm">Applied for: {match.job_title}</p>
                         </>
                       )}
+                      
+                      {/* Last message preview */}
+                      {match.last_message && (
+                        <p className="text-sm text-muted-foreground mt-2 truncate">
+                          {match.last_message_sender === user?.id ? 'You: ' : ''}{match.last_message}
+                        </p>
+                      )}
+                      
                       <div className="flex items-center gap-2 mt-2 text-xs text-muted-foreground">
                         <Calendar className="w-3 h-3" />
                         Matched {new Date(match.created_at).toLocaleDateString()}
@@ -100,12 +115,12 @@ export default function Matches() {
                     </div>
 
                     {/* Action */}
-                    <button 
-                      className="p-3 rounded-xl bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
-                      data-testid={`message-${match.id}`}
-                    >
-                      <MessageCircle className="w-5 h-5" />
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <div className="p-3 rounded-xl bg-primary/10 text-primary">
+                        <MessageCircle className="w-5 h-5" />
+                      </div>
+                      <ChevronRight className="w-5 h-5 text-muted-foreground" />
+                    </div>
                   </div>
                 </div>
               ))}

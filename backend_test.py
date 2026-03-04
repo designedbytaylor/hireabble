@@ -576,6 +576,182 @@ class HireabbleAPITester:
             print("   ✅ All required candidate profile fields present")
             return True
 
+    def test_photo_upload(self):
+        """Test photo upload endpoint"""
+        if not self.seeker_token:
+            print("❌ No seeker token available for photo upload")
+            return False
+            
+        print("⚠️  Photo upload test requires actual file - testing endpoint availability")
+        
+        # Test with invalid content type to check endpoint exists
+        headers = {"Authorization": f"Bearer {self.seeker_token}"}
+        
+        # We can't easily test file upload in this simple test, but we can test the endpoint exists
+        # by making a request without a file to get a 422 (validation error)
+        try:
+            import requests
+            url = f"{self.base_url}/upload/photo"
+            response = requests.post(url, headers=headers, timeout=10)
+            
+            # Endpoint should return 422 for missing file parameter
+            if response.status_code == 422:
+                print("✅ Photo upload endpoint exists and validates input")
+                self.tests_run += 1
+                self.tests_passed += 1
+                return True
+            else:
+                print(f"❌ Unexpected response code: {response.status_code}")
+                self.tests_run += 1
+                return False
+        except Exception as e:
+            print(f"❌ Photo upload endpoint test failed: {str(e)}")
+            self.tests_run += 1
+            return False
+
+    def test_job_filtering(self):
+        """Test job filtering with query parameters"""
+        if not self.seeker_token:
+            print("❌ No seeker token available for job filtering")
+            return False
+            
+        headers = {"Authorization": f"Bearer {self.seeker_token}"}
+        
+        # Test filtering by job type
+        success1, response1 = self.run_test(
+            "Job Filtering - Job Type",
+            "GET",
+            "jobs?job_type=remote",
+            200,
+            headers=headers
+        )
+        
+        # Test filtering by experience level
+        success2, response2 = self.run_test(
+            "Job Filtering - Experience Level",
+            "GET", 
+            "jobs?experience_level=senior",
+            200,
+            headers=headers
+        )
+        
+        # Test filtering by salary
+        success3, response3 = self.run_test(
+            "Job Filtering - Salary Min",
+            "GET",
+            "jobs?salary_min=100000",
+            200,
+            headers=headers
+        )
+        
+        # Test filtering by location
+        success4, response4 = self.run_test(
+            "Job Filtering - Location", 
+            "GET",
+            "jobs?location=San Francisco",
+            200,
+            headers=headers
+        )
+        
+        # Test multiple filters
+        success5, response5 = self.run_test(
+            "Job Filtering - Multiple Filters",
+            "GET",
+            "jobs?job_type=remote&experience_level=senior&salary_min=120000",
+            200,
+            headers=headers
+        )
+        
+        return success1 and success2 and success3 and success4 and success5
+
+    def test_messaging_endpoints(self):
+        """Test messaging functionality"""
+        if not self.seeker_token or not self.recruiter_token:
+            print("❌ Need both seeker and recruiter tokens for messaging test")
+            return False
+        
+        # First we need to create a match to test messaging
+        # This requires accepting an application
+        recruiter_headers = {"Authorization": f"Bearer {self.recruiter_token}"}
+        
+        # Get recruiter applications to find one to accept
+        success, applications = self.run_test(
+            "Get Recruiter Applications for Messaging",
+            "GET",
+            "applications",
+            200,
+            headers=recruiter_headers
+        )
+        
+        if not success or len(applications) == 0:
+            print("   ⚠️  No applications available for messaging test")
+            return True  # Not a failure, just no data to test with
+            
+        # Accept the first application to create a match
+        app_id = applications[0]['id']
+        success, response = self.run_test(
+            "Accept Application to Create Match",
+            "POST",
+            "applications/respond", 
+            200,
+            {"application_id": app_id, "action": "accept"},
+            recruiter_headers
+        )
+        
+        if not success:
+            print("❌ Failed to create match for messaging test")
+            return False
+            
+        # Get matches to find the match ID
+        seeker_headers = {"Authorization": f"Bearer {self.seeker_token}"}
+        success, matches = self.run_test(
+            "Get Matches for Messaging",
+            "GET",
+            "matches",
+            200,
+            headers=seeker_headers
+        )
+        
+        if not success or len(matches) == 0:
+            print("❌ No matches found for messaging test")
+            return False
+            
+        match_id = matches[0]['id']
+        
+        # Test sending a message
+        success1, message_response = self.run_test(
+            "Send Message",
+            "POST",
+            "messages",
+            200,
+            {"match_id": match_id, "content": "Hello! Test message from seeker."},
+            seeker_headers
+        )
+        
+        # Test getting messages for the match
+        success2, messages = self.run_test(
+            "Get Messages",
+            "GET",
+            f"messages/{match_id}",
+            200,
+            headers=seeker_headers
+        )
+        
+        # Test unread message count
+        success3, unread_count = self.run_test(
+            "Get Unread Message Count",
+            "GET",
+            "messages/unread/count",
+            200,
+            headers=recruiter_headers  # Check from recruiter side
+        )
+        
+        if success1 and success2 and success3:
+            print(f"   ✅ Found {len(messages)} messages in conversation")
+            print(f"   ✅ Recruiter has {unread_count.get('unread_count', 0)} unread messages")
+            
+        return success1 and success2 and success3
+
 def main():
     print("🚀 Starting Hireabble API Test Suite")
     print("=" * 50)
@@ -594,6 +770,7 @@ def main():
         ("Job Creation", tester.test_job_creation),
         ("Get Jobs (Seeker)", tester.test_get_jobs_for_seeker),
         ("Get Jobs (Recruiter)", tester.test_get_recruiter_jobs),
+        ("Job Filtering", tester.test_job_filtering),
         ("Job Editing", tester.test_job_editing),
         ("Job Deletion", tester.test_job_deletion),
         ("Swipe Functionality", tester.test_swipe_functionality),
@@ -601,6 +778,8 @@ def main():
         ("Candidate Profile Fields", tester.test_candidate_profile_fields),
         ("Stats", tester.test_stats_endpoints),
         ("Matches", tester.test_matches_endpoint),
+        ("Messaging", tester.test_messaging_endpoints),
+        ("Photo Upload", tester.test_photo_upload),
         ("Profile Update", tester.test_profile_update)
     ]
     

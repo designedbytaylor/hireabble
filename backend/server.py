@@ -1,5 +1,6 @@
-from fastapi import FastAPI, APIRouter, HTTPException, Depends, status
+from fastapi import FastAPI, APIRouter, HTTPException, Depends, status, UploadFile, File
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi.staticfiles import StaticFiles
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
@@ -12,9 +13,14 @@ import uuid
 from datetime import datetime, timezone, timedelta
 import jwt
 import bcrypt
+import base64
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
+
+# Create uploads directory
+UPLOADS_DIR = ROOT_DIR / "uploads"
+UPLOADS_DIR.mkdir(exist_ok=True)
 
 # MongoDB connection
 mongo_url = os.environ['MONGO_URL']
@@ -27,7 +33,10 @@ JWT_ALGORITHM = "HS256"
 JWT_EXPIRATION_HOURS = 24
 
 # Create the main app
-app = FastAPI(title="JobSwipe API")
+app = FastAPI(title="Hireabble API")
+
+# Mount static files for uploads
+app.mount("/uploads", StaticFiles(directory=str(UPLOADS_DIR)), name="uploads")
 
 # Create a router with the /api prefix
 api_router = APIRouter(prefix="/api")
@@ -297,8 +306,15 @@ async def create_job(job: JobCreate, current_user: dict = Depends(get_current_us
     return {k: v for k, v in job_doc.items() if k != "_id"}
 
 @api_router.get("/jobs", response_model=List[JobResponse])
-async def get_jobs(current_user: dict = Depends(get_current_user)):
-    """Get jobs for job seekers (excluding already swiped jobs)"""
+async def get_jobs(
+    current_user: dict = Depends(get_current_user),
+    job_type: Optional[str] = None,
+    experience_level: Optional[str] = None,
+    salary_min: Optional[int] = None,
+    salary_max: Optional[int] = None,
+    location: Optional[str] = None
+):
+    """Get jobs for job seekers (excluding already swiped jobs) with optional filters"""
     if current_user["role"] != "seeker":
         raise HTTPException(status_code=403, detail="This endpoint is for job seekers")
     
@@ -306,10 +322,23 @@ async def get_jobs(current_user: dict = Depends(get_current_user)):
     swiped = await db.applications.find({"seeker_id": current_user["id"]}, {"job_id": 1}).to_list(1000)
     swiped_job_ids = [s["job_id"] for s in swiped]
     
-    # Get active jobs not yet swiped
+    # Build query with filters
     query = {"is_active": True}
     if swiped_job_ids:
         query["id"] = {"$nin": swiped_job_ids}
+    
+    # Apply filters
+    if job_type:
+        query["job_type"] = job_type
+    if experience_level:
+        query["experience_level"] = experience_level
+    if salary_min:
+        query["$or"] = [
+            {"salary_max": {"$gte": salary_min}},
+            {"salary_min": {"$gte": salary_min}}
+        ]
+    if location:
+        query["location"] = {"$regex": location, "$options": "i"}
     
     jobs = await db.jobs.find(query, {"_id": 0}).sort("created_at", -1).to_list(50)
     return jobs
@@ -552,6 +581,133 @@ async def get_user_profile(user_id: str, current_user: dict = Depends(get_curren
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     return user
+
+# ==================== PHOTO UPLOAD ====================
+
+@api_router.post("/upload/photo")
+async def upload_photo(file: UploadFile = File(...), current_user: dict = Depends(get_current_user)):
+    """Upload a profile photo"""
+    # Validate file type
+    if not file.content_type.startswith('image/'):
+        raise HTTPException(status_code=400, detail="File must be an image")
+    
+    # Limit file size (5MB)
+    contents = await file.read()
+    if len(contents) > 5 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="File size must be less than 5MB")
+    
+    # Generate unique filename
+    ext = file.filename.split('.')[-1] if '.' in file.filename else 'jpg'
+    filename = f"{current_user['id']}_{uuid.uuid4().hex[:8]}.{ext}"
+    filepath = UPLOADS_DIR / filename
+    
+    # Save file
+    with open(filepath, "wb") as f:
+        f.write(contents)
+    
+    # Update user's photo_url
+    photo_url = f"/uploads/{filename}"
+    await db.users.update_one({"id": current_user["id"]}, {"$set": {"photo_url": photo_url}})
+    
+    return {"photo_url": photo_url, "message": "Photo uploaded successfully"}
+
+# ==================== MESSAGING ====================
+
+class MessageCreate(BaseModel):
+    match_id: str
+    content: str
+
+class MessageResponse(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str
+    match_id: str
+    sender_id: str
+    sender_name: str
+    sender_avatar: Optional[str] = None
+    content: str
+    created_at: str
+    is_read: bool = False
+
+@api_router.post("/messages")
+async def send_message(message: MessageCreate, current_user: dict = Depends(get_current_user)):
+    """Send a message in a match conversation"""
+    # Verify match exists and user is part of it
+    match = await db.matches.find_one({"id": message.match_id})
+    if not match:
+        raise HTTPException(status_code=404, detail="Match not found")
+    
+    if current_user["id"] not in [match["seeker_id"], match["recruiter_id"]]:
+        raise HTTPException(status_code=403, detail="Not authorized to message in this match")
+    
+    message_id = str(uuid.uuid4())
+    message_doc = {
+        "id": message_id,
+        "match_id": message.match_id,
+        "sender_id": current_user["id"],
+        "sender_name": current_user["name"],
+        "sender_avatar": current_user.get("photo_url") or current_user.get("avatar"),
+        "content": message.content,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "is_read": False
+    }
+    
+    await db.messages.insert_one(message_doc)
+    
+    # Update last_message on match for preview
+    await db.matches.update_one(
+        {"id": message.match_id},
+        {"$set": {
+            "last_message": message.content[:100],
+            "last_message_at": message_doc["created_at"],
+            "last_message_sender": current_user["id"]
+        }}
+    )
+    
+    return {k: v for k, v in message_doc.items() if k != "_id"}
+
+@api_router.get("/messages/{match_id}", response_model=List[MessageResponse])
+async def get_messages(match_id: str, current_user: dict = Depends(get_current_user)):
+    """Get all messages for a match conversation"""
+    # Verify match exists and user is part of it
+    match = await db.matches.find_one({"id": match_id})
+    if not match:
+        raise HTTPException(status_code=404, detail="Match not found")
+    
+    if current_user["id"] not in [match["seeker_id"], match["recruiter_id"]]:
+        raise HTTPException(status_code=403, detail="Not authorized")
+    
+    messages = await db.messages.find({"match_id": match_id}, {"_id": 0}).sort("created_at", 1).to_list(500)
+    
+    # Mark messages as read
+    await db.messages.update_many(
+        {"match_id": match_id, "sender_id": {"$ne": current_user["id"]}, "is_read": False},
+        {"$set": {"is_read": True}}
+    )
+    
+    return messages
+
+@api_router.get("/messages/unread/count")
+async def get_unread_count(current_user: dict = Depends(get_current_user)):
+    """Get count of unread messages across all matches"""
+    # Get user's matches
+    if current_user["role"] == "seeker":
+        match_query = {"seeker_id": current_user["id"]}
+    else:
+        match_query = {"recruiter_id": current_user["id"]}
+    
+    matches = await db.matches.find(match_query, {"id": 1}).to_list(100)
+    match_ids = [m["id"] for m in matches]
+    
+    if not match_ids:
+        return {"unread_count": 0}
+    
+    unread_count = await db.messages.count_documents({
+        "match_id": {"$in": match_ids},
+        "sender_id": {"$ne": current_user["id"]},
+        "is_read": False
+    })
+    
+    return {"unread_count": unread_count}
 
 # Root endpoint
 @api_router.get("/")

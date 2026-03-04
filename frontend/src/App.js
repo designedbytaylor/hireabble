@@ -9,6 +9,7 @@ import SeekerDashboard from "./pages/SeekerDashboard";
 import RecruiterDashboard from "./pages/RecruiterDashboard";
 import Profile from "./pages/Profile";
 import Matches from "./pages/Matches";
+import Chat from "./pages/Chat";
 
 const ProtectedRoute = ({ children, allowedRoles }) => {
   const { user, loading } = useAuth();
@@ -130,6 +131,14 @@ function AppRoutes() {
         element={
           <ProtectedRoute>
             <Matches />
+          </ProtectedRoute>
+        } 
+      />
+      <Route 
+        path="/chat/:matchId" 
+        element={
+          <ProtectedRoute>
+            <Chat />
           </ProtectedRoute>
         } 
       />

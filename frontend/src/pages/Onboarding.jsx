@@ -1,10 +1,10 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   User, Briefcase, MapPin, GraduationCap, Building2, 
   DollarSign, Clock, ArrowRight, ArrowLeft, Camera, CheckCircle2,
-  Award, Wrench
+  Wrench, Upload, X
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -18,6 +18,10 @@ import {
 } from '../components/ui/select';
 import { toast } from 'sonner';
 import { useAuth } from '../context/AuthContext';
+import axios from 'axios';
+
+const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
+const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 
 const STEPS = [
   { id: 'photo', title: 'Your Photo', subtitle: 'Add a professional photo' },
@@ -30,10 +34,12 @@ const STEPS = [
 ];
 
 export default function Onboarding() {
-  const { user, updateProfile } = useAuth();
+  const { user, token, updateProfile } = useAuth();
   const navigate = useNavigate();
   const [currentStep, setCurrentStep] = useState(0);
   const [loading, setLoading] = useState(false);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const fileInputRef = useRef(null);
   
   const [formData, setFormData] = useState({
     photo_url: '',
@@ -53,6 +59,45 @@ export default function Onboarding() {
 
   const handleChange = (field, value) => {
     setFormData(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handlePhotoUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      toast.error('Please select an image file');
+      return;
+    }
+
+    // Validate file size (5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('Image must be less than 5MB');
+      return;
+    }
+
+    setUploadingPhoto(true);
+    try {
+      const formDataUpload = new FormData();
+      formDataUpload.append('file', file);
+
+      const response = await axios.post(`${API}/upload/photo`, formDataUpload, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'multipart/form-data'
+        }
+      });
+
+      // Construct full URL for the photo
+      const photoUrl = `${BACKEND_URL}${response.data.photo_url}`;
+      setFormData(prev => ({ ...prev, photo_url: photoUrl }));
+      toast.success('Photo uploaded!');
+    } catch (error) {
+      toast.error('Failed to upload photo');
+    } finally {
+      setUploadingPhoto(false);
+    }
   };
 
   const nextStep = () => {
@@ -169,14 +214,29 @@ export default function Onboarding() {
                   <div className="flex flex-col items-center">
                     <div className="relative mb-4">
                       {formData.photo_url ? (
-                        <img 
-                          src={formData.photo_url} 
-                          alt="Profile"
-                          className="w-32 h-32 rounded-full object-cover border-4 border-primary"
-                        />
+                        <div className="relative">
+                          <img 
+                            src={formData.photo_url} 
+                            alt="Profile"
+                            className="w-32 h-32 rounded-full object-cover border-4 border-primary"
+                          />
+                          <button
+                            onClick={() => setFormData(prev => ({ ...prev, photo_url: '' }))}
+                            className="absolute -top-2 -right-2 w-8 h-8 rounded-full bg-destructive flex items-center justify-center"
+                          >
+                            <X className="w-4 h-4 text-white" />
+                          </button>
+                        </div>
                       ) : (
-                        <div className="w-32 h-32 rounded-full bg-accent border-4 border-dashed border-border flex items-center justify-center">
-                          <Camera className="w-10 h-10 text-muted-foreground" />
+                        <div 
+                          onClick={() => fileInputRef.current?.click()}
+                          className="w-32 h-32 rounded-full bg-accent border-4 border-dashed border-border flex items-center justify-center cursor-pointer hover:border-primary/50 transition-colors"
+                        >
+                          {uploadingPhoto ? (
+                            <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                          ) : (
+                            <Camera className="w-10 h-10 text-muted-foreground" />
+                          )}
                         </div>
                       )}
                     </div>
@@ -184,17 +244,44 @@ export default function Onboarding() {
                       A professional photo helps recruiters connect with you
                     </p>
                   </div>
-                  <div className="space-y-2">
-                    <Label>Photo URL</Label>
-                    <Input
-                      placeholder="https://example.com/your-photo.jpg"
-                      value={formData.photo_url}
-                      onChange={(e) => handleChange('photo_url', e.target.value)}
-                      className="h-12 rounded-xl bg-card border-border"
-                      data-testid="photo-url-input"
-                    />
-                    <p className="text-xs text-muted-foreground">Paste a link to your professional photo</p>
+                  
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={handlePhotoUpload}
+                    className="hidden"
+                    data-testid="photo-file-input"
+                  />
+                  
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={uploadingPhoto}
+                    className="w-full h-12 rounded-xl"
+                    data-testid="upload-photo-btn"
+                  >
+                    <Upload className="w-5 h-5 mr-2" />
+                    {uploadingPhoto ? 'Uploading...' : 'Upload Photo'}
+                  </Button>
+                  
+                  <div className="relative">
+                    <div className="absolute inset-0 flex items-center">
+                      <span className="w-full border-t border-border" />
+                    </div>
+                    <div className="relative flex justify-center text-xs uppercase">
+                      <span className="bg-background px-2 text-muted-foreground">or paste URL</span>
+                    </div>
                   </div>
+                  
+                  <Input
+                    placeholder="https://example.com/your-photo.jpg"
+                    value={formData.photo_url}
+                    onChange={(e) => handleChange('photo_url', e.target.value)}
+                    className="h-12 rounded-xl bg-card border-border"
+                    data-testid="photo-url-input"
+                  />
                 </div>
               )}
 

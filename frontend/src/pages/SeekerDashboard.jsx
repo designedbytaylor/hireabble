@@ -1,11 +1,27 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence, useMotionValue, useTransform } from 'framer-motion';
-import { X, Heart, Star, Briefcase, MapPin, DollarSign, Building2, Clock, ChevronDown } from 'lucide-react';
+import { X, Heart, Star, Briefcase, MapPin, DollarSign, Building2, Clock, ChevronDown, Filter, SlidersHorizontal } from 'lucide-react';
 import { toast } from 'sonner';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import Navigation from '../components/Navigation';
 import MatchModal from '../components/MatchModal';
+import { Button } from '../components/ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '../components/ui/dialog';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '../components/ui/select';
+import { Input } from '../components/ui/input';
+import { Label } from '../components/ui/label';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -18,18 +34,41 @@ export default function SeekerDashboard() {
   const [showMatch, setShowMatch] = useState(false);
   const [matchData, setMatchData] = useState(null);
   const [expandedCard, setExpandedCard] = useState(false);
+  const [showFilters, setShowFilters] = useState(false);
+  const [filters, setFilters] = useState({
+    job_type: '',
+    experience_level: '',
+    salary_min: '',
+    location: ''
+  });
+  const [activeFiltersCount, setActiveFiltersCount] = useState(0);
 
   useEffect(() => {
     fetchJobs();
     fetchStats();
   }, []);
 
-  const fetchJobs = async () => {
+  useEffect(() => {
+    // Count active filters
+    const count = Object.values(filters).filter(v => v !== '').length;
+    setActiveFiltersCount(count);
+  }, [filters]);
+
+  const fetchJobs = async (filterParams = filters) => {
+    setLoading(true);
     try {
-      const response = await axios.get(`${API}/jobs`, {
+      const params = new URLSearchParams();
+      if (filterParams.job_type) params.append('job_type', filterParams.job_type);
+      if (filterParams.experience_level) params.append('experience_level', filterParams.experience_level);
+      if (filterParams.salary_min) params.append('salary_min', filterParams.salary_min);
+      if (filterParams.location) params.append('location', filterParams.location);
+      
+      const url = `${API}/jobs${params.toString() ? `?${params.toString()}` : ''}`;
+      const response = await axios.get(url, {
         headers: { Authorization: `Bearer ${token}` }
       });
       setJobs(response.data);
+      setCurrentIndex(0);
     } catch (error) {
       console.error('Failed to fetch jobs:', error);
     } finally {
@@ -61,7 +100,7 @@ export default function SeekerDashboard() {
       if (action === 'like') {
         toast.success('Application sent!');
       } else if (action === 'superlike') {
-        toast.success('Super Like sent! ⭐', { duration: 2000 });
+        toast.success('Super Like sent!', { duration: 2000 });
       }
       
       setCurrentIndex(prev => prev + 1);
@@ -69,6 +108,18 @@ export default function SeekerDashboard() {
     } catch (error) {
       toast.error(error.response?.data?.detail || 'Failed to submit');
     }
+  };
+
+  const handleApplyFilters = () => {
+    fetchJobs(filters);
+    setShowFilters(false);
+  };
+
+  const handleClearFilters = () => {
+    const clearedFilters = { job_type: '', experience_level: '', salary_min: '', location: '' };
+    setFilters(clearedFilters);
+    fetchJobs(clearedFilters);
+    setShowFilters(false);
   };
 
   const currentJob = jobs[currentIndex];
@@ -96,11 +147,23 @@ export default function SeekerDashboard() {
             <h1 className="text-2xl font-bold font-['Outfit']">Hi, {user?.name?.split(' ')[0]}!</h1>
             <p className="text-muted-foreground">Find your dream job</p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setShowFilters(true)}
+              className="relative p-2 rounded-xl hover:bg-accent transition-colors"
+              data-testid="filter-btn"
+            >
+              <SlidersHorizontal className="w-5 h-5" />
+              {activeFiltersCount > 0 && (
+                <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-primary text-xs flex items-center justify-center">
+                  {activeFiltersCount}
+                </span>
+              )}
+            </button>
             <img 
-              src={user?.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user?.id}`}
+              src={user?.photo_url || user?.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user?.id}`}
               alt="Avatar"
-              className="w-10 h-10 rounded-full border-2 border-primary"
+              className="w-10 h-10 rounded-full border-2 border-primary object-cover"
             />
           </div>
         </div>
@@ -198,22 +261,127 @@ export default function SeekerDashboard() {
               </div>
               <h2 className="text-2xl font-bold font-['Outfit'] mb-3">No More Jobs</h2>
               <p className="text-muted-foreground mb-6">
-                You've seen all available jobs. Check back later for new opportunities!
+                {activeFiltersCount > 0 
+                  ? "No jobs match your filters. Try adjusting them."
+                  : "You've seen all available jobs. Check back later!"}
               </p>
-              <button 
-                onClick={() => {
-                  setCurrentIndex(0);
-                  fetchJobs();
-                }}
-                className="px-6 py-3 rounded-full bg-gradient-to-r from-primary to-secondary text-white font-medium"
-                data-testid="refresh-jobs-btn"
-              >
-                Refresh Jobs
-              </button>
+              <div className="flex gap-3">
+                {activeFiltersCount > 0 && (
+                  <Button 
+                    variant="outline"
+                    onClick={handleClearFilters}
+                    className="rounded-full"
+                  >
+                    Clear Filters
+                  </Button>
+                )}
+                <Button 
+                  onClick={() => {
+                    setCurrentIndex(0);
+                    fetchJobs();
+                  }}
+                  className="rounded-full bg-gradient-to-r from-primary to-secondary"
+                  data-testid="refresh-jobs-btn"
+                >
+                  Refresh Jobs
+                </Button>
+              </div>
             </div>
           )}
         </div>
       </main>
+
+      {/* Filter Dialog */}
+      <Dialog open={showFilters} onOpenChange={setShowFilters}>
+        <DialogContent className="max-w-md bg-card border-border">
+          <DialogHeader>
+            <DialogTitle className="font-['Outfit'] flex items-center gap-2">
+              <Filter className="w-5 h-5" />
+              Filter Jobs
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-5 py-4">
+            <div className="space-y-2">
+              <Label>Job Type</Label>
+              <Select 
+                value={filters.job_type} 
+                onValueChange={(v) => setFilters({ ...filters, job_type: v })}
+              >
+                <SelectTrigger className="h-11 rounded-xl bg-background" data-testid="filter-job-type">
+                  <SelectValue placeholder="All types" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">All types</SelectItem>
+                  <SelectItem value="remote">Remote</SelectItem>
+                  <SelectItem value="onsite">On-site</SelectItem>
+                  <SelectItem value="hybrid">Hybrid</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Experience Level</Label>
+              <Select 
+                value={filters.experience_level} 
+                onValueChange={(v) => setFilters({ ...filters, experience_level: v })}
+              >
+                <SelectTrigger className="h-11 rounded-xl bg-background" data-testid="filter-experience">
+                  <SelectValue placeholder="All levels" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">All levels</SelectItem>
+                  <SelectItem value="entry">Entry Level</SelectItem>
+                  <SelectItem value="mid">Mid Level</SelectItem>
+                  <SelectItem value="senior">Senior</SelectItem>
+                  <SelectItem value="lead">Lead / Manager</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Minimum Salary ($)</Label>
+              <Input
+                type="number"
+                placeholder="e.g., 50000"
+                value={filters.salary_min}
+                onChange={(e) => setFilters({ ...filters, salary_min: e.target.value })}
+                className="h-11 rounded-xl bg-background"
+                data-testid="filter-salary"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Location</Label>
+              <Input
+                placeholder="e.g., San Francisco, Remote"
+                value={filters.location}
+                onChange={(e) => setFilters({ ...filters, location: e.target.value })}
+                className="h-11 rounded-xl bg-background"
+                data-testid="filter-location"
+              />
+            </div>
+          </div>
+
+          <div className="flex gap-3">
+            <Button
+              variant="outline"
+              onClick={handleClearFilters}
+              className="flex-1 rounded-xl"
+              data-testid="clear-filters-btn"
+            >
+              Clear All
+            </Button>
+            <Button
+              onClick={handleApplyFilters}
+              className="flex-1 rounded-xl bg-gradient-to-r from-primary to-secondary"
+              data-testid="apply-filters-btn"
+            >
+              Apply Filters
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <Navigation />
       
@@ -297,7 +465,7 @@ function SwipeCard({ job, onSwipe, expanded, setExpanded }) {
           className="absolute top-8 left-1/2 -translate-x-1/2 px-6 py-2 rounded-full bg-secondary border-2 border-secondary font-bold text-white z-20"
           style={{ opacity: superlikeOpacity }}
         >
-          SUPER LIKE ⭐
+          SUPER LIKE
         </motion.div>
 
         {/* Content */}
