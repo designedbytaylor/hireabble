@@ -44,7 +44,7 @@ export default function Register() {
     setLoading(true);
     try {
       const user = await register(formData);
-      toast.success('Welcome to JobSwipe!');
+      toast.success('Welcome to Hireabble!');
       navigate(user.role === 'seeker' ? '/dashboard' : '/recruiter');
     } catch (error) {
       toast.error(error.response?.data?.detail || 'Registration failed');
