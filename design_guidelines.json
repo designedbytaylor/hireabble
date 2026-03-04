@@ -1,0 +1,131 @@
+{
+  "identity": {
+    "name": "JobSwipe",
+    "tone": "Electric Professionalism",
+    "aesthetic": "Neon Noir",
+    "description": "A high-energy, dark-mode-first job matching platform that blends the addictive mechanics of dating apps with the professional clarity of SaaS tools."
+  },
+  "typography": {
+    "font_family": {
+      "heading": "Outfit, sans-serif",
+      "body": "DM Sans, sans-serif",
+      "mono": "JetBrains Mono, monospace"
+    },
+    "scale": {
+      "h1": "text-4xl md:text-6xl font-bold tracking-tight",
+      "h2": "text-3xl md:text-5xl font-semibold tracking-tight",
+      "h3": "text-2xl md:text-3xl font-medium",
+      "body": "text-base md:text-lg leading-relaxed",
+      "caption": "text-sm text-muted-foreground"
+    }
+  },
+  "colors": {
+    "theme": "dark",
+    "palette": {
+      "background": "#09090b",
+      "foreground": "#fafafa",
+      "card": "#18181b",
+      "card_foreground": "#fafafa",
+      "primary": "#6366f1",
+      "primary_foreground": "#fafafa",
+      "secondary": "#d946ef",
+      "secondary_foreground": "#fafafa",
+      "destructive": "#f43f5e",
+      "destructive_foreground": "#fafafa",
+      "success": "#10b981",
+      "success_foreground": "#09090b",
+      "accent": "#27272a",
+      "accent_foreground": "#fafafa",
+      "border": "#27272a",
+      "input": "#27272a",
+      "ring": "#6366f1"
+    },
+    "gradients": {
+      "primary": "bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500",
+      "glass": "bg-black/40 backdrop-blur-xl border border-white/10",
+      "overlay": "bg-gradient-to-t from-black/90 via-black/50 to-transparent"
+    }
+  },
+  "layout": {
+    "spacing_scale": {
+      "container_padding": "p-6 md:p-8 lg:p-12",
+      "section_gap": "gap-8 md:gap-12",
+      "component_gap": "gap-4"
+    },
+    "grid_system": {
+      "dashboard": "grid grid-cols-1 md:grid-cols-12 gap-6",
+      "card_stack": "relative w-full max-w-md mx-auto aspect-[3/4]"
+    },
+    "border_radius": {
+      "card": "rounded-3xl",
+      "button": "rounded-full",
+      "input": "rounded-xl"
+    }
+  },
+  "components": {
+    "SwipeDeck": {
+      "description": "The core interaction. A stack of cards that can be swiped left/right.",
+      "requirements": [
+        "Use 'framer-motion' for physics-based gestures.",
+        "Swipe Right (Green Glow) = Apply.",
+        "Swipe Left (Red Glow) = Skip.",
+        "Swipe Up (Purple Glow) = Super Like.",
+        "Must have spring animations on release."
+      ]
+    },
+    "JobCard": {
+      "description": "A full-screen or card-sized element displaying job details.",
+      "structure": [
+        "Background Image (Office/Abstract) with heavy overlay.",
+        "Company Logo (Top Left, Circular).",
+        "Job Title (Bottom Left, Large).",
+        "Salary/Location Tags (Bottom Left, Pill-shaped).",
+        "Gradient border on active state."
+      ]
+    },
+    "MatchModal": {
+      "description": "A full-screen overlay when a match occurs.",
+      "visuals": [
+        "Confetti explosion (use 'canvas-confetti' or CSS particles).",
+        "Two avatars animating towards each other.",
+        "Neon 'It's a Match!' text."
+      ]
+    },
+    "Navigation": {
+      "description": "Mobile-style bottom bar.",
+      "style": "Floating glass pill at the bottom of the screen. Icons only on mobile, Icons + Labels on Desktop."
+    }
+  },
+  "assets": {
+    "images": {
+      "office_backgrounds": [
+        "https://images.unsplash.com/photo-1765366417031-60bc8543189c?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1NzB8MHwxfHNlYXJjaHwxfHxtb2Rlcm4lMjB0ZWNoJTIwb2ZmaWNlJTIwc3RhcnR1cCUyMGludGVyaW9yfGVufDB8fHx8MTc3MjYyOTg0OXww&ixlib=rb-4.1.0&q=85",
+        "https://images.unsplash.com/photo-1652498196118-4577d5f6abd5?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1NzB8MHwxfHNlYXJjaHwyfHxtb2Rlcm4lMjB0ZWNoJTIwb2ZmaWNlJTIwc3RhcnR1cCUyMGludGVyaW9yfGVufDB8fHx8MTc3MjYyOTg0OXww&ixlib=rb-4.1.0&q=85",
+        "https://images.unsplash.com/photo-1559310415-1e164ccd653a?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1NzB8MHwxfHNlYXJjaHwzfHxtb2Rlcm4lMjB0ZWNoJTIwb2ZmaWNlJTIwc3RhcnR1cCUyMGludGVyaW9yfGVufDB8fHx8MTc3MjYyOTg0OXww&ixlib=rb-4.1.0&q=85"
+      ],
+      "avatar_placeholder": "https://api.dicebear.com/7.x/avataaars/svg?seed=",
+      "logo_placeholder": "https://ui-avatars.com/api/?background=random&color=fff&name="
+    },
+    "icons": "Use 'lucide-react'. Key icons: Briefcase, X, Heart, Star, User, MessageCircle, Settings."
+  },
+  "instructions_to_main_agent": [
+    "CRITICAL: Install 'framer-motion' immediately using 'npm install framer-motion' or 'yarn add framer-motion'. This is essential for the swipe physics.",
+    "Implement a 'Dark Mode' toggle but default to Dark Mode.",
+    "Use the 'Outfit' font from Google Fonts for headings. Add it to index.html or import in CSS.",
+    "Use 'DM Sans' for body text.",
+    "For the Swipe Deck, use a library like 'react-tinder-card' OR build a custom one using 'framer-motion' (Preferred for control).",
+    "Ensure the 'JobCard' has a 'data-testid=\"job-card\"' attribute.",
+    "The 'Super Like' button should trigger a special animation (shake + glow).",
+    "For the Recruiter Dashboard, use a 'Bento Grid' layout to show stats, recent applicants, and active jobs.",
+    "DO NOT use generic blue for primary actions. Use the specified Neon Indigo (#6366f1)."
+  ],
+  "universal_guidelines": [
+    "You tend to converge toward generic, 'on distribution' outputs. Avoid this.",
+    "Don't make generic centered layouts. Use asymmetry.",
+    "Create depth through layered design elements with z-index hierarchy.",
+    "Use glass-morphism effects with backdrop filters (12-24px blur).",
+    "NEVER use AI assistant Emoji characters like 🤖🧠 for icons.",
+    "Every interaction needs micro-animations.",
+    "Use 2-3x more spacing than feels comfortable."
+  ]
+}
