@@ -1,46 +1,45 @@
 # Hireabble - Job Matching Made Simple
 
 ## Original Problem Statement
-Build a Tinder-like app for job applications called "Hireabble" where both job seekers AND recruiters can use the platform with mutual matching. Make signup frictionless with a step-by-step resume builder after account creation.
+Build a Tinder-like app for job applications called "Hireabble" where both job seekers AND recruiters can use the platform with mutual matching.
 
 ## User Personas
-1. **Job Seeker**: Looking for quick, engaging job discovery. Frustrated with Indeed's complexity.
-2. **Recruiter**: Seeking efficient candidate matching and easy job posting/editing.
-
-## Core Requirements
-- Simple signup first, then step-by-step "quick resume" onboarding
-- Swipe right = Apply, Swipe left = Skip, Swipe up = Super Like
-- Mutual matching system (match occurs when recruiter accepts)
-- Job posting AND editing by recruiters
-- Candidate cards show: title, experience, education, photo
-- In-app messaging for matched users
-- Job filters for seekers
+1. **Job Seeker**: Looking for quick, engaging job discovery
+2. **Recruiter**: Seeking efficient candidate matching
 
 ## Architecture
-- **Frontend**: React 19 with framer-motion for swipe physics, Tailwind CSS, Shadcn/UI
+- **Frontend**: React 19 with framer-motion, Tailwind CSS, Shadcn/UI
 - **Backend**: FastAPI with async MongoDB (Motor)
 - **Database**: MongoDB (users, jobs, applications, matches, messages)
-- **Auth**: JWT tokens with bcrypt password hashing
-- **File Storage**: Local /uploads directory for photos
+- **Real-time**: WebSocket for messaging
+- **Auth**: JWT tokens with bcrypt
+- **File Storage**: Local /uploads for photos
+- **PDF Generation**: reportlab
 
 ## What's Been Implemented (January 2026)
-### Phase 1 - MVP
-- [x] Rebranding to "Hireabble"
-- [x] Landing page with updated messaging
-- [x] Frictionless signup (just name, email, password, role)
-- [x] Step-by-step onboarding for job seekers
-- [x] Swipe interface with framer-motion
-- [x] Mutual matching system
 
-### Phase 2 - Enhancements
-- [x] **Photo Upload**: File upload to /uploads + URL paste option
-- [x] **In-app Messaging**: Real-time chat between matched users (polling every 3s)
-- [x] **Job Filters**: Filter by job type, experience level, salary, location
-- [x] Job editing functionality for recruiters
-- [x] Candidate detail modal with full profile
-- [x] Unread message count indicator
+### Phase 1 - MVP ✓
+- Rebranding to "Hireabble"
+- Landing page, auth, onboarding
+- Swipe interface with framer-motion
+- Mutual matching system
+
+### Phase 2 - Enhancements ✓
+- Photo upload (file + URL)
+- In-app messaging (polling)
+- Job filters
+- Job editing for recruiters
+- Candidate detail modal
+
+### Phase 3 - Advanced Features ✓
+- **WebSocket Real-time Chat**: Instant message delivery with connection status indicator
+- **Email Notifications**: Match alerts and new message notifications (requires RESEND_API_KEY)
+- **Resume PDF Export**: Professional PDF generation with all profile data
+- **Quick Apply Badge**: Shows when profile is 80%+ complete, indicates "profile ready" status
+- **Profile Completeness Tracker**: Percentage display with missing fields hints
 
 ## API Endpoints
+
 ### Auth
 - POST /api/auth/register
 - POST /api/auth/login
@@ -48,42 +47,51 @@ Build a Tinder-like app for job applications called "Hireabble" where both job s
 - PUT /api/auth/profile
 
 ### Jobs
-- POST /api/jobs - Create job
-- GET /api/jobs - Get jobs with filters (?job_type=&experience_level=&salary_min=&location=)
-- GET /api/jobs/recruiter - Get recruiter's jobs
-- PUT /api/jobs/{id} - Edit job
-- DELETE /api/jobs/{id} - Delete job
+- POST /api/jobs
+- GET /api/jobs (with filters)
+- GET /api/jobs/recruiter
+- PUT /api/jobs/{id}
+- DELETE /api/jobs/{id}
 
 ### Applications & Matching
-- POST /api/swipe - Submit swipe
-- GET /api/applications - Get applications
-- POST /api/applications/respond - Accept/reject
-- GET /api/matches - Get matches
+- POST /api/swipe
+- GET /api/applications
+- POST /api/applications/respond
+- GET /api/matches
 
-### Messaging (NEW)
-- POST /api/messages - Send message
-- GET /api/messages/{match_id} - Get conversation
-- GET /api/messages/unread/count - Get unread count
+### Messaging
+- POST /api/messages
+- GET /api/messages/{match_id}
+- GET /api/messages/unread/count
+- WS /ws/{token} (WebSocket)
 
-### Files (NEW)
-- POST /api/upload/photo - Upload profile photo
+### Profile
+- GET /api/profile/completeness
+- GET /api/resume/download
+- POST /api/upload/photo
+
+## Environment Variables
+- MONGO_URL (required)
+- DB_NAME (required)
+- JWT_SECRET (optional)
+- RESEND_API_KEY (optional - for email notifications)
+- SENDER_EMAIL (optional - defaults to onboarding@resend.dev)
 
 ## Prioritized Backlog
+
 ### P0 (Critical) - All Done ✓
 
 ### P1 (High Priority)
-- [ ] Real-time messaging with WebSockets (currently polling)
-- [ ] Email notifications for new matches
 - [ ] Push notifications (mobile web)
+- [ ] Video intro feature for candidates
+- [ ] Interview scheduling integration
 
 ### P2 (Medium Priority)
-- [ ] Resume PDF export
+- [ ] Advanced search with AI matching
 - [ ] Company verification badges
-- [ ] Advanced search (keyword, skills matching)
-- [ ] Save/bookmark jobs for later
+- [ ] Saved/bookmarked jobs
 
 ### P3 (Low Priority)
 - [ ] Analytics dashboard for recruiters
-- [ ] Interview scheduling integration
-- [ ] Video intro feature
 - [ ] Social sharing
+- [ ] Referral system
