@@ -4,6 +4,7 @@ import { Heart, MessageCircle, Briefcase, Building2, Calendar, ChevronRight } fr
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import Navigation from '../components/Navigation';
+import { getPhotoUrl } from '../utils/helpers';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -77,7 +78,7 @@ export default function Matches() {
                         </div>
                       ) : (
                         <img 
-                          src={match.seeker_avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${match.seeker_id}`}
+                          src={getPhotoUrl(match.seeker_avatar, match.seeker_id)}
                           alt={match.seeker_name}
                           className="w-14 h-14 rounded-xl object-cover border-2 border-primary/50"
                         />

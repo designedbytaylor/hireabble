@@ -9,6 +9,7 @@ import { toast } from 'sonner';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import Navigation from '../components/Navigation';
+import { getPhotoUrl } from '../utils/helpers';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
@@ -157,7 +158,7 @@ export default function Profile() {
           <div className="glass-card rounded-3xl p-8 mb-6 text-center">
             <div className="relative inline-block mb-4">
               <img 
-                src={user?.photo_url || user?.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user?.id}`}
+                src={getPhotoUrl(user?.photo_url, user?.id) || user?.avatar}
                 alt="Avatar"
                 className="w-24 h-24 rounded-full border-4 border-primary mx-auto object-cover"
               />

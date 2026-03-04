@@ -26,6 +26,7 @@ import { toast } from 'sonner';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import Navigation from '../components/Navigation';
+import { getPhotoUrl } from '../utils/helpers';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -198,7 +199,7 @@ export default function RecruiterDashboard() {
                 >
                   <div className="flex items-center gap-3 mb-3">
                     <img 
-                      src={app.seeker_photo || app.seeker_avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${app.seeker_id}`}
+                      src={getPhotoUrl(app.seeker_photo || app.seeker_avatar, app.seeker_id)}
                       alt={app.seeker_name}
                       className="w-14 h-14 rounded-full border-2 border-primary/50 object-cover"
                     />
@@ -379,7 +380,7 @@ export default function RecruiterDashboard() {
                 >
                   <div className="flex items-center gap-3">
                     <img 
-                      src={app.seeker_photo || app.seeker_avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${app.seeker_id}`}
+                      src={getPhotoUrl(app.seeker_photo || app.seeker_avatar, app.seeker_id)}
                       alt={app.seeker_name}
                       className="w-12 h-12 rounded-full object-cover"
                     />
@@ -442,7 +443,7 @@ export default function RecruiterDashboard() {
               {/* Photo and Basic Info */}
               <div className="flex items-center gap-4">
                 <img 
-                  src={selectedCandidate.seeker_photo || selectedCandidate.seeker_avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${selectedCandidate.seeker_id}`}
+                  src={getPhotoUrl(selectedCandidate.seeker_photo || selectedCandidate.seeker_avatar, selectedCandidate.seeker_id)}
                   alt={selectedCandidate.seeker_name}
                   className="w-20 h-20 rounded-full object-cover border-4 border-primary/50"
                 />

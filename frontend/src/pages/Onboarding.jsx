@@ -89,7 +89,7 @@ export default function Onboarding() {
         }
       });
 
-      // Construct full URL for the photo
+      // The API returns the path, construct full URL
       const photoUrl = `${BACKEND_URL}${response.data.photo_url}`;
       setFormData(prev => ({ ...prev, photo_url: photoUrl }));
       toast.success('Photo uploaded!');

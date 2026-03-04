@@ -673,11 +673,34 @@ async def upload_photo(file: UploadFile = File(...), current_user: dict = Depend
     with open(filepath, "wb") as f:
         f.write(contents)
     
-    # Update user's photo_url
-    photo_url = f"/uploads/{filename}"
+    # Update user's photo_url - use API route for serving
+    photo_url = f"/api/photos/{filename}"
     await db.users.update_one({"id": current_user["id"]}, {"$set": {"photo_url": photo_url}})
     
     return {"photo_url": photo_url, "message": "Photo uploaded successfully"}
+
+@api_router.get("/photos/{filename}")
+async def get_photo(filename: str):
+    """Serve uploaded photos"""
+    filepath = UPLOADS_DIR / filename
+    if not filepath.exists():
+        raise HTTPException(status_code=404, detail="Photo not found")
+    
+    # Determine content type
+    ext = filename.split('.')[-1].lower()
+    content_types = {
+        'jpg': 'image/jpeg',
+        'jpeg': 'image/jpeg',
+        'png': 'image/png',
+        'gif': 'image/gif',
+        'webp': 'image/webp'
+    }
+    content_type = content_types.get(ext, 'image/jpeg')
+    
+    return StreamingResponse(
+        open(filepath, "rb"),
+        media_type=content_type
+    )
 
 # ==================== MESSAGING ====================
 

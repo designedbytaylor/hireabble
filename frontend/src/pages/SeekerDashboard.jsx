@@ -22,6 +22,7 @@ import {
 } from '../components/ui/select';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
+import { getPhotoUrl } from '../utils/helpers';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -174,7 +175,7 @@ export default function SeekerDashboard() {
               )}
             </button>
             <img 
-              src={user?.photo_url || user?.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user?.id}`}
+              src={getPhotoUrl(user?.photo_url, user?.id) || user?.avatar}
               alt="Avatar"
               className="w-10 h-10 rounded-full border-2 border-primary object-cover"
             />
