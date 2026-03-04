@@ -68,12 +68,12 @@ export default function Register() {
             <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary to-secondary flex items-center justify-center">
               <Briefcase className="w-6 h-6 text-white" />
             </div>
-            <span className="text-2xl font-bold font-['Outfit']">JobSwipe</span>
+            <span className="text-2xl font-bold font-['Outfit']">Hireabble</span>
           </Link>
           
           <h1 className="text-4xl font-bold font-['Outfit'] mb-6">
-            Join the revolution in{' '}
-            <span className="gradient-text">career connections</span>
+            Join{' '}
+            <span className="gradient-text">Hireabble</span>
           </h1>
           
           <p className="text-lg text-muted-foreground">
@@ -90,7 +90,7 @@ export default function Register() {
             <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-secondary flex items-center justify-center">
               <Briefcase className="w-5 h-5 text-white" />
             </div>
-            <span className="text-xl font-bold font-['Outfit']">JobSwipe</span>
+            <span className="text-xl font-bold font-['Outfit']">Hireabble</span>
           </Link>
 
           <div className="glass-card rounded-3xl p-8 md:p-10">

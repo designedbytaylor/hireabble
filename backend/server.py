@@ -45,11 +45,6 @@ class UserCreate(BaseModel):
     name: str
     role: str  # 'seeker' or 'recruiter'
     company: Optional[str] = None
-    title: Optional[str] = None
-    bio: Optional[str] = None
-    skills: List[str] = []
-    experience_years: Optional[int] = None
-    location: Optional[str] = None
 
 class UserLogin(BaseModel):
     email: EmailStr
@@ -68,6 +63,16 @@ class UserResponse(BaseModel):
     experience_years: Optional[int] = None
     location: Optional[str] = None
     avatar: Optional[str] = None
+    photo_url: Optional[str] = None
+    current_employer: Optional[str] = None
+    previous_employers: List[str] = []
+    school: Optional[str] = None
+    degree: Optional[str] = None
+    certifications: List[str] = []
+    work_preference: Optional[str] = None
+    desired_salary: Optional[int] = None
+    available_immediately: bool = True
+    onboarding_complete: bool = False
     created_at: str
 
 class JobCreate(BaseModel):
@@ -113,6 +118,12 @@ class ApplicationResponse(BaseModel):
     seeker_title: Optional[str] = None
     seeker_skills: List[str] = []
     seeker_avatar: Optional[str] = None
+    seeker_photo: Optional[str] = None
+    seeker_experience: Optional[int] = None
+    seeker_school: Optional[str] = None
+    seeker_degree: Optional[str] = None
+    seeker_location: Optional[str] = None
+    seeker_current_employer: Optional[str] = None
     action: str
     is_matched: bool = False
     recruiter_action: Optional[str] = None
@@ -187,12 +198,22 @@ async def register(user: UserCreate):
         "name": user.name,
         "role": user.role,
         "company": user.company,
-        "title": user.title,
-        "bio": user.bio,
-        "skills": user.skills,
-        "experience_years": user.experience_years,
-        "location": user.location,
+        "title": None,
+        "bio": None,
+        "skills": [],
+        "experience_years": None,
+        "location": None,
         "avatar": avatar,
+        "photo_url": None,
+        "current_employer": None,
+        "previous_employers": [],
+        "school": None,
+        "degree": None,
+        "certifications": [],
+        "work_preference": None,
+        "desired_salary": None,
+        "available_immediately": True,
+        "onboarding_complete": user.role == "recruiter",  # Recruiters skip onboarding
         "created_at": datetime.now(timezone.utc).isoformat()
     }
     
@@ -222,7 +243,12 @@ async def get_me(current_user: dict = Depends(get_current_user)):
 
 @api_router.put("/auth/profile")
 async def update_profile(updates: dict, current_user: dict = Depends(get_current_user)):
-    allowed_fields = ["name", "title", "bio", "skills", "experience_years", "location", "company"]
+    allowed_fields = [
+        "name", "title", "bio", "skills", "experience_years", "location", "company",
+        "photo_url", "current_employer", "previous_employers", "school", "degree",
+        "certifications", "work_preference", "desired_salary", "available_immediately",
+        "onboarding_complete"
+    ]
     update_data = {k: v for k, v in updates.items() if k in allowed_fields}
     
     if update_data:
@@ -315,6 +341,30 @@ async def delete_job(job_id: str, current_user: dict = Depends(get_current_user)
     await db.jobs.update_one({"id": job_id}, {"$set": {"is_active": False}})
     return {"message": "Job deleted"}
 
+@api_router.put("/jobs/{job_id}")
+async def update_job(job_id: str, updates: dict, current_user: dict = Depends(get_current_user)):
+    """Update a job posting"""
+    if current_user["role"] != "recruiter":
+        raise HTTPException(status_code=403, detail="Only recruiters can edit jobs")
+    
+    job = await db.jobs.find_one({"id": job_id})
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    if job["recruiter_id"] != current_user["id"]:
+        raise HTTPException(status_code=403, detail="Not authorized")
+    
+    allowed_fields = [
+        "title", "company", "description", "requirements", "salary_min", "salary_max",
+        "location", "job_type", "experience_level", "is_active"
+    ]
+    update_data = {k: v for k, v in updates.items() if k in allowed_fields}
+    
+    if update_data:
+        await db.jobs.update_one({"id": job_id}, {"$set": update_data})
+    
+    updated_job = await db.jobs.find_one({"id": job_id}, {"_id": 0})
+    return updated_job
+
 # ==================== APPLICATION/SWIPE ROUTES ====================
 
 @api_router.post("/swipe")
@@ -345,6 +395,12 @@ async def swipe(action: SwipeAction, current_user: dict = Depends(get_current_us
         "seeker_title": current_user.get("title"),
         "seeker_skills": current_user.get("skills", []),
         "seeker_avatar": current_user.get("avatar"),
+        "seeker_photo": current_user.get("photo_url"),
+        "seeker_experience": current_user.get("experience_years"),
+        "seeker_school": current_user.get("school"),
+        "seeker_degree": current_user.get("degree"),
+        "seeker_location": current_user.get("location"),
+        "seeker_current_employer": current_user.get("current_employer"),
         "recruiter_id": job["recruiter_id"],
         "action": action.action,
         "is_matched": False,
@@ -500,7 +556,7 @@ async def get_user_profile(user_id: str, current_user: dict = Depends(get_curren
 # Root endpoint
 @api_router.get("/")
 async def root():
-    return {"message": "JobSwipe API", "version": "1.0.0"}
+    return {"message": "Hireabble API", "version": "1.0.0"}
 
 # Include the router
 app.include_router(api_router)

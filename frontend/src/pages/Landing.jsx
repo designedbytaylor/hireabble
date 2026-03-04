@@ -17,7 +17,7 @@ export default function Landing() {
           <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-secondary flex items-center justify-center">
             <Briefcase className="w-5 h-5 text-white" />
           </div>
-          <span className="text-xl font-bold font-['Outfit']">JobSwipe</span>
+          <span className="text-xl font-bold font-['Outfit']">Hireabble</span>
         </div>
         <div className="flex items-center gap-4">
           <Link to="/login">
@@ -41,17 +41,18 @@ export default function Landing() {
             <div className="space-y-8">
               <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full glass text-sm">
                 <Zap className="w-4 h-4 text-secondary" />
-                <span className="text-muted-foreground">The future of job hunting</span>
+                <span className="text-muted-foreground">Job hunting made simple</span>
               </div>
               
               <h1 className="text-4xl md:text-6xl lg:text-7xl font-bold font-['Outfit'] leading-tight">
-                Swipe Your Way to Your{' '}
-                <span className="gradient-text">Dream Job</span>
+                Find Jobs.<br />
+                <span className="gradient-text">Get Hired.</span><br />
+                That Simple.
               </h1>
               
               <p className="text-lg md:text-xl text-muted-foreground max-w-lg leading-relaxed">
-                Match with opportunities that fit you. Simple swipes, powerful connections. 
-                Job hunting reimagined for the modern era.
+                Skip the endless applications. Swipe through jobs, match with recruiters, 
+                and start conversations. Job hunting reimagined.
               </p>
 
               <div className="flex flex-col sm:flex-row gap-4 pt-4">
@@ -61,7 +62,7 @@ export default function Landing() {
                     className="bg-gradient-to-r from-primary to-secondary hover:opacity-90 rounded-full px-8 py-6 text-lg btn-hover-glow w-full sm:w-auto"
                     data-testid="hero-get-started-btn"
                   >
-                    Start Swiping
+                    Find a Job
                     <ArrowRight className="w-5 h-5 ml-2" />
                   </Button>
                 </Link>
@@ -153,10 +154,10 @@ export default function Landing() {
         <section className="max-w-6xl mx-auto py-24 md:py-32">
           <div className="text-center mb-16">
             <h2 className="text-3xl md:text-5xl font-bold font-['Outfit'] mb-4">
-              How It <span className="gradient-text">Works</span>
+              Why <span className="gradient-text">Hireabble</span>?
             </h2>
             <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
-              Three simple steps to find your perfect match
+              Because Indeed is confusing and takes forever. We made it simple.
             </p>
           </div>
 
@@ -165,9 +166,9 @@ export default function Landing() {
               <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-primary to-primary/50 flex items-center justify-center mb-6">
                 <Users className="w-7 h-7 text-white" />
               </div>
-              <h3 className="text-xl font-bold font-['Outfit'] mb-3">Create Profile</h3>
+              <h3 className="text-xl font-bold font-['Outfit'] mb-3">Quick Profile</h3>
               <p className="text-muted-foreground">
-                Set up your profile with skills, experience, and preferences. Let us know what you're looking for.
+                No more uploading resumes. Answer a few simple questions and you're ready to go.
               </p>
             </div>
 
@@ -177,7 +178,7 @@ export default function Landing() {
               </div>
               <h3 className="text-xl font-bold font-['Outfit'] mb-3">Swipe & Match</h3>
               <p className="text-muted-foreground">
-                Browse jobs tailored to you. Swipe right to apply, left to pass. Use Super Like for dream jobs.
+                Browse jobs like you browse dating apps. Swipe right to apply, left to pass. Easy.
               </p>
             </div>
 
@@ -185,9 +186,9 @@ export default function Landing() {
               <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-success to-success/50 flex items-center justify-center mb-6">
                 <Target className="w-7 h-7 text-white" />
               </div>
-              <h3 className="text-xl font-bold font-['Outfit'] mb-3">Get Hired</h3>
+              <h3 className="text-xl font-bold font-['Outfit'] mb-3">Real Connections</h3>
               <p className="text-muted-foreground">
-                When recruiters like you back, it's a match! Start conversations and land your dream job.
+                When recruiters like you back, it's a match! Start real conversations, not application black holes.
               </p>
             </div>
           </div>
@@ -199,10 +200,10 @@ export default function Landing() {
             <div className="absolute inset-0 bg-gradient-to-r from-primary/10 to-secondary/10" />
             <div className="relative z-10">
               <h2 className="text-3xl md:text-4xl font-bold font-['Outfit'] mb-4">
-                Ready to Find Your Match?
+                Ready to Get Hired?
               </h2>
               <p className="text-muted-foreground text-lg mb-8 max-w-lg mx-auto">
-                Join thousands of job seekers and recruiters already using JobSwipe to make meaningful connections.
+                Join thousands who've already ditched the old way of job hunting.
               </p>
               <Link to="/register">
                 <Button 
@@ -226,10 +227,10 @@ export default function Landing() {
             <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary to-secondary flex items-center justify-center">
               <Briefcase className="w-4 h-4 text-white" />
             </div>
-            <span className="font-bold font-['Outfit']">JobSwipe</span>
+            <span className="font-bold font-['Outfit']">Hireabble</span>
           </div>
           <p className="text-sm text-muted-foreground">
-            © 2024 JobSwipe. All rights reserved.
+            © 2024 Hireabble. All rights reserved.
           </p>
         </div>
       </footer>

@@ -6,7 +6,7 @@ from datetime import datetime
 import uuid
 import json
 
-class JobSwipeAPITester:
+class HireabbleAPITester:
     def __init__(self, base_url="https://hire-swipe-5.preview.emergentagent.com/api"):
         self.base_url = base_url
         self.seeker_token = None
@@ -78,11 +78,7 @@ class JobSwipeAPITester:
             "name": f"Test Seeker {self.timestamp}",
             "email": self.seeker_email,
             "password": self.test_password,
-            "role": "seeker",
-            "title": "Software Engineer",
-            "location": "San Francisco, CA",
-            "skills": ["Python", "React", "Node.js"],
-            "experience_years": 3
+            "role": "seeker"
         }
         
         success, response = self.run_test(
@@ -98,6 +94,33 @@ class JobSwipeAPITester:
             print(f"   Seeker token acquired: {self.seeker_token[:20]}...")
             return True
         return False
+    
+    def test_complete_seeker_onboarding(self):
+        """Complete seeker onboarding after status check"""
+        if not self.seeker_token:
+            return False
+            
+        headers = {"Authorization": f"Bearer {self.seeker_token}"}
+        onboarding_data = {
+            "title": "Software Engineer",
+            "experience_years": 3,
+            "current_employer": "Tech Corp",
+            "school": "MIT",
+            "degree": "bachelors",
+            "skills": ["Python", "React", "Node.js"],
+            "location": "San Francisco, CA",
+            "onboarding_complete": True
+        }
+        
+        success, response = self.run_test(
+            "Complete Seeker Onboarding",
+            "PUT",
+            "auth/profile",
+            200,
+            onboarding_data,
+            headers
+        )
+        return success
 
     def test_recruiter_registration(self):
         """Test recruiter registration"""
@@ -367,11 +390,197 @@ class JobSwipeAPITester:
         )
         return success
 
+    def test_onboarding_status(self):
+        """Test onboarding completion status for different roles"""
+        # Test seeker should NOT have onboarding complete initially
+        if self.seeker_token:
+            headers = {"Authorization": f"Bearer {self.seeker_token}"}
+            success, response = self.run_test(
+                "Check Seeker Onboarding Status",
+                "GET",
+                "auth/me",
+                200,
+                headers=headers
+            )
+            if success:
+                if response.get('onboarding_complete') == False:
+                    print("   ✅ Seeker onboarding_complete correctly set to False")
+                else:
+                    print("   ❌ Seeker onboarding_complete should be False initially")
+                    return False
+        
+        # Test recruiter should have onboarding complete by default
+        if self.recruiter_token:
+            headers = {"Authorization": f"Bearer {self.recruiter_token}"}
+            success, response = self.run_test(
+                "Check Recruiter Onboarding Status",
+                "GET", 
+                "auth/me",
+                200,
+                headers=headers
+            )
+            if success:
+                if response.get('onboarding_complete') == True:
+                    print("   ✅ Recruiter onboarding_complete correctly set to True")
+                else:
+                    print("   ❌ Recruiter onboarding_complete should be True by default")
+                    return False
+        
+        return success
+
+    def test_job_editing(self):
+        """Test job editing functionality"""
+        if not self.recruiter_token or not self.job_ids:
+            print("❌ No recruiter token or job IDs available for editing")
+            return False
+            
+        headers = {"Authorization": f"Bearer {self.recruiter_token}"}
+        job_id = self.job_ids[0]
+        
+        # Test updating job details
+        update_data = {
+            "title": "Updated Senior Python Developer",
+            "description": "Updated description for the role...",
+            "salary_min": 130000,
+            "salary_max": 170000,
+            "location": "Remote Worldwide",
+            "requirements": ["Python", "FastAPI", "MongoDB", "AWS", "6+ years experience"]
+        }
+        
+        success, response = self.run_test(
+            "Job Edit/Update",
+            "PUT",
+            f"jobs/{job_id}",
+            200,
+            update_data,
+            headers
+        )
+        
+        if success:
+            # Verify the update took effect
+            success, updated_job = self.run_test(
+                "Verify Job Update",
+                "GET",
+                f"jobs/{job_id}",
+                200,
+                headers=headers
+            )
+            
+            if success and updated_job.get('title') == "Updated Senior Python Developer":
+                print("   ✅ Job update verified successfully")
+            else:
+                print("   ❌ Job update verification failed")
+                return False
+        
+        return success
+
+    def test_job_deletion(self):
+        """Test job deletion functionality"""
+        if not self.recruiter_token:
+            print("❌ No recruiter token available for job deletion")
+            return False
+            
+        headers = {"Authorization": f"Bearer {self.recruiter_token}"}
+        
+        # Create a new job specifically for deletion testing
+        data = {
+            "title": "Test Job for Deletion",
+            "company": "Test Corp",
+            "description": "This job will be deleted",
+            "location": "Test City",
+            "job_type": "remote",
+            "experience_level": "mid"
+        }
+        
+        success, response = self.run_test(
+            "Create Job for Deletion",
+            "POST",
+            "jobs",
+            200,
+            data,
+            headers
+        )
+        
+        if not success or 'id' not in response:
+            return False
+            
+        job_to_delete = response['id']
+        
+        # Now test deletion
+        success, response = self.run_test(
+            "Job Deletion",
+            "DELETE",
+            f"jobs/{job_to_delete}",
+            200,
+            headers=headers
+        )
+        
+        if success:
+            # Verify job is marked as inactive
+            success, deleted_job = self.run_test(
+                "Verify Job Deletion",
+                "GET",
+                f"jobs/{job_to_delete}",
+                200,
+                headers=headers
+            )
+            
+            if success and deleted_job.get('is_active') == False:
+                print("   ✅ Job deletion verified - marked as inactive")
+            else:
+                print("   ❌ Job deletion verification failed")
+                return False
+        
+        return success
+
+    def test_candidate_profile_fields(self):
+        """Test that candidate profiles contain required fields for recruiter view"""
+        if not self.recruiter_token:
+            print("❌ No recruiter token available")
+            return False
+            
+        headers = {"Authorization": f"Bearer {self.recruiter_token}"}
+        
+        # Get applications to check candidate profile data
+        success, applications = self.run_test(
+            "Get Applications for Profile Check",
+            "GET",
+            "applications",
+            200,
+            headers=headers
+        )
+        
+        if not success:
+            return False
+            
+        if len(applications) == 0:
+            print("   ⚠️  No applications available to test candidate profile fields")
+            return True  # Not a failure, just no data
+        
+        # Check first application for required fields
+        app = applications[0]
+        required_fields = [
+            'seeker_name', 'seeker_title', 'seeker_experience', 
+            'seeker_school', 'seeker_degree', 'seeker_skills'
+        ]
+        
+        missing_fields = []
+        for field in required_fields:
+            if field not in app or app[field] is None:
+                missing_fields.append(field)
+        
+        if missing_fields:
+            print(f"   ❌ Missing candidate profile fields: {missing_fields}")
+            return False
+        else:
+            print("   ✅ All required candidate profile fields present")
+            return True
+
 def main():
-    print("🚀 Starting JobSwipe API Test Suite")
+    print("🚀 Starting Hireabble API Test Suite")
     print("=" * 50)
     
-    tester = JobSwipeAPITester()
+    tester = HireabbleAPITester()
     
     # Test sequence
     test_sequence = [
@@ -380,11 +589,16 @@ def main():
         ("Recruiter Registration", tester.test_recruiter_registration), 
         ("Login Flow", tester.test_login),
         ("Auth Me", tester.test_auth_me),
+        ("Onboarding Status", tester.test_onboarding_status),
+        ("Complete Seeker Onboarding", tester.test_complete_seeker_onboarding),
         ("Job Creation", tester.test_job_creation),
         ("Get Jobs (Seeker)", tester.test_get_jobs_for_seeker),
         ("Get Jobs (Recruiter)", tester.test_get_recruiter_jobs),
+        ("Job Editing", tester.test_job_editing),
+        ("Job Deletion", tester.test_job_deletion),
         ("Swipe Functionality", tester.test_swipe_functionality),
         ("Applications", tester.test_applications_endpoint),
+        ("Candidate Profile Fields", tester.test_candidate_profile_fields),
         ("Stats", tester.test_stats_endpoints),
         ("Matches", tester.test_matches_endpoint),
         ("Profile Update", tester.test_profile_update)

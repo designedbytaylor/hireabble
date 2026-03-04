@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Plus, Briefcase, Users, Star, Heart, X, Check, 
-  MapPin, DollarSign, Building2, ChevronRight, Clock
+  MapPin, DollarSign, Building2, ChevronRight, Clock,
+  Edit, GraduationCap, Trash2
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -35,8 +36,10 @@ export default function RecruiterDashboard() {
   const [applications, setApplications] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showNewJob, setShowNewJob] = useState(false);
+  const [editingJob, setEditingJob] = useState(null);
   const [selectedJob, setSelectedJob] = useState(null);
   const [jobApplications, setJobApplications] = useState([]);
+  const [selectedCandidate, setSelectedCandidate] = useState(null);
 
   useEffect(() => {
     fetchData();
@@ -84,13 +87,30 @@ export default function RecruiterDashboard() {
         toast.info('Application declined');
       }
       
-      // Refresh data
       fetchData();
       if (selectedJob) {
         handleViewApplications(selectedJob);
       }
     } catch (error) {
       toast.error('Failed to respond');
+    }
+  };
+
+  const handleEditJob = (job) => {
+    setEditingJob(job);
+  };
+
+  const handleDeleteJob = async (jobId) => {
+    if (!window.confirm('Are you sure you want to delete this job posting?')) return;
+    
+    try {
+      await axios.delete(`${API}/jobs/${jobId}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      toast.success('Job deleted');
+      fetchData();
+    } catch (error) {
+      toast.error('Failed to delete job');
     }
   };
 
@@ -173,13 +193,14 @@ export default function RecruiterDashboard() {
               {applications.slice(0, 10).map((app) => (
                 <div 
                   key={app.id}
-                  className="glass-card rounded-2xl p-4 min-w-[200px] flex-shrink-0"
+                  className="glass-card rounded-2xl p-4 min-w-[220px] flex-shrink-0 relative cursor-pointer hover:border-primary/30 transition-colors"
+                  onClick={() => setSelectedCandidate(app)}
                 >
                   <div className="flex items-center gap-3 mb-3">
                     <img 
-                      src={app.seeker_avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${app.seeker_id}`}
+                      src={app.seeker_photo || app.seeker_avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${app.seeker_id}`}
                       alt={app.seeker_name}
-                      className="w-12 h-12 rounded-full border-2 border-primary/50"
+                      className="w-14 h-14 rounded-full border-2 border-primary/50 object-cover"
                     />
                     {app.action === 'superlike' && (
                       <div className="absolute top-3 right-3">
@@ -188,19 +209,22 @@ export default function RecruiterDashboard() {
                     )}
                   </div>
                   <div className="font-medium truncate">{app.seeker_name}</div>
-                  <div className="text-sm text-muted-foreground truncate">{app.seeker_title || 'Job Seeker'}</div>
+                  <div className="text-sm text-primary truncate">{app.seeker_title || 'Job Seeker'}</div>
+                  {app.seeker_experience && (
+                    <div className="text-xs text-muted-foreground mt-1">{app.seeker_experience}+ years exp</div>
+                  )}
                   
                   {!app.recruiter_action && (
                     <div className="flex gap-2 mt-3">
                       <button
-                        onClick={() => handleRespondToApplication(app.id, 'reject')}
+                        onClick={(e) => { e.stopPropagation(); handleRespondToApplication(app.id, 'reject'); }}
                         className="flex-1 py-2 rounded-lg bg-destructive/10 text-destructive hover:bg-destructive/20 transition-colors"
                         data-testid={`reject-${app.id}`}
                       >
                         <X className="w-4 h-4 mx-auto" />
                       </button>
                       <button
-                        onClick={() => handleRespondToApplication(app.id, 'accept')}
+                        onClick={(e) => { e.stopPropagation(); handleRespondToApplication(app.id, 'accept'); }}
                         className="flex-1 py-2 rounded-lg bg-success/10 text-success hover:bg-success/20 transition-colors"
                         data-testid={`accept-${app.id}`}
                       >
@@ -238,12 +262,14 @@ export default function RecruiterDashboard() {
               {jobs.map((job) => (
                 <div 
                   key={job.id}
-                  className="glass-card rounded-2xl p-5 hover:border-primary/30 transition-colors cursor-pointer"
-                  onClick={() => handleViewApplications(job)}
+                  className="glass-card rounded-2xl p-5 hover:border-primary/30 transition-colors"
                   data-testid={`job-item-${job.id}`}
                 >
                   <div className="flex items-start justify-between">
-                    <div className="flex items-start gap-4">
+                    <div 
+                      className="flex items-start gap-4 flex-1 cursor-pointer"
+                      onClick={() => handleViewApplications(job)}
+                    >
                       <img 
                         src={job.company_logo}
                         alt={job.company}
@@ -268,7 +294,26 @@ export default function RecruiterDashboard() {
                         </div>
                       </div>
                     </div>
-                    <ChevronRight className="w-5 h-5 text-muted-foreground" />
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => handleEditJob(job)}
+                        className="p-2 rounded-lg hover:bg-accent transition-colors"
+                        data-testid={`edit-job-${job.id}`}
+                      >
+                        <Edit className="w-5 h-5 text-muted-foreground" />
+                      </button>
+                      <button
+                        onClick={() => handleDeleteJob(job.id)}
+                        className="p-2 rounded-lg hover:bg-destructive/10 transition-colors"
+                        data-testid={`delete-job-${job.id}`}
+                      >
+                        <Trash2 className="w-5 h-5 text-destructive" />
+                      </button>
+                      <ChevronRight 
+                        className="w-5 h-5 text-muted-foreground cursor-pointer"
+                        onClick={() => handleViewApplications(job)}
+                      />
+                    </div>
                   </div>
                 </div>
               ))}
@@ -290,7 +335,7 @@ export default function RecruiterDashboard() {
       </main>
 
       {/* New Job Dialog */}
-      <NewJobDialog 
+      <JobFormDialog 
         open={showNewJob}
         onClose={() => setShowNewJob(false)}
         onSuccess={() => {
@@ -299,6 +344,20 @@ export default function RecruiterDashboard() {
         }}
         token={token}
         company={user?.company}
+      />
+
+      {/* Edit Job Dialog */}
+      <JobFormDialog 
+        open={!!editingJob}
+        onClose={() => setEditingJob(null)}
+        onSuccess={() => {
+          setEditingJob(null);
+          fetchData();
+        }}
+        token={token}
+        company={user?.company}
+        job={editingJob}
+        isEditing
       />
 
       {/* Job Applications Dialog */}
@@ -313,12 +372,16 @@ export default function RecruiterDashboard() {
           <div className="max-h-[60vh] overflow-y-auto space-y-4">
             {jobApplications.length > 0 ? (
               jobApplications.map((app) => (
-                <div key={app.id} className="p-4 rounded-xl bg-background border border-border">
+                <div 
+                  key={app.id} 
+                  className="p-4 rounded-xl bg-background border border-border cursor-pointer hover:border-primary/30"
+                  onClick={() => { setSelectedJob(null); setSelectedCandidate(app); }}
+                >
                   <div className="flex items-center gap-3">
                     <img 
-                      src={app.seeker_avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${app.seeker_id}`}
+                      src={app.seeker_photo || app.seeker_avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${app.seeker_id}`}
                       alt={app.seeker_name}
-                      className="w-12 h-12 rounded-full"
+                      className="w-12 h-12 rounded-full object-cover"
                     />
                     <div className="flex-1">
                       <div className="flex items-center gap-2">
@@ -327,19 +390,19 @@ export default function RecruiterDashboard() {
                           <Star className="w-4 h-4 text-secondary fill-secondary" />
                         )}
                       </div>
-                      <div className="text-sm text-muted-foreground">{app.seeker_title || 'Job Seeker'}</div>
+                      <div className="text-sm text-primary">{app.seeker_title || 'Job Seeker'}</div>
                     </div>
                     
                     {!app.recruiter_action ? (
                       <div className="flex gap-2">
                         <button
-                          onClick={() => handleRespondToApplication(app.id, 'reject')}
+                          onClick={(e) => { e.stopPropagation(); handleRespondToApplication(app.id, 'reject'); }}
                           className="p-2 rounded-lg bg-destructive/10 text-destructive hover:bg-destructive/20"
                         >
                           <X className="w-5 h-5" />
                         </button>
                         <button
-                          onClick={() => handleRespondToApplication(app.id, 'accept')}
+                          onClick={(e) => { e.stopPropagation(); handleRespondToApplication(app.id, 'accept'); }}
                           className="p-2 rounded-lg bg-success/10 text-success hover:bg-success/20"
                         >
                           <Check className="w-5 h-5" />
@@ -355,16 +418,6 @@ export default function RecruiterDashboard() {
                       </span>
                     )}
                   </div>
-                  
-                  {app.seeker_skills?.length > 0 && (
-                    <div className="flex flex-wrap gap-1 mt-3">
-                      {app.seeker_skills.slice(0, 5).map((skill, i) => (
-                        <span key={i} className="px-2 py-0.5 rounded-md bg-accent text-xs">
-                          {skill}
-                        </span>
-                      ))}
-                    </div>
-                  )}
                 </div>
               ))
             ) : (
@@ -377,12 +430,121 @@ export default function RecruiterDashboard() {
         </DialogContent>
       </Dialog>
 
+      {/* Candidate Detail Dialog */}
+      <Dialog open={!!selectedCandidate} onOpenChange={() => setSelectedCandidate(null)}>
+        <DialogContent className="max-w-md bg-card border-border">
+          <DialogHeader>
+            <DialogTitle className="font-['Outfit']">Candidate Profile</DialogTitle>
+          </DialogHeader>
+          
+          {selectedCandidate && (
+            <div className="space-y-6">
+              {/* Photo and Basic Info */}
+              <div className="flex items-center gap-4">
+                <img 
+                  src={selectedCandidate.seeker_photo || selectedCandidate.seeker_avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${selectedCandidate.seeker_id}`}
+                  alt={selectedCandidate.seeker_name}
+                  className="w-20 h-20 rounded-full object-cover border-4 border-primary/50"
+                />
+                <div>
+                  <h3 className="text-xl font-bold font-['Outfit']">{selectedCandidate.seeker_name}</h3>
+                  <p className="text-primary font-medium">{selectedCandidate.seeker_title || 'Job Seeker'}</p>
+                  {selectedCandidate.seeker_location && (
+                    <p className="text-sm text-muted-foreground flex items-center gap-1 mt-1">
+                      <MapPin className="w-3 h-3" />
+                      {selectedCandidate.seeker_location}
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              {/* Quick Stats */}
+              <div className="grid grid-cols-2 gap-3">
+                {selectedCandidate.seeker_experience && (
+                  <div className="p-3 rounded-xl bg-background border border-border">
+                    <div className="text-xs text-muted-foreground">Experience</div>
+                    <div className="font-medium">{selectedCandidate.seeker_experience}+ years</div>
+                  </div>
+                )}
+                {selectedCandidate.seeker_current_employer && (
+                  <div className="p-3 rounded-xl bg-background border border-border">
+                    <div className="text-xs text-muted-foreground">Current</div>
+                    <div className="font-medium truncate">{selectedCandidate.seeker_current_employer}</div>
+                  </div>
+                )}
+                {selectedCandidate.seeker_school && (
+                  <div className="p-3 rounded-xl bg-background border border-border">
+                    <div className="text-xs text-muted-foreground">Education</div>
+                    <div className="font-medium truncate">{selectedCandidate.seeker_school}</div>
+                  </div>
+                )}
+                {selectedCandidate.seeker_degree && (
+                  <div className="p-3 rounded-xl bg-background border border-border">
+                    <div className="text-xs text-muted-foreground">Degree</div>
+                    <div className="font-medium truncate capitalize">{selectedCandidate.seeker_degree.replace('_', ' ')}</div>
+                  </div>
+                )}
+              </div>
+
+              {/* Skills */}
+              {selectedCandidate.seeker_skills?.length > 0 && (
+                <div>
+                  <div className="text-sm text-muted-foreground mb-2">Skills</div>
+                  <div className="flex flex-wrap gap-2">
+                    {selectedCandidate.seeker_skills.map((skill, i) => (
+                      <span key={i} className="px-3 py-1 rounded-full bg-primary/10 text-primary text-sm">
+                        {skill}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Action Buttons */}
+              {!selectedCandidate.recruiter_action ? (
+                <div className="flex gap-3">
+                  <Button
+                    variant="outline"
+                    className="flex-1 border-destructive/30 text-destructive hover:bg-destructive/10"
+                    onClick={() => {
+                      handleRespondToApplication(selectedCandidate.id, 'reject');
+                      setSelectedCandidate(null);
+                    }}
+                  >
+                    <X className="w-5 h-5 mr-2" />
+                    Pass
+                  </Button>
+                  <Button
+                    className="flex-1 bg-gradient-to-r from-primary to-secondary"
+                    onClick={() => {
+                      handleRespondToApplication(selectedCandidate.id, 'accept');
+                      setSelectedCandidate(null);
+                    }}
+                  >
+                    <Check className="w-5 h-5 mr-2" />
+                    Match
+                  </Button>
+                </div>
+              ) : (
+                <div className={`py-3 rounded-xl text-center font-medium ${
+                  selectedCandidate.recruiter_action === 'accept' 
+                    ? 'bg-success/10 text-success' 
+                    : 'bg-muted text-muted-foreground'
+                }`}>
+                  {selectedCandidate.recruiter_action === 'accept' ? "You've matched with this candidate!" : 'You passed on this candidate'}
+                </div>
+              )}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
       <Navigation />
     </div>
   );
 }
 
-function NewJobDialog({ open, onClose, onSuccess, token, company }) {
+function JobFormDialog({ open, onClose, onSuccess, token, company, job = null, isEditing = false }) {
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     title: '',
@@ -395,6 +557,34 @@ function NewJobDialog({ open, onClose, onSuccess, token, company }) {
     job_type: 'remote',
     experience_level: 'mid'
   });
+
+  useEffect(() => {
+    if (job && isEditing) {
+      setFormData({
+        title: job.title || '',
+        company: job.company || company || '',
+        description: job.description || '',
+        requirements: job.requirements?.join(', ') || '',
+        salary_min: job.salary_min?.toString() || '',
+        salary_max: job.salary_max?.toString() || '',
+        location: job.location || '',
+        job_type: job.job_type || 'remote',
+        experience_level: job.experience_level || 'mid'
+      });
+    } else if (!isEditing) {
+      setFormData({
+        title: '',
+        company: company || '',
+        description: '',
+        requirements: '',
+        salary_min: '',
+        salary_max: '',
+        location: '',
+        job_type: 'remote',
+        experience_level: 'mid'
+      });
+    }
+  }, [job, isEditing, company]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -413,25 +603,21 @@ function NewJobDialog({ open, onClose, onSuccess, token, company }) {
         salary_max: formData.salary_max ? parseInt(formData.salary_max) : null,
       };
 
-      await axios.post(`${API}/jobs`, payload, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      if (isEditing && job) {
+        await axios.put(`${API}/jobs/${job.id}`, payload, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        toast.success('Job updated successfully!');
+      } else {
+        await axios.post(`${API}/jobs`, payload, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        toast.success('Job posted successfully!');
+      }
 
-      toast.success('Job posted successfully!');
       onSuccess();
-      setFormData({
-        title: '',
-        company: company || '',
-        description: '',
-        requirements: '',
-        salary_min: '',
-        salary_max: '',
-        location: '',
-        job_type: 'remote',
-        experience_level: 'mid'
-      });
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Failed to post job');
+      toast.error(error.response?.data?.detail || 'Failed to save job');
     } finally {
       setLoading(false);
     }
@@ -441,7 +627,9 @@ function NewJobDialog({ open, onClose, onSuccess, token, company }) {
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="max-w-lg bg-card border-border max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="font-['Outfit'] text-xl">Post a New Job</DialogTitle>
+          <DialogTitle className="font-['Outfit'] text-xl">
+            {isEditing ? 'Edit Job Posting' : 'Post a New Job'}
+          </DialogTitle>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-5">
@@ -569,6 +757,8 @@ function NewJobDialog({ open, onClose, onSuccess, token, company }) {
           >
             {loading ? (
               <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+            ) : isEditing ? (
+              'Save Changes'
             ) : (
               'Post Job'
             )}
