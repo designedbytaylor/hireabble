@@ -298,6 +298,107 @@ async def login(credentials: UserLogin):
 async def get_me(current_user: dict = Depends(get_current_user)):
     return current_user
 
+# ==================== FORGOT PASSWORD ====================
+
+class ForgotPasswordRequest(BaseModel):
+    email: EmailStr
+
+class ResetPasswordRequest(BaseModel):
+    token: str
+    password: str
+
+@api_router.post("/auth/forgot-password")
+async def forgot_password(request: ForgotPasswordRequest):
+    """Send password reset email"""
+    user = await db.users.find_one({"email": request.email})
+    
+    # Always return success to prevent email enumeration
+    if not user:
+        return {"message": "If an account exists with this email, a reset link has been sent."}
+    
+    # Generate unique reset token
+    reset_token = str(uuid.uuid4())
+    expires_at = datetime.now(timezone.utc) + timedelta(hours=1)
+    
+    # Store token in database (delete any existing tokens for this user first)
+    await db.password_reset_tokens.delete_many({"user_id": user["id"]})
+    await db.password_reset_tokens.insert_one({
+        "token": reset_token,
+        "user_id": user["id"],
+        "email": request.email,
+        "expires_at": expires_at.isoformat(),
+        "created_at": datetime.now(timezone.utc).isoformat()
+    })
+    
+    # Get frontend URL from environment or use default
+    frontend_url = os.environ.get('FRONTEND_URL', 'https://password-reset-47.preview.emergentagent.com')
+    reset_link = f"{frontend_url}/reset-password?token={reset_token}"
+    
+    # Send email
+    if RESEND_API_KEY:
+        email_html = f"""
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+            <div style="text-align: center; margin-bottom: 30px;">
+                <h1 style="color: #6366f1; margin: 0;">Hireabble</h1>
+            </div>
+            <div style="background: #f8f9fa; padding: 30px; border-radius: 16px; border-left: 4px solid #6366f1;">
+                <h2 style="margin: 0 0 15px 0; color: #333;">Reset Your Password</h2>
+                <p style="color: #666; font-size: 16px; margin-bottom: 20px;">
+                    You requested to reset your password. Click the button below to create a new password.
+                </p>
+                <p style="color: #999; font-size: 14px;">
+                    This link will expire in 1 hour.
+                </p>
+            </div>
+            <div style="padding: 25px 0; text-align: center;">
+                <a href="{reset_link}" style="display: inline-block; background: linear-gradient(135deg, #6366f1 0%, #d946ef 100%); color: white; padding: 14px 40px; border-radius: 25px; text-decoration: none; font-weight: bold; font-size: 16px;">Reset Password</a>
+            </div>
+            <div style="text-align: center; color: #999; font-size: 13px; margin-top: 20px;">
+                <p>If you didn't request this reset, you can safely ignore this email.</p>
+                <p style="margin-top: 10px;">Or copy this link: <br/><span style="color: #6366f1; word-break: break-all;">{reset_link}</span></p>
+            </div>
+            <div style="border-top: 1px solid #eee; padding-top: 20px; margin-top: 30px; text-align: center; color: #999; font-size: 12px;">
+                <p>© Hireabble - Your career starts with a swipe</p>
+            </div>
+        </div>
+        """
+        asyncio.create_task(send_email_notification(
+            request.email,
+            "Reset Your Hireabble Password",
+            email_html
+        ))
+    else:
+        logger.warning(f"RESEND_API_KEY not configured. Reset link: {reset_link}")
+    
+    return {"message": "If an account exists with this email, a reset link has been sent."}
+
+@api_router.post("/auth/reset-password")
+async def reset_password(request: ResetPasswordRequest):
+    """Reset password using token"""
+    # Find token
+    token_doc = await db.password_reset_tokens.find_one({"token": request.token})
+    
+    if not token_doc:
+        raise HTTPException(status_code=400, detail="Invalid or expired reset token")
+    
+    # Check expiration
+    expires_at = datetime.fromisoformat(token_doc["expires_at"].replace('Z', '+00:00'))
+    if datetime.now(timezone.utc) > expires_at:
+        await db.password_reset_tokens.delete_one({"token": request.token})
+        raise HTTPException(status_code=400, detail="Reset token has expired")
+    
+    # Update password
+    hashed_password = hash_password(request.password)
+    await db.users.update_one(
+        {"id": token_doc["user_id"]},
+        {"$set": {"password": hashed_password}}
+    )
+    
+    # Delete used token
+    await db.password_reset_tokens.delete_one({"token": request.token})
+    
+    return {"message": "Password has been reset successfully"}
+
 @api_router.put("/auth/profile")
 async def update_profile(updates: dict, current_user: dict = Depends(get_current_user)):
     allowed_fields = [

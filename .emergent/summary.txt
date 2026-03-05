@@ -1,0 +1,183 @@
+<analysis>**original_problem_statement:**
+The user wants to create a mobile-first, Tinder-style application for job searching, named Hireabble.
+
+**PRODUCT REQUIREMENTS:**
+- **Dual User Roles:** The platform must support both Job Seekers and Recruiters.
+- **Core Swipe Mechanics:** Job seekers swipe right to apply for a job and left to pass. A match occurs when a recruiter also expresses interest in a seeker who has applied.
+- **Recruiter Functionality:** Recruiters can post, view, and edit their job listings. They can also view candidates who have applied to their jobs.
+- **Frictionless Onboarding:**
+    - User registration should be simple, requiring only basic information (email, password, role).
+    - After registration, job seekers are guided through a step-by-step process to build a simple resume by providing details like work experience, education, headline, and a professional photo.
+- **Profile & Resume:**
+    - User profiles must display the uploaded photo.
+    - A feature to download a user's resume as a PDF.
+    - A profile completeness indicator for seekers.
+- **Job Cards:** The swipe-able job cards must display key information like job title, experience level, etc.
+- **Real-time Chat:** Once a match is made, the recruiter and job seeker should be able to chat in real-time within the app.
+- **Notifications:** Send email notifications to users when a new match occurs.
+- **Forgot Password Feature:** Implement a mechanism for users to reset their forgotten passwords.
+
+**User's preferred language**: English
+
+**what currently exists?**
+A full-stack web application named Hireabble built with a React frontend and a FastAPI backend using a MongoDB database.
+
+- **Backend:**
+    - JWT-based authentication for user registration and login.
+    - CRUD APIs for Jobs, and endpoints for user onboarding, profile updates, and photo uploads.
+    - A swipe mechanism that records applications and creates matches.
+    - A static file-serving endpoint () to correctly serve user-uploaded images through the ingress.
+    - Real-time chat functionality via WebSockets.
+    - Email notifications for new matches using SendGrid.
+    - PDF resume generation using ReportLab.
+
+- **Frontend:**
+    - Separate dashboards for Job Seekers and Recruiters.
+    - A swipe interface for job seekers using .
+    - A multi-step onboarding flow for seekers post-registration.
+    - Profile pages that display user information, including the uploaded photo.
+    - A real-time chat component that connects to the WebSocket backend.
+    - Recruiters can create and edit job postings via a modal form.
+    - A utility function () exists to correctly format and display photo URLs across the application.
+
+**Last working item**:
+The user requested to add a Forgot Password feature and to delete their old account () so they could re-register. The agent has successfully deleted the account from the database.
+
+    - Last item agent was working: The agent was about to begin implementing the Forgot Password functionality after confirming the user account deletion.
+    - Status: NOT STARTED
+    - Agent Testing Done: N
+    - Which testing method agent to use? backend testing agent
+    - User Testing Done: N
+
+**All Pending/In progress Issue list**:
+  - **Issue 1 (P0): Implement Forgot Password functionality.** This is the immediate task requested by the user.
+
+  **Issues Detail:**
+  - **Issue 1:** Implement Forgot Password functionality
+     - **Attempted fixes:** None. This is a new feature request.
+     - **Next debug checklist:**
+       1.  **Backend:**
+           -  Create a new collection in MongoDB to store password reset tokens with an expiration timestamp.
+           -  Implement an API endpoint (e.g., ) that takes an email, generates a unique token, saves it to the new collection, and sends a password reset email (containing a link with the token) to the user.
+           -  Implement a second API endpoint (e.g., ) that takes the token and a new password. It should validate the token, check for expiration, and update the user's password in the  collection.
+       2.  **Frontend:**
+           -  Create a new Forgot Password page with a form to enter an email.
+           -  Create a Reset Password page that accepts the token from the URL and has a form for the new password.
+           -  Update the Login page with a link to the Forgot Password page.
+     - **Why fix this issue and what will be achieved with the fix?** This is a critical usability feature that allows users to regain access to their accounts if they forget their password.
+     - **Status:** NOT STARTED
+     - **Is recurring issue?** N
+     - **Should Test frontend/backend/both after fix?** both
+     - **Blocked on other issue:** None
+
+**In progress Task List**:
+  There are no other in-progress tasks.
+
+**Upcoming and Future Tasks**
+**Upcoming Tasks:**
+- **(P1) Implement Super Like feature:** This was part of the original plan but was deferred. It would allow a job seeker to give a job posting a Super Like to show higher interest, which could be highlighted to the recruiter.
+- **(P2) In-App Notifications:** Add real-time notifications in the UI for new matches and new messages, so users don't have to rely solely on email.
+
+**Completed work in this session**
+- **Core Application Build:** Created the initial full-stack application with user roles, JWT auth, and swipe functionality.
+- **Rebranding:** Changed the application name from JobSwipe to Hireabble across the entire codebase.
+- **Onboarding Flow:** Implemented a multi-step onboarding process for job seekers that occurs after the initial sign-up.
+- **Recruiter Job Editing:** Added functionality for recruiters to edit their job postings.
+- **Photo Upload & Bug Fix:**
+    - Implemented photo uploads for user profiles.
+    - **Fixed a critical bug** where photos were not displaying due to an ingress routing issue. The fix involved creating a new API endpoint () to serve images and updating all relevant components to use a URL helper ().
+- **Swipe Logic Bug Fix:** Investigated user reports of seeing the same job repeatedly. The issue was traced to duplicate test data, which was cleaned up.
+- **Advanced Features Implemented:**
+    - **Real-time Chat:** Integrated WebSocket for instant messaging between matched users.
+    - **Email Notifications:** Set up SendGrid to send emails on new matches.
+    - **PDF Resume Download:** Added a feature for users to download their profile as a PDF.
+    - **Profile Completeness & Quick Apply:** Added UI elements for these features.
+- **User Account Deletion:** Deleted a user account from the database as per a direct user request.
+
+**Earlier issues found/mentioned but not fixed**
+   - **Issue 1: Minor Dropdown Interaction Issue**
+     - A testing agent run (Message 66) reported a non-critical frontend success rate of 95% due to a minor dropdown interaction issue. This was deferred to prioritize core functionality.
+     - **Debug checklist:** Re-run the frontend testing agent to isolate the specific component and interaction causing the issue. Inspect the relevant component's JSX and CSS for event handler or z-index issues.
+     - **Why to solve this issue and what will be achieved with this?** Fixing this will improve the UI polish and bring frontend test success to 100%.
+     - **Should Test frontend/backend/both after fix:** frontend
+     - **Is recurring issue?** N
+
+**Known issue recurrence from previous fork**
+  - None.
+
+**Code Architecture**
+
+
+**Key Technical Concepts**
+- **Backend:** FastAPI, MongoDB (motor), WebSockets
+- **Frontend:** React, Tailwind CSS, Framer Motion
+- **Authentication:** JWT (JSON Web Tokens)
+- **Integrations:** SendGrid (email), ReportLab (PDF generation)
+- **Deployment:** Docker/Kubernetes container environment with Ingress routing.
+
+**key DB schema**
+- **users:** 
+- **jobs:** 
+- **applications:** 
+- **matches:** 
+- **messages:** 
+
+**changes in tech stack**
+- None. The stack has been consistent (React, FastAPI, MongoDB).
+
+**All files of reference**
+- : The single source for all backend logic, including auth, API endpoints, and WebSocket handling.
+- : Contains the main application routing and context providers.
+- : Core swipe functionality for job seekers.
+- : Job management for recruiters.
+- : The post-registration resume builder.
+- : Displays user profile, including the photo.
+- : **Important file** created to solve the photo display bug. It contains the  helper.
+
+**Areas that need refactoring**:
+-  is becoming very large. It could be beneficial to refactor the routes into separate files (e.g., , ) using FastAPI's  to improve organization.
+
+**key api endpoints**
+- , 
+-  (PUT)
+-  (GET, POST),  (PUT)
+-  (POST)
+-  (POST): For uploading profile photos.
+-  (GET): **Critical endpoint** for serving uploaded images.
+-  (GET): Downloads the user's profile as a PDF.
+- : WebSocket connection endpoint for real-time chat.
+
+**Critical Info for New Agent**
+- **Photo Serving is Critical:** Due to ingress rules, static files like profile pictures cannot be served from a standard  or  path. They **must** be served through an endpoint prefixed with . The current implementation uses .
+- **Frontend URL Helper:** A helper function  exists in . You **must** use this function whenever displaying a user photo to ensure the URL is correctly constructed (prepending the backend URL if necessary). This was the fix for a major bug.
+- **Single Backend File:** All backend logic is currently in . Be mindful of this when adding new routes.
+
+**documents and test reports created in this job**
+- : Contains the Product Requirements Document.
+- Test reports are available in .
+
+**Last 10 User Messages and any pending HUMAN messages**
+1.  **User (Msg 258):** Can we make a forgot password function? Also, can you delete my account  so I can sign up again?
+2.  **Agent (Msg 259):** I'll delete your account and add a forgot password feature right away.
+3.  **User (Msg 261):** continue
+4.  **Agent (Msg 262):** Now let me add the forgot password feature:
+
+**Project Health Check:**
+- **Broken:** None.
+- **Mocked:** The SendGrid integration is functional but relies on API keys being present in the environment.
+
+**3rd Party Integrations**
+- **SendGrid** (Email Notifications) — requires User API Key.
+
+**Testing status**
+- Testing agent used after significant changes: YES
+- Troubleshoot agent used after agent stuck in loop: NO
+- Test files created: None explicitly. Testing was done via testing agent and manual / commands.
+- Known regressions: None.
+
+**Credentials to test flow:**
+No static credentials. The agent should register a new test user for both the Job Seeker and Recruiter roles to test the end-to-end flow.
+
+**What agent forgot to execute**
+- The Super Like feature, mentioned in the agent's initial plan (Message 10), was never implemented.
+- A minor dropdown UI issue identified by the testing agent (Message 66) was deferred and never fixed.</analysis>

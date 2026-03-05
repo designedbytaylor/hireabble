@@ -7,7 +7,7 @@ import uuid
 import json
 
 class HireabbleAPITester:
-    def __init__(self, base_url="https://hire-swipe-5.preview.emergentagent.com/api"):
+    def __init__(self, base_url="https://password-reset-47.preview.emergentagent.com/api"):
         self.base_url = base_url
         self.seeker_token = None
         self.recruiter_token = None
