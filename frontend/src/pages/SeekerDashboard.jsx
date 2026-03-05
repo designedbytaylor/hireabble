@@ -54,6 +54,7 @@ export default function SeekerDashboard() {
     fetchStats();
     fetchProfileCompleteness();
     fetchSuperLikesRemaining();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -520,6 +521,7 @@ function SwipeCard({ job, onSwipe, expanded, setExpanded, swipeDirection }) {
       
       requestAnimationFrame(animate);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [swipeDirection]);
 
   const handleDragEnd = (_, info) => {

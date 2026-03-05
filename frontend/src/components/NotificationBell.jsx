@@ -20,6 +20,7 @@ export default function NotificationBell() {
     fetchUnreadCount();
     const interval = setInterval(fetchUnreadCount, 30000); // Poll every 30 seconds
     return () => clearInterval(interval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
 
   useEffect(() => {
