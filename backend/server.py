@@ -399,6 +399,111 @@ async def reset_password(request: ResetPasswordRequest):
     
     return {"message": "Password has been reset successfully"}
 
+# ==================== CHANGE PASSWORD ====================
+
+class ChangePasswordRequest(BaseModel):
+    current_password: str
+    new_password: str
+
+@api_router.post("/auth/change-password")
+async def change_password(request: ChangePasswordRequest, current_user: dict = Depends(get_current_user)):
+    """Change password for logged-in user"""
+    # Get user with password
+    user = await db.users.find_one({"id": current_user["id"]})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    # Verify current password
+    if not verify_password(request.current_password, user["password"]):
+        raise HTTPException(status_code=400, detail="Current password is incorrect")
+    
+    # Validate new password
+    if len(request.new_password) < 6:
+        raise HTTPException(status_code=400, detail="New password must be at least 6 characters")
+    
+    # Update password
+    hashed_password = hash_password(request.new_password)
+    await db.users.update_one(
+        {"id": current_user["id"]},
+        {"$set": {"password": hashed_password}}
+    )
+    
+    return {"message": "Password changed successfully"}
+
+# ==================== NOTIFICATIONS ====================
+
+class NotificationResponse(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str
+    user_id: str
+    type: str  # 'match', 'message', 'application'
+    title: str
+    message: str
+    data: Optional[dict] = None
+    is_read: bool = False
+    created_at: str
+
+@api_router.get("/notifications", response_model=List[NotificationResponse])
+async def get_notifications(current_user: dict = Depends(get_current_user), limit: int = 20):
+    """Get notifications for current user"""
+    notifications = await db.notifications.find(
+        {"user_id": current_user["id"]},
+        {"_id": 0}
+    ).sort("created_at", -1).limit(limit).to_list(limit)
+    
+    return notifications
+
+@api_router.get("/notifications/unread/count")
+async def get_unread_notifications_count(current_user: dict = Depends(get_current_user)):
+    """Get count of unread notifications"""
+    count = await db.notifications.count_documents({
+        "user_id": current_user["id"],
+        "is_read": False
+    })
+    return {"unread_count": count}
+
+@api_router.put("/notifications/{notification_id}/read")
+async def mark_notification_read(notification_id: str, current_user: dict = Depends(get_current_user)):
+    """Mark a notification as read"""
+    result = await db.notifications.update_one(
+        {"id": notification_id, "user_id": current_user["id"]},
+        {"$set": {"is_read": True}}
+    )
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Notification not found")
+    return {"message": "Notification marked as read"}
+
+@api_router.put("/notifications/read-all")
+async def mark_all_notifications_read(current_user: dict = Depends(get_current_user)):
+    """Mark all notifications as read"""
+    await db.notifications.update_many(
+        {"user_id": current_user["id"], "is_read": False},
+        {"$set": {"is_read": True}}
+    )
+    return {"message": "All notifications marked as read"}
+
+async def create_notification(user_id: str, notif_type: str, title: str, message: str, data: dict = None):
+    """Helper function to create a notification"""
+    notification_doc = {
+        "id": str(uuid.uuid4()),
+        "user_id": user_id,
+        "type": notif_type,
+        "title": title,
+        "message": message,
+        "data": data or {},
+        "is_read": False,
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
+    await db.notifications.insert_one(notification_doc)
+    
+    # Send via WebSocket if user is connected
+    await manager.send_to_user(user_id, {
+        "type": "notification",
+        "notification": {k: v for k, v in notification_doc.items() if k != "_id"}
+    })
+    
+    return notification_doc
+
 @api_router.put("/auth/profile")
 async def update_profile(updates: dict, current_user: dict = Depends(get_current_user)):
     allowed_fields = [
@@ -545,6 +650,34 @@ async def update_job(job_id: str, updates: dict, current_user: dict = Depends(ge
 
 # ==================== APPLICATION/SWIPE ROUTES ====================
 
+DAILY_SUPERLIKE_LIMIT = 3
+
+@api_router.get("/superlikes/remaining")
+async def get_remaining_superlikes(current_user: dict = Depends(get_current_user)):
+    """Get remaining super likes for today"""
+    if current_user["role"] != "seeker":
+        raise HTTPException(status_code=403, detail="Only job seekers can access this")
+    
+    # Get today's date range
+    today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+    today_end = today_start + timedelta(days=1)
+    
+    # Count super likes used today
+    superlikes_today = await db.applications.count_documents({
+        "seeker_id": current_user["id"],
+        "action": "superlike",
+        "created_at": {
+            "$gte": today_start.isoformat(),
+            "$lt": today_end.isoformat()
+        }
+    })
+    
+    return {
+        "remaining": max(0, DAILY_SUPERLIKE_LIMIT - superlikes_today),
+        "used_today": superlikes_today,
+        "daily_limit": DAILY_SUPERLIKE_LIMIT
+    }
+
 @api_router.post("/swipe")
 async def swipe(action: SwipeAction, current_user: dict = Depends(get_current_user)):
     """Job seeker swipes on a job"""
@@ -558,6 +691,26 @@ async def swipe(action: SwipeAction, current_user: dict = Depends(get_current_us
     })
     if existing:
         raise HTTPException(status_code=400, detail="Already swiped on this job")
+    
+    # Check super like limit for today
+    if action.action == "superlike":
+        today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+        today_end = today_start + timedelta(days=1)
+        
+        superlikes_today = await db.applications.count_documents({
+            "seeker_id": current_user["id"],
+            "action": "superlike",
+            "created_at": {
+                "$gte": today_start.isoformat(),
+                "$lt": today_end.isoformat()
+            }
+        })
+        
+        if superlikes_today >= DAILY_SUPERLIKE_LIMIT:
+            raise HTTPException(
+                status_code=400, 
+                detail=f"Daily Super Like limit reached ({DAILY_SUPERLIKE_LIMIT}/day). Try again tomorrow!"
+            )
     
     # Get job details
     job = await db.jobs.find_one({"id": action.job_id}, {"_id": 0})
@@ -588,7 +741,26 @@ async def swipe(action: SwipeAction, current_user: dict = Depends(get_current_us
     
     await db.applications.insert_one(application_doc)
     
-    return {"message": f"Swiped {action.action}", "application_id": application_id}
+    # Return remaining super likes if it was a superlike action
+    remaining_superlikes = None
+    if action.action == "superlike":
+        today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+        today_end = today_start + timedelta(days=1)
+        superlikes_today = await db.applications.count_documents({
+            "seeker_id": current_user["id"],
+            "action": "superlike",
+            "created_at": {
+                "$gte": today_start.isoformat(),
+                "$lt": today_end.isoformat()
+            }
+        })
+        remaining_superlikes = DAILY_SUPERLIKE_LIMIT - superlikes_today
+    
+    return {
+        "message": f"Swiped {action.action}", 
+        "application_id": application_id,
+        "remaining_superlikes": remaining_superlikes
+    }
 
 @api_router.get("/applications", response_model=List[ApplicationResponse])
 async def get_applications(current_user: dict = Depends(get_current_user)):
@@ -660,6 +832,15 @@ async def respond_to_application(response: RecruiterAction, current_user: dict =
             "created_at": datetime.now(timezone.utc).isoformat()
         }
         await db.matches.insert_one(match_doc)
+        
+        # Create in-app notification for seeker
+        await create_notification(
+            user_id=application["seeker_id"],
+            notif_type="match",
+            title="It's a Match!",
+            message=f"{job['company'] if job else 'A company'} accepted your application for {job['title'] if job else 'a position'}!",
+            data={"match_id": match_doc["id"], "job_id": application["job_id"]}
+        )
         
         # Send WebSocket notification to seeker
         await manager.send_to_user(application["seeker_id"], {

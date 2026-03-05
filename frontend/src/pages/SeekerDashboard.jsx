@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import Navigation from '../components/Navigation';
+import NotificationBell from '../components/NotificationBell';
 import MatchModal from '../components/MatchModal';
 import { Button } from '../components/ui/button';
 import {
@@ -37,6 +38,7 @@ export default function SeekerDashboard() {
   const [expandedCard, setExpandedCard] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
   const [profileComplete, setProfileComplete] = useState(false);
+  const [superLikesRemaining, setSuperLikesRemaining] = useState(3);
   const [filters, setFilters] = useState({
     job_type: '',
     experience_level: '',
@@ -49,6 +51,7 @@ export default function SeekerDashboard() {
     fetchJobs();
     fetchStats();
     fetchProfileCompleteness();
+    fetchSuperLikesRemaining();
   }, []);
 
   useEffect(() => {
@@ -56,6 +59,17 @@ export default function SeekerDashboard() {
     const count = Object.values(filters).filter(v => v !== '').length;
     setActiveFiltersCount(count);
   }, [filters]);
+
+  const fetchSuperLikesRemaining = async () => {
+    try {
+      const response = await axios.get(`${API}/superlikes/remaining`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setSuperLikesRemaining(response.data.remaining);
+    } catch (error) {
+      console.error('Failed to fetch super likes:', error);
+    }
+  };
 
   const fetchProfileCompleteness = async () => {
     try {
@@ -104,9 +118,15 @@ export default function SeekerDashboard() {
   const handleSwipe = async (action) => {
     if (currentIndex >= jobs.length) return;
     
+    // Check super like limit before sending
+    if (action === 'superlike' && superLikesRemaining <= 0) {
+      toast.error('No Super Likes remaining today! Try again tomorrow.', { duration: 3000 });
+      return;
+    }
+    
     const job = jobs[currentIndex];
     try {
-      await axios.post(`${API}/swipe`, 
+      const response = await axios.post(`${API}/swipe`, 
         { job_id: job.id, action },
         { headers: { Authorization: `Bearer ${token}` } }
       );
@@ -114,7 +134,15 @@ export default function SeekerDashboard() {
       if (action === 'like') {
         toast.success('Application sent!');
       } else if (action === 'superlike') {
-        toast.success('Super Like sent!', { duration: 2000 });
+        const remaining = response.data.remaining_superlikes;
+        setSuperLikesRemaining(remaining);
+        toast.success(
+          <div className="flex items-center gap-2">
+            <Star className="w-5 h-5 text-yellow-400 fill-yellow-400" />
+            <span>Super Like sent! ({remaining} remaining today)</span>
+          </div>,
+          { duration: 2500 }
+        );
       }
       
       setCurrentIndex(prev => prev + 1);
@@ -162,6 +190,7 @@ export default function SeekerDashboard() {
             <p className="text-muted-foreground">Find your dream job</p>
           </div>
           <div className="flex items-center gap-3">
+            <NotificationBell />
             <button
               onClick={() => setShowFilters(true)}
               className="relative p-2 rounded-xl hover:bg-accent transition-colors"
@@ -264,13 +293,28 @@ export default function SeekerDashboard() {
                 >
                   <X className="w-7 h-7 text-destructive" />
                 </button>
-                <button
-                  onClick={() => handleSwipe('superlike')}
-                  className="w-20 h-20 rounded-full bg-secondary/10 border border-secondary/30 flex items-center justify-center hover:scale-110 hover:neon-glow-pink transition-all duration-300"
-                  data-testid="superlike-btn"
-                >
-                  <Star className="w-9 h-9 text-secondary" />
-                </button>
+                <div className="relative">
+                  <button
+                    onClick={() => handleSwipe('superlike')}
+                    disabled={superLikesRemaining <= 0}
+                    className={`w-20 h-20 rounded-full bg-secondary/10 border border-secondary/30 flex items-center justify-center transition-all duration-300 ${
+                      superLikesRemaining > 0 
+                        ? 'hover:scale-110 hover:neon-glow-pink' 
+                        : 'opacity-50 cursor-not-allowed'
+                    }`}
+                    data-testid="superlike-btn"
+                  >
+                    <Star className={`w-9 h-9 ${superLikesRemaining > 0 ? 'text-secondary' : 'text-muted-foreground'}`} />
+                  </button>
+                  {/* Super Like Counter Badge */}
+                  <span className={`absolute -top-1 -right-1 w-6 h-6 rounded-full text-xs font-bold flex items-center justify-center ${
+                    superLikesRemaining > 0 
+                      ? 'bg-secondary text-white' 
+                      : 'bg-muted text-muted-foreground'
+                  }`}>
+                    {superLikesRemaining}
+                  </span>
+                </div>
                 <button
                   onClick={() => handleSwipe('like')}
                   className="w-16 h-16 rounded-full bg-success/10 border border-success/30 flex items-center justify-center hover:scale-110 hover:neon-glow-green transition-all duration-300"

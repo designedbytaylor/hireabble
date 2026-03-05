@@ -26,6 +26,7 @@ import { toast } from 'sonner';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import Navigation from '../components/Navigation';
+import NotificationBell from '../components/NotificationBell';
 import { getPhotoUrl } from '../utils/helpers';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
@@ -138,14 +139,17 @@ export default function RecruiterDashboard() {
             <h1 className="text-2xl font-bold font-['Outfit']">Recruiter Hub</h1>
             <p className="text-muted-foreground">{user?.company || 'Your Company'}</p>
           </div>
-          <Button 
-            onClick={() => setShowNewJob(true)}
-            className="bg-gradient-to-r from-primary to-secondary rounded-full px-5"
-            data-testid="post-job-btn"
-          >
-            <Plus className="w-5 h-5 mr-2" />
-            Post Job
-          </Button>
+          <div className="flex items-center gap-3">
+            <NotificationBell />
+            <Button 
+              onClick={() => setShowNewJob(true)}
+              className="bg-gradient-to-r from-primary to-secondary rounded-full px-5"
+              data-testid="post-job-btn"
+            >
+              <Plus className="w-5 h-5 mr-2" />
+              Post Job
+            </Button>
+          </div>
         </div>
 
         {/* Stats Grid - Bento Style */}
