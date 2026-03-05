@@ -20,48 +20,57 @@ router = APIRouter(prefix="/auth", tags=["Authentication"])
 
 @router.post("/register")
 async def register(user: UserCreate):
-    # Check if user exists
-    existing = await db.users.find_one({"email": user.email})
-    if existing:
-        raise HTTPException(status_code=400, detail="Email already registered")
-    
-    user_id = str(uuid.uuid4())
-    avatar = f"https://api.dicebear.com/7.x/avataaars/svg?seed={user_id}"
-    
-    user_doc = {
-        "id": user_id,
-        "email": user.email,
-        "password": hash_password(user.password),
-        "name": user.name,
-        "role": user.role,
-        "company": user.company,
-        "avatar": avatar,
-        "photo_url": None,
-        "video_url": None,
-        "title": None,
-        "bio": None,
-        "skills": [],
-        "experience_years": None,
-        "location": None,
-        "current_employer": None,
-        "previous_employers": [],
-        "school": None,
-        "degree": None,
-        "certifications": [],
-        "work_preference": None,
-        "desired_salary": None,
-        "available_immediately": True,
-        "onboarding_complete": False,
-        "push_subscription": None,
-        "created_at": datetime.now(timezone.utc).isoformat()
-    }
-    
-    await db.users.insert_one(user_doc)
-    
-    token = create_token(user_id, user.role)
-    user_response = {k: v for k, v in user_doc.items() if k not in ['_id', 'password']}
-    
-    return {"token": token, "user": user_response}
+    try:
+        logger.info(f"Registration attempt for email: {user.email}")
+
+        # Check if user exists
+        existing = await db.users.find_one({"email": user.email})
+        if existing:
+            raise HTTPException(status_code=400, detail="Email already registered")
+
+        user_id = str(uuid.uuid4())
+        avatar = f"https://api.dicebear.com/7.x/avataaars/svg?seed={user_id}"
+
+        user_doc = {
+            "id": user_id,
+            "email": user.email,
+            "password": hash_password(user.password),
+            "name": user.name,
+            "role": user.role,
+            "company": user.company,
+            "avatar": avatar,
+            "photo_url": None,
+            "video_url": None,
+            "title": None,
+            "bio": None,
+            "skills": [],
+            "experience_years": None,
+            "location": None,
+            "current_employer": None,
+            "previous_employers": [],
+            "school": None,
+            "degree": None,
+            "certifications": [],
+            "work_preference": None,
+            "desired_salary": None,
+            "available_immediately": True,
+            "onboarding_complete": False,
+            "push_subscription": None,
+            "created_at": datetime.now(timezone.utc).isoformat()
+        }
+
+        await db.users.insert_one(user_doc)
+        logger.info(f"User created successfully: {user_id}")
+
+        token = create_token(user_id, user.role)
+        user_response = {k: v for k, v in user_doc.items() if k not in ['_id', 'password']}
+
+        return {"token": token, "user": user_response}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Registration failed: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Registration error: {str(e)}")
 
 @router.post("/login")
 async def login(credentials: UserLogin):
