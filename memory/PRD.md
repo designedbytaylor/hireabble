@@ -38,6 +38,14 @@ Build a Tinder-like app for job applications called "Hireabble" where both job s
 - **Quick Apply Badge**: Shows when profile is 80%+ complete, indicates "profile ready" status
 - **Profile Completeness Tracker**: Percentage display with missing fields hints
 
+### Phase 4 - Account Security (March 2026) ✓
+- **Forgot Password Flow**: Complete password reset via email
+  - `/forgot-password` page: Email input form with success state
+  - `/reset-password` page: Token validation and new password form
+  - Token expires in 1 hour for security
+  - Invalid/expired token error handling
+  - Email notifications via SendGrid (optional - requires RESEND_API_KEY)
+
 ## API Endpoints
 
 ### Auth
@@ -45,6 +53,8 @@ Build a Tinder-like app for job applications called "Hireabble" where both job s
 - POST /api/auth/login
 - GET /api/auth/me
 - PUT /api/auth/profile
+- POST /api/auth/forgot-password (new)
+- POST /api/auth/reset-password (new)
 
 ### Jobs
 - POST /api/jobs
