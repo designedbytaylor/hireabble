@@ -1,0 +1,26 @@
+{
+  "short_name": "Hireabble",
+  "name": "Hireabble - Job Matching",
+  "description": "A Tinder-style job matching platform. Swipe to find your dream job or perfect candidate.",
+  "icons": [
+    {
+      "src": "icons/icon-192.svg",
+      "type": "image/svg+xml",
+      "sizes": "192x192",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icons/icon-512.svg",
+      "type": "image/svg+xml",
+      "sizes": "512x512",
+      "purpose": "any maskable"
+    }
+  ],
+  "start_url": ".",
+  "display": "standalone",
+  "theme_color": "#09090b",
+  "background_color": "#09090b",
+  "orientation": "portrait",
+  "scope": "/",
+  "categories": ["business", "productivity"]
+}
