@@ -45,6 +45,23 @@ Build a Tinder-like app for job applications called "Hireabble" where both job s
   - Token expires in 1 hour for security
   - Invalid/expired token error handling
   - Email notifications via SendGrid (optional - requires RESEND_API_KEY)
+- **Change Password**: In-profile password update
+  - Collapsible section in Profile page
+  - Verifies current password before allowing change
+  - Password visibility toggles
+
+### Phase 5 - Enhanced Engagement (March 2026) ✓
+- **Super Like Feature**: Premium swipe action with daily limits
+  - 3 Super Likes per day limit
+  - Badge on button showing remaining count
+  - Toast notification with remaining count after use
+  - Blocked when daily limit reached
+- **In-App Notifications**: Real-time notification system
+  - Bell icon with unread badge in header
+  - Dropdown showing recent notifications
+  - Mark as read / mark all as read functionality
+  - Notification types: match, message, application
+  - WebSocket integration for real-time delivery
 
 ## API Endpoints
 
@@ -53,8 +70,18 @@ Build a Tinder-like app for job applications called "Hireabble" where both job s
 - POST /api/auth/login
 - GET /api/auth/me
 - PUT /api/auth/profile
-- POST /api/auth/forgot-password (new)
-- POST /api/auth/reset-password (new)
+- POST /api/auth/forgot-password
+- POST /api/auth/reset-password
+- POST /api/auth/change-password (new)
+
+### Super Likes
+- GET /api/superlikes/remaining (new)
+
+### Notifications
+- GET /api/notifications (new)
+- GET /api/notifications/unread/count (new)
+- PUT /api/notifications/{id}/read (new)
+- PUT /api/notifications/read-all (new)
 
 ### Jobs
 - POST /api/jobs
