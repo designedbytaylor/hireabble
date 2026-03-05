@@ -47,7 +47,12 @@ export default function Register() {
       toast.success('Welcome to Hireabble!');
       navigate(user.role === 'seeker' ? '/dashboard' : '/recruiter');
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Registration failed');
+      console.error('Registration error:', error);
+      console.error('Response status:', error.response?.status);
+      console.error('Response data:', error.response?.data);
+      console.error('Request URL:', error.config?.url);
+      const message = error.response?.data?.detail || error.message || 'Registration failed';
+      toast.error(`Registration failed: ${message}`);
     } finally {
       setLoading(false);
     }
