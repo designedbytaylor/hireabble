@@ -39,6 +39,8 @@ export default function SeekerDashboard() {
   const [showFilters, setShowFilters] = useState(false);
   const [profileComplete, setProfileComplete] = useState(false);
   const [superLikesRemaining, setSuperLikesRemaining] = useState(3);
+  const [swipeDirection, setSwipeDirection] = useState(null); // 'left', 'right', 'up'
+  const [isAnimating, setIsAnimating] = useState(false);
   const [filters, setFilters] = useState({
     job_type: '',
     experience_level: '',
@@ -115,8 +117,8 @@ export default function SeekerDashboard() {
     }
   };
 
-  const handleSwipe = async (action) => {
-    if (currentIndex >= jobs.length) return;
+  const handleSwipe = async (action, fromDrag = false) => {
+    if (currentIndex >= jobs.length || isAnimating) return;
     
     // Check super like limit before sending
     if (action === 'superlike' && superLikesRemaining <= 0) {
@@ -125,6 +127,18 @@ export default function SeekerDashboard() {
     }
     
     const job = jobs[currentIndex];
+    
+    // If triggered from button, animate the card first
+    if (!fromDrag) {
+      setIsAnimating(true);
+      if (action === 'like') setSwipeDirection('right');
+      else if (action === 'pass') setSwipeDirection('left');
+      else if (action === 'superlike') setSwipeDirection('up');
+      
+      // Wait for animation to complete before API call
+      await new Promise(resolve => setTimeout(resolve, 300));
+    }
+    
     try {
       const response = await axios.post(`${API}/swipe`, 
         { job_id: job.id, action },
@@ -146,9 +160,13 @@ export default function SeekerDashboard() {
       }
       
       setCurrentIndex(prev => prev + 1);
+      setSwipeDirection(null);
+      setIsAnimating(false);
       fetchStats();
     } catch (error) {
       toast.error(error.response?.data?.detail || 'Failed to submit');
+      setSwipeDirection(null);
+      setIsAnimating(false);
     }
   };
 
@@ -278,9 +296,10 @@ export default function SeekerDashboard() {
                 {/* Main Swipeable Card */}
                 <SwipeCard 
                   job={currentJob}
-                  onSwipe={handleSwipe}
+                  onSwipe={(action) => handleSwipe(action, true)}
                   expanded={expandedCard}
                   setExpanded={setExpandedCard}
+                  swipeDirection={swipeDirection}
                 />
               </div>
 
@@ -465,27 +484,80 @@ export default function SeekerDashboard() {
   );
 }
 
-function SwipeCard({ job, onSwipe, expanded, setExpanded }) {
+function SwipeCard({ job, onSwipe, expanded, setExpanded, swipeDirection }) {
   const x = useMotionValue(0);
   const y = useMotionValue(0);
   const rotate = useTransform(x, [-200, 200], [-25, 25]);
-  const opacity = useTransform(x, [-200, -100, 0, 100, 200], [0.5, 1, 1, 1, 0.5]);
   
   // Indicator opacities
   const likeOpacity = useTransform(x, [0, 100], [0, 1]);
   const passOpacity = useTransform(x, [-100, 0], [1, 0]);
   const superlikeOpacity = useTransform(y, [-100, 0], [1, 0]);
 
+  // Handle button-triggered swipes
+  useEffect(() => {
+    if (swipeDirection) {
+      const toX = swipeDirection === 'right' ? 1500 : swipeDirection === 'left' ? -1500 : 0;
+      const toY = swipeDirection === 'up' ? -1500 : 0;
+      
+      const startX = x.get();
+      const startY = y.get();
+      const startTime = Date.now();
+      const duration = 300;
+      
+      const animate = () => {
+        const elapsed = Date.now() - startTime;
+        const progress = Math.min(elapsed / duration, 1);
+        const easeProgress = 1 - Math.pow(1 - progress, 3);
+        
+        x.set(startX + (toX - startX) * easeProgress);
+        y.set(startY + (toY - startY) * easeProgress);
+        
+        if (progress < 1) {
+          requestAnimationFrame(animate);
+        }
+      };
+      
+      requestAnimationFrame(animate);
+    }
+  }, [swipeDirection]);
+
   const handleDragEnd = (_, info) => {
     const swipeThreshold = 100;
+    const velocity = info.velocity;
     
-    if (info.offset.y < -swipeThreshold) {
-      onSwipe('superlike');
-    } else if (info.offset.x > swipeThreshold) {
-      onSwipe('like');
-    } else if (info.offset.x < -swipeThreshold) {
-      onSwipe('pass');
+    // Check if swiped with enough distance or velocity
+    if (info.offset.y < -swipeThreshold || velocity.y < -500) {
+      animateCardOut(0, -1500, 'superlike');
+    } else if (info.offset.x > swipeThreshold || velocity.x > 500) {
+      animateCardOut(1500, 0, 'like');
+    } else if (info.offset.x < -swipeThreshold || velocity.x < -500) {
+      animateCardOut(-1500, 0, 'pass');
     }
+  };
+
+  const animateCardOut = (toX, toY, action) => {
+    const startX = x.get();
+    const startY = y.get();
+    const startTime = Date.now();
+    const duration = 300;
+    
+    const animate = () => {
+      const elapsed = Date.now() - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+      const easeProgress = 1 - Math.pow(1 - progress, 3);
+      
+      x.set(startX + (toX - startX) * easeProgress);
+      y.set(startY + (toY - startY) * easeProgress);
+      
+      if (progress < 1) {
+        requestAnimationFrame(animate);
+      } else {
+        onSwipe(action);
+      }
+    };
+    
+    requestAnimationFrame(animate);
   };
 
   const formatSalary = (min, max) => {
@@ -499,10 +571,10 @@ function SwipeCard({ job, onSwipe, expanded, setExpanded }) {
   return (
     <motion.div
       className="absolute inset-0 cursor-grab active:cursor-grabbing"
-      style={{ x, y, rotate, opacity }}
-      drag
+      style={{ x, y, rotate }}
+      drag={!swipeDirection}
       dragConstraints={{ left: 0, right: 0, top: 0, bottom: 0 }}
-      dragElastic={0.7}
+      dragElastic={1}
       onDragEnd={handleDragEnd}
       whileTap={{ cursor: 'grabbing' }}
       data-testid="job-card"
