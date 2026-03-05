@@ -63,6 +63,26 @@ Build a Tinder-like app for job applications called "Hireabble" where both job s
   - Notification types: match, message, application
   - WebSocket integration for real-time delivery
 
+### Phase 6 - Platform Improvements (March 2026) ✓
+- **Backend Refactoring**: Organized codebase from single file to modular routers
+  - `/app/backend/routers/`: auth, jobs, applications, matches, notifications, uploads, stats
+  - `/app/backend/database.py`: Shared models, utilities, and DB connection
+  - Main entry point: `/app/backend/server.py` (now ~100 lines vs 1400+)
+- **Video Introduction**: Candidates can upload video intros
+  - VideoUpload component in Profile page
+  - Max 50MB, supports MP4/WebM/MOV
+  - Video preview with play/pause controls
+  - DELETE option to remove video
+  - "VIDEO" badge shown on candidate cards for recruiters
+  - Full video playback in candidate detail modal
+- **Push Notification Infrastructure**: Backend endpoints ready
+  - POST /api/push/subscribe - Save subscription
+  - DELETE /api/push/unsubscribe - Remove subscription
+  - Dropdown showing recent notifications
+  - Mark as read / mark all as read functionality
+  - Notification types: match, message, application
+  - WebSocket integration for real-time delivery
+
 ## API Endpoints
 
 ### Auth
@@ -102,10 +122,21 @@ Build a Tinder-like app for job applications called "Hireabble" where both job s
 - GET /api/messages/unread/count
 - WS /ws/{token} (WebSocket)
 
-### Profile
+### Profile & Uploads
 - GET /api/profile/completeness
-- GET /api/resume/download
-- POST /api/upload/photo
+- GET /api/users/resume/download
+- POST /api/upload (photo)
+- POST /api/upload/video (new)
+- DELETE /api/upload/video (new)
+- GET /api/photos/{filename}
+- GET /api/videos/{filename} (new)
+
+### Push Notifications
+- POST /api/push/subscribe (new)
+- DELETE /api/push/unsubscribe (new)
+
+### Stats
+- GET /api/stats
 
 ## Environment Variables
 - MONGO_URL (required)
