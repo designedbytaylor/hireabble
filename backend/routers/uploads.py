@@ -18,6 +18,7 @@ ALLOWED_VIDEO_TYPES = ["video/mp4", "video/webm", "video/quicktime", "video/x-ms
 MAX_IMAGE_SIZE = 5 * 1024 * 1024  # 5MB
 MAX_VIDEO_SIZE = 50 * 1024 * 1024  # 50MB
 
+@router.post("/upload/photo")
 @router.post("/upload")
 async def upload_file(
     file: UploadFile = File(...),
