@@ -7,7 +7,7 @@ import uuid
 import asyncio
 
 from database import (
-    db, security, logger, RESEND_API_KEY, UPLOADS_DIR,
+    db, security, logger, RESEND_API_KEY,
     hash_password, verify_password, create_token, get_current_user,
     send_email_notification, manager,
     UserCreate, UserLogin, UserResponse, ForgotPasswordRequest, 

@@ -89,9 +89,8 @@ export default function Onboarding() {
         }
       });
 
-      // The API returns the path, construct full URL
-      const photoUrl = `${BACKEND_URL}${response.data.photo_url}`;
-      setFormData(prev => ({ ...prev, photo_url: photoUrl }));
+      // The API returns the full public URL from Supabase Storage
+      setFormData(prev => ({ ...prev, photo_url: response.data.photo_url }));
       toast.success('Photo uploaded!');
     } catch (error) {
       toast.error('Failed to upload photo');
