@@ -394,6 +394,11 @@ export default function RecruiterDashboard() {
                         {app.action === 'superlike' && (
                           <Star className="w-4 h-4 text-secondary fill-secondary" />
                         )}
+                        {app.seeker_video && (
+                          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-purple-500/10 text-purple-500 text-[10px] font-medium">
+                            VIDEO
+                          </span>
+                        )}
                       </div>
                       <div className="text-sm text-primary">{app.seeker_title || 'Job Seeker'}</div>
                     </div>
@@ -490,6 +495,26 @@ export default function RecruiterDashboard() {
                   </div>
                 )}
               </div>
+
+              {/* Video Introduction */}
+              {selectedCandidate.seeker_video && (
+                <div>
+                  <div className="text-sm text-muted-foreground mb-2 flex items-center gap-2">
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-secondary/20 text-secondary text-xs font-medium">
+                      Video Intro
+                    </span>
+                  </div>
+                  <video
+                    src={selectedCandidate.seeker_video.startsWith('http') 
+                      ? selectedCandidate.seeker_video 
+                      : `${process.env.REACT_APP_BACKEND_URL}${selectedCandidate.seeker_video}`}
+                    className="w-full rounded-xl aspect-video object-contain bg-black/5"
+                    controls
+                    playsInline
+                    data-testid="candidate-video"
+                  />
+                </div>
+              )}
 
               {/* Skills */}
               {selectedCandidate.seeker_skills?.length > 0 && (

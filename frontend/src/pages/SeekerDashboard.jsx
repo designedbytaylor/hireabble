@@ -106,7 +106,7 @@ export default function SeekerDashboard() {
 
   const fetchStats = async () => {
     try {
-      const response = await axios.get(`${API}/stats/seeker`, {
+      const response = await axios.get(`${API}/stats`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       setStats(response.data);

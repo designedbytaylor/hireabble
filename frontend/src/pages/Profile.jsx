@@ -9,6 +9,7 @@ import { toast } from 'sonner';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import Navigation from '../components/Navigation';
+import VideoUpload from '../components/VideoUpload';
 import { getPhotoUrl } from '../utils/helpers';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
@@ -325,6 +326,17 @@ export default function Profile() {
                     placeholder="e.g., React, Node.js, Python"
                     className="h-12 rounded-xl bg-background border-border"
                     data-testid="profile-skills-input"
+                  />
+                </div>
+
+                {/* Video Introduction */}
+                <div className="pt-4 border-t border-border">
+                  <VideoUpload
+                    token={token}
+                    currentVideoUrl={user?.video_url}
+                    onVideoChange={(url) => {
+                      updateProfile({ video_url: url });
+                    }}
                   />
                 </div>
               </>
