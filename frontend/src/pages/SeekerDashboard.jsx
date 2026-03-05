@@ -331,14 +331,14 @@ export default function SeekerDashboard() {
             <div className="space-y-2">
               <Label>Job Type</Label>
               <Select 
-                value={filters.job_type} 
-                onValueChange={(v) => setFilters({ ...filters, job_type: v })}
+                value={filters.job_type || "all"} 
+                onValueChange={(v) => setFilters({ ...filters, job_type: v === "all" ? "" : v })}
               >
                 <SelectTrigger className="h-11 rounded-xl bg-background" data-testid="filter-job-type">
                   <SelectValue placeholder="All types" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All types</SelectItem>
+                  <SelectItem value="all">All types</SelectItem>
                   <SelectItem value="remote">Remote</SelectItem>
                   <SelectItem value="onsite">On-site</SelectItem>
                   <SelectItem value="hybrid">Hybrid</SelectItem>
@@ -349,14 +349,14 @@ export default function SeekerDashboard() {
             <div className="space-y-2">
               <Label>Experience Level</Label>
               <Select 
-                value={filters.experience_level} 
-                onValueChange={(v) => setFilters({ ...filters, experience_level: v })}
+                value={filters.experience_level || "all"} 
+                onValueChange={(v) => setFilters({ ...filters, experience_level: v === "all" ? "" : v })}
               >
                 <SelectTrigger className="h-11 rounded-xl bg-background" data-testid="filter-experience">
                   <SelectValue placeholder="All levels" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All levels</SelectItem>
+                  <SelectItem value="all">All levels</SelectItem>
                   <SelectItem value="entry">Entry Level</SelectItem>
                   <SelectItem value="mid">Mid Level</SelectItem>
                   <SelectItem value="senior">Senior</SelectItem>
