@@ -47,19 +47,19 @@ export default function AdminLogin() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 flex items-center justify-center p-4">
+    <div className="min-h-screen flex items-center justify-center p-4" style={{ background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%)' }}>
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-red-500/20 border border-red-500/30 mb-4">
-            <Shield className="w-8 h-8 text-red-400" />
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl mb-4" style={{ background: 'rgba(239,68,68,0.2)', border: '1px solid rgba(239,68,68,0.3)' }}>
+            <Shield className="w-8 h-8" style={{ color: '#f87171' }} />
           </div>
-          <h1 className="text-2xl font-bold text-white">Admin Portal</h1>
-          <p className="text-gray-400 mt-1">
+          <h1 className="text-2xl font-bold" style={{ color: '#ffffff' }}>Admin Portal</h1>
+          <p style={{ color: '#9ca3af', marginTop: '4px' }}>
             {isSetup ? 'Create your admin account' : 'Hireabble Platform Administration'}
           </p>
         </div>
 
-        <form onSubmit={handleSubmit} className="bg-gray-800/50 border border-gray-700 rounded-2xl p-8 space-y-6 backdrop-blur-sm">
+        <form onSubmit={handleSubmit} className="rounded-2xl p-8 space-y-6" style={{ background: 'rgba(31,41,55,0.7)', border: '1px solid rgba(75,85,99,0.5)', backdropFilter: 'blur(8px)' }}>
           {isSetup && (
             <div className="space-y-2">
               <Label className="text-gray-300">Name</Label>
