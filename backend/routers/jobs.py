@@ -10,6 +10,7 @@ from database import (
     db, get_current_user,
     JobCreate, JobResponse
 )
+from content_filter import check_fields, is_severe
 
 router = APIRouter(prefix="/jobs", tags=["Jobs"])
 
@@ -19,8 +20,18 @@ async def create_job(job: JobCreate, current_user: dict = Depends(get_current_us
     if current_user["role"] != "recruiter":
         raise HTTPException(status_code=403, detail="Only recruiters can post jobs")
     
+    # Content moderation check
+    is_clean, violations = check_fields({
+        "title": job.title,
+        "company": job.company,
+        "description": job.description,
+        "requirements": job.requirements,
+    })
+    if not is_clean and is_severe(violations):
+        raise HTTPException(status_code=400, detail="Job posting contains prohibited content and cannot be published.")
+
     job_id = str(uuid.uuid4())
-    
+
     # Gradient backgrounds for variety
     backgrounds = [
         "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
@@ -50,6 +61,19 @@ async def create_job(job: JobCreate, current_user: dict = Depends(get_current_us
         "is_active": True
     }
     
+    # Flag for review if non-severe violations found
+    if not is_clean:
+        job_doc["is_flagged"] = True
+        await db.moderation_queue.insert_one({
+            "id": str(uuid.uuid4()),
+            "content_type": "job",
+            "content_id": job_id,
+            "user_id": current_user["id"],
+            "violations": violations,
+            "status": "pending",
+            "created_at": datetime.now(timezone.utc).isoformat(),
+        })
+
     await db.jobs.insert_one(job_doc)
     return {k: v for k, v in job_doc.items() if k != '_id'}
 
@@ -114,11 +138,29 @@ async def update_job(job_id: str, updates: dict, current_user: dict = Depends(ge
     if not job:
         raise HTTPException(status_code=404, detail="Job not found or not authorized")
     
-    allowed_fields = ["title", "company", "description", "requirements", 
-                      "salary_min", "salary_max", "location", "job_type", 
+    allowed_fields = ["title", "company", "description", "requirements",
+                      "salary_min", "salary_max", "location", "job_type",
                       "experience_level", "is_active"]
     update_data = {k: v for k, v in updates.items() if k in allowed_fields}
-    
+
+    # Content moderation on text fields being updated
+    text_fields = {k: v for k, v in update_data.items() if k in ("title", "company", "description", "requirements")}
+    if text_fields:
+        is_clean, violations = check_fields(text_fields)
+        if not is_clean and is_severe(violations):
+            raise HTTPException(status_code=400, detail="Update contains prohibited content.")
+        if not is_clean:
+            update_data["is_flagged"] = True
+            await db.moderation_queue.insert_one({
+                "id": str(uuid.uuid4()),
+                "content_type": "job",
+                "content_id": job_id,
+                "user_id": current_user["id"],
+                "violations": violations,
+                "status": "pending",
+                "created_at": datetime.now(timezone.utc).isoformat(),
+            })
+
     if update_data:
         await db.jobs.update_one({"id": job_id}, {"$set": update_data})
     

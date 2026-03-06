@@ -311,3 +311,43 @@ class ChangePasswordRequest(BaseModel):
 class PushSubscription(BaseModel):
     endpoint: str
     keys: dict
+
+# ==================== ADMIN MODELS ====================
+
+class AdminLogin(BaseModel):
+    email: EmailStr
+    password: str
+
+class AdminCreate(BaseModel):
+    email: EmailStr
+    password: str
+    name: str
+
+class ReportCreate(BaseModel):
+    reported_type: str  # 'user', 'job', 'message'
+    reported_id: str
+    reason: str
+    details: Optional[str] = None
+
+# ==================== ADMIN AUTH ====================
+
+async def get_current_admin(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    """Authenticate admin users from the admin_users collection."""
+    try:
+        token = credentials.credentials
+        payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+        user_id = payload.get("user_id")
+        role = payload.get("role")
+        if not user_id or role != "admin":
+            raise HTTPException(status_code=401, detail="Invalid admin token")
+
+        admin = await db.admin_users.find_one({"id": user_id}, {"_id": 0, "password": 0})
+        if not admin:
+            raise HTTPException(status_code=401, detail="Admin not found")
+        if admin.get("is_active") is False:
+            raise HTTPException(status_code=403, detail="Admin account is deactivated")
+        return admin
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(status_code=401, detail="Token expired")
+    except jwt.InvalidTokenError:
+        raise HTTPException(status_code=401, detail="Invalid token")
