@@ -14,7 +14,7 @@ import json
 from database import db, manager, UPLOADS_DIR, logger
 
 # Import routers
-from routers import auth, jobs, applications, matches, notifications, uploads, stats, admin
+from routers import auth, jobs, applications, matches, notifications, uploads, stats, admin, interviews
 
 # Create the main app
 app = FastAPI(
@@ -44,6 +44,7 @@ app.include_router(notifications.router, prefix="/api")
 app.include_router(uploads.router, prefix="/api")
 app.include_router(stats.router, prefix="/api")
 app.include_router(admin.router, prefix="/api")
+app.include_router(interviews.router, prefix="/api")
 
 # ==================== WEBSOCKET ====================
 
@@ -123,6 +124,11 @@ async def startup():
     await db.reports.create_index([("status", 1), ("created_at", -1)])
     await db.moderation_queue.create_index("id", unique=True)
     await db.moderation_queue.create_index([("status", 1), ("created_at", -1)])
+
+    # Interview indexes
+    await db.interviews.create_index("id", unique=True)
+    await db.interviews.create_index([("created_by", 1), ("status", 1)])
+    await db.interviews.create_index([("other_party_id", 1), ("status", 1)])
 
     logger.info("Database indexes created")
     logger.info("Hireabble API started successfully!")

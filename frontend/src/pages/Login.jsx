@@ -6,6 +6,7 @@ import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { toast } from 'sonner';
 import { useAuth } from '../context/AuthContext';
+import OAuthButtons from '../components/OAuthButtons';
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -145,6 +146,8 @@ export default function Login() {
                 )}
               </Button>
             </form>
+
+            <OAuthButtons />
 
             <p className="mt-8 text-center text-muted-foreground">
               Don't have an account?{' '}

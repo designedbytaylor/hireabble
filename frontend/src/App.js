@@ -13,6 +13,8 @@ import RecruiterDashboard from "./pages/RecruiterDashboard";
 import Profile from "./pages/Profile";
 import Matches from "./pages/Matches";
 import Chat from "./pages/Chat";
+import InterviewScheduler from "./pages/InterviewScheduler";
+import RecruiterAnalytics from "./pages/RecruiterAnalytics";
 import AdminLogin from "./pages/admin/AdminLogin";
 import AdminLayout from "./pages/admin/AdminLayout";
 import AdminOverview from "./pages/admin/AdminOverview";
@@ -170,6 +172,22 @@ function AppRoutes() {
         element={
           <ProtectedRoute>
             <Chat />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/interviews"
+        element={
+          <ProtectedRoute>
+            <InterviewScheduler />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/recruiter/analytics"
+        element={
+          <ProtectedRoute allowedRoles={['recruiter']}>
+            <RecruiterAnalytics />
           </ProtectedRoute>
         }
       />

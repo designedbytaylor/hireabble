@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  Plus, Briefcase, Users, Star, Heart, X, Check, 
+import {
+  Plus, Briefcase, Users, Star, Heart, X, Check,
   MapPin, DollarSign, Building2, ChevronRight, Clock,
-  Edit, GraduationCap, Trash2
+  Edit, GraduationCap, Trash2, BarChart3, Calendar
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -32,6 +33,7 @@ import { getPhotoUrl } from '../utils/helpers';
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
 export default function RecruiterDashboard() {
+  const navigate = useNavigate();
   const { user, token } = useAuth();
   const [stats, setStats] = useState({ active_jobs: 0, total_applications: 0, super_likes: 0, matches: 0 });
   const [jobs, setJobs] = useState([]);
@@ -140,9 +142,23 @@ export default function RecruiterDashboard() {
             <h1 className="text-2xl font-bold font-['Outfit']">Recruiter Hub</h1>
             <p className="text-muted-foreground">{user?.company || 'Your Company'}</p>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
             <NotificationBell />
-            <Button 
+            <button
+              onClick={() => navigate('/interviews')}
+              className="p-2.5 rounded-xl hover:bg-accent transition-colors"
+              title="Interviews"
+            >
+              <Calendar className="w-5 h-5 text-muted-foreground" />
+            </button>
+            <button
+              onClick={() => navigate('/recruiter/analytics')}
+              className="p-2.5 rounded-xl hover:bg-accent transition-colors"
+              title="Analytics"
+            >
+              <BarChart3 className="w-5 h-5 text-muted-foreground" />
+            </button>
+            <Button
               onClick={() => setShowNewJob(true)}
               className="bg-gradient-to-r from-primary to-secondary rounded-full px-5"
               data-testid="post-job-btn"
