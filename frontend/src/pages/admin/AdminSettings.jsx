@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import { useAdminAuth } from '../../context/AdminAuthContext';
 import { Button } from '../../components/ui/button';
@@ -16,7 +16,7 @@ export default function AdminSettings() {
   const [newCategory, setNewCategory] = useState('custom');
   const [loading, setLoading] = useState(true);
 
-  const fetchWords = async () => {
+  const fetchWords = useCallback(async () => {
     try {
       const res = await axios.get(`${API}/admin/banned-words`, {
         headers: { Authorization: `Bearer ${token}` },
@@ -27,9 +27,9 @@ export default function AdminSettings() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [token]);
 
-  useEffect(() => { fetchWords(); }, [token]);
+  useEffect(() => { fetchWords(); }, [fetchWords]);
 
   const addWord = async () => {
     if (!newWord.trim()) return;
