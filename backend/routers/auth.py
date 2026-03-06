@@ -6,6 +6,9 @@ from datetime import datetime, timezone, timedelta
 import uuid
 import asyncio
 
+import os
+import requests as http_requests
+
 from database import (
     db, security, logger, RESEND_API_KEY,
     hash_password, verify_password, create_token, get_current_user,
@@ -14,6 +17,12 @@ from database import (
     ResetPasswordRequest, ChangePasswordRequest
 )
 from content_filter import check_fields, is_severe
+
+# OAuth Configuration
+GOOGLE_CLIENT_ID = os.environ.get('GOOGLE_CLIENT_ID', '')
+GOOGLE_CLIENT_SECRET = os.environ.get('GOOGLE_CLIENT_SECRET', '')
+GITHUB_CLIENT_ID = os.environ.get('GITHUB_CLIENT_ID', '')
+GITHUB_CLIENT_SECRET = os.environ.get('GITHUB_CLIENT_SECRET', '')
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
@@ -264,3 +273,176 @@ async def update_profile(updates: dict, current_user: dict = Depends(get_current
     
     updated_user = await db.users.find_one({"id": current_user["id"]}, {"_id": 0, "password": 0})
     return updated_user
+
+
+# ==================== OAUTH / SSO ====================
+
+async def _find_or_create_oauth_user(email: str, name: str, provider: str, role: str = "seeker"):
+    """Find existing user by email or create a new one from OAuth data"""
+    existing = await db.users.find_one({"email": email})
+    if existing:
+        # Link OAuth provider if not already linked
+        providers = existing.get("oauth_providers", [])
+        if provider not in providers:
+            providers.append(provider)
+            await db.users.update_one({"email": email}, {"$set": {"oauth_providers": providers}})
+        token = create_token(existing["id"], existing["role"])
+        user_response = {k: v for k, v in existing.items() if k not in ['_id', 'password']}
+        return {"token": token, "user": user_response}
+
+    # Create new user
+    user_id = str(uuid.uuid4())
+    avatar = f"https://api.dicebear.com/7.x/avataaars/svg?seed={user_id}"
+    user_doc = {
+        "id": user_id,
+        "email": email,
+        "password": hash_password(str(uuid.uuid4())),  # Random password for OAuth users
+        "name": name,
+        "role": role,
+        "company": None,
+        "avatar": avatar,
+        "photo_url": None,
+        "video_url": None,
+        "title": None,
+        "bio": None,
+        "skills": [],
+        "experience_years": None,
+        "location": None,
+        "current_employer": None,
+        "previous_employers": [],
+        "school": None,
+        "degree": None,
+        "certifications": [],
+        "work_preference": None,
+        "desired_salary": None,
+        "available_immediately": True,
+        "onboarding_complete": False,
+        "push_subscription": None,
+        "oauth_providers": [provider],
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
+    await db.users.insert_one(user_doc)
+    token = create_token(user_id, role)
+    user_response = {k: v for k, v in user_doc.items() if k not in ['_id', 'password']}
+    return {"token": token, "user": user_response}
+
+
+@router.post("/oauth/google")
+async def google_oauth(body: dict):
+    """Authenticate with Google OAuth. Expects {code, redirect_uri, role?}"""
+    code = body.get("code")
+    redirect_uri = body.get("redirect_uri")
+    role = body.get("role", "seeker")
+
+    if not code or not redirect_uri:
+        raise HTTPException(status_code=400, detail="Missing code or redirect_uri")
+
+    if not GOOGLE_CLIENT_ID or not GOOGLE_CLIENT_SECRET:
+        raise HTTPException(status_code=501, detail="Google OAuth not configured")
+
+    try:
+        # Exchange code for tokens
+        token_resp = http_requests.post("https://oauth2.googleapis.com/token", data={
+            "code": code,
+            "client_id": GOOGLE_CLIENT_ID,
+            "client_secret": GOOGLE_CLIENT_SECRET,
+            "redirect_uri": redirect_uri,
+            "grant_type": "authorization_code",
+        }, timeout=10)
+        token_data = token_resp.json()
+
+        if "error" in token_data:
+            raise HTTPException(status_code=400, detail=token_data.get("error_description", "Google auth failed"))
+
+        # Get user info
+        userinfo_resp = http_requests.get("https://www.googleapis.com/oauth2/v2/userinfo", headers={
+            "Authorization": f"Bearer {token_data['access_token']}"
+        }, timeout=10)
+        userinfo = userinfo_resp.json()
+
+        email = userinfo.get("email")
+        name = userinfo.get("name", email.split("@")[0])
+
+        if not email:
+            raise HTTPException(status_code=400, detail="Could not retrieve email from Google")
+
+        return await _find_or_create_oauth_user(email, name, "google", role)
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Google OAuth error: {str(e)}")
+        raise HTTPException(status_code=500, detail="Google authentication failed")
+
+
+@router.post("/oauth/github")
+async def github_oauth(body: dict):
+    """Authenticate with GitHub OAuth. Expects {code, role?}"""
+    code = body.get("code")
+    role = body.get("role", "seeker")
+
+    if not code:
+        raise HTTPException(status_code=400, detail="Missing code")
+
+    if not GITHUB_CLIENT_ID or not GITHUB_CLIENT_SECRET:
+        raise HTTPException(status_code=501, detail="GitHub OAuth not configured")
+
+    try:
+        # Exchange code for access token
+        token_resp = http_requests.post("https://github.com/login/oauth/access_token", json={
+            "client_id": GITHUB_CLIENT_ID,
+            "client_secret": GITHUB_CLIENT_SECRET,
+            "code": code,
+        }, headers={"Accept": "application/json"}, timeout=10)
+        token_data = token_resp.json()
+
+        if "error" in token_data:
+            raise HTTPException(status_code=400, detail=token_data.get("error_description", "GitHub auth failed"))
+
+        access_token = token_data.get("access_token")
+
+        # Get user info
+        user_resp = http_requests.get("https://api.github.com/user", headers={
+            "Authorization": f"Bearer {access_token}",
+            "Accept": "application/json"
+        }, timeout=10)
+        github_user = user_resp.json()
+
+        # Get primary email (may need separate call if email is private)
+        email = github_user.get("email")
+        if not email:
+            emails_resp = http_requests.get("https://api.github.com/user/emails", headers={
+                "Authorization": f"Bearer {access_token}",
+                "Accept": "application/json"
+            }, timeout=10)
+            emails = emails_resp.json()
+            primary = next((e for e in emails if e.get("primary")), None)
+            email = primary["email"] if primary else None
+
+        if not email:
+            raise HTTPException(status_code=400, detail="Could not retrieve email from GitHub")
+
+        name = github_user.get("name") or github_user.get("login", email.split("@")[0])
+
+        return await _find_or_create_oauth_user(email, name, "github", role)
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"GitHub OAuth error: {str(e)}")
+        raise HTTPException(status_code=500, detail="GitHub authentication failed")
+
+
+@router.get("/oauth/config")
+async def get_oauth_config():
+    """Return available OAuth providers and their client IDs (public info only)"""
+    return {
+        "google": {
+            "enabled": bool(GOOGLE_CLIENT_ID),
+            "client_id": GOOGLE_CLIENT_ID if GOOGLE_CLIENT_ID else None,
+        },
+        "github": {
+            "enabled": bool(GITHUB_CLIENT_ID),
+            "client_id": GITHUB_CLIENT_ID if GITHUB_CLIENT_ID else None,
+        }
+    }

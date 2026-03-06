@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Send, Briefcase, User, Wifi, WifiOff, Flag } from 'lucide-react';
+import { ArrowLeft, Send, Briefcase, User, Wifi, WifiOff, Flag, Calendar } from 'lucide-react';
 import ReportDialog from '../components/ReportDialog';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -175,6 +175,14 @@ export default function Chat() {
             <p className="text-xs text-muted-foreground">{otherPerson?.subtitle}</p>
           </div>
         </div>
+
+        <button
+          onClick={() => navigate(`/interviews?match=${matchId}`)}
+          className="p-2 rounded-lg hover:bg-primary/10 text-muted-foreground hover:text-primary transition-colors"
+          title="Schedule interview"
+        >
+          <Calendar className="w-4 h-4" />
+        </button>
 
         <button
           onClick={() => setReportOpen(true)}

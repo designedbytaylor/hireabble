@@ -6,6 +6,7 @@ import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { toast } from 'sonner';
 import { useAuth } from '../context/AuthContext';
+import OAuthButtons from '../components/OAuthButtons';
 
 export default function Register() {
   const [searchParams] = useSearchParams();
@@ -265,6 +266,8 @@ export default function Register() {
                 )}
               </Button>
             </form>
+
+            <OAuthButtons role={formData.role} />
 
             <p className="mt-8 text-center text-muted-foreground">
               Already have an account?{' '}

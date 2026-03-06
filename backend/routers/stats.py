@@ -49,6 +49,74 @@ async def get_stats(current_user: dict = Depends(get_current_user)):
             "matches": matches
         }
 
+@router.get("/stats/recruiter")
+async def get_recruiter_stats(current_user: dict = Depends(get_current_user)):
+    """Get detailed recruiter statistics"""
+    if current_user["role"] != "recruiter":
+        raise HTTPException(status_code=403, detail="Only recruiters can access this")
+
+    uid = current_user["id"]
+
+    active_jobs = await db.jobs.count_documents({"recruiter_id": uid, "is_active": True})
+    total_jobs = await db.jobs.count_documents({"recruiter_id": uid})
+    total_applications = await db.applications.count_documents({"recruiter_id": uid})
+    pending_applications = await db.applications.count_documents({"recruiter_id": uid, "recruiter_action": None})
+    super_likes = await db.applications.count_documents({"recruiter_id": uid, "action": "superlike"})
+    matches = await db.matches.count_documents({"recruiter_id": uid})
+    interviews_scheduled = await db.interviews.count_documents({"recruiter_id": uid, "status": "accepted"})
+    interviews_pending = await db.interviews.count_documents({"recruiter_id": uid, "status": "pending"})
+
+    # Application response rate
+    responded = await db.applications.count_documents({
+        "recruiter_id": uid,
+        "recruiter_action": {"$ne": None}
+    })
+    response_rate = round((responded / total_applications * 100) if total_applications > 0 else 0)
+
+    # Match rate (matches / total applications)
+    match_rate = round((matches / total_applications * 100) if total_applications > 0 else 0)
+
+    # Weekly new applications (last 7 days)
+    week_ago = (datetime.now(timezone.utc) - timedelta(days=7)).isoformat()
+    weekly_apps = await db.applications.count_documents({
+        "recruiter_id": uid,
+        "created_at": {"$gte": week_ago}
+    })
+
+    # Applications per job (for top jobs)
+    jobs_list = await db.jobs.find(
+        {"recruiter_id": uid},
+        {"_id": 0, "id": 1, "title": 1}
+    ).to_list(50)
+
+    top_jobs = []
+    for job in jobs_list:
+        app_count = await db.applications.count_documents({"job_id": job["id"]})
+        match_count = await db.matches.count_documents({"job_id": job["id"]})
+        top_jobs.append({
+            "job_id": job["id"],
+            "title": job["title"],
+            "applications": app_count,
+            "matches": match_count,
+        })
+    top_jobs.sort(key=lambda j: j["applications"], reverse=True)
+
+    return {
+        "active_jobs": active_jobs,
+        "total_jobs": total_jobs,
+        "total_applications": total_applications,
+        "pending_applications": pending_applications,
+        "super_likes": super_likes,
+        "matches": matches,
+        "interviews_scheduled": interviews_scheduled,
+        "interviews_pending": interviews_pending,
+        "response_rate": response_rate,
+        "match_rate": match_rate,
+        "weekly_applications": weekly_apps,
+        "top_jobs": top_jobs[:10],
+    }
+
+
 @router.get("/profile/completeness")
 async def get_profile_completeness(current_user: dict = Depends(get_current_user)):
     """Get profile completeness percentage"""
