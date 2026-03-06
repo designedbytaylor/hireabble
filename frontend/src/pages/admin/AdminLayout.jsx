@@ -1,7 +1,7 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useAdminAuth } from '../../context/AdminAuthContext';
 import {
-  LayoutDashboard, Users, ShieldAlert, Flag, Settings, LogOut, Shield, Briefcase,
+  LayoutDashboard, Users, ShieldAlert, Flag, Settings, LogOut, Shield, Briefcase, Beaker,
 } from 'lucide-react';
 
 const navItems = [
@@ -10,6 +10,7 @@ const navItems = [
   { icon: Briefcase, label: 'Jobs', path: '/admin/jobs' },
   { icon: ShieldAlert, label: 'Moderation', path: '/admin/moderation' },
   { icon: Flag, label: 'Reports', path: '/admin/reports' },
+  { icon: Beaker, label: 'Testing', path: '/admin/testing' },
   { icon: Settings, label: 'Settings', path: '/admin/settings' },
 ];
 
