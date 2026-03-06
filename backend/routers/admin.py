@@ -20,6 +20,30 @@ router = APIRouter(tags=["Admin"])
 
 # ==================== ADMIN AUTH (separate flow) ====================
 
+@router.post("/admin/setup")
+async def admin_setup(admin: AdminCreate):
+    """One-time bootstrap: create the first admin. Only works when no admins exist."""
+    count = await db.admin_users.count_documents({})
+    if count > 0:
+        raise HTTPException(status_code=403, detail="Admin already exists. Use /admin/login.")
+
+    admin_id = str(uuid.uuid4())
+    admin_doc = {
+        "id": admin_id,
+        "email": admin.email,
+        "password": hash_password(admin.password),
+        "name": admin.name,
+        "is_active": True,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+    await db.admin_users.insert_one(admin_doc)
+    token = create_token(admin_id, "admin")
+    return {
+        "message": "Admin account created",
+        "token": token,
+        "admin": {"id": admin_id, "email": admin.email, "name": admin.name, "role": "admin"},
+    }
+
 @router.post("/admin/login")
 async def admin_login(credentials: AdminLogin):
     """Admin login — completely separate from user auth."""
