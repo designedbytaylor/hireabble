@@ -23,6 +23,7 @@ import AdminJobs from "./pages/admin/AdminJobs";
 import AdminModeration from "./pages/admin/AdminModeration";
 import AdminReports from "./pages/admin/AdminReports";
 import AdminSettings from "./pages/admin/AdminSettings";
+import AdminTesting from "./pages/admin/AdminTesting";
 
 const ProtectedRoute = ({ children, allowedRoles }) => {
   const { user, loading } = useAuth();
@@ -201,6 +202,7 @@ function AppRoutes() {
         <Route path="jobs" element={<AdminJobs />} />
         <Route path="moderation" element={<AdminModeration />} />
         <Route path="reports" element={<AdminReports />} />
+        <Route path="testing" element={<AdminTesting />} />
         <Route path="settings" element={<AdminSettings />} />
       </Route>
     </Routes>
