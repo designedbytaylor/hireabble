@@ -7,12 +7,13 @@ import uuid
 import asyncio
 
 from database import (
-    db, security, logger, RESEND_API_KEY, UPLOADS_DIR,
+    db, security, logger, RESEND_API_KEY,
     hash_password, verify_password, create_token, get_current_user,
     send_email_notification, manager,
-    UserCreate, UserLogin, UserResponse, ForgotPasswordRequest, 
+    UserCreate, UserLogin, UserResponse, ForgotPasswordRequest,
     ResetPasswordRequest, ChangePasswordRequest
 )
+from content_filter import check_fields, is_severe
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
@@ -22,6 +23,11 @@ router = APIRouter(prefix="/auth", tags=["Authentication"])
 async def register(user: UserCreate):
     try:
         logger.info(f"Registration attempt for email: {user.email}")
+
+        # Content moderation on registration fields
+        is_clean, violations = check_fields({"name": user.name, "company": user.company or ""})
+        if not is_clean and is_severe(violations):
+            raise HTTPException(status_code=400, detail="Registration contains prohibited content.")
 
         # Check if user exists
         existing = await db.users.find_one({"email": user.email})
@@ -80,7 +86,14 @@ async def login(credentials: UserLogin):
     
     if not verify_password(credentials.password, user["password"]):
         raise HTTPException(status_code=401, detail="Invalid credentials")
-    
+
+    # Block banned/suspended users from logging in
+    user_status = user.get("status", "active")
+    if user_status == "banned":
+        raise HTTPException(status_code=403, detail="Your account has been banned. Contact support for more info.")
+    if user_status == "suspended":
+        raise HTTPException(status_code=403, detail="Your account is temporarily suspended. Contact support for more info.")
+
     token = create_token(user["id"], user["role"])
     user_response = {k: v for k, v in user.items() if k not in ['_id', 'password']}
     
@@ -223,7 +236,26 @@ async def update_profile(updates: dict, current_user: dict = Depends(get_current
     ]
     
     update_data = {k: v for k, v in updates.items() if k in allowed_fields}
-    
+
+    # Content moderation on text fields
+    text_keys = ("name", "title", "bio", "skills", "company", "current_employer", "school", "degree", "certifications")
+    text_fields = {k: v for k, v in update_data.items() if k in text_keys and v}
+    if text_fields:
+        is_clean, violations = check_fields(text_fields)
+        if not is_clean and is_severe(violations):
+            raise HTTPException(status_code=400, detail="Profile update contains prohibited content.")
+        if not is_clean:
+            update_data["is_flagged"] = True
+            await db.moderation_queue.insert_one({
+                "id": str(uuid.uuid4()),
+                "content_type": "user",
+                "content_id": current_user["id"],
+                "user_id": current_user["id"],
+                "violations": violations,
+                "status": "pending",
+                "created_at": datetime.now(timezone.utc).isoformat(),
+            })
+
     if update_data:
         await db.users.update_one(
             {"id": current_user["id"]},

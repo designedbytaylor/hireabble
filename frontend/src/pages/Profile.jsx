@@ -94,8 +94,7 @@ export default function Profile() {
         }
       });
 
-      const photoUrl = `${BACKEND_URL}${response.data.photo_url}`;
-      await updateProfile({ photo_url: photoUrl });
+      await updateProfile({ photo_url: response.data.photo_url });
       toast.success('Photo updated!');
       fetchCompleteness();
     } catch (error) {

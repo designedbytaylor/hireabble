@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Send, Briefcase, User, Wifi, WifiOff } from 'lucide-react';
+import { ArrowLeft, Send, Briefcase, User, Wifi, WifiOff, Flag } from 'lucide-react';
+import ReportDialog from '../components/ReportDialog';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import axios from 'axios';
@@ -19,6 +20,7 @@ export default function Chat() {
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [wsConnected, setWsConnected] = useState(false);
+  const [reportOpen, setReportOpen] = useState(false);
   const messagesEndRef = useRef(null);
   const wsRef = useRef(null);
   const reconnectTimeoutRef = useRef(null);
@@ -174,6 +176,14 @@ export default function Chat() {
           </div>
         </div>
 
+        <button
+          onClick={() => setReportOpen(true)}
+          className="p-2 rounded-lg hover:bg-red-500/10 text-muted-foreground hover:text-red-400 transition-colors"
+          title="Report user"
+        >
+          <Flag className="w-4 h-4" />
+        </button>
+
         {/* Connection status */}
         <div className={`p-2 rounded-lg ${wsConnected ? 'bg-success/10' : 'bg-muted'}`}>
           {wsConnected ? (
@@ -183,6 +193,13 @@ export default function Chat() {
           )}
         </div>
       </header>
+
+      <ReportDialog
+        open={reportOpen}
+        onOpenChange={setReportOpen}
+        reportedType="user"
+        reportedId={user?.role === 'seeker' ? match?.recruiter_id : match?.seeker_id}
+      />
 
       {/* Messages */}
       <main className="flex-1 overflow-y-auto p-4 space-y-4">

@@ -10,6 +10,7 @@ from database import (
     db, get_current_user, manager, create_notification,
     MatchResponse, MessageCreate, MessageResponse
 )
+from content_filter import check_text, is_severe
 
 router = APIRouter(tags=["Matches & Messages"])
 
@@ -53,6 +54,11 @@ async def send_message(message: MessageCreate, current_user: dict = Depends(get_
     if match["seeker_id"] != current_user["id"] and match["recruiter_id"] != current_user["id"]:
         raise HTTPException(status_code=403, detail="Not authorized to message in this match")
     
+    # Content moderation on message text
+    is_clean, violations = check_text(message.content)
+    if not is_clean and is_severe(violations):
+        raise HTTPException(status_code=400, detail="Message contains prohibited content.")
+
     # Determine receiver
     receiver_id = match["recruiter_id"] if current_user["id"] == match["seeker_id"] else match["seeker_id"]
     
