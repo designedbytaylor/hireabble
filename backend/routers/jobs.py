@@ -77,6 +77,17 @@ async def create_job(job: JobCreate, current_user: dict = Depends(get_current_us
     await db.jobs.insert_one(job_doc)
     return {k: v for k, v in job_doc.items() if k != '_id'}
 
+@router.get("/recruiter")
+async def get_recruiter_jobs(current_user: dict = Depends(get_current_user)):
+    """Get all jobs posted by the current recruiter"""
+    if current_user["role"] != "recruiter":
+        raise HTTPException(status_code=403, detail="Only recruiters can access this")
+    jobs = await db.jobs.find(
+        {"recruiter_id": current_user["id"]},
+        {"_id": 0}
+    ).sort("created_at", -1).to_list(100)
+    return jobs
+
 @router.get("", response_model=List[JobResponse])
 async def get_jobs(
     current_user: dict = Depends(get_current_user),
