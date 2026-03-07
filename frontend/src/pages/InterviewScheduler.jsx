@@ -221,11 +221,15 @@ export default function InterviewScheduler() {
             </div>
             <h2 className="text-2xl font-bold font-['Outfit'] mb-3">No Interviews Yet</h2>
             <p className="text-muted-foreground max-w-xs mx-auto mb-6">
-              Schedule your first interview with a match to get started.
+              {user?.role === 'recruiter'
+                ? 'Schedule your first interview with a match to get started.'
+                : 'When a recruiter schedules an interview with you, it will appear here.'}
             </p>
-            <Button onClick={() => setShowCreate(true)} className="bg-gradient-to-r from-primary to-secondary rounded-full">
-              <Plus className="w-5 h-5 mr-2" /> Schedule Interview
-            </Button>
+            {user?.role === 'recruiter' && (
+              <Button onClick={() => setShowCreate(true)} className="bg-gradient-to-r from-primary to-secondary rounded-full">
+                <Plus className="w-5 h-5 mr-2" /> Schedule Interview
+              </Button>
+            )}
           </div>
         )}
       </main>
@@ -262,6 +266,8 @@ export default function InterviewScheduler() {
         onClose={() => setRespondingTo(null)}
         interview={respondingTo}
         onRespond={handleRespond}
+        token={token}
+        onSuccess={fetchData}
       />
 
       <Navigation />
@@ -611,15 +617,68 @@ function CreateInterviewDialog({ open, onClose, matches, preselectedMatch, token
   );
 }
 
-function RespondDialog({ open, onClose, interview, onRespond }) {
+function RespondDialog({ open, onClose, interview, onRespond, token, onSuccess }) {
   const [selectedTime, setSelectedTime] = useState(null);
   const [message, setMessage] = useState('');
+  const [showSuggest, setShowSuggest] = useState(false);
+  const [suggestedSlots, setSuggestedSlots] = useState([{ date: '', startTime: '', endTime: '' }]);
+  const [suggestLoading, setSuggestLoading] = useState(false);
+
+  const addSuggestedSlot = () => {
+    if (suggestedSlots.length < 5) {
+      setSuggestedSlots([...suggestedSlots, { date: '', startTime: '', endTime: '' }]);
+    }
+  };
+
+  const removeSuggestedSlot = (index) => {
+    if (suggestedSlots.length > 1) {
+      setSuggestedSlots(suggestedSlots.filter((_, i) => i !== index));
+    }
+  };
+
+  const updateSuggestedSlot = (index, field, value) => {
+    const updated = [...suggestedSlots];
+    updated[index] = { ...updated[index], [field]: value };
+    setSuggestedSlots(updated);
+  };
+
+  const handleSuggestTimes = async () => {
+    const validSlots = suggestedSlots.filter(s => s.date && s.startTime && s.endTime);
+    if (validSlots.length === 0) {
+      toast.error('Please add at least one suggested time');
+      return;
+    }
+
+    const proposed_times = validSlots.map(s => ({
+      start: new Date(`${s.date}T${s.startTime}`).toISOString(),
+      end: new Date(`${s.date}T${s.endTime}`).toISOString(),
+    }));
+
+    setSuggestLoading(true);
+    try {
+      await axios.put(`${API}/interviews/${interview.id}/reschedule`, {
+        proposed_times,
+        message: message || null,
+      }, { headers: { Authorization: `Bearer ${token}` } });
+
+      toast.success('Alternative times suggested! The recruiter will be notified.');
+      setShowSuggest(false);
+      setSuggestedSlots([{ date: '', startTime: '', endTime: '' }]);
+      setMessage('');
+      onClose();
+      if (onSuccess) onSuccess();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Failed to suggest times');
+    } finally {
+      setSuggestLoading(false);
+    }
+  };
 
   if (!interview) return null;
 
   return (
-    <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-md bg-card border-border">
+    <Dialog open={open} onOpenChange={() => { onClose(); setShowSuggest(false); }}>
+      <DialogContent className="max-w-md bg-card border-border max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="font-['Outfit']">Respond to Interview</DialogTitle>
         </DialogHeader>
@@ -629,63 +688,172 @@ function RespondDialog({ open, onClose, interview, onRespond }) {
             <div className="font-bold">{interview.title}</div>
             <div className="text-sm text-muted-foreground">{interview.job_title} at {interview.company}</div>
             <div className="text-sm text-muted-foreground">From: {interview.created_by_name}</div>
+            {interview.interview_type && (
+              <div className="text-sm text-muted-foreground mt-1 flex items-center gap-1">
+                {interview.interview_type === 'video' && <Video className="w-3 h-3" />}
+                {interview.interview_type === 'phone' && <Phone className="w-3 h-3" />}
+                {interview.interview_type === 'in_person' && <MapPin className="w-3 h-3" />}
+                {TYPE_LABELS[interview.interview_type]}
+                {interview.location && ` — ${interview.location}`}
+              </div>
+            )}
           </div>
 
           {interview.description && (
             <p className="text-sm text-muted-foreground">{interview.description}</p>
           )}
 
-          <div>
-            <Label className="mb-2 block">Select a time slot</Label>
-            <div className="space-y-2">
-              {interview.proposed_times?.map((slot, i) => (
-                <button
-                  key={i}
-                  type="button"
-                  onClick={() => setSelectedTime(i)}
-                  className={`w-full p-3 rounded-xl border text-left transition-colors ${
-                    selectedTime === i
-                      ? 'border-primary bg-primary/10'
-                      : 'border-border bg-background hover:border-primary/30'
-                  }`}
+          {!showSuggest ? (
+            <>
+              <div>
+                <Label className="mb-2 block">Select a time slot</Label>
+                <div className="space-y-2">
+                  {interview.proposed_times?.map((slot, i) => (
+                    <button
+                      key={i}
+                      type="button"
+                      onClick={() => setSelectedTime(i)}
+                      className={`w-full p-3 rounded-xl border text-left transition-colors ${
+                        selectedTime === i
+                          ? 'border-primary bg-primary/10'
+                          : 'border-border bg-background hover:border-primary/30'
+                      }`}
+                    >
+                      <div className="font-medium text-sm">
+                        {new Date(slot.start).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        {new Date(slot.start).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} - {new Date(slot.end).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Message (optional)</Label>
+                <Textarea
+                  placeholder="Any notes or questions..."
+                  value={message}
+                  onChange={(e) => setMessage(e.target.value)}
+                  className="min-h-[60px] rounded-xl bg-background resize-none"
+                />
+              </div>
+
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  className="flex-1 border-red-500/30 text-red-500 hover:bg-red-500/10"
+                  onClick={() => onRespond(interview.id, 'decline', null, message)}
                 >
-                  <div className="font-medium text-sm">
-                    {new Date(slot.start).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}
-                  </div>
-                  <div className="text-xs text-muted-foreground">
-                    {new Date(slot.start).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} - {new Date(slot.end).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                  </div>
-                </button>
-              ))}
-            </div>
-          </div>
+                  <X className="w-4 h-4 mr-1" /> Decline
+                </Button>
+                <Button
+                  variant="outline"
+                  className="flex-1 border-blue-500/30 text-blue-500 hover:bg-blue-500/10"
+                  onClick={() => setShowSuggest(true)}
+                >
+                  <RefreshCw className="w-4 h-4 mr-1" /> Suggest
+                </Button>
+                <Button
+                  className="flex-1 bg-gradient-to-r from-primary to-secondary"
+                  disabled={selectedTime === null}
+                  onClick={() => onRespond(interview.id, 'accept', selectedTime, message)}
+                >
+                  <Check className="w-4 h-4 mr-1" /> Accept
+                </Button>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="p-3 rounded-xl bg-blue-500/10 border border-blue-500/20">
+                <div className="text-sm text-blue-500 flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4" />
+                  Suggest alternative times that work better for you. The recruiter will review and respond.
+                </div>
+              </div>
 
-          <div className="space-y-2">
-            <Label>Message (optional)</Label>
-            <Textarea
-              placeholder="Any notes or questions..."
-              value={message}
-              onChange={(e) => setMessage(e.target.value)}
-              className="min-h-[60px] rounded-xl bg-background resize-none"
-            />
-          </div>
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <Label>Your Suggested Times *</Label>
+                  {suggestedSlots.length < 5 && (
+                    <button type="button" onClick={addSuggestedSlot} className="text-xs text-primary hover:underline flex items-center gap-1">
+                      <Plus className="w-3 h-3" /> Add time
+                    </button>
+                  )}
+                </div>
+                {suggestedSlots.map((slot, i) => (
+                  <div key={i} className="flex gap-2 items-end">
+                    <div className="flex-1 space-y-1">
+                      <Label className="text-xs text-muted-foreground">Date</Label>
+                      <Input
+                        type="date"
+                        value={slot.date}
+                        onChange={(e) => updateSuggestedSlot(i, 'date', e.target.value)}
+                        className="h-10 rounded-lg bg-background text-sm"
+                      />
+                    </div>
+                    <div className="flex-1 space-y-1">
+                      <Label className="text-xs text-muted-foreground">Start</Label>
+                      <Input
+                        type="time"
+                        value={slot.startTime}
+                        onChange={(e) => updateSuggestedSlot(i, 'startTime', e.target.value)}
+                        className="h-10 rounded-lg bg-background text-sm"
+                      />
+                    </div>
+                    <div className="flex-1 space-y-1">
+                      <Label className="text-xs text-muted-foreground">End</Label>
+                      <Input
+                        type="time"
+                        value={slot.endTime}
+                        onChange={(e) => updateSuggestedSlot(i, 'endTime', e.target.value)}
+                        className="h-10 rounded-lg bg-background text-sm"
+                      />
+                    </div>
+                    {suggestedSlots.length > 1 && (
+                      <button type="button" onClick={() => removeSuggestedSlot(i)} className="p-2 text-muted-foreground hover:text-red-500">
+                        <X className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
 
-          <div className="flex gap-3">
-            <Button
-              variant="outline"
-              className="flex-1 border-red-500/30 text-red-500 hover:bg-red-500/10"
-              onClick={() => onRespond(interview.id, 'decline', null, message)}
-            >
-              <X className="w-4 h-4 mr-1" /> Decline
-            </Button>
-            <Button
-              className="flex-1 bg-gradient-to-r from-primary to-secondary"
-              disabled={selectedTime === null}
-              onClick={() => onRespond(interview.id, 'accept', selectedTime, message)}
-            >
-              <Check className="w-4 h-4 mr-1" /> Accept
-            </Button>
-          </div>
+              <div className="space-y-2">
+                <Label>Message (optional)</Label>
+                <Textarea
+                  placeholder="Let them know why these times work better..."
+                  value={message}
+                  onChange={(e) => setMessage(e.target.value)}
+                  className="min-h-[60px] rounded-xl bg-background resize-none"
+                />
+              </div>
+
+              <div className="flex gap-3">
+                <Button
+                  variant="outline"
+                  className="flex-1"
+                  onClick={() => setShowSuggest(false)}
+                >
+                  Back
+                </Button>
+                <Button
+                  className="flex-1 bg-gradient-to-r from-blue-500 to-primary"
+                  disabled={suggestLoading}
+                  onClick={handleSuggestTimes}
+                >
+                  {suggestLoading ? (
+                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  ) : (
+                    <>
+                      <Send className="w-4 h-4 mr-1" /> Send Suggestion
+                    </>
+                  )}
+                </Button>
+              </div>
+            </>
+          )}
         </div>
       </DialogContent>
     </Dialog>
