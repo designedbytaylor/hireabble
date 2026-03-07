@@ -18,7 +18,28 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Create PR and auto-merge
+      - name: Auto-rebase and merge
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          BRANCH="${GITHUB_REF#refs/heads/}"
+          BASE="main"
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          # Rebase onto main to avoid merge conflicts
+          git fetch origin "$BASE"
+          git rebase "origin/$BASE" || {
+            echo "Rebase failed - aborting"
+            git rebase --abort
+            exit 1
+          }
+
+          # Force push the rebased branch
+          git push origin "$BRANCH" --force
+
+      - name: Create PR and merge
         uses: actions/github-script@v7
         with:
           script: |
@@ -51,46 +72,15 @@ jobs:
               console.log(`Created PR #${pr.number}`);
             }
 
-            // Wait a moment for PR to be fully created
+            // Wait for PR to be ready after rebase
             await new Promise(r => setTimeout(r, 5000));
 
-            // Try immediate merge first (works when no branch protection)
-            try {
-              await github.rest.pulls.merge({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                pull_number: pr.number,
-                merge_method: 'squash',
-              });
-              console.log(`PR #${pr.number} merged successfully`);
-              return;
-            } catch (error) {
-              console.log(`Immediate merge failed: ${error.message}`);
-            }
-
-            // If immediate merge failed, retry with longer backoff for checks
+            // Retry merge with backoff
             const maxRetries = 10;
             const delaySeconds = 30;
 
-            for (let attempt = 2; attempt <= maxRetries; attempt++) {
-              console.log(`Waiting ${delaySeconds}s before retry ${attempt}/${maxRetries}...`);
-              await new Promise(r => setTimeout(r, delaySeconds * 1000));
-
+            for (let attempt = 1; attempt <= maxRetries; attempt++) {
               try {
-                // Check PR mergeable status first
-                const { data: prStatus } = await github.rest.pulls.get({
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
-                  pull_number: pr.number,
-                });
-
-                console.log(`PR mergeable: ${prStatus.mergeable}, state: ${prStatus.mergeable_state}`);
-
-                if (prStatus.mergeable === false) {
-                  console.log('PR has merge conflicts, cannot auto-merge');
-                  return;
-                }
-
                 await github.rest.pulls.merge({
                   owner: context.repo.owner,
                   repo: context.repo.repo,
@@ -101,6 +91,10 @@ jobs:
                 return;
               } catch (error) {
                 console.log(`Attempt ${attempt}/${maxRetries} failed: ${error.message}`);
+                if (attempt < maxRetries) {
+                  console.log(`Waiting ${delaySeconds}s before retry...`);
+                  await new Promise(r => setTimeout(r, delaySeconds * 1000));
+                }
               }
             }
 
