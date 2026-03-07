@@ -13,7 +13,7 @@ import random
 from database import (
     db, logger,
     hash_password, verify_password, create_token, get_current_admin,
-    AdminLogin, AdminCreate, ReportCreate, get_current_user,
+    AdminLogin, AdminCreate, ReportCreate, get_current_user, JobCreate,
 )
 from content_filter import check_text, BANNED_WORDS
 
@@ -494,6 +494,53 @@ async def admin_toggle_job(
 
     status_text = "activated" if is_active else "deactivated"
     return {"message": f"Job {status_text}"}
+
+
+@router.post("/admin/jobs")
+async def admin_create_job(job: JobCreate, admin: dict = Depends(get_current_admin)):
+    """Admin can post a job directly on behalf of the platform."""
+    job_id = str(uuid.uuid4())
+
+    backgrounds = [
+        "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+        "linear-gradient(135deg, #f093fb 0%, #f5576c 100%)",
+        "linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)",
+        "linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)",
+        "linear-gradient(135deg, #fa709a 0%, #fee140 100%)",
+        "linear-gradient(135deg, #a18cd1 0%, #fbc2eb 100%)",
+    ]
+
+    job_doc = {
+        "id": job_id,
+        "title": job.title,
+        "company": job.company,
+        "description": job.description,
+        "requirements": job.requirements,
+        "salary_min": job.salary_min,
+        "salary_max": job.salary_max,
+        "location": job.location,
+        "job_type": job.job_type,
+        "experience_level": job.experience_level,
+        "location_restriction": job.location_restriction,
+        "recruiter_id": f"admin:{admin['id']}",
+        "recruiter_name": admin["name"],
+        "company_logo": f"https://api.dicebear.com/7.x/identicon/svg?seed={job.company}",
+        "background_image": backgrounds[hash(job_id) % len(backgrounds)],
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "is_active": True,
+    }
+
+    await db.jobs.insert_one(job_doc)
+    return {k: v for k, v in job_doc.items() if k != "_id"}
+
+
+@router.delete("/admin/jobs/{job_id}")
+async def admin_delete_job(job_id: str, admin: dict = Depends(get_current_admin)):
+    """Admin can delete any job."""
+    result = await db.jobs.delete_one({"id": job_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Job not found")
+    return {"message": "Job deleted"}
 
 
 # ==================== IMPERSONATION ====================

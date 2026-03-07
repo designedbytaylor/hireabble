@@ -58,9 +58,10 @@ async def create_job(job: JobCreate, current_user: dict = Depends(get_current_us
         "company_logo": f"https://api.dicebear.com/7.x/identicon/svg?seed={job.company}",
         "background_image": backgrounds[hash(job_id) % len(backgrounds)],
         "created_at": datetime.now(timezone.utc).isoformat(),
+        "location_restriction": job.location_restriction,
         "is_active": True
     }
-    
+
     # Flag for review if non-severe violations found
     if not is_clean:
         job_doc["is_flagged"] = True
@@ -126,7 +127,17 @@ async def get_jobs(
             query["salary_min"] = {"$gte": salary_min}
         if location:
             query["location"] = {"$regex": location, "$options": "i"}
-        
+
+        # Filter out jobs with specific location restrictions if seeker's location doesn't match
+        seeker_location = current_user.get("location", "")
+        if seeker_location:
+            query["$or"] = [
+                {"location_restriction": None},
+                {"location_restriction": "any"},
+                {"location_restriction": {"$exists": False}},
+                {"location": {"$regex": seeker_location.split(",")[0].strip(), "$options": "i"}},
+            ]
+
         jobs = await db.jobs.find(query, {"_id": 0}).sort("created_at", -1).to_list(100)
     
     return jobs
@@ -151,7 +162,7 @@ async def update_job(job_id: str, updates: dict, current_user: dict = Depends(ge
     
     allowed_fields = ["title", "company", "description", "requirements",
                       "salary_min", "salary_max", "location", "job_type",
-                      "experience_level", "is_active"]
+                      "experience_level", "is_active", "location_restriction"]
     update_data = {k: v for k, v in updates.items() if k in allowed_fields}
 
     # Content moderation on text fields being updated
