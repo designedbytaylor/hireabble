@@ -15,6 +15,7 @@ import Matches from "./pages/Matches";
 import Chat from "./pages/Chat";
 import InterviewScheduler from "./pages/InterviewScheduler";
 import RecruiterAnalytics from "./pages/RecruiterAnalytics";
+import AppliedJobs from "./pages/AppliedJobs";
 import AdminLogin from "./pages/admin/AdminLogin";
 import AdminLayout from "./pages/admin/AdminLayout";
 import AdminOverview from "./pages/admin/AdminOverview";
@@ -173,6 +174,14 @@ function AppRoutes() {
         element={
           <ProtectedRoute>
             <Chat />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/applied"
+        element={
+          <ProtectedRoute allowedRoles={['seeker']}>
+            <AppliedJobs />
           </ProtectedRoute>
         }
       />

@@ -230,10 +230,26 @@ async def get_jobs(
 
         jobs = await db.jobs.find(query, {"_id": 0}).sort("created_at", -1).to_list(100)
 
-        # Calculate match scores and sort by best match
+        # Calculate match scores
+        now = datetime.now(timezone.utc).isoformat()
         for job in jobs:
             job["match_score"] = calculate_job_match_score(current_user, job)
-        jobs.sort(key=lambda j: j["match_score"], reverse=True)
+            # Check if job is actively boosted
+            job["is_boosted"] = bool(job.get("is_boosted") and job.get("boost_until", "") >= now)
+
+        # Sort: boosted jobs first (interleaved), then by match score
+        boosted = [j for j in jobs if j.get("is_boosted")]
+        regular = [j for j in jobs if not j.get("is_boosted")]
+        regular.sort(key=lambda j: j["match_score"], reverse=True)
+
+        # Interleave boosted jobs at positions 0, 3, 7, etc. for natural feel
+        result = list(regular)
+        boost_positions = [0, 3, 7, 12, 18]
+        for i, bj in enumerate(boosted):
+            pos = boost_positions[i] if i < len(boost_positions) else len(result)
+            pos = min(pos, len(result))
+            result.insert(pos, bj)
+        jobs = result
 
     return jobs
 

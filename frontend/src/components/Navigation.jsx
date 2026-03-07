@@ -1,29 +1,34 @@
 import { Link, useLocation } from 'react-router-dom';
-import { Home, Heart, User, Calendar } from 'lucide-react';
+import { Home, Heart, User, Calendar, Briefcase } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 export default function Navigation() {
   const location = useLocation();
   const { user } = useAuth();
-  
+
   const isSeeker = user?.role === 'seeker';
-  
+
   const navItems = [
     {
       icon: Home,
       label: 'Home',
       path: isSeeker ? '/dashboard' : '/recruiter'
     },
+    ...(isSeeker ? [{
+      icon: Briefcase,
+      label: 'Applied',
+      path: '/applied'
+    }] : []),
     {
       icon: Heart,
       label: 'Matches',
       path: '/matches'
     },
-    ...(!isSeeker ? [{
+    {
       icon: Calendar,
       label: 'Interviews',
       path: '/interviews'
-    }] : []),
+    },
     {
       icon: User,
       label: 'Profile',

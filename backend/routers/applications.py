@@ -172,16 +172,57 @@ async def get_applications(
     """Get applications for recruiter's jobs"""
     if current_user["role"] != "recruiter":
         raise HTTPException(status_code=403, detail="Only recruiters can view applications")
-    
+
     query = {
         "recruiter_id": current_user["id"],
         "action": {"$in": ["like", "superlike"]}
     }
     if job_id:
         query["job_id"] = job_id
-    
+
     applications = await db.applications.find(query, {"_id": 0}).sort("created_at", -1).to_list(100)
     return applications
+
+
+@router.get("/applications/mine")
+async def get_my_applications(current_user: dict = Depends(get_current_user)):
+    """Get all jobs the current seeker has applied to, with job details and status"""
+    if current_user["role"] != "seeker":
+        raise HTTPException(status_code=403, detail="Only seekers can view their applications")
+
+    applications = await db.applications.find(
+        {"seeker_id": current_user["id"], "action": {"$in": ["like", "superlike"]}},
+        {"_id": 0}
+    ).sort("created_at", -1).to_list(200)
+
+    # Enrich with job details
+    result = []
+    for app in applications:
+        job = await db.jobs.find_one({"id": app["job_id"]}, {"_id": 0})
+        status = "matched" if app.get("is_matched") else (
+            "declined" if app.get("recruiter_action") == "reject" else "pending"
+        )
+        result.append({
+            "id": app["id"],
+            "job_id": app["job_id"],
+            "action": app["action"],
+            "status": status,
+            "recruiter_action": app.get("recruiter_action"),
+            "is_matched": app.get("is_matched", False),
+            "created_at": app["created_at"],
+            "job": {
+                "title": job["title"] if job else "Job Removed",
+                "company": job["company"] if job else "",
+                "location": job.get("location", "") if job else "",
+                "job_type": job.get("job_type", "") if job else "",
+                "salary_min": job.get("salary_min") if job else None,
+                "salary_max": job.get("salary_max") if job else None,
+                "company_logo": job.get("company_logo") if job else None,
+                "employment_type": job.get("employment_type", "full-time") if job else "",
+            } if True else None,
+        })
+
+    return result
 
 @router.post("/applications/respond")
 async def respond_to_application(response: RecruiterAction, current_user: dict = Depends(get_current_user)):

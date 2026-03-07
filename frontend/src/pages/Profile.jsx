@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { User, Mail, Briefcase, MapPin, Save, LogOut, Building2, Download, Upload, CheckCircle, AlertCircle, Lock, Eye, EyeOff, ChevronDown, Plus, Trash2, GraduationCap, Award, Clock, Navigation2 } from 'lucide-react';
+import { User, Mail, Briefcase, MapPin, Save, LogOut, Building2, Download, Upload, CheckCircle, AlertCircle, Lock, Eye, EyeOff, ChevronDown, Plus, Trash2, GraduationCap, Award, Clock, Navigation2, Bell, BellOff } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
@@ -11,6 +11,7 @@ import { useAuth } from '../context/AuthContext';
 import Navigation from '../components/Navigation';
 import VideoUpload from '../components/VideoUpload';
 import { getPhotoUrl } from '../utils/helpers';
+import { isPushSupported, getPermissionStatus, subscribeToPush, unsubscribeFromPush } from '../utils/pushNotifications';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
@@ -33,6 +34,8 @@ export default function Profile() {
     confirm: false
   });
   const [changingPassword, setChangingPassword] = useState(false);
+  const [pushEnabled, setPushEnabled] = useState(false);
+  const [pushSupported] = useState(isPushSupported());
   const [detectingLocation, setDetectingLocation] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
@@ -69,8 +72,30 @@ export default function Profile() {
       setCertifications(user.certifications || []);
       fetchCompleteness();
     }
+    // Check push notification status
+    if (pushSupported) {
+      setPushEnabled(getPermissionStatus() === 'granted');
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
+
+  const handleTogglePush = async () => {
+    if (pushEnabled) {
+      const ok = await unsubscribeFromPush(token);
+      if (ok) {
+        setPushEnabled(false);
+        toast.success('Push notifications disabled');
+      }
+    } else {
+      const ok = await subscribeToPush(token);
+      if (ok) {
+        setPushEnabled(true);
+        toast.success('Push notifications enabled! You\'ll be notified of new matches and messages.');
+      } else {
+        toast.error('Could not enable notifications. Please check your browser settings.');
+      }
+    }
+  };
 
   const fetchCompleteness = async () => {
     try {
@@ -789,6 +814,38 @@ export default function Profile() {
               </form>
             )}
           </div>
+
+          {/* Push Notifications */}
+          {pushSupported && (
+            <div className="glass-card rounded-2xl p-5 mt-6">
+              <h3 className="text-lg font-bold font-['Outfit'] mb-3 flex items-center gap-2">
+                <Bell className="w-5 h-5" /> Notifications
+              </h3>
+              <button
+                type="button"
+                onClick={handleTogglePush}
+                className={`w-full flex items-center gap-3 p-4 rounded-xl border transition-all ${
+                  pushEnabled
+                    ? 'bg-primary/10 border-primary/40 text-primary'
+                    : 'bg-background border-border text-muted-foreground hover:border-primary/20'
+                }`}
+              >
+                {pushEnabled ? <Bell className="w-5 h-5" /> : <BellOff className="w-5 h-5" />}
+                <div className="flex-1 text-left">
+                  <div className="font-medium text-sm">Push Notifications</div>
+                  <div className="text-xs opacity-70">
+                    {pushEnabled ? 'Get notified of matches, messages & interviews' : 'Enable to stay updated on your phone'}
+                  </div>
+                </div>
+                <div className={`w-10 h-6 rounded-full transition-colors ${pushEnabled ? 'bg-primary' : 'bg-muted'}`}>
+                  <div className={`w-5 h-5 rounded-full bg-white mt-0.5 transition-transform ${pushEnabled ? 'translate-x-[18px]' : 'translate-x-0.5'}`} />
+                </div>
+              </button>
+              <p className="text-xs text-muted-foreground mt-2">
+                You can also manage notifications through your device settings.
+              </p>
+            </div>
+          )}
 
           {/* Logout Button */}
           <Button

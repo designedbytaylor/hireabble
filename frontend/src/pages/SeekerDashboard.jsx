@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence, useMotionValue, useTransform } from 'framer-motion';
 import { X, Heart, Star, Briefcase, MapPin, DollarSign, Building2, Clock, ChevronDown, Filter, SlidersHorizontal, Zap, CheckCircle, Globe, Wifi, Navigation2 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -28,6 +29,7 @@ import { getPhotoUrl } from '../utils/helpers';
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
 export default function SeekerDashboard() {
+  const navigate = useNavigate();
   const { user, token } = useAuth();
   const [jobs, setJobs] = useState([]);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -275,7 +277,7 @@ export default function SeekerDashboard() {
 
         {/* Stats Bar */}
         <div className="flex gap-4 overflow-x-auto pb-2">
-          <div className="glass-card rounded-2xl px-5 py-3 flex items-center gap-3 whitespace-nowrap">
+          <button onClick={() => navigate('/applied')} className="glass-card rounded-2xl px-5 py-3 flex items-center gap-3 whitespace-nowrap hover:border-primary/30 transition-colors text-left">
             <div className="w-10 h-10 rounded-xl bg-primary/20 flex items-center justify-center">
               <Heart className="w-5 h-5 text-primary" />
             </div>
@@ -283,7 +285,7 @@ export default function SeekerDashboard() {
               <div className="text-xl font-bold">{stats.applications_sent}</div>
               <div className="text-xs text-muted-foreground">Applied</div>
             </div>
-          </div>
+          </button>
           <div className="glass-card rounded-2xl px-5 py-3 flex items-center gap-3 whitespace-nowrap">
             <div className="w-10 h-10 rounded-xl bg-secondary/20 flex items-center justify-center">
               <Star className="w-5 h-5 text-secondary" />
@@ -791,11 +793,18 @@ function SwipeCard({ job, onSwipe, expanded, setExpanded, swipeDirection }) {
           SUPER LIKE
         </motion.div>
 
+        {/* Promoted Badge */}
+        {job.is_boosted && (
+          <div className="absolute top-4 right-4 z-20 px-3 py-1 rounded-full bg-gradient-to-r from-amber-500 to-orange-500 text-white text-xs font-bold flex items-center gap-1 shadow-lg">
+            <Zap className="w-3 h-3" /> Promoted
+          </div>
+        )}
+
         {/* Content */}
         <div className="absolute inset-0 flex flex-col justify-end p-6 z-10">
           {/* Company Logo & Name */}
           <div className="flex items-center gap-3 mb-4">
-            <img 
+            <img
               src={job.company_logo}
               alt={job.company}
               className="w-12 h-12 rounded-xl object-cover border border-white/20"
