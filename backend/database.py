@@ -206,6 +206,47 @@ async def create_notification(user_id: str, notif_type: str, title: str, message
 
     return notification_doc
 
+
+async def send_system_message(match_id: str, sender_id: str, sender_name: str, content: str, msg_type: str = "system"):
+    """Send an auto-generated system message in a match conversation."""
+    receiver_match = await db.matches.find_one({"id": match_id}, {"_id": 0})
+    if not receiver_match:
+        return None
+
+    receiver_id = receiver_match["recruiter_id"] if sender_id == receiver_match["seeker_id"] else receiver_match["seeker_id"]
+
+    message_doc = {
+        "id": str(uuid.uuid4()),
+        "match_id": match_id,
+        "sender_id": sender_id,
+        "sender_name": sender_name,
+        "receiver_id": receiver_id,
+        "content": content,
+        "message_type": msg_type,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "is_read": False
+    }
+    await db.messages.insert_one(message_doc)
+
+    # Update last message on the match
+    await db.matches.update_one(
+        {"id": match_id},
+        {"$set": {
+            "last_message": content[:100],
+            "last_message_sender": sender_id,
+            "last_message_at": message_doc["created_at"]
+        }}
+    )
+
+    # Send via WebSocket
+    await manager.send_to_user(receiver_id, {
+        "type": "new_message",
+        "message": {k: v for k, v in message_doc.items() if k != "_id"}
+    })
+
+    return message_doc
+
+
 # ==================== PYDANTIC MODELS ====================
 
 class UserCreate(BaseModel):

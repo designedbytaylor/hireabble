@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { Home, Heart, User, Calendar, Briefcase } from 'lucide-react';
+import { Home, Heart, User, Briefcase, MessageCircle, BarChart3 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 export default function Navigation() {
@@ -18,17 +18,21 @@ export default function Navigation() {
       icon: Briefcase,
       label: 'Applied',
       path: '/applied'
-    }] : []),
+    }] : [{
+      icon: BarChart3,
+      label: 'Dashboard',
+      path: '/recruiter/dashboard'
+    }]),
     {
       icon: Heart,
       label: 'Matches',
       path: '/matches'
     },
-    ...(!isSeeker ? [{
-      icon: Calendar,
-      label: 'Interviews',
-      path: '/interviews'
-    }] : []),
+    {
+      icon: MessageCircle,
+      label: 'Messages',
+      path: '/messages'
+    },
     {
       icon: User,
       label: 'Profile',

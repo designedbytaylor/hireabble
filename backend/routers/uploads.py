@@ -8,7 +8,7 @@ import uuid
 import os
 
 from database import (
-    db, get_current_user, SUPABASE_URL, SUPABASE_KEY, logger
+    db, get_current_user, SUPABASE_URL, SUPABASE_KEY, UPLOADS_DIR, logger
 )
 
 router = APIRouter(tags=["Uploads"])
@@ -21,9 +21,12 @@ MAX_VIDEO_SIZE = 50 * 1024 * 1024  # 50MB
 PHOTO_BUCKET = "photos"
 VIDEO_BUCKET = "videos"
 
+# Whether Supabase storage is configured
+_USE_SUPABASE = bool(SUPABASE_URL and SUPABASE_KEY)
+
 
 def _get_supabase():
-    if not SUPABASE_URL or not SUPABASE_KEY:
+    if not _USE_SUPABASE:
         raise HTTPException(status_code=500, detail="Storage not configured")
     return create_client(SUPABASE_URL, SUPABASE_KEY)
 
@@ -33,13 +36,22 @@ def _public_url(bucket: str, path: str) -> str:
     return f"{SUPABASE_URL}/storage/v1/object/public/{bucket}/{path}"
 
 
+def _save_local(subdir: str, filename: str, contents: bytes) -> str:
+    """Save file to local uploads directory, return relative URL path."""
+    target_dir = UPLOADS_DIR / subdir
+    target_dir.mkdir(parents=True, exist_ok=True)
+    filepath = target_dir / filename
+    filepath.write_bytes(contents)
+    return f"/uploads/{subdir}/{filename}"
+
+
 @router.post("/upload/photo")
 @router.post("/upload")
 async def upload_file(
     file: UploadFile = File(...),
     current_user: dict = Depends(get_current_user)
 ):
-    """Upload a profile photo to Supabase Storage"""
+    """Upload a profile photo (Supabase Storage or local fallback)"""
     if file.content_type not in ALLOWED_IMAGE_TYPES:
         raise HTTPException(status_code=400, detail="Only image files are allowed")
 
@@ -50,29 +62,32 @@ async def upload_file(
     ext = file.filename.split('.')[-1] if '.' in file.filename else 'jpg'
     filename = f"{current_user['id']}_{uuid.uuid4().hex[:8]}.{ext}"
 
-    supabase = _get_supabase()
+    if _USE_SUPABASE:
+        supabase = _get_supabase()
 
-    # Remove old photo if it exists in the bucket
-    user = await db.users.find_one({"id": current_user["id"]})
-    if user and user.get("photo_url") and SUPABASE_URL in (user.get("photo_url") or ""):
-        old_path = user["photo_url"].split(f"/{PHOTO_BUCKET}/")[-1]
+        # Remove old photo if it exists in the bucket
+        user = await db.users.find_one({"id": current_user["id"]})
+        if user and user.get("photo_url") and SUPABASE_URL in (user.get("photo_url") or ""):
+            old_path = user["photo_url"].split(f"/{PHOTO_BUCKET}/")[-1]
+            try:
+                supabase.storage.from_(PHOTO_BUCKET).remove([old_path])
+            except Exception:
+                pass
+
         try:
-            supabase.storage.from_(PHOTO_BUCKET).remove([old_path])
-        except Exception:
-            pass  # old file may already be gone
+            supabase.storage.from_(PHOTO_BUCKET).upload(
+                filename,
+                contents,
+                file_options={"content-type": file.content_type}
+            )
+        except Exception as e:
+            logger.error(f"Supabase upload failed: {e}")
+            raise HTTPException(status_code=500, detail="Failed to upload photo")
 
-    # Upload to Supabase Storage
-    try:
-        supabase.storage.from_(PHOTO_BUCKET).upload(
-            filename,
-            contents,
-            file_options={"content-type": file.content_type}
-        )
-    except Exception as e:
-        logger.error(f"Supabase upload failed: {e}")
-        raise HTTPException(status_code=500, detail="Failed to upload photo")
-
-    photo_url = _public_url(PHOTO_BUCKET, filename)
+        photo_url = _public_url(PHOTO_BUCKET, filename)
+    else:
+        # Local fallback
+        photo_url = _save_local("photos", filename, contents)
 
     await db.users.update_one(
         {"id": current_user["id"]},
@@ -102,28 +117,30 @@ async def upload_video(
     ext = file.filename.split('.')[-1] if '.' in file.filename else 'mp4'
     filename = f"video_{current_user['id']}_{uuid.uuid4().hex[:8]}.{ext}"
 
-    supabase = _get_supabase()
+    if _USE_SUPABASE:
+        supabase = _get_supabase()
 
-    # Remove old video if it exists
-    user = await db.users.find_one({"id": current_user["id"]})
-    if user and user.get("video_url") and SUPABASE_URL in (user.get("video_url") or ""):
-        old_path = user["video_url"].split(f"/{VIDEO_BUCKET}/")[-1]
+        user = await db.users.find_one({"id": current_user["id"]})
+        if user and user.get("video_url") and SUPABASE_URL in (user.get("video_url") or ""):
+            old_path = user["video_url"].split(f"/{VIDEO_BUCKET}/")[-1]
+            try:
+                supabase.storage.from_(VIDEO_BUCKET).remove([old_path])
+            except Exception:
+                pass
+
         try:
-            supabase.storage.from_(VIDEO_BUCKET).remove([old_path])
-        except Exception:
-            pass
+            supabase.storage.from_(VIDEO_BUCKET).upload(
+                filename,
+                contents,
+                file_options={"content-type": file.content_type}
+            )
+        except Exception as e:
+            logger.error(f"Supabase video upload failed: {e}")
+            raise HTTPException(status_code=500, detail="Failed to upload video")
 
-    try:
-        supabase.storage.from_(VIDEO_BUCKET).upload(
-            filename,
-            contents,
-            file_options={"content-type": file.content_type}
-        )
-    except Exception as e:
-        logger.error(f"Supabase video upload failed: {e}")
-        raise HTTPException(status_code=500, detail="Failed to upload video")
-
-    video_url = _public_url(VIDEO_BUCKET, filename)
+        video_url = _public_url(VIDEO_BUCKET, filename)
+    else:
+        video_url = _save_local("videos", filename, contents)
 
     await db.users.update_one(
         {"id": current_user["id"]},

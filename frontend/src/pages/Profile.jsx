@@ -188,7 +188,7 @@ export default function Profile() {
 
   const handleDownloadResume = async () => {
     try {
-      const response = await axios.get(`${API}/resume/download`, {
+      const response = await axios.get(`${API}/users/resume/download`, {
         headers: { Authorization: `Bearer ${token}` },
         responseType: 'blob'
       });

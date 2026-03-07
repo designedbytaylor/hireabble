@@ -10,6 +10,7 @@ import ResetPassword from "./pages/ResetPassword";
 import Onboarding from "./pages/Onboarding";
 import SeekerDashboard from "./pages/SeekerDashboard";
 import RecruiterDashboard from "./pages/RecruiterDashboard";
+import RecruiterSwipe from "./pages/RecruiterSwipe";
 import Profile from "./pages/Profile";
 import Matches from "./pages/Matches";
 import Chat from "./pages/Chat";
@@ -25,6 +26,7 @@ import AdminModeration from "./pages/admin/AdminModeration";
 import AdminReports from "./pages/admin/AdminReports";
 import AdminSettings from "./pages/admin/AdminSettings";
 import AdminTesting from "./pages/admin/AdminTesting";
+import Messages from "./pages/Messages";
 import Impersonate from "./pages/Impersonate";
 
 const ProtectedRoute = ({ children, allowedRoles }) => {
@@ -150,6 +152,14 @@ function AppRoutes() {
         path="/recruiter"
         element={
           <ProtectedRoute allowedRoles={['recruiter']}>
+            <RecruiterSwipe />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/recruiter/dashboard"
+        element={
+          <ProtectedRoute allowedRoles={['recruiter']}>
             <RecruiterDashboard />
           </ProtectedRoute>
         }
@@ -167,6 +177,14 @@ function AppRoutes() {
         element={
           <ProtectedRoute>
             <Matches />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/messages"
+        element={
+          <ProtectedRoute>
+            <Messages />
           </ProtectedRoute>
         }
       />
