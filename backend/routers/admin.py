@@ -4,14 +4,14 @@ Admin routes for Hireabble API.
 Separate auth flow, user management, content moderation,
 reports review, and platform analytics.
 """
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, Body
 from typing import Optional
 from datetime import datetime, timezone, timedelta
 import uuid
 import random
 
 from database import (
-    db, logger,
+    db, logger, manager, create_notification,
     hash_password, verify_password, create_token, get_current_admin,
     AdminLogin, AdminCreate, ReportCreate, get_current_user, JobCreate,
 )
@@ -576,13 +576,98 @@ async def admin_create_job(job: JobCreate, admin: dict = Depends(get_current_adm
     return {k: v for k, v in job_doc.items() if k != "_id"}
 
 
-@router.delete("/admin/jobs/{job_id}")
-async def admin_delete_job(job_id: str, admin: dict = Depends(get_current_admin)):
-    """Admin can delete any job."""
-    result = await db.jobs.delete_one({"id": job_id})
-    if result.deleted_count == 0:
+@router.get("/admin/jobs/{job_id}")
+async def admin_get_job_detail(job_id: str, admin: dict = Depends(get_current_admin)):
+    """Get full job details for admin review."""
+    job = await db.jobs.find_one({"id": job_id}, {"_id": 0})
+    if not job:
         raise HTTPException(status_code=404, detail="Job not found")
-    return {"message": "Job deleted"}
+
+    # Get poster info
+    poster = None
+    if job.get("recruiter_id"):
+        poster = await db.users.find_one(
+            {"id": job["recruiter_id"]},
+            {"_id": 0, "password": 0}
+        )
+
+    # Get application count
+    app_count = await db.applications.count_documents({"job_id": job_id})
+
+    return {
+        "job": job,
+        "poster": poster,
+        "application_count": app_count,
+    }
+
+
+@router.delete("/admin/jobs/{job_id}")
+async def admin_delete_job(
+    job_id: str,
+    admin: dict = Depends(get_current_admin),
+    body: dict = Body(default=None),
+):
+    """Remove a job for policy violation, issue a strike, and notify the poster."""
+    job = await db.jobs.find_one({"id": job_id}, {"_id": 0})
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    reason = (body or {}).get("reason", "Community guideline violation")
+
+    # Delete the job
+    await db.jobs.delete_one({"id": job_id})
+
+    # Issue a strike to the poster
+    recruiter_id = job.get("recruiter_id")
+    if recruiter_id:
+        # Increment strike count
+        await db.users.update_one(
+            {"id": recruiter_id},
+            {"$inc": {"strikes": 1}},
+        )
+
+        # Fetch updated user to check strike count
+        user = await db.users.find_one({"id": recruiter_id}, {"_id": 0})
+        strike_count = user.get("strikes", 1) if user else 1
+
+        # Notify the poster
+        await create_notification(
+            user_id=recruiter_id,
+            notif_type="warning",
+            title="Job Post Removed",
+            message=f"Your job post \"{job.get('title', 'Untitled')}\" was removed due to community guideline violations. Reason: {reason}. You have {strike_count}/3 strike(s).",
+            data={"job_id": job_id, "strikes": strike_count}
+        )
+
+        # Send real-time notification via WebSocket
+        await manager.send_to_user(recruiter_id, {
+            "type": "job_removed",
+            "job_title": job.get("title"),
+            "reason": reason,
+            "strikes": strike_count,
+        })
+
+        # Auto-ban at 3 strikes
+        if strike_count >= 3:
+            await db.users.update_one(
+                {"id": recruiter_id},
+                {"$set": {
+                    "status": "banned",
+                    "status_reason": "Banned after 3 community guideline violations",
+                    "status_updated_at": datetime.now(timezone.utc).isoformat(),
+                    "status_updated_by": admin["id"],
+                }},
+            )
+            await create_notification(
+                user_id=recruiter_id,
+                notif_type="warning",
+                title="Account Banned",
+                message="Your account has been banned after 3 community guideline violations.",
+                data={"strikes": strike_count}
+            )
+            return {"message": "Job removed. User has been banned (3 strikes).", "strikes": strike_count, "banned": True}
+
+    return {"message": "Job removed and poster notified.", "strikes": strike_count if recruiter_id else 0, "banned": False}
 
 
 # ==================== IMPERSONATION ====================

@@ -42,7 +42,10 @@ class InterviewReschedule(BaseModel):
 
 @router.post("")
 async def create_interview(data: InterviewCreate, current_user: dict = Depends(get_current_user)):
-    """Create an interview request for a match"""
+    """Create an interview request for a match (recruiters only)"""
+    if current_user.get("role") != "recruiter":
+        raise HTTPException(status_code=403, detail="Only recruiters can schedule interviews")
+
     # Verify match exists and user is part of it
     match = await db.matches.find_one({"id": data.match_id}, {"_id": 0})
     if not match:

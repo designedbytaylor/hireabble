@@ -38,6 +38,14 @@ export default function Chat() {
     ? (user?.id === match.seeker_id ? match.recruiter_id : match.seeker_id)
     : null;
 
+  const markAsRead = useCallback(async () => {
+    try {
+      await axios.post(`${API}/messages/${matchId}/read`, {}, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+    } catch (e) { /* silent */ }
+  }, [matchId, token]);
+
   // WebSocket connection
   const connectWebSocket = useCallback(() => {
     if (!token || wsRef.current?.readyState === WebSocket.OPEN) return;
@@ -82,15 +90,7 @@ export default function Chat() {
     } catch (error) {
       console.error('Failed to connect WebSocket:', error);
     }
-  }, [token, matchId, scrollToBottom, user?.id]);
-
-  const markAsRead = useCallback(async () => {
-    try {
-      await axios.post(`${API}/messages/${matchId}/read`, {}, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-    } catch (e) { /* silent */ }
-  }, [matchId, token]);
+  }, [token, matchId, scrollToBottom, user?.id, markAsRead]);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -260,13 +260,15 @@ export default function Chat() {
           </div>
         </div>
 
-        <button
-          onClick={() => navigate(`/interviews?match=${matchId}`)}
-          className="p-2 rounded-lg hover:bg-primary/10 text-muted-foreground hover:text-primary transition-colors"
-          title="Schedule interview"
-        >
-          <Calendar className="w-4 h-4" />
-        </button>
+        {user?.role === 'recruiter' && (
+          <button
+            onClick={() => navigate(`/interviews?match=${matchId}`)}
+            className="p-2 rounded-lg hover:bg-primary/10 text-muted-foreground hover:text-primary transition-colors"
+            title="Schedule interview"
+          >
+            <Calendar className="w-4 h-4" />
+          </button>
+        )}
 
         <button
           onClick={() => setReportOpen(true)}

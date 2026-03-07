@@ -8,10 +8,13 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.cors import CORSMiddleware
 from pathlib import Path
+from datetime import datetime, timezone
 import json
+import uuid
+import jwt as pyjwt
 
 # Import database and shared utilities
-from database import db, manager, UPLOADS_DIR, logger
+from database import db, manager, UPLOADS_DIR, logger, JWT_SECRET, JWT_ALGORITHM, create_notification
 
 # Import routers
 from routers import auth, jobs, applications, matches, notifications, uploads, stats, admin, interviews
@@ -48,21 +51,40 @@ app.include_router(interviews.router, prefix="/api")
 
 # ==================== WEBSOCKET ====================
 
-@app.websocket("/ws/{user_id}")
-async def websocket_endpoint(websocket: WebSocket, user_id: str):
+@app.websocket("/ws/{token}")
+async def websocket_endpoint(websocket: WebSocket, token: str):
     """WebSocket endpoint for real-time notifications and chat"""
+    # Decode JWT token to get real user_id
+    try:
+        payload = pyjwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+        user_id = payload.get("user_id")
+        if not user_id:
+            await websocket.close(code=4001, reason="Invalid token")
+            return
+    except pyjwt.InvalidTokenError:
+        await websocket.accept()
+        await websocket.close(code=4001, reason="Invalid token")
+        return
+
+    # Block banned/suspended users from WebSocket
+    ws_user = await db.users.find_one({"id": user_id}, {"_id": 0, "status": 1})
+    if ws_user and ws_user.get("status") in ("banned", "suspended"):
+        await websocket.accept()
+        await websocket.close(code=4003, reason="Account banned or suspended")
+        return
+
     await manager.connect(websocket, user_id)
     logger.info(f"WebSocket connected: {user_id}")
-    
+
     try:
         while True:
             data = await websocket.receive_text()
             message_data = json.loads(data)
-            
+
             # Handle ping/pong for connection keep-alive
             if message_data.get("type") == "ping":
                 await websocket.send_json({"type": "pong"})
-            
+
             # Handle typing indicators
             elif message_data.get("type") == "typing":
                 receiver_id = message_data.get("receiver_id")
@@ -74,17 +96,66 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str):
                         "is_typing": message_data.get("is_typing", True)
                     })
 
-            # Handle chat messages
-            elif message_data.get("type") == "chat":
-                receiver_id = message_data.get("receiver_id")
-                if receiver_id:
-                    await manager.send_to_user(receiver_id, {
-                        "type": "chat_message",
-                        "sender_id": user_id,
-                        "content": message_data.get("content"),
-                        "match_id": message_data.get("match_id")
-                    })
-                    
+            # Handle chat messages sent via WebSocket
+            elif message_data.get("type") == "message":
+                match_id = message_data.get("match_id")
+                content = message_data.get("content", "").strip()
+                if not match_id or not content:
+                    continue
+
+                # Verify match exists and user is part of it
+                match = await db.matches.find_one({"id": match_id}, {"_id": 0})
+                if not match:
+                    continue
+                if match["seeker_id"] != user_id and match["recruiter_id"] != user_id:
+                    continue
+
+                # Determine receiver
+                receiver_id = match["recruiter_id"] if user_id == match["seeker_id"] else match["seeker_id"]
+
+                # Get sender info
+                sender = await db.users.find_one({"id": user_id}, {"_id": 0, "name": 1, "avatar": 1, "photo_url": 1})
+                sender_name = sender.get("name", "Unknown") if sender else "Unknown"
+                sender_avatar = (sender.get("avatar") or sender.get("photo_url")) if sender else None
+
+                # Save message to DB
+                message_id = str(uuid.uuid4())
+                message_doc = {
+                    "id": message_id,
+                    "match_id": match_id,
+                    "sender_id": user_id,
+                    "sender_name": sender_name,
+                    "sender_avatar": sender_avatar,
+                    "receiver_id": receiver_id,
+                    "content": content,
+                    "created_at": datetime.now(timezone.utc).isoformat(),
+                    "is_read": False
+                }
+                await db.messages.insert_one(message_doc)
+
+                msg_response = {k: v for k, v in message_doc.items() if k != "_id"}
+
+                # Send confirmation back to sender
+                await manager.send_to_user(user_id, {
+                    "type": "message_sent",
+                    "message": msg_response
+                })
+
+                # Send to receiver
+                await manager.send_to_user(receiver_id, {
+                    "type": "new_message",
+                    "message": msg_response
+                })
+
+                # Create notification for receiver
+                await create_notification(
+                    user_id=receiver_id,
+                    notif_type="message",
+                    title="New Message",
+                    message=f"{sender_name}: {content[:50]}{'...' if len(content) > 50 else ''}",
+                    data={"match_id": match_id, "message_id": message_id}
+                )
+
     except WebSocketDisconnect:
         manager.disconnect(websocket, user_id)
         logger.info(f"WebSocket disconnected: {user_id}")
