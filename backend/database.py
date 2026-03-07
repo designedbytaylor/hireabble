@@ -105,6 +105,13 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
         user = await db.users.find_one({"id": user_id}, {"_id": 0, "password": 0})
         if not user:
             raise HTTPException(status_code=401, detail="User not found")
+
+        # Block banned/suspended users from making API calls
+        if user.get("status") == "banned":
+            raise HTTPException(status_code=403, detail="Your account has been banned. Contact support for more info.")
+        if user.get("status") == "suspended":
+            raise HTTPException(status_code=403, detail="Your account is temporarily suspended. Contact support for more info.")
+
         return user
     except jwt.ExpiredSignatureError:
         raise HTTPException(status_code=401, detail="Token expired")

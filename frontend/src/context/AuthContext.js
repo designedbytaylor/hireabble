@@ -29,6 +29,24 @@ export const AuthProvider = ({ children }) => {
     initAuth();
   }, [token]);
 
+  // Global axios interceptor: auto-logout banned/suspended users
+  useEffect(() => {
+    const interceptor = axios.interceptors.response.use(
+      (response) => response,
+      (error) => {
+        if (error.response?.status === 403 &&
+            error.response?.data?.detail?.includes('banned')) {
+          localStorage.removeItem('token');
+          setToken(null);
+          setUser(null);
+          window.location.href = '/login?reason=banned';
+        }
+        return Promise.reject(error);
+      }
+    );
+    return () => axios.interceptors.response.eject(interceptor);
+  }, []);
+
   const login = async (email, password) => {
     const response = await axios.post(`${API}/auth/login`, { email, password });
     const { token: newToken, user: userData } = response.data;

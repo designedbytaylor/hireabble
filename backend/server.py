@@ -66,6 +66,13 @@ async def websocket_endpoint(websocket: WebSocket, token: str):
         await websocket.close(code=4001, reason="Invalid token")
         return
 
+    # Block banned/suspended users from WebSocket
+    ws_user = await db.users.find_one({"id": user_id}, {"_id": 0, "status": 1})
+    if ws_user and ws_user.get("status") in ("banned", "suspended"):
+        await websocket.accept()
+        await websocket.close(code=4003, reason="Account banned or suspended")
+        return
+
     await manager.connect(websocket, user_id)
     logger.info(f"WebSocket connected: {user_id}")
 
