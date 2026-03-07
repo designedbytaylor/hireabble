@@ -4,7 +4,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   Plus, Briefcase, Users, Star, Heart, X, Check,
   MapPin, DollarSign, Building2, ChevronRight, Clock,
-  Edit, GraduationCap, Trash2, BarChart3, Calendar, Globe
+  Edit, GraduationCap, Trash2, BarChart3, Calendar, Globe,
+  FileText, Send, Info
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -44,6 +45,9 @@ export default function RecruiterDashboard() {
   const [selectedJob, setSelectedJob] = useState(null);
   const [jobApplications, setJobApplications] = useState([]);
   const [selectedCandidate, setSelectedCandidate] = useState(null);
+  const [resumeData, setResumeData] = useState(null);
+  const [loadingResume, setLoadingResume] = useState(false);
+  const [requestingRefs, setRequestingRefs] = useState(false);
 
   useEffect(() => {
     fetchData();
@@ -119,6 +123,34 @@ export default function RecruiterDashboard() {
     }
   };
 
+  const handleViewResume = async (seekerId) => {
+    setLoadingResume(true);
+    try {
+      const response = await axios.get(`${API}/applicant/${seekerId}/resume`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setResumeData(response.data);
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Failed to load resume');
+    } finally {
+      setLoadingResume(false);
+    }
+  };
+
+  const handleRequestReferences = async (seekerId) => {
+    setRequestingRefs(true);
+    try {
+      await axios.post(`${API}/references/request/${seekerId}`, {}, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      toast.success('Reference request sent! The candidate will be notified.');
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Failed to request references');
+    } finally {
+      setRequestingRefs(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -190,7 +222,15 @@ export default function RecruiterDashboard() {
               <Star className="w-6 h-6 text-secondary" />
             </div>
             <div className="text-3xl font-bold font-['Outfit']">{stats.super_likes}</div>
-            <div className="text-sm text-muted-foreground">Super Likes</div>
+            <div className="text-sm text-muted-foreground flex items-center gap-1">
+              Super Likes
+              <span className="relative group">
+                <Info className="w-3 h-3 cursor-help" />
+                <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 rounded-lg bg-foreground text-background text-xs w-48 text-center opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-50">
+                  Super Likes put your job at the top of seekers' queues, increasing visibility and match chances!
+                </span>
+              </span>
+            </div>
           </div>
           <div className="glass-card rounded-2xl p-5 hover:border-pink-500/30 transition-colors">
             <div className="w-12 h-12 rounded-xl bg-pink-500/20 flex items-center justify-center mb-3">
@@ -478,6 +518,99 @@ export default function RecruiterDashboard() {
                       </span>
                     ))}
                   </div>
+                </div>
+              )}
+
+              {/* Resume & References */}
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleViewResume(selectedCandidate.seeker_id)}
+                  disabled={loadingResume}
+                  className="flex-1 rounded-xl border-primary/30 text-primary hover:bg-primary/10"
+                >
+                  {loadingResume ? (
+                    <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin mr-2" />
+                  ) : (
+                    <FileText className="w-4 h-4 mr-2" />
+                  )}
+                  View Full Resume
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleRequestReferences(selectedCandidate.seeker_id)}
+                  disabled={requestingRefs}
+                  className="flex-1 rounded-xl border-secondary/30 text-secondary hover:bg-secondary/10"
+                >
+                  {requestingRefs ? (
+                    <div className="w-4 h-4 border-2 border-secondary border-t-transparent rounded-full animate-spin mr-2" />
+                  ) : (
+                    <Send className="w-4 h-4 mr-2" />
+                  )}
+                  Request References
+                </Button>
+              </div>
+
+              {/* Full Resume View */}
+              {resumeData && (
+                <div className="p-4 rounded-xl bg-background border border-border space-y-3 max-h-[300px] overflow-y-auto">
+                  <div className="flex items-center justify-between">
+                    <h4 className="font-semibold text-sm">Full Resume</h4>
+                    <button onClick={() => setResumeData(null)} className="text-muted-foreground hover:text-foreground">
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                  {resumeData.bio && (
+                    <div>
+                      <div className="text-xs text-muted-foreground mb-1">About</div>
+                      <p className="text-sm">{resumeData.bio}</p>
+                    </div>
+                  )}
+                  {resumeData.work_history?.length > 0 && (
+                    <div>
+                      <div className="text-xs text-muted-foreground mb-1">Work Experience</div>
+                      {resumeData.work_history.map((job, i) => (
+                        <div key={i} className="mb-2">
+                          <div className="text-sm font-medium">{job.position || job.title}</div>
+                          <div className="text-xs text-muted-foreground">{job.company} {job.start_date && `| ${job.start_date} - ${job.end_date || 'Present'}`}</div>
+                          {job.description && <p className="text-xs mt-1">{job.description}</p>}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {resumeData.education?.length > 0 && (
+                    <div>
+                      <div className="text-xs text-muted-foreground mb-1">Education</div>
+                      {resumeData.education.map((edu, i) => (
+                        <div key={i} className="text-sm">
+                          {edu.degree} {edu.field && `in ${edu.field}`} - {edu.school} {edu.year && `(${edu.year})`}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {resumeData.certifications?.length > 0 && (
+                    <div>
+                      <div className="text-xs text-muted-foreground mb-1">Certifications</div>
+                      <div className="flex flex-wrap gap-1">
+                        {resumeData.certifications.map((cert, i) => (
+                          <span key={i} className="px-2 py-0.5 rounded-full bg-primary/10 text-primary text-xs">{cert}</span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {resumeData.references_visible && resumeData.references?.length > 0 && (
+                    <div>
+                      <div className="text-xs text-muted-foreground mb-1">References</div>
+                      {resumeData.references.map((ref, i) => (
+                        <div key={i} className="text-sm">
+                          <span className="font-medium">{ref.name}</span> - {ref.title} at {ref.company}
+                          {ref.email && <span className="text-xs text-muted-foreground ml-2">{ref.email}</span>}
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
 

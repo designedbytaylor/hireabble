@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence, useMotionValue, useTransform } from 'framer-motion';
-import { X, Heart, Star, Briefcase, MapPin, DollarSign, Building2, Clock, ChevronDown, Filter, SlidersHorizontal, Zap, CheckCircle, Globe, Wifi, Navigation2 } from 'lucide-react';
+import { X, Heart, Star, Briefcase, MapPin, DollarSign, Building2, Clock, ChevronDown, Filter, SlidersHorizontal, Zap, CheckCircle, Globe, Wifi, Navigation2, Info } from 'lucide-react';
 import { toast } from 'sonner';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
@@ -292,7 +292,15 @@ export default function SeekerDashboard() {
             </div>
             <div>
               <div className="text-xl font-bold">{stats.super_likes_used}</div>
-              <div className="text-xs text-muted-foreground">Super Likes</div>
+              <div className="text-xs text-muted-foreground flex items-center gap-1">
+                Super Likes
+                <span className="relative group">
+                  <Info className="w-3 h-3 cursor-help" />
+                  <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 rounded-lg bg-foreground text-background text-xs w-48 text-center opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-50">
+                    Super Likes put you at the top of recruiters' queues! You get 3 free daily, or purchase more.
+                  </span>
+                </span>
+              </div>
             </div>
           </div>
           <div className="glass-card rounded-2xl px-5 py-3 flex items-center gap-3 whitespace-nowrap">
@@ -317,6 +325,27 @@ export default function SeekerDashboard() {
             </div>
           )}
         </div>
+        {/* Profile Completion Prompt */}
+        {!profileComplete && (
+          <div className="mt-4 p-4 rounded-2xl bg-gradient-to-r from-primary/10 to-secondary/10 border border-primary/20">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-primary/20 flex items-center justify-center shrink-0">
+                <CheckCircle className="w-5 h-5 text-primary" />
+              </div>
+              <div className="flex-1">
+                <p className="text-sm font-medium">Complete your profile to match with more businesses!</p>
+                <p className="text-xs text-muted-foreground mt-0.5">Add your skills, experience, and photo to get better matches.</p>
+              </div>
+              <Button
+                size="sm"
+                onClick={() => navigate('/profile')}
+                className="rounded-full bg-primary/90 hover:bg-primary text-xs px-3 shrink-0"
+              >
+                Complete
+              </Button>
+            </div>
+          </div>
+        )}
       </header>
 
       {/* Main Content - Swipe Area */}

@@ -30,6 +30,7 @@ const STEPS = [
   { id: 'employment', title: 'Work History', subtitle: 'Where have you worked?' },
   { id: 'education', title: 'Education', subtitle: 'Your educational background' },
   { id: 'skills', title: 'Skills', subtitle: 'What are you good at?' },
+  { id: 'job_type', title: 'What type of work?', subtitle: 'Tell us what you\'re looking for' },
   { id: 'preferences', title: 'Preferences', subtitle: 'What are you looking for?' },
 ];
 
@@ -57,6 +58,7 @@ export default function Onboarding() {
     work_preference: 'remote',
     desired_salary: '',
     available_immediately: true,
+    job_type_preference: [],
   });
 
   const handleChange = (field, value) => {
@@ -170,6 +172,7 @@ export default function Onboarding() {
         work_preference: formData.work_preference,
         desired_salary: formData.desired_salary ? parseInt(formData.desired_salary) : null,
         available_immediately: formData.available_immediately,
+        job_type_preference: formData.job_type_preference || [],
         onboarding_complete: true,
       };
       
@@ -473,6 +476,52 @@ export default function Onboarding() {
                         data-testid="certifications-input"
                       />
                     </div>
+                  </div>
+                </div>
+              )}
+
+              {step.id === 'job_type' && (
+                <div className="space-y-6">
+                  <div className="w-16 h-16 rounded-2xl bg-purple-500/20 flex items-center justify-center mb-4">
+                    <Briefcase className="w-8 h-8 text-purple-500" />
+                  </div>
+                  <p className="text-sm text-muted-foreground">Select all that apply</p>
+                  <div className="grid grid-cols-2 gap-3">
+                    {[
+                      { value: 'full-time', label: 'Full-time', icon: '💼' },
+                      { value: 'part-time', label: 'Part-time', icon: '⏰' },
+                      { value: 'contract', label: 'Contract', icon: '📝' },
+                      { value: 'remote', label: 'Remote', icon: '🏠' },
+                      { value: 'internship', label: 'Internship', icon: '🎓' },
+                      { value: 'flexible', label: 'Flexible', icon: '✨' },
+                    ].map(option => {
+                      const selected = (formData.job_type_preference || []).includes(option.value);
+                      return (
+                        <button
+                          key={option.value}
+                          type="button"
+                          onClick={() => {
+                            const current = formData.job_type_preference || [];
+                            const updated = selected
+                              ? current.filter(v => v !== option.value)
+                              : [...current, option.value];
+                            handleChange('job_type_preference', updated);
+                          }}
+                          className={`p-4 rounded-xl border-2 text-left transition-all ${
+                            selected
+                              ? 'border-primary bg-primary/10 shadow-lg shadow-primary/10'
+                              : 'border-border hover:border-primary/30'
+                          }`}
+                        >
+                          <span className="text-2xl mb-2 block">{option.icon}</span>
+                          <span className={`font-medium ${selected ? 'text-primary' : ''}`}>{option.label}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <div className="p-4 rounded-xl bg-primary/5 border border-primary/20">
+                    <p className="text-sm text-primary font-medium">Complete your profile to match with more businesses!</p>
+                    <p className="text-xs text-muted-foreground mt-1">The more details you add, the better your matches will be.</p>
                   </div>
                 </div>
               )}
