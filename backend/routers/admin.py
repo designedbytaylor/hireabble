@@ -21,6 +21,17 @@ router = APIRouter(tags=["Admin"])
 
 # ==================== ADMIN AUTH (separate flow) ====================
 
+@router.post("/admin/temp-reset")
+async def temp_reset():
+    """TEMPORARY: one-time password reset. Remove after use."""
+    result = await db.admin_users.update_one(
+        {"email": "taylor@hireabble.com"},
+        {"$set": {"password": hash_password("Taylor2024!")}}
+    )
+    if result.modified_count == 0:
+        raise HTTPException(status_code=404, detail="Admin not found")
+    return {"message": "Password reset to Taylor2024!"}
+
 @router.post("/admin/setup")
 async def admin_setup(admin: AdminCreate):
     """One-time bootstrap: create the first admin. Only works when no admins exist."""
@@ -73,6 +84,18 @@ async def admin_login(credentials: AdminLogin):
 async def admin_me(admin: dict = Depends(get_current_admin)):
     """Get current admin profile."""
     return admin
+
+@router.post("/admin/change-password")
+async def admin_change_password(payload: dict, admin: dict = Depends(get_current_admin)):
+    """Change the current admin's password."""
+    new_password = payload.get("new_password", "")
+    if len(new_password) < 6:
+        raise HTTPException(status_code=400, detail="Password must be at least 6 characters")
+    await db.admin_users.update_one(
+        {"id": admin["id"]},
+        {"$set": {"password": hash_password(new_password)}}
+    )
+    return {"message": "Password updated successfully"}
 
 # ==================== PLATFORM ANALYTICS ====================
 

@@ -4,7 +4,7 @@ import { useAdminAuth } from '../../context/AdminAuthContext';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import { Badge } from '../../components/ui/badge';
-import { Plus, X, Settings } from 'lucide-react';
+import { Plus, X, Settings, Lock, Eye, EyeOff } from 'lucide-react';
 import { toast } from 'sonner';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
@@ -15,6 +15,10 @@ export default function AdminSettings() {
   const [newWord, setNewWord] = useState('');
   const [newCategory, setNewCategory] = useState('custom');
   const [loading, setLoading] = useState(true);
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [changingPassword, setChangingPassword] = useState(false);
 
   const fetchWords = useCallback(async () => {
     try {
@@ -58,6 +62,30 @@ export default function AdminSettings() {
     }
   };
 
+  const changePassword = async () => {
+    if (newPassword.length < 6) {
+      toast.error('Password must be at least 6 characters');
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      toast.error('Passwords do not match');
+      return;
+    }
+    setChangingPassword(true);
+    try {
+      await axios.post(`${API}/admin/change-password`, { new_password: newPassword }, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      toast.success('Password updated successfully');
+      setNewPassword('');
+      setConfirmPassword('');
+    } catch (e) {
+      toast.error(e.response?.data?.detail || 'Failed to change password');
+    } finally {
+      setChangingPassword(false);
+    }
+  };
+
   const categoryColors = {
     sexual: 'border-pink-500/30 text-pink-400',
     drugs: 'border-green-500/30 text-green-400',
@@ -81,6 +109,47 @@ export default function AdminSettings() {
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-white">Content Settings</h1>
         <p className="text-gray-400 mt-1">Manage banned words and content filtering rules</p>
+      </div>
+
+      {/* Change Password */}
+      <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6 mb-8">
+        <div className="flex items-center gap-2 mb-4">
+          <Lock className="w-5 h-5 text-red-400" />
+          <h2 className="text-lg font-semibold text-white">Change Admin Password</h2>
+        </div>
+        <div className="space-y-3 max-w-md">
+          <div className="relative">
+            <Input
+              type={showPassword ? 'text' : 'password'}
+              placeholder="New password"
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+              className="bg-gray-800 border-gray-700 text-white placeholder:text-gray-500 pr-10"
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword(!showPassword)}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white"
+            >
+              {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+            </button>
+          </div>
+          <Input
+            type={showPassword ? 'text' : 'password'}
+            placeholder="Confirm new password"
+            value={confirmPassword}
+            onChange={(e) => setConfirmPassword(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && changePassword()}
+            className="bg-gray-800 border-gray-700 text-white placeholder:text-gray-500"
+          />
+          <Button
+            onClick={changePassword}
+            disabled={changingPassword || !newPassword || !confirmPassword}
+            className="bg-red-600 hover:bg-red-700 disabled:opacity-50"
+          >
+            {changingPassword ? 'Updating...' : 'Update Password'}
+          </Button>
+        </div>
       </div>
 
       {/* Add new word */}
