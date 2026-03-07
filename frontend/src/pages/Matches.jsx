@@ -1,10 +1,16 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Heart, MessageCircle, Briefcase, Building2, Calendar, ChevronRight } from 'lucide-react';
+import {
+  Heart, MessageCircle, Briefcase, Building2, Calendar, ChevronRight,
+  X, MapPin, GraduationCap, Clock, User, Mail, ArrowLeft,
+} from 'lucide-react';
+import { Badge } from '../components/ui/badge';
+import { Button } from '../components/ui/button';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import Navigation from '../components/Navigation';
 import { getPhotoUrl } from '../utils/helpers';
+import { toast } from 'sonner';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -13,6 +19,10 @@ export default function Matches() {
   const { user, token } = useAuth();
   const [matches, setMatches] = useState([]);
   const [loading, setLoading] = useState(true);
+
+  // Profile view state
+  const [viewingProfile, setViewingProfile] = useState(null);
+  const [profileLoading, setProfileLoading] = useState(false);
 
   useEffect(() => {
     fetchMatches();
@@ -36,6 +46,20 @@ export default function Matches() {
     navigate(`/chat/${matchId}`);
   };
 
+  const handleViewProfile = async (matchId) => {
+    setProfileLoading(true);
+    try {
+      const res = await axios.get(`${API}/matches/${matchId}/profile`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setViewingProfile(res.data);
+    } catch (e) {
+      toast.error('Failed to load profile');
+    } finally {
+      setProfileLoading(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -44,41 +68,214 @@ export default function Matches() {
     );
   }
 
+  // ==================== PROFILE VIEW ====================
+  if (viewingProfile) {
+    const p = viewingProfile.profile;
+    const m = viewingProfile.match;
+    return (
+      <div className="min-h-screen bg-background pb-24">
+        <div className="fixed inset-0 overflow-hidden pointer-events-none">
+          <div className="absolute top-0 left-1/4 w-96 h-96 bg-primary/10 rounded-full blur-[150px]" />
+          <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-secondary/10 rounded-full blur-[150px]" />
+        </div>
+
+        <header className="relative z-10 p-6 md:p-8">
+          <button
+            onClick={() => setViewingProfile(null)}
+            className="flex items-center gap-2 text-muted-foreground hover:text-foreground mb-4 transition-colors"
+          >
+            <ArrowLeft className="w-4 h-4" /> Back to Matches
+          </button>
+        </header>
+
+        <main className="relative z-10 px-6 md:px-8">
+          <div className="max-w-lg mx-auto space-y-6">
+            {/* Profile Header */}
+            <div className="glass-card rounded-3xl p-8 text-center">
+              {(p.photo_url || p.avatar) ? (
+                <img
+                  src={getPhotoUrl(p.photo_url, p.id) || p.avatar}
+                  alt={p.name}
+                  className="w-24 h-24 rounded-full border-4 border-primary mx-auto object-cover mb-4"
+                />
+              ) : (
+                <div className="w-24 h-24 rounded-full bg-primary/20 flex items-center justify-center mx-auto mb-4">
+                  <User className="w-12 h-12 text-primary" />
+                </div>
+              )}
+              <h1 className="text-2xl font-bold font-['Outfit']">{p.name}</h1>
+              {p.title && <p className="text-primary mt-1">{p.title}</p>}
+              <p className="text-muted-foreground text-sm mt-1">Applied for: {m.job_title}</p>
+
+              <div className="flex justify-center gap-3 mt-4">
+                <Button
+                  onClick={() => handleOpenChat(m.id)}
+                  className="rounded-xl bg-gradient-to-r from-primary to-secondary hover:opacity-90"
+                >
+                  <MessageCircle className="w-4 h-4 mr-2" /> Message
+                </Button>
+                {user?.role === 'recruiter' && (
+                  <Button
+                    variant="outline"
+                    onClick={() => navigate(`/interviews?match=${m.id}`)}
+                    className="rounded-xl border-primary/30 text-primary hover:bg-primary/10"
+                  >
+                    <Calendar className="w-4 h-4 mr-2" /> Schedule Interview
+                  </Button>
+                )}
+              </div>
+            </div>
+
+            {/* Bio */}
+            {p.bio && (
+              <div className="glass-card rounded-2xl p-6">
+                <h2 className="font-bold font-['Outfit'] mb-2">About</h2>
+                <p className="text-muted-foreground text-sm leading-relaxed">{p.bio}</p>
+              </div>
+            )}
+
+            {/* Details */}
+            <div className="glass-card rounded-2xl p-6 space-y-3">
+              <h2 className="font-bold font-['Outfit'] mb-2">Details</h2>
+              {p.location && (
+                <div className="flex items-center gap-3 text-sm">
+                  <MapPin className="w-4 h-4 text-muted-foreground shrink-0" />
+                  <span>{p.location}</span>
+                </div>
+              )}
+              {(p.current_employer || p.company) && (
+                <div className="flex items-center gap-3 text-sm">
+                  <Building2 className="w-4 h-4 text-muted-foreground shrink-0" />
+                  <span>{p.current_employer || p.company}</span>
+                </div>
+              )}
+              {p.experience_years && (
+                <div className="flex items-center gap-3 text-sm">
+                  <Clock className="w-4 h-4 text-muted-foreground shrink-0" />
+                  <span>{p.experience_years} years experience</span>
+                </div>
+              )}
+              {p.school && (
+                <div className="flex items-center gap-3 text-sm">
+                  <GraduationCap className="w-4 h-4 text-muted-foreground shrink-0" />
+                  <span>{p.school}{p.degree ? ` (${p.degree})` : ''}</span>
+                </div>
+              )}
+              {p.email && (
+                <div className="flex items-center gap-3 text-sm">
+                  <Mail className="w-4 h-4 text-muted-foreground shrink-0" />
+                  <span>{p.email}</span>
+                </div>
+              )}
+            </div>
+
+            {/* Skills */}
+            {p.skills?.length > 0 && (
+              <div className="glass-card rounded-2xl p-6">
+                <h2 className="font-bold font-['Outfit'] mb-3">Skills</h2>
+                <div className="flex flex-wrap gap-2">
+                  {p.skills.map((skill, i) => (
+                    <Badge key={i} className="bg-primary/10 text-primary border-primary/20 hover:bg-primary/20">
+                      {skill}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Work History */}
+            {p.work_history?.length > 0 && (
+              <div className="glass-card rounded-2xl p-6">
+                <h2 className="font-bold font-['Outfit'] mb-3">Work Experience</h2>
+                <div className="space-y-4">
+                  {p.work_history.map((job, i) => (
+                    <div key={i} className={`${i > 0 ? 'pt-4 border-t border-border' : ''}`}>
+                      <h3 className="font-semibold">{job.position}</h3>
+                      <p className="text-primary text-sm">{job.company}</p>
+                      <p className="text-muted-foreground text-xs mt-1">
+                        {job.start_date}{job.end_date ? ` — ${job.end_date}` : ' — Present'}
+                      </p>
+                      {job.description && (
+                        <p className="text-muted-foreground text-sm mt-2">{job.description}</p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Education */}
+            {p.education?.length > 0 && (
+              <div className="glass-card rounded-2xl p-6">
+                <h2 className="font-bold font-['Outfit'] mb-3">Education</h2>
+                <div className="space-y-4">
+                  {p.education.map((edu, i) => (
+                    <div key={i} className={`${i > 0 ? 'pt-4 border-t border-border' : ''}`}>
+                      <h3 className="font-semibold">{edu.school}</h3>
+                      <p className="text-primary text-sm">{edu.degree}{edu.field ? `, ${edu.field}` : ''}</p>
+                      {edu.year && <p className="text-muted-foreground text-xs mt-1">{edu.year}</p>}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Certifications */}
+            {p.certifications?.length > 0 && (
+              <div className="glass-card rounded-2xl p-6">
+                <h2 className="font-bold font-['Outfit'] mb-3">Certifications</h2>
+                <div className="flex flex-wrap gap-2">
+                  {p.certifications.map((cert, i) => (
+                    <Badge key={i} variant="outline" className="border-secondary/30 text-secondary">
+                      {cert}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </main>
+
+        <Navigation />
+      </div>
+    );
+  }
+
+  // ==================== MATCHES LIST ====================
   return (
     <div className="min-h-screen bg-background pb-24">
-      {/* Background Effects */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
         <div className="absolute top-0 left-1/4 w-96 h-96 bg-primary/10 rounded-full blur-[150px]" />
         <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-secondary/10 rounded-full blur-[150px]" />
       </div>
 
-      {/* Header */}
       <header className="relative z-10 p-6 md:p-8">
         <h1 className="text-2xl font-bold font-['Outfit']">Matches</h1>
         <p className="text-muted-foreground">Your successful connections</p>
       </header>
 
-      {/* Matches List */}
       <main className="relative z-10 px-6 md:px-8">
         <div className="max-w-lg mx-auto">
           {matches.length > 0 ? (
             <div className="space-y-4">
               {matches.map((match) => (
-                <div 
+                <div
                   key={match.id}
-                  onClick={() => handleOpenChat(match.id)}
-                  className="glass-card rounded-2xl p-5 hover:border-primary/30 transition-colors cursor-pointer"
+                  className="glass-card rounded-2xl p-5 hover:border-primary/30 transition-colors"
                   data-testid={`match-${match.id}`}
                 >
                   <div className="flex items-start gap-4">
                     {/* Avatar or Logo */}
-                    <div className="relative">
+                    <div
+                      className="relative cursor-pointer"
+                      onClick={() => user?.role === 'recruiter' ? handleViewProfile(match.id) : handleOpenChat(match.id)}
+                    >
                       {user?.role === 'seeker' ? (
                         <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-primary to-secondary flex items-center justify-center">
                           <Building2 className="w-7 h-7 text-white" />
                         </div>
                       ) : (
-                        <img 
+                        <img
                           src={getPhotoUrl(match.seeker_avatar, match.seeker_id)}
                           alt={match.seeker_name}
                           className="w-14 h-14 rounded-xl object-cover border-2 border-primary/50"
@@ -90,7 +287,10 @@ export default function Matches() {
                     </div>
 
                     {/* Match Info */}
-                    <div className="flex-1 min-w-0">
+                    <div
+                      className="flex-1 min-w-0 cursor-pointer"
+                      onClick={() => user?.role === 'recruiter' ? handleViewProfile(match.id) : handleOpenChat(match.id)}
+                    >
                       {user?.role === 'seeker' ? (
                         <>
                           <h3 className="font-bold font-['Outfit'] text-lg">{match.job_title}</h3>
@@ -102,26 +302,37 @@ export default function Matches() {
                           <p className="text-muted-foreground text-sm">Applied for: {match.job_title}</p>
                         </>
                       )}
-                      
-                      {/* Last message preview */}
+
                       {match.last_message && (
                         <p className="text-sm text-muted-foreground mt-2 truncate">
                           {match.last_message_sender === user?.id ? 'You: ' : ''}{match.last_message}
                         </p>
                       )}
-                      
+
                       <div className="flex items-center gap-2 mt-2 text-xs text-muted-foreground">
                         <Calendar className="w-3 h-3" />
                         Matched {new Date(match.created_at).toLocaleDateString()}
                       </div>
                     </div>
 
-                    {/* Action */}
+                    {/* Actions */}
                     <div className="flex items-center gap-2">
-                      <div className="p-3 rounded-xl bg-primary/10 text-primary">
+                      {user?.role === 'recruiter' && (
+                        <button
+                          onClick={() => handleViewProfile(match.id)}
+                          className="p-3 rounded-xl bg-secondary/10 text-secondary hover:bg-secondary/20 transition-colors"
+                          title="View profile"
+                        >
+                          <User className="w-5 h-5" />
+                        </button>
+                      )}
+                      <button
+                        onClick={() => handleOpenChat(match.id)}
+                        className="p-3 rounded-xl bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
+                        title="Open chat"
+                      >
                         <MessageCircle className="w-5 h-5" />
-                      </div>
-                      <ChevronRight className="w-5 h-5 text-muted-foreground" />
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -134,7 +345,7 @@ export default function Matches() {
               </div>
               <h2 className="text-2xl font-bold font-['Outfit'] mb-3">No Matches Yet</h2>
               <p className="text-muted-foreground max-w-xs mx-auto">
-                {user?.role === 'seeker' 
+                {user?.role === 'seeker'
                   ? "Keep swiping! When a recruiter likes you back, you'll see your matches here."
                   : "Accept applications from job seekers to create matches and start conversations."}
               </p>
@@ -144,6 +355,13 @@ export default function Matches() {
       </main>
 
       <Navigation />
+
+      {/* Profile loading overlay */}
+      {profileLoading && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+          <div className="w-10 h-10 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+        </div>
+      )}
     </div>
   );
 }

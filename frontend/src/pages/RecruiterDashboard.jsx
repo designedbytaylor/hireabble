@@ -70,7 +70,7 @@ export default function RecruiterDashboard() {
   const handleViewApplications = async (job) => {
     setSelectedJob(job);
     try {
-      const response = await axios.get(`${API}/applications/job/${job.id}`, {
+      const response = await axios.get(`${API}/applications?job_id=${job.id}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       setJobApplications(response.data);
