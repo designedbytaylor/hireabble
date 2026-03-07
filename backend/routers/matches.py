@@ -125,6 +125,7 @@ def calculate_match_score(viewer: dict, other: dict, job: dict = None) -> int:
     return min(100, int((score / max_score) * 100))
 
 
+
 # ==================== MESSAGES ====================
 
 @router.post("/messages", response_model=MessageResponse)

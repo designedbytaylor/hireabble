@@ -24,11 +24,11 @@ export default function Navigation() {
       label: 'Matches',
       path: '/matches'
     },
-    {
+    ...(!isSeeker ? [{
       icon: Calendar,
       label: 'Interviews',
       path: '/interviews'
-    },
+    }] : []),
     {
       icon: User,
       label: 'Profile',
