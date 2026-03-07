@@ -110,10 +110,51 @@ async def get_messages(match_id: str, current_user: dict = Depends(get_current_u
         {"_id": 0}
     ).sort("created_at", 1).to_list(500)
     
-    # Mark messages as read
-    await db.messages.update_many(
+    # Mark messages as read and notify sender
+    unread = await db.messages.find(
         {"match_id": match_id, "receiver_id": current_user["id"], "is_read": False},
-        {"$set": {"is_read": True}}
-    )
-    
+        {"_id": 0, "sender_id": 1, "id": 1}
+    ).to_list(500)
+
+    if unread:
+        await db.messages.update_many(
+            {"match_id": match_id, "receiver_id": current_user["id"], "is_read": False},
+            {"$set": {"is_read": True, "read_at": datetime.now(timezone.utc).isoformat()}}
+        )
+        # Notify senders via WebSocket that messages were read
+        sender_ids = set(m["sender_id"] for m in unread)
+        for sid in sender_ids:
+            await manager.send_to_user(sid, {
+                "type": "messages_read",
+                "match_id": match_id,
+                "read_by": current_user["id"]
+            })
+
     return messages
+
+
+@router.post("/messages/{match_id}/read")
+async def mark_messages_read(match_id: str, current_user: dict = Depends(get_current_user)):
+    """Mark all messages in a match as read by the current user."""
+    match = await db.matches.find_one({"id": match_id}, {"_id": 0})
+    if not match:
+        raise HTTPException(status_code=404, detail="Match not found")
+
+    if match["seeker_id"] != current_user["id"] and match["recruiter_id"] != current_user["id"]:
+        raise HTTPException(status_code=403, detail="Not authorized")
+
+    result = await db.messages.update_many(
+        {"match_id": match_id, "receiver_id": current_user["id"], "is_read": False},
+        {"$set": {"is_read": True, "read_at": datetime.now(timezone.utc).isoformat()}}
+    )
+
+    # Notify sender
+    other_id = match["recruiter_id"] if current_user["id"] == match["seeker_id"] else match["seeker_id"]
+    if result.modified_count > 0:
+        await manager.send_to_user(other_id, {
+            "type": "messages_read",
+            "match_id": match_id,
+            "read_by": current_user["id"]
+        })
+
+    return {"marked_read": result.modified_count}

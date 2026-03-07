@@ -382,80 +382,14 @@ export default function RecruiterDashboard() {
         isEditing
       />
 
-      {/* Job Applications Dialog */}
-      <Dialog open={!!selectedJob} onOpenChange={() => setSelectedJob(null)}>
-        <DialogContent className="max-w-lg bg-card border-border">
-          <DialogHeader>
-            <DialogTitle className="font-['Outfit']">
-              Applications for {selectedJob?.title}
-            </DialogTitle>
-          </DialogHeader>
-          
-          <div className="max-h-[60vh] overflow-y-auto space-y-4">
-            {jobApplications.length > 0 ? (
-              jobApplications.map((app) => (
-                <div 
-                  key={app.id} 
-                  className="p-4 rounded-xl bg-background border border-border cursor-pointer hover:border-primary/30"
-                  onClick={() => { setSelectedJob(null); setSelectedCandidate(app); }}
-                >
-                  <div className="flex items-center gap-3">
-                    <img 
-                      src={getPhotoUrl(app.seeker_photo || app.seeker_avatar, app.seeker_id)}
-                      alt={app.seeker_name}
-                      className="w-12 h-12 rounded-full object-cover"
-                    />
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium">{app.seeker_name}</span>
-                        {app.action === 'superlike' && (
-                          <Star className="w-4 h-4 text-secondary fill-secondary" />
-                        )}
-                        {app.seeker_video && (
-                          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-purple-500/10 text-purple-500 text-[10px] font-medium">
-                            VIDEO
-                          </span>
-                        )}
-                      </div>
-                      <div className="text-sm text-primary">{app.seeker_title || 'Job Seeker'}</div>
-                    </div>
-                    
-                    {!app.recruiter_action ? (
-                      <div className="flex gap-2">
-                        <button
-                          onClick={(e) => { e.stopPropagation(); handleRespondToApplication(app.id, 'reject'); }}
-                          className="p-2 rounded-lg bg-destructive/10 text-destructive hover:bg-destructive/20"
-                        >
-                          <X className="w-5 h-5" />
-                        </button>
-                        <button
-                          onClick={(e) => { e.stopPropagation(); handleRespondToApplication(app.id, 'accept'); }}
-                          className="p-2 rounded-lg bg-success/10 text-success hover:bg-success/20"
-                        >
-                          <Check className="w-5 h-5" />
-                        </button>
-                      </div>
-                    ) : (
-                      <span className={`px-3 py-1 rounded-full text-sm ${
-                        app.recruiter_action === 'accept' 
-                          ? 'bg-success/10 text-success' 
-                          : 'bg-muted text-muted-foreground'
-                      }`}>
-                        {app.recruiter_action === 'accept' ? 'Matched' : 'Declined'}
-                      </span>
-                    )}
-                  </div>
-                </div>
-              ))
-            ) : (
-              <div className="text-center py-8">
-                <Users className="w-12 h-12 text-muted-foreground mx-auto mb-3" />
-                <p className="text-muted-foreground">No applications for this job yet.</p>
-              </div>
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
+      {/* Job Applications Dialog - Enhanced */}
+      <JobApplicationsDialog
+        selectedJob={selectedJob}
+        onClose={() => setSelectedJob(null)}
+        jobApplications={jobApplications}
+        onViewCandidate={(app) => { setSelectedJob(null); setSelectedCandidate(app); }}
+        onRespond={handleRespondToApplication}
+      />
 
       {/* Candidate Detail Dialog */}
       <Dialog open={!!selectedCandidate} onOpenChange={() => setSelectedCandidate(null)}>
@@ -840,6 +774,172 @@ function JobFormDialog({ open, onClose, onSuccess, token, company, job = null, i
             )}
           </Button>
         </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function JobApplicationsDialog({ selectedJob, onClose, jobApplications, onViewCandidate, onRespond }) {
+  const [filter, setFilter] = useState('all'); // 'all', 'pending', 'superlike', 'matched', 'declined'
+
+  const filteredApps = jobApplications.filter(app => {
+    if (filter === 'pending') return !app.recruiter_action;
+    if (filter === 'superlike') return app.action === 'superlike';
+    if (filter === 'matched') return app.recruiter_action === 'accept';
+    if (filter === 'declined') return app.recruiter_action === 'reject';
+    return true;
+  });
+
+  const pendingApps = jobApplications.filter(a => !a.recruiter_action);
+
+  const handleBulkAccept = async () => {
+    if (!window.confirm(`Accept all ${pendingApps.length} pending applicants?`)) return;
+    for (const app of pendingApps) {
+      await onRespond(app.id, 'accept');
+    }
+  };
+
+  const handleBulkReject = async () => {
+    if (!window.confirm(`Decline all ${pendingApps.length} pending applicants?`)) return;
+    for (const app of pendingApps) {
+      await onRespond(app.id, 'reject');
+    }
+  };
+
+  const filterTabs = [
+    { key: 'all', label: 'All', count: jobApplications.length },
+    { key: 'pending', label: 'Pending', count: pendingApps.length },
+    { key: 'superlike', label: 'Super Likes', count: jobApplications.filter(a => a.action === 'superlike').length },
+    { key: 'matched', label: 'Matched', count: jobApplications.filter(a => a.recruiter_action === 'accept').length },
+  ];
+
+  return (
+    <Dialog open={!!selectedJob} onOpenChange={onClose}>
+      <DialogContent className="max-w-lg bg-card border-border">
+        <DialogHeader>
+          <DialogTitle className="font-['Outfit']">
+            Applications for {selectedJob?.title}
+          </DialogTitle>
+        </DialogHeader>
+
+        {/* Filter Tabs */}
+        <div className="flex gap-2 overflow-x-auto pb-1">
+          {filterTabs.map(tab => (
+            <button
+              key={tab.key}
+              onClick={() => setFilter(tab.key)}
+              className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors ${
+                filter === tab.key
+                  ? 'bg-primary text-white'
+                  : 'bg-accent text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              {tab.label} ({tab.count})
+            </button>
+          ))}
+        </div>
+
+        {/* Bulk Actions */}
+        {pendingApps.length > 1 && filter !== 'matched' && (
+          <div className="flex gap-2 p-3 rounded-xl bg-background border border-border">
+            <span className="text-xs text-muted-foreground flex-1 flex items-center">
+              {pendingApps.length} pending applicants
+            </span>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={handleBulkReject}
+              className="h-7 text-xs border-destructive/30 text-destructive hover:bg-destructive/10"
+            >
+              Decline All
+            </Button>
+            <Button
+              size="sm"
+              onClick={handleBulkAccept}
+              className="h-7 text-xs bg-success hover:bg-success/90 text-white"
+            >
+              Accept All
+            </Button>
+          </div>
+        )}
+
+        <div className="max-h-[55vh] overflow-y-auto space-y-3">
+          {filteredApps.length > 0 ? (
+            filteredApps.map((app) => (
+              <div
+                key={app.id}
+                className="p-4 rounded-xl bg-background border border-border cursor-pointer hover:border-primary/30 transition-colors"
+                onClick={() => onViewCandidate(app)}
+              >
+                <div className="flex items-center gap-3">
+                  <img
+                    src={getPhotoUrl(app.seeker_photo || app.seeker_avatar, app.seeker_id)}
+                    alt={app.seeker_name}
+                    className="w-12 h-12 rounded-full object-cover"
+                  />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium truncate">{app.seeker_name}</span>
+                      {app.action === 'superlike' && (
+                        <Star className="w-4 h-4 text-secondary fill-secondary flex-shrink-0" />
+                      )}
+                      {app.seeker_video && (
+                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-purple-500/10 text-purple-500 text-[10px] font-medium flex-shrink-0">
+                          VIDEO
+                        </span>
+                      )}
+                    </div>
+                    <div className="text-sm text-primary truncate">{app.seeker_title || 'Job Seeker'}</div>
+                    <div className="flex items-center gap-3 mt-1">
+                      {app.seeker_location && (
+                        <span className="text-xs text-muted-foreground flex items-center gap-1">
+                          <MapPin className="w-3 h-3" /> {app.seeker_location}
+                        </span>
+                      )}
+                      {app.seeker_experience && (
+                        <span className="text-xs text-muted-foreground">
+                          {app.seeker_experience}+ yrs
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {!app.recruiter_action ? (
+                    <div className="flex gap-2 flex-shrink-0">
+                      <button
+                        onClick={(e) => { e.stopPropagation(); onRespond(app.id, 'reject'); }}
+                        className="p-2 rounded-lg bg-destructive/10 text-destructive hover:bg-destructive/20"
+                      >
+                        <X className="w-5 h-5" />
+                      </button>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); onRespond(app.id, 'accept'); }}
+                        className="p-2 rounded-lg bg-success/10 text-success hover:bg-success/20"
+                      >
+                        <Check className="w-5 h-5" />
+                      </button>
+                    </div>
+                  ) : (
+                    <span className={`px-3 py-1 rounded-full text-xs flex-shrink-0 ${
+                      app.recruiter_action === 'accept'
+                        ? 'bg-success/10 text-success'
+                        : 'bg-muted text-muted-foreground'
+                    }`}>
+                      {app.recruiter_action === 'accept' ? 'Matched' : 'Declined'}
+                    </span>
+                  )}
+                </div>
+              </div>
+            ))
+          ) : (
+            <div className="text-center py-8">
+              <Users className="w-12 h-12 text-muted-foreground mx-auto mb-3" />
+              <p className="text-muted-foreground">
+                {filter === 'all' ? 'No applications for this job yet.' : `No ${filter} applications.`}
+              </p>
+            </div>
+          )}
+        </div>
       </DialogContent>
     </Dialog>
   );

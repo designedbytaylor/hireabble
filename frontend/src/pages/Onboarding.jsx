@@ -1,10 +1,10 @@
 import { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  User, Briefcase, MapPin, GraduationCap, Building2, 
+import {
+  User, Briefcase, MapPin, GraduationCap, Building2,
   DollarSign, Clock, ArrowRight, ArrowLeft, Camera, CheckCircle2,
-  Wrench, Upload, X
+  Wrench, Upload, X, Globe
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -442,12 +442,42 @@ export default function Onboarding() {
                   </div>
                   <div className="space-y-4">
                     <div className="space-y-2">
-                      <Label>Where are you located?</Label>
+                      <Label className="flex items-center gap-2">
+                        <MapPin className="w-4 h-4" />
+                        Where are you located?
+                      </Label>
+                      <Select
+                        value={formData.location || "custom"}
+                        onValueChange={(v) => handleChange('location', v === 'custom' ? '' : v)}
+                      >
+                        <SelectTrigger className="h-12 rounded-xl bg-card" data-testid="location-select">
+                          <SelectValue placeholder="Select your location" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="custom">
+                            <span className="flex items-center gap-2"><Globe className="w-3.5 h-3.5" /> Type custom location...</span>
+                          </SelectItem>
+                          <SelectItem value="San Francisco, CA">San Francisco, CA</SelectItem>
+                          <SelectItem value="New York, NY">New York, NY</SelectItem>
+                          <SelectItem value="Austin, TX">Austin, TX</SelectItem>
+                          <SelectItem value="Seattle, WA">Seattle, WA</SelectItem>
+                          <SelectItem value="Chicago, IL">Chicago, IL</SelectItem>
+                          <SelectItem value="Los Angeles, CA">Los Angeles, CA</SelectItem>
+                          <SelectItem value="Denver, CO">Denver, CO</SelectItem>
+                          <SelectItem value="Portland, OR">Portland, OR</SelectItem>
+                          <SelectItem value="Boston, MA">Boston, MA</SelectItem>
+                          <SelectItem value="Miami, FL">Miami, FL</SelectItem>
+                          <SelectItem value="London, UK">London, UK</SelectItem>
+                          <SelectItem value="Toronto, Canada">Toronto, Canada</SelectItem>
+                          <SelectItem value="Berlin, Germany">Berlin, Germany</SelectItem>
+                          <SelectItem value="Remote">Remote / No fixed location</SelectItem>
+                        </SelectContent>
+                      </Select>
                       <Input
-                        placeholder="e.g., New York, NY"
+                        placeholder="Or type your location..."
                         value={formData.location}
                         onChange={(e) => handleChange('location', e.target.value)}
-                        className="h-12 rounded-xl bg-card border-border"
+                        className="h-11 rounded-xl bg-card border-border"
                         data-testid="location-input"
                       />
                     </div>
