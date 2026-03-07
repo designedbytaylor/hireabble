@@ -6,7 +6,7 @@ import { Badge } from '../../components/ui/badge';
 import {
   Database, Users, Trash2, Play,
   LogIn, ExternalLink, RefreshCw, CheckCircle,
-  Beaker, UserCheck, Building2, Check
+  Beaker, UserCheck, Building2
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -19,7 +19,6 @@ export default function AdminTesting() {
   const [users, setUsers] = useState([]);
   const [usersLoading, setUsersLoading] = useState(true);
   const [filter, setFilter] = useState('all');
-  const [copiedId, setCopiedId] = useState(null);
 
   const fetchUsers = useCallback(async () => {
     setUsersLoading(true);
@@ -79,6 +78,11 @@ export default function AdminTesting() {
 
   const handleImpersonate = async (user) => {
     setLoading(prev => ({ ...prev, impersonate: user.id }));
+
+    // Open window immediately during user gesture (before async call)
+    // Safari blocks popups/navigation that happen after async operations
+    const newWindow = window.open('about:blank', '_blank');
+
     try {
       const res = await axios.post(`${API}/admin/impersonate/${user.id}`, {}, {
         headers: { Authorization: `Bearer ${token}` },
@@ -86,29 +90,21 @@ export default function AdminTesting() {
       const impersonateToken = res.data.token;
       const targetPath = user.role === 'seeker' ? '/dashboard' : '/recruiter';
 
-      // Build impersonation URL with token as query param
-      // The Login page handles the ?impersonate= param to auto-login
       const baseUrl = window.location.origin;
       const impersonateUrl = `${baseUrl}/login?impersonate=${encodeURIComponent(impersonateToken)}&redirect=${encodeURIComponent(targetPath)}`;
 
-      // Use a link click to avoid popup blockers on mobile
-      const link = document.createElement('a');
-      link.href = impersonateUrl;
-      link.target = '_blank';
-      link.rel = 'noopener noreferrer';
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-
-      // Also copy to clipboard as backup for mobile
-      try {
-        await navigator.clipboard.writeText(impersonateUrl);
-        setCopiedId(user.id);
-        setTimeout(() => setCopiedId(null), 3000);
-      } catch { /* clipboard not available */ }
+      if (newWindow) {
+        // Navigate the already-opened window to the impersonation URL
+        newWindow.location.href = impersonateUrl;
+      } else {
+        // Fallback: navigate in same tab if popup was still blocked
+        window.location.href = impersonateUrl;
+      }
 
       toast.success(`Opening as ${user.name}...`);
     } catch (e) {
+      // Close the blank window on error
+      if (newWindow) newWindow.close();
       toast.error('Failed to impersonate user');
     } finally {
       setLoading(prev => ({ ...prev, impersonate: null }));
@@ -280,8 +276,6 @@ export default function AdminTesting() {
                 >
                   {loading.impersonate === u.id ? (
                     <RefreshCw className="w-3 h-3 animate-spin" />
-                  ) : copiedId === u.id ? (
-                    <><Check className="w-3 h-3 mr-0.5" /> Copied</>
                   ) : (
                     <><ExternalLink className="w-3 h-3 mr-0.5" /> Go</>
                   )}
