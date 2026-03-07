@@ -25,6 +25,7 @@ import AdminModeration from "./pages/admin/AdminModeration";
 import AdminReports from "./pages/admin/AdminReports";
 import AdminSettings from "./pages/admin/AdminSettings";
 import AdminTesting from "./pages/admin/AdminTesting";
+import Impersonate from "./pages/Impersonate";
 
 const ProtectedRoute = ({ children, allowedRoles }) => {
   const { user, loading } = useAuth();
@@ -201,6 +202,9 @@ function AppRoutes() {
           </ProtectedRoute>
         }
       />
+
+      {/* Admin impersonation — no PublicRoute wrapper so it always works */}
+      <Route path="/impersonate" element={<Impersonate />} />
 
       {/* Admin routes — completely separate auth flow */}
       <Route path="/admin/login" element={<AdminLogin />} />
