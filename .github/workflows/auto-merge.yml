@@ -51,12 +51,46 @@ jobs:
               console.log(`Created PR #${pr.number}`);
             }
 
-            // Retry merge with backoff - wait for checks to complete
-            const maxRetries = 6;
+            // Wait a moment for PR to be fully created
+            await new Promise(r => setTimeout(r, 5000));
+
+            // Try immediate merge first (works when no branch protection)
+            try {
+              await github.rest.pulls.merge({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: pr.number,
+                merge_method: 'squash',
+              });
+              console.log(`PR #${pr.number} merged successfully`);
+              return;
+            } catch (error) {
+              console.log(`Immediate merge failed: ${error.message}`);
+            }
+
+            // If immediate merge failed, retry with longer backoff for checks
+            const maxRetries = 10;
             const delaySeconds = 30;
 
-            for (let attempt = 1; attempt <= maxRetries; attempt++) {
+            for (let attempt = 2; attempt <= maxRetries; attempt++) {
+              console.log(`Waiting ${delaySeconds}s before retry ${attempt}/${maxRetries}...`);
+              await new Promise(r => setTimeout(r, delaySeconds * 1000));
+
               try {
+                // Check PR mergeable status first
+                const { data: prStatus } = await github.rest.pulls.get({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  pull_number: pr.number,
+                });
+
+                console.log(`PR mergeable: ${prStatus.mergeable}, state: ${prStatus.mergeable_state}`);
+
+                if (prStatus.mergeable === false) {
+                  console.log('PR has merge conflicts, cannot auto-merge');
+                  return;
+                }
+
                 await github.rest.pulls.merge({
                   owner: context.repo.owner,
                   repo: context.repo.repo,
@@ -67,14 +101,10 @@ jobs:
                 return;
               } catch (error) {
                 console.log(`Attempt ${attempt}/${maxRetries} failed: ${error.message}`);
-                if (attempt < maxRetries) {
-                  console.log(`Waiting ${delaySeconds}s before retry...`);
-                  await new Promise(r => setTimeout(r, delaySeconds * 1000));
-                }
               }
             }
 
-            // If all retries failed, try enabling auto-merge as last resort
+            // Last resort: enable auto-merge so it merges when checks pass
             try {
               const { data: prData } = await github.rest.pulls.get({
                 owner: context.repo.owner,
@@ -95,9 +125,8 @@ jobs:
                 pullRequestId: prData.node_id,
                 mergeMethod: 'SQUASH',
               });
-              console.log(`Auto-merge enabled for PR #${pr.number}`);
+              console.log(`Auto-merge enabled for PR #${pr.number} - will merge when checks pass`);
             } catch (autoMergeError) {
               console.log(`Could not enable auto-merge: ${autoMergeError.message}`);
-              // Don't fail the workflow - the PR exists and can be merged manually if needed
-              console.log(`PR #${pr.number} created but could not be auto-merged. Please merge manually or enable auto-merge in repo settings.`);
+              console.log(`PR #${pr.number} created but needs manual merge.`);
             }
