@@ -18,7 +18,28 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Create PR and auto-merge
+      - name: Auto-rebase and merge
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          BRANCH="${GITHUB_REF#refs/heads/}"
+          BASE="main"
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          # Rebase onto main to avoid merge conflicts
+          git fetch origin "$BASE"
+          git rebase "origin/$BASE" || {
+            echo "Rebase failed - aborting"
+            git rebase --abort
+            exit 1
+          }
+
+          # Force push the rebased branch
+          git push origin "$BRANCH" --force
+
+      - name: Create PR and merge
         uses: actions/github-script@v7
         with:
           script: |
@@ -51,8 +72,11 @@ jobs:
               console.log(`Created PR #${pr.number}`);
             }
 
-            // Retry merge with backoff - wait for checks to complete
-            const maxRetries = 6;
+            // Wait for PR to be ready after rebase
+            await new Promise(r => setTimeout(r, 5000));
+
+            // Retry merge with backoff
+            const maxRetries = 10;
             const delaySeconds = 30;
 
             for (let attempt = 1; attempt <= maxRetries; attempt++) {
@@ -74,7 +98,7 @@ jobs:
               }
             }
 
-            // If all retries failed, try enabling auto-merge as last resort
+            // Last resort: enable auto-merge so it merges when checks pass
             try {
               const { data: prData } = await github.rest.pulls.get({
                 owner: context.repo.owner,
@@ -95,9 +119,8 @@ jobs:
                 pullRequestId: prData.node_id,
                 mergeMethod: 'SQUASH',
               });
-              console.log(`Auto-merge enabled for PR #${pr.number}`);
+              console.log(`Auto-merge enabled for PR #${pr.number} - will merge when checks pass`);
             } catch (autoMergeError) {
               console.log(`Could not enable auto-merge: ${autoMergeError.message}`);
-              // Don't fail the workflow - the PR exists and can be merged manually if needed
-              console.log(`PR #${pr.number} created but could not be auto-merged. Please merge manually or enable auto-merge in repo settings.`);
+              console.log(`PR #${pr.number} created but needs manual merge.`);
             }
