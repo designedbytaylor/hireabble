@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence, useMotionValue, useTransform } from 'framer-motion';
-import { X, Heart, Star, Briefcase, MapPin, DollarSign, Building2, Clock, ChevronDown, Filter, SlidersHorizontal, Zap, CheckCircle } from 'lucide-react';
+import { X, Heart, Star, Briefcase, MapPin, DollarSign, Building2, Clock, ChevronDown, Filter, SlidersHorizontal, Zap, CheckCircle, Globe, Wifi } from 'lucide-react';
 import { toast } from 'sonner';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
@@ -45,7 +45,8 @@ export default function SeekerDashboard() {
     job_type: '',
     experience_level: '',
     salary_min: '',
-    location: ''
+    location: '',
+    remote_only: false
   });
   const [activeFiltersCount, setActiveFiltersCount] = useState(0);
 
@@ -59,7 +60,9 @@ export default function SeekerDashboard() {
 
   useEffect(() => {
     // Count active filters
-    const count = Object.values(filters).filter(v => v !== '').length;
+    const count = Object.entries(filters).filter(([k, v]) =>
+      k === 'remote_only' ? v === true : v !== ''
+    ).length;
     setActiveFiltersCount(count);
   }, [filters]);
 
@@ -89,7 +92,11 @@ export default function SeekerDashboard() {
     setLoading(true);
     try {
       const params = new URLSearchParams();
-      if (filterParams.job_type) params.append('job_type', filterParams.job_type);
+      if (filterParams.remote_only) {
+        params.append('job_type', 'remote');
+      } else if (filterParams.job_type) {
+        params.append('job_type', filterParams.job_type);
+      }
       if (filterParams.experience_level) params.append('experience_level', filterParams.experience_level);
       if (filterParams.salary_min) params.append('salary_min', filterParams.salary_min);
       if (filterParams.location) params.append('location', filterParams.location);
@@ -137,7 +144,7 @@ export default function SeekerDashboard() {
       else if (action === 'superlike') setSwipeDirection('up');
       
       // Wait for animation to complete before API call
-      await new Promise(resolve => setTimeout(resolve, 300));
+      await new Promise(resolve => setTimeout(resolve, 200));
     }
     
     try {
@@ -177,7 +184,7 @@ export default function SeekerDashboard() {
   };
 
   const handleClearFilters = () => {
-    const clearedFilters = { job_type: '', experience_level: '', salary_min: '', location: '' };
+    const clearedFilters = { job_type: '', experience_level: '', salary_min: '', location: '', remote_only: false };
     setFilters(clearedFilters);
     fetchJobs(clearedFilters);
     setShowFilters(false);
@@ -392,28 +399,92 @@ export default function SeekerDashboard() {
           </DialogHeader>
 
           <div className="space-y-5 py-4">
+            {/* Remote Jobs Toggle */}
+            <button
+              type="button"
+              onClick={() => setFilters({ ...filters, remote_only: !filters.remote_only, job_type: '' })}
+              className={`w-full flex items-center gap-3 p-4 rounded-xl border transition-all ${
+                filters.remote_only
+                  ? 'bg-primary/10 border-primary/40 text-primary'
+                  : 'bg-background border-border text-muted-foreground hover:border-primary/20'
+              }`}
+              data-testid="filter-remote-toggle"
+            >
+              <Wifi className="w-5 h-5" />
+              <div className="flex-1 text-left">
+                <div className="font-medium text-sm">Remote Jobs Only</div>
+                <div className="text-xs opacity-70">Show only remote positions</div>
+              </div>
+              <div className={`w-10 h-6 rounded-full transition-colors ${filters.remote_only ? 'bg-primary' : 'bg-muted'}`}>
+                <div className={`w-5 h-5 rounded-full bg-white mt-0.5 transition-transform ${filters.remote_only ? 'translate-x-[18px]' : 'translate-x-0.5'}`} />
+              </div>
+            </button>
+
+            {/* Location Selection */}
             <div className="space-y-2">
-              <Label>Job Type</Label>
-              <Select 
-                value={filters.job_type || "all"} 
-                onValueChange={(v) => setFilters({ ...filters, job_type: v === "all" ? "" : v })}
+              <Label className="flex items-center gap-2">
+                <MapPin className="w-4 h-4" />
+                Location
+              </Label>
+              <Select
+                value={filters.location || "any"}
+                onValueChange={(v) => setFilters({ ...filters, location: v === "any" ? "" : v })}
               >
-                <SelectTrigger className="h-11 rounded-xl bg-background" data-testid="filter-job-type">
-                  <SelectValue placeholder="All types" />
+                <SelectTrigger className="h-11 rounded-xl bg-background" data-testid="filter-location">
+                  <SelectValue placeholder="Any location" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All types</SelectItem>
-                  <SelectItem value="remote">Remote</SelectItem>
-                  <SelectItem value="onsite">On-site</SelectItem>
-                  <SelectItem value="hybrid">Hybrid</SelectItem>
+                  <SelectItem value="any">
+                    <span className="flex items-center gap-2"><Globe className="w-3.5 h-3.5" /> Any Location</span>
+                  </SelectItem>
+                  <SelectItem value="San Francisco">San Francisco, CA</SelectItem>
+                  <SelectItem value="New York">New York, NY</SelectItem>
+                  <SelectItem value="Austin">Austin, TX</SelectItem>
+                  <SelectItem value="Seattle">Seattle, WA</SelectItem>
+                  <SelectItem value="Chicago">Chicago, IL</SelectItem>
+                  <SelectItem value="Los Angeles">Los Angeles, CA</SelectItem>
+                  <SelectItem value="Denver">Denver, CO</SelectItem>
+                  <SelectItem value="Portland">Portland, OR</SelectItem>
+                  <SelectItem value="Boston">Boston, MA</SelectItem>
+                  <SelectItem value="Miami">Miami, FL</SelectItem>
+                  <SelectItem value="London">London, UK</SelectItem>
+                  <SelectItem value="Toronto">Toronto, Canada</SelectItem>
+                  <SelectItem value="Berlin">Berlin, Germany</SelectItem>
                 </SelectContent>
               </Select>
+              <Input
+                placeholder="Or type a custom location..."
+                value={filters.location}
+                onChange={(e) => setFilters({ ...filters, location: e.target.value })}
+                className="h-10 rounded-xl bg-background text-sm"
+                data-testid="filter-location-custom"
+              />
             </div>
+
+            {!filters.remote_only && (
+              <div className="space-y-2">
+                <Label>Job Type</Label>
+                <Select
+                  value={filters.job_type || "all"}
+                  onValueChange={(v) => setFilters({ ...filters, job_type: v === "all" ? "" : v })}
+                >
+                  <SelectTrigger className="h-11 rounded-xl bg-background" data-testid="filter-job-type">
+                    <SelectValue placeholder="All types" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All types</SelectItem>
+                    <SelectItem value="remote">Remote</SelectItem>
+                    <SelectItem value="onsite">On-site</SelectItem>
+                    <SelectItem value="hybrid">Hybrid</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
 
             <div className="space-y-2">
               <Label>Experience Level</Label>
-              <Select 
-                value={filters.experience_level || "all"} 
+              <Select
+                value={filters.experience_level || "all"}
                 onValueChange={(v) => setFilters({ ...filters, experience_level: v === "all" ? "" : v })}
               >
                 <SelectTrigger className="h-11 rounded-xl bg-background" data-testid="filter-experience">
@@ -438,17 +509,6 @@ export default function SeekerDashboard() {
                 onChange={(e) => setFilters({ ...filters, salary_min: e.target.value })}
                 className="h-11 rounded-xl bg-background"
                 data-testid="filter-salary"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label>Location</Label>
-              <Input
-                placeholder="e.g., San Francisco, Remote"
-                value={filters.location}
-                onChange={(e) => setFilters({ ...filters, location: e.target.value })}
-                className="h-11 rounded-xl bg-background"
-                data-testid="filter-location"
               />
             </div>
           </div>
@@ -489,76 +549,103 @@ function SwipeCard({ job, onSwipe, expanded, setExpanded, swipeDirection }) {
   const x = useMotionValue(0);
   const y = useMotionValue(0);
   const rotate = useTransform(x, [-200, 200], [-25, 25]);
-  
-  // Indicator opacities
-  const likeOpacity = useTransform(x, [0, 100], [0, 1]);
-  const passOpacity = useTransform(x, [-100, 0], [1, 0]);
-  const superlikeOpacity = useTransform(y, [-100, 0], [1, 0]);
+
+  // Indicator opacities - show sooner for snappier feedback
+  const likeOpacity = useTransform(x, [0, 60], [0, 1]);
+  const passOpacity = useTransform(x, [-60, 0], [1, 0]);
+  const superlikeOpacity = useTransform(y, [-60, 0], [1, 0]);
 
   // Handle button-triggered swipes
   useEffect(() => {
     if (swipeDirection) {
       const toX = swipeDirection === 'right' ? 1500 : swipeDirection === 'left' ? -1500 : 0;
       const toY = swipeDirection === 'up' ? -1500 : 0;
-      
+
       const startX = x.get();
       const startY = y.get();
       const startTime = Date.now();
-      const duration = 300;
-      
+      const duration = 200;
+
       const animate = () => {
         const elapsed = Date.now() - startTime;
         const progress = Math.min(elapsed / duration, 1);
         const easeProgress = 1 - Math.pow(1 - progress, 3);
-        
+
         x.set(startX + (toX - startX) * easeProgress);
         y.set(startY + (toY - startY) * easeProgress);
-        
+
         if (progress < 1) {
           requestAnimationFrame(animate);
         }
       };
-      
+
       requestAnimationFrame(animate);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [swipeDirection]);
 
   const handleDragEnd = (_, info) => {
-    const swipeThreshold = 100;
+    const swipeThreshold = 60;
+    const velocityThreshold = 300;
     const velocity = info.velocity;
-    
-    // Check if swiped with enough distance or velocity
-    if (info.offset.y < -swipeThreshold || velocity.y < -500) {
+
+    // Lower thresholds = easier to trigger swipe, feels snappier like Tinder
+    if (info.offset.y < -swipeThreshold || velocity.y < -velocityThreshold) {
       animateCardOut(0, -1500, 'superlike');
-    } else if (info.offset.x > swipeThreshold || velocity.x > 500) {
+    } else if (info.offset.x > swipeThreshold || velocity.x > velocityThreshold) {
       animateCardOut(1500, 0, 'like');
-    } else if (info.offset.x < -swipeThreshold || velocity.x < -500) {
+    } else if (info.offset.x < -swipeThreshold || velocity.x < -velocityThreshold) {
       animateCardOut(-1500, 0, 'pass');
+    } else {
+      // Spring back to center smoothly
+      animateSpringBack();
     }
+  };
+
+  const animateSpringBack = () => {
+    const startX = x.get();
+    const startY = y.get();
+    const startTime = Date.now();
+    const duration = 200;
+
+    const animate = () => {
+      const elapsed = Date.now() - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+      // Elastic ease out
+      const easeProgress = 1 - Math.pow(1 - progress, 4);
+
+      x.set(startX * (1 - easeProgress));
+      y.set(startY * (1 - easeProgress));
+
+      if (progress < 1) {
+        requestAnimationFrame(animate);
+      }
+    };
+
+    requestAnimationFrame(animate);
   };
 
   const animateCardOut = (toX, toY, action) => {
     const startX = x.get();
     const startY = y.get();
     const startTime = Date.now();
-    const duration = 300;
-    
+    const duration = 150; // Much faster fly-out
+
     const animate = () => {
       const elapsed = Date.now() - startTime;
       const progress = Math.min(elapsed / duration, 1);
-      const easeProgress = 1 - Math.pow(1 - progress, 3);
-      
+      const easeProgress = progress * progress; // ease-in for fast acceleration
+
       x.set(startX + (toX - startX) * easeProgress);
       y.set(startY + (toY - startY) * easeProgress);
-      
+
       if (progress < 1) {
         requestAnimationFrame(animate);
       } else {
         onSwipe(action);
       }
     };
-    
+
     requestAnimationFrame(animate);
   };
 
@@ -575,8 +662,8 @@ function SwipeCard({ job, onSwipe, expanded, setExpanded, swipeDirection }) {
       className="absolute inset-0 cursor-grab active:cursor-grabbing"
       style={{ x, y, rotate }}
       drag={!swipeDirection}
-      dragConstraints={{ left: 0, right: 0, top: 0, bottom: 0 }}
-      dragElastic={1}
+      dragConstraints={false}
+      dragElastic={0.9}
       onDragEnd={handleDragEnd}
       whileTap={{ cursor: 'grabbing' }}
       data-testid="job-card"

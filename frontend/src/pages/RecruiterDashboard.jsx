@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   Plus, Briefcase, Users, Star, Heart, X, Check,
   MapPin, DollarSign, Building2, ChevronRight, Clock,
-  Edit, GraduationCap, Trash2, BarChart3, Calendar
+  Edit, GraduationCap, Trash2, BarChart3, Calendar, Globe
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -602,7 +602,8 @@ function JobFormDialog({ open, onClose, onSuccess, token, company, job = null, i
     salary_max: '',
     location: '',
     job_type: 'remote',
-    experience_level: 'mid'
+    experience_level: 'mid',
+    location_restriction: 'any'
   });
 
   useEffect(() => {
@@ -616,7 +617,8 @@ function JobFormDialog({ open, onClose, onSuccess, token, company, job = null, i
         salary_max: job.salary_max?.toString() || '',
         location: job.location || '',
         job_type: job.job_type || 'remote',
-        experience_level: job.experience_level || 'mid'
+        experience_level: job.experience_level || 'mid',
+        location_restriction: job.location_restriction || 'any'
       });
     } else if (!isEditing) {
       setFormData({
@@ -628,7 +630,8 @@ function JobFormDialog({ open, onClose, onSuccess, token, company, job = null, i
         salary_max: '',
         location: '',
         job_type: 'remote',
-        experience_level: 'mid'
+        experience_level: 'mid',
+        location_restriction: 'any'
       });
     }
   }, [job, isEditing, company]);
@@ -648,6 +651,7 @@ function JobFormDialog({ open, onClose, onSuccess, token, company, job = null, i
         requirements: formData.requirements.split(',').map(r => r.trim()).filter(Boolean),
         salary_min: formData.salary_min ? parseInt(formData.salary_min) : null,
         salary_max: formData.salary_max ? parseInt(formData.salary_max) : null,
+        location_restriction: formData.location_restriction || 'any',
       };
 
       if (isEditing && job) {
@@ -794,6 +798,31 @@ function JobFormDialog({ open, onClose, onSuccess, token, company, job = null, i
                 </SelectContent>
               </Select>
             </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Applicant Location Requirement</Label>
+            <Select
+              value={formData.location_restriction}
+              onValueChange={(v) => setFormData({ ...formData, location_restriction: v })}
+            >
+              <SelectTrigger className="h-11 rounded-xl bg-background" data-testid="job-location-restriction">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="any">
+                  <span className="flex items-center gap-2"><Globe className="w-3.5 h-3.5" /> Open to all locations</span>
+                </SelectItem>
+                <SelectItem value="specific">
+                  <span className="flex items-center gap-2"><MapPin className="w-3.5 h-3.5" /> Applicants must be in job location</span>
+                </SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              {formData.location_restriction === 'specific'
+                ? 'Only applicants near this job\'s location will see this posting'
+                : 'Applicants from any location can see and apply to this job'}
+            </p>
           </div>
 
           <Button
