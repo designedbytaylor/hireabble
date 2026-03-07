@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence, useMotionValue, useTransform } from 'framer-motion';
-import { X, Heart, Star, Briefcase, MapPin, DollarSign, Building2, Clock, ChevronDown, Filter, SlidersHorizontal, Zap, CheckCircle, Globe, Wifi } from 'lucide-react';
+import { X, Heart, Star, Briefcase, MapPin, DollarSign, Building2, Clock, ChevronDown, Filter, SlidersHorizontal, Zap, CheckCircle, Globe, Wifi, Navigation2 } from 'lucide-react';
 import { toast } from 'sonner';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
@@ -46,9 +46,11 @@ export default function SeekerDashboard() {
     experience_level: '',
     salary_min: '',
     location: '',
-    remote_only: false
+    remote_only: false,
+    category: ''
   });
   const [activeFiltersCount, setActiveFiltersCount] = useState(0);
+  const [detectingLocation, setDetectingLocation] = useState(false);
 
   useEffect(() => {
     fetchJobs();
@@ -100,6 +102,7 @@ export default function SeekerDashboard() {
       if (filterParams.experience_level) params.append('experience_level', filterParams.experience_level);
       if (filterParams.salary_min) params.append('salary_min', filterParams.salary_min);
       if (filterParams.location) params.append('location', filterParams.location);
+      if (filterParams.category) params.append('category', filterParams.category);
       
       const url = `${API}/jobs${params.toString() ? `?${params.toString()}` : ''}`;
       const response = await axios.get(url, {
@@ -184,10 +187,41 @@ export default function SeekerDashboard() {
   };
 
   const handleClearFilters = () => {
-    const clearedFilters = { job_type: '', experience_level: '', salary_min: '', location: '', remote_only: false };
+    const clearedFilters = { job_type: '', experience_level: '', salary_min: '', location: '', remote_only: false, category: '' };
     setFilters(clearedFilters);
     fetchJobs(clearedFilters);
     setShowFilters(false);
+  };
+
+  const handleDetectLocation = () => {
+    if (!navigator.geolocation) {
+      toast.error('Geolocation not supported');
+      return;
+    }
+    setDetectingLocation(true);
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        try {
+          const { latitude, longitude } = position.coords;
+          const res = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json`
+          );
+          const data = await res.json();
+          const city = data.address?.city || data.address?.town || data.address?.village || '';
+          if (city) {
+            setFilters(prev => ({ ...prev, location: city }));
+            toast.success(`Location: ${city}`);
+          }
+        } catch { /* ignore */ } finally {
+          setDetectingLocation(false);
+        }
+      },
+      () => {
+        toast.error('Location access denied');
+        setDetectingLocation(false);
+      },
+      { timeout: 10000 }
+    );
   };
 
   const currentJob = jobs[currentIndex];
@@ -452,6 +486,19 @@ export default function SeekerDashboard() {
                   <SelectItem value="Berlin">Berlin, Germany</SelectItem>
                 </SelectContent>
               </Select>
+              <button
+                type="button"
+                onClick={handleDetectLocation}
+                disabled={detectingLocation}
+                className="w-full flex items-center justify-center gap-2 h-10 rounded-xl bg-primary/10 text-primary hover:bg-primary/20 transition-colors text-sm"
+              >
+                {detectingLocation ? (
+                  <div className="w-3.5 h-3.5 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <Navigation2 className="w-3.5 h-3.5" />
+                )}
+                {detectingLocation ? 'Detecting...' : 'Use my current location'}
+              </button>
               <Input
                 placeholder="Or type a custom location..."
                 value={filters.location}
@@ -496,6 +543,30 @@ export default function SeekerDashboard() {
                   <SelectItem value="mid">Mid Level</SelectItem>
                   <SelectItem value="senior">Senior</SelectItem>
                   <SelectItem value="lead">Lead / Manager</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Category</Label>
+              <Select
+                value={filters.category || "all"}
+                onValueChange={(v) => setFilters({ ...filters, category: v === "all" ? "" : v })}
+              >
+                <SelectTrigger className="h-11 rounded-xl bg-background">
+                  <SelectValue placeholder="All categories" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Categories</SelectItem>
+                  <SelectItem value="technology">Technology</SelectItem>
+                  <SelectItem value="design">Design</SelectItem>
+                  <SelectItem value="marketing">Marketing</SelectItem>
+                  <SelectItem value="sales">Sales</SelectItem>
+                  <SelectItem value="finance">Finance</SelectItem>
+                  <SelectItem value="healthcare">Healthcare</SelectItem>
+                  <SelectItem value="engineering">Engineering</SelectItem>
+                  <SelectItem value="education">Education</SelectItem>
+                  <SelectItem value="other">Other</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -717,8 +788,20 @@ function SwipeCard({ job, onSwipe, expanded, setExpanded, swipeDirection }) {
             </div>
           </div>
 
-          {/* Job Title */}
-          <h2 className="text-2xl md:text-3xl font-bold font-['Outfit'] mb-3">{job.title}</h2>
+          {/* Job Title + Match Score */}
+          <div className="flex items-start justify-between gap-3 mb-3">
+            <h2 className="text-2xl md:text-3xl font-bold font-['Outfit']">{job.title}</h2>
+            {job.match_score != null && (
+              <span className={`shrink-0 px-3 py-1 rounded-full text-sm font-bold flex items-center gap-1 ${
+                job.match_score >= 75 ? 'bg-success/20 text-success' :
+                job.match_score >= 50 ? 'bg-primary/20 text-primary' :
+                'bg-muted text-muted-foreground'
+              }`}>
+                <Star className="w-3.5 h-3.5" />
+                {job.match_score}%
+              </span>
+            )}
+          </div>
 
           {/* Tags */}
           <div className="flex flex-wrap gap-2 mb-4">
@@ -738,6 +821,11 @@ function SwipeCard({ job, onSwipe, expanded, setExpanded, swipeDirection }) {
             <span className="px-3 py-1.5 rounded-full bg-accent text-accent-foreground text-sm capitalize">
               {job.experience_level}
             </span>
+            {job.category && job.category !== 'other' && (
+              <span className="px-3 py-1.5 rounded-full bg-primary/10 text-primary text-sm capitalize">
+                {job.category}
+              </span>
+            )}
           </div>
 
           {/* Expandable Description */}

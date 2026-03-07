@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   User, Briefcase, MapPin, GraduationCap, Building2,
   DollarSign, Clock, ArrowRight, ArrowLeft, Camera, CheckCircle2,
-  Wrench, Upload, X, Globe
+  Wrench, Upload, X, Globe, Navigation2
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -41,6 +41,8 @@ export default function Onboarding() {
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const fileInputRef = useRef(null);
   
+  const [detectingLocation, setDetectingLocation] = useState(false);
+
   const [formData, setFormData] = useState({
     photo_url: '',
     title: '',
@@ -59,6 +61,46 @@ export default function Onboarding() {
 
   const handleChange = (field, value) => {
     setFormData(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handleDetectLocation = () => {
+    if (!navigator.geolocation) {
+      toast.error('Geolocation is not supported by your browser');
+      return;
+    }
+    setDetectingLocation(true);
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        try {
+          const { latitude, longitude } = position.coords;
+          const res = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json`
+          );
+          const data = await res.json();
+          const city = data.address?.city || data.address?.town || data.address?.village || '';
+          const state = data.address?.state || '';
+          const country = data.address?.country || '';
+          let locationStr = city;
+          if (state) locationStr += `, ${state}`;
+          else if (country) locationStr += `, ${country}`;
+          if (locationStr) {
+            handleChange('location', locationStr);
+            toast.success(`Location detected: ${locationStr}`);
+          } else {
+            toast.error('Could not determine your city. Please enter manually.');
+          }
+        } catch {
+          toast.error('Failed to detect location. Please enter manually.');
+        } finally {
+          setDetectingLocation(false);
+        }
+      },
+      () => {
+        toast.error('Location access denied. Please enter your location manually.');
+        setDetectingLocation(false);
+      },
+      { timeout: 10000 }
+    );
   };
 
   const handlePhotoUpload = async (e) => {
@@ -473,6 +515,19 @@ export default function Onboarding() {
                           <SelectItem value="Remote">Remote / No fixed location</SelectItem>
                         </SelectContent>
                       </Select>
+                      <button
+                        type="button"
+                        onClick={handleDetectLocation}
+                        disabled={detectingLocation}
+                        className="w-full flex items-center justify-center gap-2 h-11 rounded-xl bg-primary/10 text-primary hover:bg-primary/20 transition-colors text-sm font-medium"
+                      >
+                        {detectingLocation ? (
+                          <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                        ) : (
+                          <Navigation2 className="w-4 h-4" />
+                        )}
+                        {detectingLocation ? 'Detecting...' : 'Use my current location'}
+                      </button>
                       <Input
                         placeholder="Or type your location..."
                         value={formData.location}

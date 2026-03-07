@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { User, Mail, Briefcase, MapPin, Save, LogOut, Building2, Download, Upload, CheckCircle, AlertCircle, Lock, Eye, EyeOff, ChevronDown, Plus, Trash2, GraduationCap, Award, Clock } from 'lucide-react';
+import { User, Mail, Briefcase, MapPin, Save, LogOut, Building2, Download, Upload, CheckCircle, AlertCircle, Lock, Eye, EyeOff, ChevronDown, Plus, Trash2, GraduationCap, Award, Clock, Navigation2 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
@@ -33,6 +33,7 @@ export default function Profile() {
     confirm: false
   });
   const [changingPassword, setChangingPassword] = useState(false);
+  const [detectingLocation, setDetectingLocation] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     title: '',
@@ -166,6 +167,46 @@ export default function Profile() {
   const handleLogout = () => {
     logout();
     toast.success('Logged out successfully');
+  };
+
+  const handleDetectLocation = () => {
+    if (!navigator.geolocation) {
+      toast.error('Geolocation is not supported by your browser');
+      return;
+    }
+    setDetectingLocation(true);
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        try {
+          const { latitude, longitude } = position.coords;
+          const res = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json`
+          );
+          const data = await res.json();
+          const city = data.address?.city || data.address?.town || data.address?.village || '';
+          const state = data.address?.state || '';
+          const country = data.address?.country || '';
+          let locationStr = city;
+          if (state) locationStr += `, ${state}`;
+          else if (country) locationStr += `, ${country}`;
+          if (locationStr) {
+            setFormData(prev => ({ ...prev, location: locationStr }));
+            toast.success(`Location detected: ${locationStr}`);
+          } else {
+            toast.error('Could not determine your city');
+          }
+        } catch {
+          toast.error('Failed to detect location');
+        } finally {
+          setDetectingLocation(false);
+        }
+      },
+      () => {
+        toast.error('Location access denied');
+        setDetectingLocation(false);
+      },
+      { timeout: 10000 }
+    );
   };
 
   const handleChangePassword = async (e) => {
@@ -599,6 +640,19 @@ export default function Profile() {
                   data-testid="profile-location-input"
                 />
               </div>
+              <button
+                type="button"
+                onClick={handleDetectLocation}
+                disabled={detectingLocation}
+                className="flex items-center gap-2 text-sm text-primary hover:text-primary/80 transition-colors"
+              >
+                {detectingLocation ? (
+                  <div className="w-3.5 h-3.5 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <Navigation2 className="w-3.5 h-3.5" />
+                )}
+                {detectingLocation ? 'Detecting...' : 'Use my current location'}
+              </button>
             </div>
 
             <div className="space-y-2">

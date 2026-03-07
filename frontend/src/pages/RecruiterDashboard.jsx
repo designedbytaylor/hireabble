@@ -537,7 +537,8 @@ function JobFormDialog({ open, onClose, onSuccess, token, company, job = null, i
     location: '',
     job_type: 'remote',
     experience_level: 'mid',
-    location_restriction: 'any'
+    location_restriction: 'any',
+    category: ''
   });
 
   useEffect(() => {
@@ -552,7 +553,8 @@ function JobFormDialog({ open, onClose, onSuccess, token, company, job = null, i
         location: job.location || '',
         job_type: job.job_type || 'remote',
         experience_level: job.experience_level || 'mid',
-        location_restriction: job.location_restriction || 'any'
+        location_restriction: job.location_restriction || 'any',
+        category: job.category || ''
       });
     } else if (!isEditing) {
       setFormData({
@@ -565,7 +567,8 @@ function JobFormDialog({ open, onClose, onSuccess, token, company, job = null, i
         location: '',
         job_type: 'remote',
         experience_level: 'mid',
-        location_restriction: 'any'
+        location_restriction: 'any',
+        category: ''
       });
     }
   }, [job, isEditing, company]);
@@ -732,6 +735,32 @@ function JobFormDialog({ open, onClose, onSuccess, token, company, job = null, i
                 </SelectContent>
               </Select>
             </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Job Category</Label>
+            <Select
+              value={formData.category}
+              onValueChange={(v) => setFormData({ ...formData, category: v })}
+            >
+              <SelectTrigger className="h-11 rounded-xl bg-background">
+                <SelectValue placeholder="Auto-detect from job details" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="technology">Technology</SelectItem>
+                <SelectItem value="design">Design</SelectItem>
+                <SelectItem value="marketing">Marketing</SelectItem>
+                <SelectItem value="sales">Sales</SelectItem>
+                <SelectItem value="finance">Finance</SelectItem>
+                <SelectItem value="healthcare">Healthcare</SelectItem>
+                <SelectItem value="engineering">Engineering</SelectItem>
+                <SelectItem value="education">Education</SelectItem>
+                <SelectItem value="other">Other</SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              Leave empty to auto-detect category from job title and description
+            </p>
           </div>
 
           <div className="space-y-2">
