@@ -14,6 +14,85 @@ from content_filter import check_fields, is_severe
 
 router = APIRouter(prefix="/jobs", tags=["Jobs"])
 
+# Job category keywords for auto-detection
+CATEGORY_KEYWORDS = {
+    "technology": ["software", "developer", "engineer", "programming", "frontend", "backend", "fullstack",
+                   "devops", "cloud", "data", "machine learning", "ai", "python", "javascript", "react",
+                   "node", "java", "golang", "rust", "ios", "android", "mobile", "web", "api", "database",
+                   "cybersecurity", "security", "infrastructure", "sre", "platform"],
+    "design": ["designer", "ux", "ui", "graphic", "creative", "figma", "sketch", "photoshop",
+               "illustration", "brand", "visual", "product design", "interaction"],
+    "marketing": ["marketing", "seo", "content", "social media", "growth", "brand", "advertising",
+                  "campaign", "analytics", "digital marketing", "copywriter", "pr", "communications"],
+    "sales": ["sales", "account executive", "business development", "bdr", "sdr", "revenue",
+              "partnerships", "client", "customer success", "account manager"],
+    "finance": ["finance", "accounting", "financial", "analyst", "cfo", "controller", "audit",
+                "tax", "investment", "banking", "fintech", "payroll", "bookkeeping"],
+    "healthcare": ["healthcare", "medical", "nurse", "doctor", "clinical", "pharma", "biotech",
+                   "health", "patient", "hospital", "therapy", "dental"],
+    "engineering": ["mechanical", "electrical", "civil", "chemical", "aerospace", "structural",
+                    "manufacturing", "industrial", "hardware", "robotics", "embedded"],
+    "education": ["teacher", "professor", "instructor", "tutor", "education", "curriculum",
+                  "training", "academic", "school", "university", "learning"],
+}
+
+def auto_categorize_job(title: str, requirements: list, description: str) -> str:
+    """Auto-categorize a job based on title, requirements, and description keywords"""
+    text = f"{title} {' '.join(requirements)} {description}".lower()
+    scores = {}
+    for category, keywords in CATEGORY_KEYWORDS.items():
+        scores[category] = sum(1 for kw in keywords if kw in text)
+    best = max(scores, key=scores.get)
+    return best if scores[best] > 0 else "other"
+
+
+def calculate_job_match_score(seeker: dict, job: dict) -> int:
+    """Calculate how well a job matches a seeker's profile (0-100)"""
+    score = 0
+    max_score = 0
+
+    # Skills match (40 points)
+    if job.get("requirements"):
+        max_score += 40
+        seeker_skills = [s.lower().strip() for s in seeker.get("skills", [])]
+        job_reqs = [r.lower().strip() for r in job["requirements"]]
+        if job_reqs and seeker_skills:
+            matched = sum(1 for r in job_reqs if any(r in s or s in r for s in seeker_skills))
+            score += int((matched / len(job_reqs)) * 40)
+
+    # Experience level (25 points)
+    if job.get("experience_level"):
+        max_score += 25
+        exp_years = seeker.get("experience_years") or 0
+        level_map = {"entry": (0, 2), "mid": (2, 5), "senior": (5, 10), "lead": (8, 99)}
+        low, high = level_map.get(job["experience_level"], (0, 99))
+        if low <= exp_years <= high:
+            score += 25
+        elif abs(exp_years - low) <= 2 or abs(exp_years - high) <= 2:
+            score += 12
+
+    # Location (20 points)
+    max_score += 20
+    if job.get("job_type") == "remote":
+        score += 20
+    elif job.get("location") and seeker.get("location"):
+        job_loc = job["location"].lower().split(",")[0].strip()
+        user_loc = seeker["location"].lower().split(",")[0].strip()
+        if job_loc and user_loc and (job_loc in user_loc or user_loc in job_loc):
+            score += 20
+
+    # Salary match (15 points)
+    if job.get("salary_min") and seeker.get("desired_salary"):
+        max_score += 15
+        if seeker["desired_salary"] <= (job.get("salary_max") or job["salary_min"] * 2):
+            score += 15
+        elif seeker["desired_salary"] <= job["salary_min"] * 1.3:
+            score += 7
+
+    if max_score == 0:
+        return 50
+    return min(100, int((score / max_score) * 100))
+
 @router.post("", response_model=JobResponse)
 async def create_job(job: JobCreate, current_user: dict = Depends(get_current_user)):
     """Create a new job posting (recruiters only)"""
@@ -42,6 +121,9 @@ async def create_job(job: JobCreate, current_user: dict = Depends(get_current_us
         "linear-gradient(135deg, #a18cd1 0%, #fbc2eb 100%)",
     ]
     
+    # Auto-detect category from title/requirements if not provided
+    category = job.category or auto_categorize_job(job.title, job.requirements, job.description)
+
     job_doc = {
         "id": job_id,
         "title": job.title,
@@ -59,6 +141,8 @@ async def create_job(job: JobCreate, current_user: dict = Depends(get_current_us
         "background_image": backgrounds[hash(job_id) % len(backgrounds)],
         "created_at": datetime.now(timezone.utc).isoformat(),
         "location_restriction": job.location_restriction,
+        "category": category,
+        "employment_type": job.employment_type or "full-time",
         "is_active": True
     }
 
@@ -95,10 +179,12 @@ async def get_jobs(
     job_type: Optional[str] = None,
     experience_level: Optional[str] = None,
     salary_min: Optional[int] = None,
-    location: Optional[str] = None
+    location: Optional[str] = None,
+    category: Optional[str] = None,
+    employment_type: Optional[str] = None
 ):
-    """Get available jobs for seekers or recruiter's own jobs"""
-    
+    """Get available jobs for seekers or recruiter's own jobs, with smart matching"""
+
     if current_user["role"] == "recruiter":
         # Recruiters see their own jobs
         jobs = await db.jobs.find(
@@ -112,12 +198,12 @@ async def get_jobs(
             {"job_id": 1}
         ).to_list(1000)
         swiped_job_ids = [s["job_id"] for s in swiped_jobs]
-        
+
         query = {
             "id": {"$nin": swiped_job_ids},
             "is_active": True
         }
-        
+
         # Apply filters
         if job_type:
             query["job_type"] = job_type
@@ -127,6 +213,10 @@ async def get_jobs(
             query["salary_min"] = {"$gte": salary_min}
         if location:
             query["location"] = {"$regex": location, "$options": "i"}
+        if category:
+            query["category"] = category
+        if employment_type:
+            query["employment_type"] = employment_type
 
         # Filter out jobs with specific location restrictions if seeker's location doesn't match
         seeker_location = current_user.get("location", "")
@@ -139,7 +229,28 @@ async def get_jobs(
             ]
 
         jobs = await db.jobs.find(query, {"_id": 0}).sort("created_at", -1).to_list(100)
-    
+
+        # Calculate match scores
+        now = datetime.now(timezone.utc).isoformat()
+        for job in jobs:
+            job["match_score"] = calculate_job_match_score(current_user, job)
+            # Check if job is actively boosted
+            job["is_boosted"] = bool(job.get("is_boosted") and job.get("boost_until", "") >= now)
+
+        # Sort: boosted jobs first (interleaved), then by match score
+        boosted = [j for j in jobs if j.get("is_boosted")]
+        regular = [j for j in jobs if not j.get("is_boosted")]
+        regular.sort(key=lambda j: j["match_score"], reverse=True)
+
+        # Interleave boosted jobs at positions 0, 3, 7, etc. for natural feel
+        result = list(regular)
+        boost_positions = [0, 3, 7, 12, 18]
+        for i, bj in enumerate(boosted):
+            pos = boost_positions[i] if i < len(boost_positions) else len(result)
+            pos = min(pos, len(result))
+            result.insert(pos, bj)
+        jobs = result
+
     return jobs
 
 @router.get("/{job_id}", response_model=JobResponse)
@@ -162,7 +273,7 @@ async def update_job(job_id: str, updates: dict, current_user: dict = Depends(ge
     
     allowed_fields = ["title", "company", "description", "requirements",
                       "salary_min", "salary_max", "location", "job_type",
-                      "experience_level", "is_active", "location_restriction"]
+                      "experience_level", "is_active", "location_restriction", "category", "employment_type"]
     update_data = {k: v for k, v in updates.items() if k in allowed_fields}
 
     # Content moderation on text fields being updated

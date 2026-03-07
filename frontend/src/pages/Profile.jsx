@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { User, Mail, Briefcase, MapPin, Save, LogOut, Building2, Download, Upload, CheckCircle, AlertCircle, Lock, Eye, EyeOff, ChevronDown, Plus, Trash2, GraduationCap, Award, Clock } from 'lucide-react';
+import { User, Mail, Briefcase, MapPin, Save, LogOut, Building2, Download, Upload, CheckCircle, AlertCircle, Lock, Eye, EyeOff, ChevronDown, Plus, Trash2, GraduationCap, Award, Clock, Navigation2, Bell, BellOff } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
@@ -11,6 +11,7 @@ import { useAuth } from '../context/AuthContext';
 import Navigation from '../components/Navigation';
 import VideoUpload from '../components/VideoUpload';
 import { getPhotoUrl } from '../utils/helpers';
+import { isPushSupported, getPermissionStatus, subscribeToPush, unsubscribeFromPush } from '../utils/pushNotifications';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
@@ -33,6 +34,9 @@ export default function Profile() {
     confirm: false
   });
   const [changingPassword, setChangingPassword] = useState(false);
+  const [pushEnabled, setPushEnabled] = useState(false);
+  const [pushSupported] = useState(isPushSupported());
+  const [detectingLocation, setDetectingLocation] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     title: '',
@@ -48,6 +52,9 @@ export default function Profile() {
   const [workHistory, setWorkHistory] = useState([]);
   const [education, setEducation] = useState([]);
   const [certifications, setCertifications] = useState([]);
+  const [references, setReferences] = useState([]);
+  const [referencesHidden, setReferencesHidden] = useState(true);
+  const [referenceRequests, setReferenceRequests] = useState([]);
 
   useEffect(() => {
     if (user) {
@@ -66,10 +73,46 @@ export default function Profile() {
       setWorkHistory(user.work_history || []);
       setEducation(user.education || []);
       setCertifications(user.certifications || []);
+      setReferences(user.references || []);
+      setReferencesHidden(user.references_hidden !== false);
       fetchCompleteness();
+      fetchReferenceRequests();
+    }
+    // Check push notification status
+    if (pushSupported) {
+      setPushEnabled(getPermissionStatus() === 'granted');
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
+
+  const handleTogglePush = async () => {
+    if (pushEnabled) {
+      const ok = await unsubscribeFromPush(token);
+      if (ok) {
+        setPushEnabled(false);
+        toast.success('Push notifications disabled');
+      }
+    } else {
+      const ok = await subscribeToPush(token);
+      if (ok) {
+        setPushEnabled(true);
+        toast.success('Push notifications enabled! You\'ll be notified of new matches and messages.');
+      } else {
+        toast.error('Could not enable notifications. Please check your browser settings.');
+      }
+    }
+  };
+
+  const fetchReferenceRequests = async () => {
+    try {
+      const response = await axios.get(`${API}/references/requests`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setReferenceRequests(response.data);
+    } catch (error) {
+      console.error('Failed to fetch reference requests:', error);
+    }
+  };
 
   const fetchCompleteness = async () => {
     try {
@@ -130,6 +173,8 @@ export default function Profile() {
         work_history: workHistory,
         education: education,
         certifications: certifications.filter(Boolean),
+        references: references.filter(r => r.name),
+        references_hidden: referencesHidden,
       };
       await updateProfile(updates);
       toast.success('Profile updated!');
@@ -166,6 +211,46 @@ export default function Profile() {
   const handleLogout = () => {
     logout();
     toast.success('Logged out successfully');
+  };
+
+  const handleDetectLocation = () => {
+    if (!navigator.geolocation) {
+      toast.error('Geolocation is not supported by your browser');
+      return;
+    }
+    setDetectingLocation(true);
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        try {
+          const { latitude, longitude } = position.coords;
+          const res = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json`
+          );
+          const data = await res.json();
+          const city = data.address?.city || data.address?.town || data.address?.village || '';
+          const state = data.address?.state || '';
+          const country = data.address?.country || '';
+          let locationStr = city;
+          if (state) locationStr += `, ${state}`;
+          else if (country) locationStr += `, ${country}`;
+          if (locationStr) {
+            setFormData(prev => ({ ...prev, location: locationStr }));
+            toast.success(`Location detected: ${locationStr}`);
+          } else {
+            toast.error('Could not determine your city');
+          }
+        } catch {
+          toast.error('Failed to detect location');
+        } finally {
+          setDetectingLocation(false);
+        }
+      },
+      () => {
+        toast.error('Location access denied');
+        setDetectingLocation(false);
+      },
+      { timeout: 10000 }
+    );
   };
 
   const handleChangePassword = async (e) => {
@@ -558,6 +643,139 @@ export default function Profile() {
                   )}
                 </div>
 
+                {/* References */}
+                <div className="pt-4 border-t border-border space-y-3">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-base font-semibold">References</Label>
+                    <button
+                      type="button"
+                      onClick={() => setReferences([...references, { name: '', title: '', company: '', email: '', phone: '' }])}
+                      className="flex items-center gap-1 text-sm text-primary hover:text-primary/80"
+                    >
+                      <Plus className="w-4 h-4" /> Add
+                    </button>
+                  </div>
+
+                  {/* Hide References Toggle */}
+                  <button
+                    type="button"
+                    onClick={() => setReferencesHidden(!referencesHidden)}
+                    className={`w-full flex items-center gap-3 p-3 rounded-xl border transition-all ${
+                      referencesHidden
+                        ? 'bg-background border-border'
+                        : 'bg-primary/10 border-primary/40'
+                    }`}
+                  >
+                    {referencesHidden ? <EyeOff className="w-4 h-4 text-muted-foreground" /> : <Eye className="w-4 h-4 text-primary" />}
+                    <div className="flex-1 text-left">
+                      <div className="text-sm font-medium">{referencesHidden ? 'References Hidden' : 'References Visible'}</div>
+                      <div className="text-xs text-muted-foreground">
+                        {referencesHidden ? 'Recruiters will see "Available upon request"' : 'Recruiters can see your references'}
+                      </div>
+                    </div>
+                    <div className={`w-10 h-6 rounded-full transition-colors ${!referencesHidden ? 'bg-primary' : 'bg-muted'}`}>
+                      <div className={`w-5 h-5 rounded-full bg-white mt-0.5 transition-transform ${!referencesHidden ? 'translate-x-[18px]' : 'translate-x-0.5'}`} />
+                    </div>
+                  </button>
+
+                  {references.map((ref, i) => (
+                    <div key={i} className="p-4 rounded-xl bg-background/50 border border-border space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-medium text-muted-foreground">Reference {i + 1}</span>
+                        <button
+                          type="button"
+                          onClick={() => setReferences(references.filter((_, idx) => idx !== i))}
+                          className="text-destructive hover:text-destructive/80"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                      <Input
+                        value={ref.name}
+                        onChange={(e) => { const r = [...references]; r[i] = { ...r[i], name: e.target.value }; setReferences(r); }}
+                        placeholder="Full Name"
+                        className="h-10 rounded-lg bg-background border-border"
+                      />
+                      <Input
+                        value={ref.title}
+                        onChange={(e) => { const r = [...references]; r[i] = { ...r[i], title: e.target.value }; setReferences(r); }}
+                        placeholder="Job Title"
+                        className="h-10 rounded-lg bg-background border-border"
+                      />
+                      <Input
+                        value={ref.company}
+                        onChange={(e) => { const r = [...references]; r[i] = { ...r[i], company: e.target.value }; setReferences(r); }}
+                        placeholder="Company"
+                        className="h-10 rounded-lg bg-background border-border"
+                      />
+                      <div className="grid grid-cols-2 gap-2">
+                        <Input
+                          value={ref.email}
+                          onChange={(e) => { const r = [...references]; r[i] = { ...r[i], email: e.target.value }; setReferences(r); }}
+                          placeholder="Email"
+                          className="h-10 rounded-lg bg-background border-border"
+                        />
+                        <Input
+                          value={ref.phone}
+                          onChange={(e) => { const r = [...references]; r[i] = { ...r[i], phone: e.target.value }; setReferences(r); }}
+                          placeholder="Phone"
+                          className="h-10 rounded-lg bg-background border-border"
+                        />
+                      </div>
+                    </div>
+                  ))}
+                  {references.length === 0 && (
+                    <p className="text-sm text-muted-foreground text-center py-2">No references added yet</p>
+                  )}
+
+                  {/* Reference Requests */}
+                  {referenceRequests.length > 0 && (
+                    <div className="space-y-2 pt-3">
+                      <Label className="text-sm font-semibold text-secondary">Reference Requests</Label>
+                      {referenceRequests.filter(r => r.status === 'pending').map(req => (
+                        <div key={req.id} className="p-3 rounded-xl bg-secondary/10 border border-secondary/20 flex items-center gap-3">
+                          <div className="flex-1">
+                            <div className="text-sm font-medium">{req.recruiter_name}</div>
+                            <div className="text-xs text-muted-foreground">{req.company_name} wants to see your references</div>
+                          </div>
+                          <div className="flex gap-2">
+                            <button
+                              type="button"
+                              onClick={async () => {
+                                try {
+                                  await axios.post(`${API}/references/respond/${req.id}`, { action: 'approve' }, {
+                                    headers: { Authorization: `Bearer ${token}` }
+                                  });
+                                  toast.success('References shared!');
+                                  fetchReferenceRequests();
+                                } catch { toast.error('Failed to respond'); }
+                              }}
+                              className="px-3 py-1.5 rounded-lg bg-success/20 text-success text-xs font-medium hover:bg-success/30"
+                            >
+                              Approve
+                            </button>
+                            <button
+                              type="button"
+                              onClick={async () => {
+                                try {
+                                  await axios.post(`${API}/references/respond/${req.id}`, { action: 'deny' }, {
+                                    headers: { Authorization: `Bearer ${token}` }
+                                  });
+                                  toast.info('Request denied');
+                                  fetchReferenceRequests();
+                                } catch { toast.error('Failed to respond'); }
+                              }}
+                              className="px-3 py-1.5 rounded-lg bg-destructive/20 text-destructive text-xs font-medium hover:bg-destructive/30"
+                            >
+                              Deny
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
                 {/* Video Introduction */}
                 <div className="pt-4 border-t border-border">
                   <VideoUpload
@@ -599,6 +817,19 @@ export default function Profile() {
                   data-testid="profile-location-input"
                 />
               </div>
+              <button
+                type="button"
+                onClick={handleDetectLocation}
+                disabled={detectingLocation}
+                className="flex items-center gap-2 text-sm text-primary hover:text-primary/80 transition-colors"
+              >
+                {detectingLocation ? (
+                  <div className="w-3.5 h-3.5 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <Navigation2 className="w-3.5 h-3.5" />
+                )}
+                {detectingLocation ? 'Detecting...' : 'Use my current location'}
+              </button>
             </div>
 
             <div className="space-y-2">
@@ -735,6 +966,38 @@ export default function Profile() {
               </form>
             )}
           </div>
+
+          {/* Push Notifications */}
+          {pushSupported && (
+            <div className="glass-card rounded-2xl p-5 mt-6">
+              <h3 className="text-lg font-bold font-['Outfit'] mb-3 flex items-center gap-2">
+                <Bell className="w-5 h-5" /> Notifications
+              </h3>
+              <button
+                type="button"
+                onClick={handleTogglePush}
+                className={`w-full flex items-center gap-3 p-4 rounded-xl border transition-all ${
+                  pushEnabled
+                    ? 'bg-primary/10 border-primary/40 text-primary'
+                    : 'bg-background border-border text-muted-foreground hover:border-primary/20'
+                }`}
+              >
+                {pushEnabled ? <Bell className="w-5 h-5" /> : <BellOff className="w-5 h-5" />}
+                <div className="flex-1 text-left">
+                  <div className="font-medium text-sm">Push Notifications</div>
+                  <div className="text-xs opacity-70">
+                    {pushEnabled ? 'Get notified of matches, messages & interviews' : 'Enable to stay updated on your phone'}
+                  </div>
+                </div>
+                <div className={`w-10 h-6 rounded-full transition-colors ${pushEnabled ? 'bg-primary' : 'bg-muted'}`}>
+                  <div className={`w-5 h-5 rounded-full bg-white mt-0.5 transition-transform ${pushEnabled ? 'translate-x-[18px]' : 'translate-x-0.5'}`} />
+                </div>
+              </button>
+              <p className="text-xs text-muted-foreground mt-2">
+                You can also manage notifications through your device settings.
+              </p>
+            </div>
+          )}
 
           {/* Logout Button */}
           <Button

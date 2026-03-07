@@ -158,3 +158,36 @@ async def delete_video(current_user: dict = Depends(get_current_user)):
         logger.info(f"Video deleted for user {current_user['id']}")
 
     return {"message": "Video deleted successfully"}
+
+
+@router.post("/upload/chat-video")
+async def upload_chat_video(
+    file: UploadFile = File(...),
+    current_user: dict = Depends(get_current_user)
+):
+    """Upload a video message for chat"""
+    if file.content_type not in ALLOWED_VIDEO_TYPES:
+        raise HTTPException(status_code=400, detail="Only video files (MP4, WebM, MOV) are allowed")
+
+    contents = await file.read()
+    if len(contents) > MAX_VIDEO_SIZE:
+        raise HTTPException(status_code=400, detail="Video size exceeds 50MB limit")
+
+    ext = file.filename.split('.')[-1] if '.' in file.filename else 'webm'
+    filename = f"chat_{current_user['id']}_{uuid.uuid4().hex[:8]}.{ext}"
+
+    supabase = _get_supabase()
+
+    try:
+        supabase.storage.from_(VIDEO_BUCKET).upload(
+            filename,
+            contents,
+            file_options={"content-type": file.content_type}
+        )
+    except Exception as e:
+        logger.error(f"Supabase chat video upload failed: {e}")
+        raise HTTPException(status_code=500, detail="Failed to upload video")
+
+    video_url = _public_url(VIDEO_BUCKET, filename)
+    logger.info(f"Chat video uploaded by user {current_user['id']}: {filename}")
+    return {"url": video_url, "filename": filename}

@@ -144,6 +144,41 @@ async def send_email_notification(to_email: str, subject: str, html_content: str
 
 # ==================== NOTIFICATION HELPER ====================
 
+async def send_web_push(user_id: str, title: str, body: str, push_data: dict = None):
+    """Send a web push notification to a user's subscribed devices"""
+    try:
+        user = await db.users.find_one({"id": user_id}, {"_id": 0, "push_subscription": 1})
+        subscription = user.get("push_subscription") if user else None
+        if not subscription:
+            return
+
+        vapid_private_key = os.getenv("VAPID_PRIVATE_KEY", "")
+        vapid_email = os.getenv("VAPID_EMAIL", "")
+        if not vapid_private_key:
+            return
+
+        import json
+        try:
+            from pywebpush import webpush
+            webpush(
+                subscription_info=subscription,
+                data=json.dumps({
+                    "title": title,
+                    "body": body,
+                    "data": push_data or {},
+                    "tag": f"hireabble-{push_data.get('type', 'notification') if push_data else 'notification'}",
+                }),
+                vapid_private_key=vapid_private_key,
+                vapid_claims={"sub": f"mailto:{vapid_email}"}
+            )
+        except ImportError:
+            logger.debug("pywebpush not installed, skipping web push")
+        except Exception as e:
+            logger.error(f"Web push failed: {e}")
+    except Exception as e:
+        logger.error(f"send_web_push error: {e}")
+
+
 async def create_notification(user_id: str, notif_type: str, title: str, message: str, data: dict = None):
     """Helper function to create a notification"""
     notification_doc = {
@@ -157,13 +192,18 @@ async def create_notification(user_id: str, notif_type: str, title: str, message
         "created_at": datetime.now(timezone.utc).isoformat()
     }
     await db.notifications.insert_one(notification_doc)
-    
+
     # Send via WebSocket if user is connected
     await manager.send_to_user(user_id, {
         "type": "notification",
         "notification": {k: v for k, v in notification_doc.items() if k != "_id"}
     })
-    
+
+    # Send web push notification (non-blocking)
+    import asyncio
+    push_data = {**(data or {}), "type": notif_type}
+    asyncio.create_task(send_web_push(user_id, title, message, push_data))
+
     return notification_doc
 
 # ==================== PYDANTIC MODELS ====================
@@ -217,6 +257,8 @@ class JobCreate(BaseModel):
     job_type: str  # 'remote', 'onsite', 'hybrid'
     experience_level: str  # 'entry', 'mid', 'senior', 'lead'
     location_restriction: Optional[str] = None  # 'any', 'specific', None
+    category: Optional[str] = None  # 'technology', 'healthcare', 'finance', 'marketing', 'design', 'sales', 'engineering', 'education', 'other'
+    employment_type: Optional[str] = "full-time"  # 'full-time', 'part-time', 'contract', 'internship'
 
 class JobResponse(BaseModel):
     model_config = ConfigDict(extra="ignore")
@@ -235,6 +277,9 @@ class JobResponse(BaseModel):
     company_logo: Optional[str] = None
     background_image: Optional[str] = None
     location_restriction: Optional[str] = None
+    category: Optional[str] = None
+    employment_type: Optional[str] = "full-time"
+    match_score: Optional[int] = None
     created_at: str
     is_active: bool = True
 

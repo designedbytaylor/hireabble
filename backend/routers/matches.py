@@ -44,7 +44,7 @@ async def get_match(match_id: str, current_user: dict = Depends(get_current_user
 
 @router.get("/matches/{match_id}/profile")
 async def get_match_profile(match_id: str, current_user: dict = Depends(get_current_user)):
-    """Get the full profile of the other person in a match"""
+    """Get the full profile of the other person in a match, plus job details and match score"""
     match = await db.matches.find_one({"id": match_id}, {"_id": 0})
     if not match:
         raise HTTPException(status_code=404, detail="Match not found")
@@ -58,10 +58,72 @@ async def get_match_profile(match_id: str, current_user: dict = Depends(get_curr
     if not profile:
         raise HTTPException(status_code=404, detail="User not found")
 
+    # Get job details
+    job = None
+    if match.get("job_id"):
+        job = await db.jobs.find_one({"id": match["job_id"]}, {"_id": 0})
+
+    # Calculate match score
+    match_score = calculate_match_score(current_user, profile, job)
+
     return {
         "match": match,
         "profile": profile,
+        "job": job,
+        "match_score": match_score,
     }
+
+
+def calculate_match_score(viewer: dict, other: dict, job: dict = None) -> int:
+    """Calculate a compatibility score (0-100) between a candidate and job/recruiter"""
+    score = 0
+    max_score = 0
+
+    # Skills match (40 points max)
+    if job and job.get("requirements"):
+        max_score += 40
+        seeker = other if other.get("role") == "seeker" else viewer
+        seeker_skills = [s.lower().strip() for s in seeker.get("skills", [])]
+        job_reqs = [r.lower().strip() for r in job["requirements"]]
+        if job_reqs:
+            matched = sum(1 for r in job_reqs if any(r in s or s in r for s in seeker_skills))
+            score += int((matched / len(job_reqs)) * 40)
+
+    # Experience level match (20 points max)
+    if job and job.get("experience_level"):
+        max_score += 20
+        seeker = other if other.get("role") == "seeker" else viewer
+        exp_years = seeker.get("experience_years") or 0
+        level_map = {"entry": (0, 2), "mid": (2, 5), "senior": (5, 10), "lead": (8, 99)}
+        low, high = level_map.get(job["experience_level"], (0, 99))
+        if low <= exp_years <= high:
+            score += 20
+        elif abs(exp_years - low) <= 2 or abs(exp_years - high) <= 2:
+            score += 10
+
+    # Location match (20 points max)
+    max_score += 20
+    if job and job.get("job_type") == "remote":
+        score += 20  # Remote jobs match everyone
+    elif job and job.get("location") and other.get("location"):
+        job_loc = job["location"].lower().split(",")[0].strip()
+        user_loc = other.get("location", "").lower().split(",")[0].strip()
+        if job_loc and user_loc and (job_loc in user_loc or user_loc in job_loc):
+            score += 20
+        elif job_loc and user_loc:
+            score += 5  # Partial credit
+
+    # Profile completeness bonus (20 points max)
+    max_score += 20
+    seeker = other if other.get("role") == "seeker" else viewer
+    fields_present = sum(1 for f in ["bio", "skills", "experience_years", "school", "work_history", "education"]
+                        if seeker.get(f))
+    score += int((fields_present / 6) * 20)
+
+    if max_score == 0:
+        return 50
+    return min(100, int((score / max_score) * 100))
+
 
 
 # ==================== MESSAGES ====================

@@ -238,10 +238,12 @@ async def update_profile(updates: dict, current_user: dict = Depends(get_current
     """Update user profile"""
     allowed_fields = [
         "name", "title", "bio", "skills", "experience_years", "location",
-        "company", "avatar", "photo_url", "video_url", "current_employer", 
-        "previous_employers", "school", "degree", "certifications", 
-        "work_preference", "desired_salary", "available_immediately", 
-        "onboarding_complete", "push_subscription"
+        "company", "avatar", "photo_url", "video_url", "current_employer",
+        "previous_employers", "school", "degree", "certifications",
+        "work_preference", "desired_salary", "available_immediately",
+        "onboarding_complete", "push_subscription",
+        "job_type_preference", "work_history", "education",
+        "references", "references_hidden"
     ]
     
     update_data = {k: v for k, v in updates.items() if k in allowed_fields}

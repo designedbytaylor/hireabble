@@ -51,14 +51,14 @@ def get_match_email_html(job_title: str, company: str, other_name: str, is_seeke
 
 @router.get("/superlikes/remaining")
 async def get_remaining_superlikes(current_user: dict = Depends(get_current_user)):
-    """Get remaining super likes for today"""
+    """Get remaining super likes for today (free daily + purchased)"""
     if current_user["role"] != "seeker":
         raise HTTPException(status_code=403, detail="Only job seekers can access this")
-    
+
     # Get today's date range
     today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
     today_end = today_start + timedelta(days=1)
-    
+
     # Count super likes used today
     superlikes_today = await db.applications.count_documents({
         "seeker_id": current_user["id"],
@@ -68,9 +68,17 @@ async def get_remaining_superlikes(current_user: dict = Depends(get_current_user
             "$lt": today_end.isoformat()
         }
     })
-    
+
+    # Get purchased super likes balance
+    user = await db.users.find_one({"id": current_user["id"]}, {"_id": 0, "seeker_purchased_superlikes": 1})
+    purchased = (user or {}).get("seeker_purchased_superlikes", 0)
+
+    free_remaining = max(0, DAILY_SUPERLIKE_LIMIT - superlikes_today)
+
     return {
-        "remaining": max(0, DAILY_SUPERLIKE_LIMIT - superlikes_today),
+        "remaining": free_remaining + purchased,
+        "free_remaining": free_remaining,
+        "purchased_remaining": purchased,
         "used_today": superlikes_today,
         "daily_limit": DAILY_SUPERLIKE_LIMIT
     }
@@ -91,11 +99,11 @@ async def swipe(action: SwipeAction, current_user: dict = Depends(get_current_us
     if existing:
         raise HTTPException(status_code=400, detail="Already swiped on this job")
     
-    # Check super like limit for today
+    # Check super like limit for today (free + purchased)
     if action.action == "superlike":
         today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
         today_end = today_start + timedelta(days=1)
-        
+
         superlikes_today = await db.applications.count_documents({
             "seeker_id": current_user["id"],
             "action": "superlike",
@@ -104,11 +112,22 @@ async def swipe(action: SwipeAction, current_user: dict = Depends(get_current_us
                 "$lt": today_end.isoformat()
             }
         })
-        
-        if superlikes_today >= DAILY_SUPERLIKE_LIMIT:
+
+        user_data = await db.users.find_one({"id": current_user["id"]}, {"_id": 0, "seeker_purchased_superlikes": 1})
+        purchased = (user_data or {}).get("seeker_purchased_superlikes", 0)
+        free_remaining = max(0, DAILY_SUPERLIKE_LIMIT - superlikes_today)
+
+        if free_remaining <= 0 and purchased <= 0:
             raise HTTPException(
-                status_code=400, 
-                detail=f"Daily Super Like limit reached ({DAILY_SUPERLIKE_LIMIT}/day). Try again tomorrow!"
+                status_code=400,
+                detail="No Super Likes remaining! Purchase more or try again tomorrow."
+            )
+
+        # Use purchased first if free are exhausted
+        if free_remaining <= 0 and purchased > 0:
+            await db.users.update_one(
+                {"id": current_user["id"]},
+                {"$inc": {"seeker_purchased_superlikes": -1}}
             )
     
     # Get job details
@@ -154,7 +173,9 @@ async def swipe(action: SwipeAction, current_user: dict = Depends(get_current_us
                 "$lt": today_end.isoformat()
             }
         })
-        remaining_superlikes = DAILY_SUPERLIKE_LIMIT - superlikes_today
+        user_data = await db.users.find_one({"id": current_user["id"]}, {"_id": 0, "seeker_purchased_superlikes": 1})
+        purchased_remaining = (user_data or {}).get("seeker_purchased_superlikes", 0)
+        remaining_superlikes = max(0, DAILY_SUPERLIKE_LIMIT - superlikes_today) + purchased_remaining
     
     return {
         "message": f"Swiped {action.action}", 
@@ -172,16 +193,65 @@ async def get_applications(
     """Get applications for recruiter's jobs"""
     if current_user["role"] != "recruiter":
         raise HTTPException(status_code=403, detail="Only recruiters can view applications")
-    
+
     query = {
         "recruiter_id": current_user["id"],
         "action": {"$in": ["like", "superlike"]}
     }
     if job_id:
         query["job_id"] = job_id
-    
+
     applications = await db.applications.find(query, {"_id": 0}).sort("created_at", -1).to_list(100)
+    # Sort: superlikes first (priority applicants), then regular
+    applications.sort(key=lambda a: (0 if a.get("action") == "superlike" else 1, a.get("created_at", "")), reverse=False)
+    # Re-reverse so newest first within each group
+    superlikes = [a for a in applications if a.get("action") == "superlike"]
+    regulars = [a for a in applications if a.get("action") != "superlike"]
+    superlikes.sort(key=lambda a: a.get("created_at", ""), reverse=True)
+    regulars.sort(key=lambda a: a.get("created_at", ""), reverse=True)
+    applications = superlikes + regulars
     return applications
+
+
+@router.get("/applications/mine")
+async def get_my_applications(current_user: dict = Depends(get_current_user)):
+    """Get all jobs the current seeker has applied to, with job details and status"""
+    if current_user["role"] != "seeker":
+        raise HTTPException(status_code=403, detail="Only seekers can view their applications")
+
+    applications = await db.applications.find(
+        {"seeker_id": current_user["id"], "action": {"$in": ["like", "superlike"]}},
+        {"_id": 0}
+    ).sort("created_at", -1).to_list(200)
+
+    # Enrich with job details
+    result = []
+    for app in applications:
+        job = await db.jobs.find_one({"id": app["job_id"]}, {"_id": 0})
+        status = "matched" if app.get("is_matched") else (
+            "declined" if app.get("recruiter_action") == "reject" else "pending"
+        )
+        result.append({
+            "id": app["id"],
+            "job_id": app["job_id"],
+            "action": app["action"],
+            "status": status,
+            "recruiter_action": app.get("recruiter_action"),
+            "is_matched": app.get("is_matched", False),
+            "created_at": app["created_at"],
+            "job": {
+                "title": job["title"] if job else "Job Removed",
+                "company": job["company"] if job else "",
+                "location": job.get("location", "") if job else "",
+                "job_type": job.get("job_type", "") if job else "",
+                "salary_min": job.get("salary_min") if job else None,
+                "salary_max": job.get("salary_max") if job else None,
+                "company_logo": job.get("company_logo") if job else None,
+                "employment_type": job.get("employment_type", "full-time") if job else "",
+            } if True else None,
+        })
+
+    return result
 
 @router.post("/applications/respond")
 async def respond_to_application(response: RecruiterAction, current_user: dict = Depends(get_current_user)):
@@ -255,3 +325,136 @@ async def respond_to_application(response: RecruiterAction, current_user: dict =
             ))
     
     return {"message": f"Application {response.action}ed", "is_matched": is_matched}
+
+
+# ==================== REFERENCES ====================
+
+@router.post("/references/request/{seeker_id}")
+async def request_references(seeker_id: str, current_user: dict = Depends(get_current_user)):
+    """Recruiter requests references from a seeker"""
+    if current_user["role"] != "recruiter":
+        raise HTTPException(status_code=403, detail="Only recruiters can request references")
+
+    seeker = await db.users.find_one({"id": seeker_id}, {"_id": 0})
+    if not seeker:
+        raise HTTPException(status_code=404, detail="Seeker not found")
+
+    # Create a reference request
+    request_doc = {
+        "id": str(uuid.uuid4()),
+        "recruiter_id": current_user["id"],
+        "recruiter_name": current_user["name"],
+        "recruiter_company": current_user.get("company", ""),
+        "seeker_id": seeker_id,
+        "status": "pending",
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+    await db.reference_requests.insert_one(request_doc)
+
+    await create_notification(
+        user_id=seeker_id,
+        notif_type="reference_request",
+        title="References Requested",
+        message=f"{current_user['name']} from {current_user.get('company', 'a company')} is requesting your references.",
+        data={"request_id": request_doc["id"], "recruiter_id": current_user["id"]}
+    )
+
+    return {"message": "Reference request sent", "request_id": request_doc["id"]}
+
+
+@router.post("/references/respond/{request_id}")
+async def respond_to_reference_request(
+    request_id: str,
+    action: dict,
+    current_user: dict = Depends(get_current_user)
+):
+    """Seeker approves or denies a reference request"""
+    if current_user["role"] != "seeker":
+        raise HTTPException(status_code=403, detail="Only seekers can respond to reference requests")
+
+    ref_request = await db.reference_requests.find_one({"id": request_id, "seeker_id": current_user["id"]})
+    if not ref_request:
+        raise HTTPException(status_code=404, detail="Reference request not found")
+
+    status = "approved" if action.get("approve") else "denied"
+    await db.reference_requests.update_one(
+        {"id": request_id},
+        {"$set": {"status": status}}
+    )
+
+    await create_notification(
+        user_id=ref_request["recruiter_id"],
+        notif_type="reference_response",
+        title=f"References {status.capitalize()}",
+        message=f"{current_user['name']} has {status} your reference request.",
+        data={"request_id": request_id, "seeker_id": current_user["id"], "status": status}
+    )
+
+    return {"message": f"Reference request {status}"}
+
+
+@router.get("/references/requests")
+async def get_reference_requests(current_user: dict = Depends(get_current_user)):
+    """Get reference requests for the current user"""
+    if current_user["role"] == "seeker":
+        query = {"seeker_id": current_user["id"]}
+    else:
+        query = {"recruiter_id": current_user["id"]}
+
+    requests = await db.reference_requests.find(query, {"_id": 0}).sort("created_at", -1).to_list(50)
+    return requests
+
+
+# ==================== RESUME VIEW FOR RECRUITERS ====================
+
+@router.get("/applicant/{seeker_id}/resume")
+async def get_applicant_resume(seeker_id: str, current_user: dict = Depends(get_current_user)):
+    """Get full resume data for a seeker (recruiter only, must have an application)"""
+    if current_user["role"] != "recruiter":
+        raise HTTPException(status_code=403, detail="Only recruiters can view resumes")
+
+    # Verify there's an application from this seeker to this recruiter
+    app = await db.applications.find_one({
+        "seeker_id": seeker_id,
+        "recruiter_id": current_user["id"],
+        "action": {"$in": ["like", "superlike"]}
+    })
+    if not app:
+        raise HTTPException(status_code=403, detail="No application from this seeker")
+
+    seeker = await db.users.find_one({"id": seeker_id}, {"_id": 0, "password": 0})
+    if not seeker:
+        raise HTTPException(status_code=404, detail="Seeker not found")
+
+    # Check if references are shared
+    ref_request = await db.reference_requests.find_one({
+        "seeker_id": seeker_id,
+        "recruiter_id": current_user["id"],
+        "status": "approved"
+    })
+
+    # Only include references if approved or not hidden
+    references = seeker.get("references", [])
+    if seeker.get("references_hidden", True) and not ref_request:
+        references = []
+
+    return {
+        "name": seeker.get("name"),
+        "title": seeker.get("title"),
+        "email": seeker.get("email"),
+        "location": seeker.get("location"),
+        "bio": seeker.get("bio"),
+        "skills": seeker.get("skills", []),
+        "experience_years": seeker.get("experience_years"),
+        "current_employer": seeker.get("current_employer"),
+        "work_history": seeker.get("work_history", []),
+        "education": seeker.get("education", []),
+        "school": seeker.get("school"),
+        "degree": seeker.get("degree"),
+        "certifications": seeker.get("certifications", []),
+        "photo_url": seeker.get("photo_url"),
+        "video_url": seeker.get("video_url"),
+        "references": references,
+        "references_available": bool(seeker.get("references")) and seeker.get("references_hidden", True) and not ref_request,
+        "references_approved": bool(ref_request),
+    }

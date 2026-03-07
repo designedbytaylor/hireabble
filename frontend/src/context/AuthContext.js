@@ -65,6 +65,22 @@ export const AuthProvider = ({ children }) => {
     return newUser;
   };
 
+  const loginWithToken = async (impersonateToken) => {
+    localStorage.setItem('token', impersonateToken);
+    setToken(impersonateToken);
+    try {
+      const response = await axios.get(`${API}/auth/me`, {
+        headers: { Authorization: `Bearer ${impersonateToken}` }
+      });
+      setUser(response.data);
+      return response.data;
+    } catch {
+      localStorage.removeItem('token');
+      setToken(null);
+      return null;
+    }
+  };
+
   const logout = () => {
     localStorage.removeItem('token');
     setToken(null);
@@ -80,7 +96,7 @@ export const AuthProvider = ({ children }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, token, loading, login, register, logout, updateProfile }}>
+    <AuthContext.Provider value={{ user, token, loading, login, loginWithToken, register, logout, updateProfile }}>
       {children}
     </AuthContext.Provider>
   );

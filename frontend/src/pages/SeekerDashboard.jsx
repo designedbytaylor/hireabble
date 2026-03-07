@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence, useMotionValue, useTransform } from 'framer-motion';
-import { X, Heart, Star, Briefcase, MapPin, DollarSign, Building2, Clock, ChevronDown, Filter, SlidersHorizontal, Zap, CheckCircle, Globe, Wifi } from 'lucide-react';
+import { X, Heart, Star, Briefcase, MapPin, DollarSign, Building2, Clock, ChevronDown, Filter, SlidersHorizontal, Zap, CheckCircle, Globe, Wifi, Navigation2, Info } from 'lucide-react';
 import { toast } from 'sonner';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
@@ -28,6 +29,7 @@ import { getPhotoUrl } from '../utils/helpers';
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
 export default function SeekerDashboard() {
+  const navigate = useNavigate();
   const { user, token } = useAuth();
   const [jobs, setJobs] = useState([]);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -46,9 +48,12 @@ export default function SeekerDashboard() {
     experience_level: '',
     salary_min: '',
     location: '',
-    remote_only: false
+    remote_only: false,
+    category: '',
+    employment_type: ''
   });
   const [activeFiltersCount, setActiveFiltersCount] = useState(0);
+  const [detectingLocation, setDetectingLocation] = useState(false);
 
   useEffect(() => {
     fetchJobs();
@@ -100,7 +105,9 @@ export default function SeekerDashboard() {
       if (filterParams.experience_level) params.append('experience_level', filterParams.experience_level);
       if (filterParams.salary_min) params.append('salary_min', filterParams.salary_min);
       if (filterParams.location) params.append('location', filterParams.location);
-      
+      if (filterParams.category) params.append('category', filterParams.category);
+      if (filterParams.employment_type) params.append('employment_type', filterParams.employment_type);
+
       const url = `${API}/jobs${params.toString() ? `?${params.toString()}` : ''}`;
       const response = await axios.get(url, {
         headers: { Authorization: `Bearer ${token}` }
@@ -184,10 +191,41 @@ export default function SeekerDashboard() {
   };
 
   const handleClearFilters = () => {
-    const clearedFilters = { job_type: '', experience_level: '', salary_min: '', location: '', remote_only: false };
+    const clearedFilters = { job_type: '', experience_level: '', salary_min: '', location: '', remote_only: false, category: '', employment_type: '' };
     setFilters(clearedFilters);
     fetchJobs(clearedFilters);
     setShowFilters(false);
+  };
+
+  const handleDetectLocation = () => {
+    if (!navigator.geolocation) {
+      toast.error('Geolocation not supported');
+      return;
+    }
+    setDetectingLocation(true);
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        try {
+          const { latitude, longitude } = position.coords;
+          const res = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json`
+          );
+          const data = await res.json();
+          const city = data.address?.city || data.address?.town || data.address?.village || '';
+          if (city) {
+            setFilters(prev => ({ ...prev, location: city }));
+            toast.success(`Location: ${city}`);
+          }
+        } catch { /* ignore */ } finally {
+          setDetectingLocation(false);
+        }
+      },
+      () => {
+        toast.error('Location access denied');
+        setDetectingLocation(false);
+      },
+      { timeout: 10000 }
+    );
   };
 
   const currentJob = jobs[currentIndex];
@@ -239,7 +277,7 @@ export default function SeekerDashboard() {
 
         {/* Stats Bar */}
         <div className="flex gap-4 overflow-x-auto pb-2">
-          <div className="glass-card rounded-2xl px-5 py-3 flex items-center gap-3 whitespace-nowrap">
+          <button onClick={() => navigate('/applied')} className="glass-card rounded-2xl px-5 py-3 flex items-center gap-3 whitespace-nowrap hover:border-primary/30 transition-colors text-left">
             <div className="w-10 h-10 rounded-xl bg-primary/20 flex items-center justify-center">
               <Heart className="w-5 h-5 text-primary" />
             </div>
@@ -247,14 +285,22 @@ export default function SeekerDashboard() {
               <div className="text-xl font-bold">{stats.applications_sent}</div>
               <div className="text-xs text-muted-foreground">Applied</div>
             </div>
-          </div>
+          </button>
           <div className="glass-card rounded-2xl px-5 py-3 flex items-center gap-3 whitespace-nowrap">
             <div className="w-10 h-10 rounded-xl bg-secondary/20 flex items-center justify-center">
               <Star className="w-5 h-5 text-secondary" />
             </div>
             <div>
               <div className="text-xl font-bold">{stats.super_likes_used}</div>
-              <div className="text-xs text-muted-foreground">Super Likes</div>
+              <div className="text-xs text-muted-foreground flex items-center gap-1">
+                Super Likes
+                <span className="relative group">
+                  <Info className="w-3 h-3 cursor-help" />
+                  <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 rounded-lg bg-foreground text-background text-xs w-48 text-center opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-50">
+                    Super Likes put you at the top of recruiters' queues! You get 3 free daily, or purchase more.
+                  </span>
+                </span>
+              </div>
             </div>
           </div>
           <div className="glass-card rounded-2xl px-5 py-3 flex items-center gap-3 whitespace-nowrap">
@@ -279,6 +325,27 @@ export default function SeekerDashboard() {
             </div>
           )}
         </div>
+        {/* Profile Completion Prompt */}
+        {!profileComplete && (
+          <div className="mt-4 p-4 rounded-2xl bg-gradient-to-r from-primary/10 to-secondary/10 border border-primary/20">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-primary/20 flex items-center justify-center shrink-0">
+                <CheckCircle className="w-5 h-5 text-primary" />
+              </div>
+              <div className="flex-1">
+                <p className="text-sm font-medium">Complete your profile to match with more businesses!</p>
+                <p className="text-xs text-muted-foreground mt-0.5">Add your skills, experience, and photo to get better matches.</p>
+              </div>
+              <Button
+                size="sm"
+                onClick={() => navigate('/profile')}
+                className="rounded-full bg-primary/90 hover:bg-primary text-xs px-3 shrink-0"
+              >
+                Complete
+              </Button>
+            </div>
+          </div>
+        )}
       </header>
 
       {/* Main Content - Swipe Area */}
@@ -452,6 +519,19 @@ export default function SeekerDashboard() {
                   <SelectItem value="Berlin">Berlin, Germany</SelectItem>
                 </SelectContent>
               </Select>
+              <button
+                type="button"
+                onClick={handleDetectLocation}
+                disabled={detectingLocation}
+                className="w-full flex items-center justify-center gap-2 h-10 rounded-xl bg-primary/10 text-primary hover:bg-primary/20 transition-colors text-sm"
+              >
+                {detectingLocation ? (
+                  <div className="w-3.5 h-3.5 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <Navigation2 className="w-3.5 h-3.5" />
+                )}
+                {detectingLocation ? 'Detecting...' : 'Use my current location'}
+              </button>
               <Input
                 placeholder="Or type a custom location..."
                 value={filters.location}
@@ -496,6 +576,49 @@ export default function SeekerDashboard() {
                   <SelectItem value="mid">Mid Level</SelectItem>
                   <SelectItem value="senior">Senior</SelectItem>
                   <SelectItem value="lead">Lead / Manager</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Category</Label>
+              <Select
+                value={filters.category || "all"}
+                onValueChange={(v) => setFilters({ ...filters, category: v === "all" ? "" : v })}
+              >
+                <SelectTrigger className="h-11 rounded-xl bg-background">
+                  <SelectValue placeholder="All categories" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Categories</SelectItem>
+                  <SelectItem value="technology">Technology</SelectItem>
+                  <SelectItem value="design">Design</SelectItem>
+                  <SelectItem value="marketing">Marketing</SelectItem>
+                  <SelectItem value="sales">Sales</SelectItem>
+                  <SelectItem value="finance">Finance</SelectItem>
+                  <SelectItem value="healthcare">Healthcare</SelectItem>
+                  <SelectItem value="engineering">Engineering</SelectItem>
+                  <SelectItem value="education">Education</SelectItem>
+                  <SelectItem value="other">Other</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Employment Type</Label>
+              <Select
+                value={filters.employment_type || "all"}
+                onValueChange={(v) => setFilters({ ...filters, employment_type: v === "all" ? "" : v })}
+              >
+                <SelectTrigger className="h-11 rounded-xl bg-background">
+                  <SelectValue placeholder="All types" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Types</SelectItem>
+                  <SelectItem value="full-time">Full-time</SelectItem>
+                  <SelectItem value="part-time">Part-time</SelectItem>
+                  <SelectItem value="contract">Contract</SelectItem>
+                  <SelectItem value="internship">Internship</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -699,11 +822,18 @@ function SwipeCard({ job, onSwipe, expanded, setExpanded, swipeDirection }) {
           SUPER LIKE
         </motion.div>
 
+        {/* Promoted Badge */}
+        {job.is_boosted && (
+          <div className="absolute top-4 right-4 z-20 px-3 py-1 rounded-full bg-gradient-to-r from-amber-500 to-orange-500 text-white text-xs font-bold flex items-center gap-1 shadow-lg">
+            <Zap className="w-3 h-3" /> Promoted
+          </div>
+        )}
+
         {/* Content */}
         <div className="absolute inset-0 flex flex-col justify-end p-6 z-10">
           {/* Company Logo & Name */}
           <div className="flex items-center gap-3 mb-4">
-            <img 
+            <img
               src={job.company_logo}
               alt={job.company}
               className="w-12 h-12 rounded-xl object-cover border border-white/20"
@@ -717,8 +847,20 @@ function SwipeCard({ job, onSwipe, expanded, setExpanded, swipeDirection }) {
             </div>
           </div>
 
-          {/* Job Title */}
-          <h2 className="text-2xl md:text-3xl font-bold font-['Outfit'] mb-3">{job.title}</h2>
+          {/* Job Title + Match Score */}
+          <div className="flex items-start justify-between gap-3 mb-3">
+            <h2 className="text-2xl md:text-3xl font-bold font-['Outfit']">{job.title}</h2>
+            {job.match_score != null && (
+              <span className={`shrink-0 px-3 py-1 rounded-full text-sm font-bold flex items-center gap-1 ${
+                job.match_score >= 75 ? 'bg-success/20 text-success' :
+                job.match_score >= 50 ? 'bg-primary/20 text-primary' :
+                'bg-muted text-muted-foreground'
+              }`}>
+                <Star className="w-3.5 h-3.5" />
+                {job.match_score}%
+              </span>
+            )}
+          </div>
 
           {/* Tags */}
           <div className="flex flex-wrap gap-2 mb-4">
@@ -738,6 +880,16 @@ function SwipeCard({ job, onSwipe, expanded, setExpanded, swipeDirection }) {
             <span className="px-3 py-1.5 rounded-full bg-accent text-accent-foreground text-sm capitalize">
               {job.experience_level}
             </span>
+            {job.employment_type && job.employment_type !== 'full-time' && (
+              <span className="px-3 py-1.5 rounded-full bg-secondary/10 text-secondary text-sm capitalize">
+                {job.employment_type}
+              </span>
+            )}
+            {job.category && job.category !== 'other' && (
+              <span className="px-3 py-1.5 rounded-full bg-primary/10 text-primary text-sm capitalize">
+                {job.category}
+              </span>
+            )}
           </div>
 
           {/* Expandable Description */}

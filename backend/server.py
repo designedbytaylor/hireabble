@@ -17,7 +17,7 @@ import jwt as pyjwt
 from database import db, manager, UPLOADS_DIR, logger, JWT_SECRET, JWT_ALGORITHM, create_notification
 
 # Import routers
-from routers import auth, jobs, applications, matches, notifications, uploads, stats, admin, interviews
+from routers import auth, jobs, applications, matches, notifications, uploads, stats, admin, interviews, payments
 
 # Create the main app
 app = FastAPI(
@@ -48,6 +48,7 @@ app.include_router(uploads.router, prefix="/api")
 app.include_router(stats.router, prefix="/api")
 app.include_router(admin.router, prefix="/api")
 app.include_router(interviews.router, prefix="/api")
+app.include_router(payments.router, prefix="/api")
 
 # ==================== WEBSOCKET ====================
 

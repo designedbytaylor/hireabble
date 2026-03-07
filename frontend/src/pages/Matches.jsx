@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Heart, MessageCircle, Briefcase, Building2, Calendar, ChevronRight,
-  X, MapPin, GraduationCap, Clock, User, Mail, ArrowLeft,
+  X, MapPin, GraduationCap, Clock, User, Mail, ArrowLeft, Star,
 } from 'lucide-react';
 import { Badge } from '../components/ui/badge';
 import { Button } from '../components/ui/button';
@@ -72,6 +72,9 @@ export default function Matches() {
   if (viewingProfile) {
     const p = viewingProfile.profile;
     const m = viewingProfile.match;
+    const j = viewingProfile.job;
+    const isRecruiterViewing = user?.role === 'recruiter';
+
     return (
       <div className="min-h-screen bg-background pb-24">
         <div className="fixed inset-0 overflow-hidden pointer-events-none">
@@ -92,20 +95,42 @@ export default function Matches() {
           <div className="max-w-lg mx-auto space-y-6">
             {/* Profile Header */}
             <div className="glass-card rounded-3xl p-8 text-center">
-              {(p.photo_url || p.avatar) ? (
-                <img
-                  src={getPhotoUrl(p.photo_url, p.id) || p.avatar}
-                  alt={p.name}
-                  className="w-24 h-24 rounded-full border-4 border-primary mx-auto object-cover mb-4"
-                />
+              {isRecruiterViewing ? (
+                (p.photo_url || p.avatar) ? (
+                  <img
+                    src={getPhotoUrl(p.photo_url, p.id) || p.avatar}
+                    alt={p.name}
+                    className="w-24 h-24 rounded-full border-4 border-primary mx-auto object-cover mb-4"
+                  />
+                ) : (
+                  <div className="w-24 h-24 rounded-full bg-primary/20 flex items-center justify-center mx-auto mb-4">
+                    <User className="w-12 h-12 text-primary" />
+                  </div>
+                )
               ) : (
-                <div className="w-24 h-24 rounded-full bg-primary/20 flex items-center justify-center mx-auto mb-4">
-                  <User className="w-12 h-12 text-primary" />
+                <div className="w-24 h-24 rounded-xl bg-gradient-to-br from-primary to-secondary flex items-center justify-center mx-auto mb-4">
+                  <Building2 className="w-12 h-12 text-white" />
                 </div>
               )}
-              <h1 className="text-2xl font-bold font-['Outfit']">{p.name}</h1>
-              {p.title && <p className="text-primary mt-1">{p.title}</p>}
-              <p className="text-muted-foreground text-sm mt-1">Applied for: {m.job_title}</p>
+
+              <h1 className="text-2xl font-bold font-['Outfit']">
+                {isRecruiterViewing ? p.name : (p.company || p.name)}
+              </h1>
+              {isRecruiterViewing && p.title && <p className="text-primary mt-1">{p.title}</p>}
+              {!isRecruiterViewing && p.name && p.company && (
+                <p className="text-primary mt-1">Recruiter: {p.name}</p>
+              )}
+              <p className="text-muted-foreground text-sm mt-1">
+                {isRecruiterViewing ? `Applied for: ${m.job_title}` : `Position: ${m.job_title}`}
+              </p>
+
+              {/* Match score */}
+              {viewingProfile.match_score != null && (
+                <div className="mt-3 inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-success/10 text-success text-sm font-medium">
+                  <Star className="w-4 h-4 fill-success" />
+                  {viewingProfile.match_score}% Match
+                </div>
+              )}
 
               <div className="flex justify-center gap-3 mt-4">
                 <Button
@@ -114,7 +139,7 @@ export default function Matches() {
                 >
                   <MessageCircle className="w-4 h-4 mr-2" /> Message
                 </Button>
-                {user?.role === 'recruiter' && (
+                {isRecruiterViewing && (
                   <Button
                     variant="outline"
                     onClick={() => navigate(`/interviews?match=${m.id}`)}
@@ -126,10 +151,54 @@ export default function Matches() {
               </div>
             </div>
 
+            {/* Job Details (for seeker viewing) */}
+            {!isRecruiterViewing && j && (
+              <div className="glass-card rounded-2xl p-6 space-y-3">
+                <h2 className="font-bold font-['Outfit'] mb-2">Job Details</h2>
+                <div className="flex items-center gap-3 text-sm">
+                  <Briefcase className="w-4 h-4 text-muted-foreground shrink-0" />
+                  <span className="capitalize">{j.job_type} &middot; {j.experience_level} level</span>
+                </div>
+                {j.location && (
+                  <div className="flex items-center gap-3 text-sm">
+                    <MapPin className="w-4 h-4 text-muted-foreground shrink-0" />
+                    <span>{j.location}</span>
+                  </div>
+                )}
+                {(j.salary_min || j.salary_max) && (
+                  <div className="flex items-center gap-3 text-sm">
+                    <span className="text-muted-foreground shrink-0">$</span>
+                    <span>
+                      {j.salary_min ? `$${j.salary_min.toLocaleString()}` : ''}
+                      {j.salary_min && j.salary_max ? ' - ' : ''}
+                      {j.salary_max ? `$${j.salary_max.toLocaleString()}` : ''}
+                    </span>
+                  </div>
+                )}
+                {j.description && (
+                  <div className="pt-3 border-t border-border">
+                    <p className="text-muted-foreground text-sm leading-relaxed whitespace-pre-line">{j.description}</p>
+                  </div>
+                )}
+                {j.requirements?.length > 0 && (
+                  <div className="pt-3 border-t border-border">
+                    <h3 className="text-sm font-semibold mb-2">Requirements</h3>
+                    <div className="flex flex-wrap gap-2">
+                      {j.requirements.map((req, i) => (
+                        <Badge key={i} className="bg-primary/10 text-primary border-primary/20">{req}</Badge>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* Bio */}
             {p.bio && (
               <div className="glass-card rounded-2xl p-6">
-                <h2 className="font-bold font-['Outfit'] mb-2">About</h2>
+                <h2 className="font-bold font-['Outfit'] mb-2">
+                  {isRecruiterViewing ? 'About' : 'About the Recruiter'}
+                </h2>
                 <p className="text-muted-foreground text-sm leading-relaxed">{p.bio}</p>
               </div>
             )}
@@ -169,7 +238,7 @@ export default function Matches() {
               )}
             </div>
 
-            {/* Skills */}
+            {/* Skills (mainly for recruiter viewing seeker) */}
             {p.skills?.length > 0 && (
               <div className="glass-card rounded-2xl p-6">
                 <h2 className="font-bold font-['Outfit'] mb-3">Skills</h2>
@@ -268,7 +337,7 @@ export default function Matches() {
                     {/* Avatar or Logo */}
                     <div
                       className="relative cursor-pointer"
-                      onClick={() => user?.role === 'recruiter' ? handleViewProfile(match.id) : handleOpenChat(match.id)}
+                      onClick={() => handleViewProfile(match.id)}
                     >
                       {user?.role === 'seeker' ? (
                         <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-primary to-secondary flex items-center justify-center">
@@ -289,7 +358,7 @@ export default function Matches() {
                     {/* Match Info */}
                     <div
                       className="flex-1 min-w-0 cursor-pointer"
-                      onClick={() => user?.role === 'recruiter' ? handleViewProfile(match.id) : handleOpenChat(match.id)}
+                      onClick={() => handleViewProfile(match.id)}
                     >
                       {user?.role === 'seeker' ? (
                         <>
@@ -317,15 +386,13 @@ export default function Matches() {
 
                     {/* Actions */}
                     <div className="flex items-center gap-2">
-                      {user?.role === 'recruiter' && (
-                        <button
-                          onClick={() => handleViewProfile(match.id)}
-                          className="p-3 rounded-xl bg-secondary/10 text-secondary hover:bg-secondary/20 transition-colors"
-                          title="View profile"
-                        >
-                          <User className="w-5 h-5" />
-                        </button>
-                      )}
+                      <button
+                        onClick={() => handleViewProfile(match.id)}
+                        className="p-3 rounded-xl bg-secondary/10 text-secondary hover:bg-secondary/20 transition-colors"
+                        title={user?.role === 'recruiter' ? 'View profile' : 'View details'}
+                      >
+                        {user?.role === 'recruiter' ? <User className="w-5 h-5" /> : <Building2 className="w-5 h-5" />}
+                      </button>
                       <button
                         onClick={() => handleOpenChat(match.id)}
                         className="p-3 rounded-xl bg-primary/10 text-primary hover:bg-primary/20 transition-colors"

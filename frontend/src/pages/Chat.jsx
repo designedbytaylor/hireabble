@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Send, Briefcase, User, Wifi, WifiOff, Flag, Calendar, CheckCheck, Check, Image, X } from 'lucide-react';
+import { ArrowLeft, Send, Briefcase, User, Wifi, WifiOff, Flag, Calendar, CheckCheck, Check, Image, X, Video, Square, Loader2 } from 'lucide-react';
 import ReportDialog from '../components/ReportDialog';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -24,11 +24,17 @@ export default function Chat() {
   const [reportOpen, setReportOpen] = useState(false);
   const [otherTyping, setOtherTyping] = useState(false);
   const [imagePreview, setImagePreview] = useState(null);
+  const [videoPreview, setVideoPreview] = useState(null);
+  const [isRecording, setIsRecording] = useState(false);
+  const [uploadingVideo, setUploadingVideo] = useState(false);
   const messagesEndRef = useRef(null);
   const wsRef = useRef(null);
   const reconnectTimeoutRef = useRef(null);
   const typingTimeoutRef = useRef(null);
   const fileInputRef = useRef(null);
+  const videoInputRef = useRef(null);
+  const mediaRecorderRef = useRef(null);
+  const recordedChunksRef = useRef([]);
 
   const scrollToBottom = useCallback(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -156,19 +162,96 @@ export default function Chat() {
     reader.readAsDataURL(file);
   };
 
+  const handleVideoSelect = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith('video/')) {
+      toast.error('Please select a video file');
+      return;
+    }
+    if (file.size > 50 * 1024 * 1024) {
+      toast.error('Video must be less than 50MB');
+      return;
+    }
+    setVideoPreview(file);
+  };
+
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+      mediaRecorderRef.current = new MediaRecorder(stream, { mimeType: 'video/webm' });
+      recordedChunksRef.current = [];
+
+      mediaRecorderRef.current.ondataavailable = (e) => {
+        if (e.data.size > 0) recordedChunksRef.current.push(e.data);
+      };
+
+      mediaRecorderRef.current.onstop = () => {
+        const blob = new Blob(recordedChunksRef.current, { type: 'video/webm' });
+        const file = new File([blob], `video-message-${Date.now()}.webm`, { type: 'video/webm' });
+        setVideoPreview(file);
+        stream.getTracks().forEach(t => t.stop());
+      };
+
+      mediaRecorderRef.current.start();
+      setIsRecording(true);
+      // Auto-stop after 60 seconds
+      setTimeout(() => {
+        if (mediaRecorderRef.current?.state === 'recording') {
+          stopRecording();
+        }
+      }, 60000);
+    } catch (err) {
+      toast.error('Could not access camera. Check permissions.');
+    }
+  };
+
+  const stopRecording = () => {
+    if (mediaRecorderRef.current?.state === 'recording') {
+      mediaRecorderRef.current.stop();
+    }
+    setIsRecording(false);
+  };
+
+  const uploadAndSendVideo = async () => {
+    if (!videoPreview) return null;
+    setUploadingVideo(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', videoPreview);
+      const res = await axios.post(`${API}/upload/chat-video`, formData, {
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'multipart/form-data' }
+      });
+      return res.data.url;
+    } catch (err) {
+      toast.error('Failed to upload video');
+      return null;
+    } finally {
+      setUploadingVideo(false);
+    }
+  };
+
   const handleSend = async (e) => {
     e.preventDefault();
     const hasText = newMessage.trim();
     const hasImage = imagePreview;
-    if ((!hasText && !hasImage) || sending) return;
+    const hasVideo = videoPreview;
+    if ((!hasText && !hasImage && !hasVideo) || sending) return;
 
     let messageContent = newMessage.trim();
-    if (hasImage) {
+
+    // Upload video if present
+    if (hasVideo) {
+      const videoUrl = await uploadAndSendVideo();
+      if (!videoUrl) return;
+      messageContent = messageContent ? `[Video: ${videoUrl}] ${messageContent}` : `[Video: ${videoUrl}]`;
+    } else if (hasImage) {
       messageContent = messageContent ? `[Image] ${messageContent}` : '[Image shared]';
     }
 
     setNewMessage('');
     setImagePreview(null);
+    setVideoPreview(null);
     setSending(true);
 
     if (wsRef.current?.readyState === WebSocket.OPEN && otherPersonId) {
@@ -336,7 +419,22 @@ export default function Chat() {
                         : 'bg-card border border-border rounded-bl-md'
                     }`}
                   >
-                    <p className="text-sm">{msg.content}</p>
+                    {msg.content?.match(/\[Video: (https?:\/\/[^\]]+)\]/) ? (
+                      <>
+                        <video
+                          src={msg.content.match(/\[Video: (https?:\/\/[^\]]+)\]/)[1]}
+                          controls
+                          playsInline
+                          className="rounded-lg max-w-full mb-1"
+                          style={{ maxHeight: '200px' }}
+                        />
+                        {msg.content.replace(/\[Video: https?:\/\/[^\]]+\]\s*/, '').trim() && (
+                          <p className="text-sm">{msg.content.replace(/\[Video: https?:\/\/[^\]]+\]\s*/, '').trim()}</p>
+                        )}
+                      </>
+                    ) : (
+                      <p className="text-sm">{msg.content}</p>
+                    )}
                   </div>
                   <div className={`flex items-center gap-1 mt-1 ${isOwn ? 'justify-end' : 'justify-start'}`}>
                     <p className="text-xs text-muted-foreground">
@@ -372,17 +470,36 @@ export default function Chat() {
         <div ref={messagesEndRef} />
       </main>
 
-      {/* Image Preview */}
-      {imagePreview && (
+      {/* Media Preview */}
+      {(imagePreview || videoPreview) && (
         <div className="px-4 py-2 border-t border-border">
           <div className="relative inline-block">
-            <img src={imagePreview} alt="Preview" className="h-20 rounded-lg object-cover" />
-            <button
-              onClick={() => setImagePreview(null)}
-              className="absolute -top-2 -right-2 w-6 h-6 rounded-full bg-destructive flex items-center justify-center"
-            >
-              <X className="w-3 h-3 text-white" />
-            </button>
+            {imagePreview && (
+              <>
+                <img src={imagePreview} alt="Preview" className="h-20 rounded-lg object-cover" />
+                <button
+                  onClick={() => setImagePreview(null)}
+                  className="absolute -top-2 -right-2 w-6 h-6 rounded-full bg-destructive flex items-center justify-center"
+                >
+                  <X className="w-3 h-3 text-white" />
+                </button>
+              </>
+            )}
+            {videoPreview && (
+              <>
+                <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-primary/10 border border-primary/30">
+                  <Video className="w-4 h-4 text-primary" />
+                  <span className="text-sm text-primary">{videoPreview.name || 'Recorded video'}</span>
+                  <span className="text-xs text-muted-foreground">({(videoPreview.size / (1024 * 1024)).toFixed(1)}MB)</span>
+                </div>
+                <button
+                  onClick={() => setVideoPreview(null)}
+                  className="absolute -top-2 -right-2 w-6 h-6 rounded-full bg-destructive flex items-center justify-center"
+                >
+                  <X className="w-3 h-3 text-white" />
+                </button>
+              </>
+            )}
           </div>
         </div>
       )}
@@ -397,13 +514,47 @@ export default function Chat() {
             onChange={handleImageSelect}
             className="hidden"
           />
+          <input
+            ref={videoInputRef}
+            type="file"
+            accept="video/*"
+            onChange={handleVideoSelect}
+            className="hidden"
+          />
           <button
             type="button"
             onClick={() => fileInputRef.current?.click()}
-            className="h-12 w-12 rounded-full bg-accent flex items-center justify-center hover:bg-accent/80 transition-colors flex-shrink-0"
+            className="h-10 w-10 rounded-full bg-accent flex items-center justify-center hover:bg-accent/80 transition-colors flex-shrink-0"
           >
-            <Image className="w-5 h-5 text-muted-foreground" />
+            <Image className="w-4 h-4 text-muted-foreground" />
           </button>
+          {isRecording ? (
+            <button
+              type="button"
+              onClick={stopRecording}
+              className="h-10 w-10 rounded-full bg-red-500 flex items-center justify-center hover:bg-red-600 transition-colors flex-shrink-0 animate-pulse"
+            >
+              <Square className="w-4 h-4 text-white" />
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => {
+                if (videoPreview) { setVideoPreview(null); return; }
+                // Show options: record or upload
+                if (navigator.mediaDevices?.getUserMedia) {
+                  startRecording();
+                } else {
+                  videoInputRef.current?.click();
+                }
+              }}
+              onContextMenu={(e) => { e.preventDefault(); videoInputRef.current?.click(); }}
+              className="h-10 w-10 rounded-full bg-accent flex items-center justify-center hover:bg-accent/80 transition-colors flex-shrink-0"
+              title="Tap to record, long-press to upload"
+            >
+              <Video className="w-4 h-4 text-muted-foreground" />
+            </button>
+          )}
           <Input
             value={newMessage}
             onChange={handleInputChange}
@@ -413,11 +564,11 @@ export default function Chat() {
           />
           <Button
             type="submit"
-            disabled={(!newMessage.trim() && !imagePreview) || sending}
+            disabled={(!newMessage.trim() && !imagePreview && !videoPreview) || sending || uploadingVideo}
             className="h-12 w-12 rounded-full bg-gradient-to-r from-primary to-secondary p-0"
             data-testid="send-btn"
           >
-            <Send className="w-5 h-5" />
+            {uploadingVideo ? <Loader2 className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5" />}
           </Button>
         </form>
       </footer>
