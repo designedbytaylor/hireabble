@@ -115,6 +115,45 @@ async def get_analytics(admin: dict = Depends(get_current_admin)):
     pending_reports = await db.reports.count_documents({"status": "pending"})
     pending_moderation = await db.moderation_queue.count_documents({"status": "pending"})
 
+    # Growth data - users per day (last 14 days)
+    growth_data = []
+    for i in range(13, -1, -1):
+        day = datetime.now(timezone.utc) - timedelta(days=i)
+        day_start = day.replace(hour=0, minute=0, second=0, microsecond=0).isoformat()
+        day_end = (day.replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(days=1)).isoformat()
+
+        users_that_day = await db.users.count_documents({
+            "created_at": {"$gte": day_start, "$lt": day_end}
+        })
+        apps_that_day = await db.applications.count_documents({
+            "created_at": {"$gte": day_start, "$lt": day_end}
+        })
+        matches_that_day = await db.matches.count_documents({
+            "created_at": {"$gte": day_start, "$lt": day_end}
+        })
+        growth_data.append({
+            "date": day.strftime("%b %d"),
+            "users": users_that_day,
+            "applications": apps_that_day,
+            "matches": matches_that_day,
+        })
+
+    # Top locations
+    locations_pipeline = [
+        {"$match": {"location": {"$ne": None, "$ne": ""}}},
+        {"$group": {"_id": "$location", "count": {"$sum": 1}}},
+        {"$sort": {"count": -1}},
+        {"$limit": 8},
+    ]
+    top_locations = []
+    async for doc in db.users.aggregate(locations_pipeline):
+        top_locations.append({"location": doc["_id"], "count": doc["count"]})
+
+    # Job type distribution
+    job_types = {}
+    for jt in ["remote", "onsite", "hybrid"]:
+        job_types[jt] = await db.jobs.count_documents({"job_type": jt, "is_active": True})
+
     return {
         "users": {
             "total": total_users,
@@ -136,6 +175,9 @@ async def get_analytics(admin: dict = Depends(get_current_admin)):
             "pending_reports": pending_reports,
             "pending_moderation": pending_moderation,
         },
+        "growth": growth_data,
+        "top_locations": top_locations,
+        "job_types": job_types,
     }
 
 # ==================== USER MANAGEMENT ====================
