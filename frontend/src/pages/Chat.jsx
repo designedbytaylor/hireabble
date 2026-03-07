@@ -38,6 +38,14 @@ export default function Chat() {
     ? (user?.id === match.seeker_id ? match.recruiter_id : match.seeker_id)
     : null;
 
+  const markAsRead = useCallback(async () => {
+    try {
+      await axios.post(`${API}/messages/${matchId}/read`, {}, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+    } catch (e) { /* silent */ }
+  }, [matchId, token]);
+
   // WebSocket connection
   const connectWebSocket = useCallback(() => {
     if (!token || wsRef.current?.readyState === WebSocket.OPEN) return;
@@ -82,15 +90,7 @@ export default function Chat() {
     } catch (error) {
       console.error('Failed to connect WebSocket:', error);
     }
-  }, [token, matchId, scrollToBottom, user?.id]);
-
-  const markAsRead = useCallback(async () => {
-    try {
-      await axios.post(`${API}/messages/${matchId}/read`, {}, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-    } catch (e) { /* silent */ }
-  }, [matchId, token]);
+  }, [token, matchId, scrollToBottom, user?.id, markAsRead]);
 
   useEffect(() => {
     const fetchData = async () => {
