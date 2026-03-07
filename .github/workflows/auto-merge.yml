@@ -18,7 +18,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Create PR and merge
+      - name: Create PR and auto-merge
         uses: actions/github-script@v7
         with:
           script: |
@@ -39,7 +39,6 @@ jobs:
               pr = existingPRs[0];
               console.log(`PR #${pr.number} already exists`);
             } else {
-              // Create new PR
               const { data: newPR } = await github.rest.pulls.create({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
@@ -52,43 +51,53 @@ jobs:
               console.log(`Created PR #${pr.number}`);
             }
 
-            // Enable auto-merge so GitHub merges once all checks pass
-            try {
-              await github.rest.pulls.merge({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                pull_number: pr.number,
-                merge_method: 'squash',
-              });
-              console.log(`PR #${pr.number} merged successfully`);
-            } catch (error) {
-              console.log(`Immediate merge failed (likely pending checks): ${error.message}`);
-              console.log('Enabling auto-merge to merge once checks pass...');
+            // Retry merge with backoff - wait for checks to complete
+            const maxRetries = 6;
+            const delaySeconds = 30;
 
-              // Use GraphQL to enable auto-merge (waits for required checks)
+            for (let attempt = 1; attempt <= maxRetries; attempt++) {
               try {
-                const { data: prData } = await github.rest.pulls.get({
+                await github.rest.pulls.merge({
                   owner: context.repo.owner,
                   repo: context.repo.repo,
                   pull_number: pr.number,
+                  merge_method: 'squash',
                 });
-
-                await github.graphql(`
-                  mutation($pullRequestId: ID!, $mergeMethod: PullRequestMergeMethod!) {
-                    enablePullRequestAutoMerge(input: {
-                      pullRequestId: $pullRequestId,
-                      mergeMethod: $mergeMethod
-                    }) {
-                      pullRequest { number }
-                    }
-                  }
-                `, {
-                  pullRequestId: prData.node_id,
-                  mergeMethod: 'SQUASH',
-                });
-                console.log(`Auto-merge enabled for PR #${pr.number}`);
-              } catch (autoMergeError) {
-                console.log(`Could not enable auto-merge: ${autoMergeError.message}`);
-                core.setFailed(`Could not merge or enable auto-merge for PR #${pr.number}: ${autoMergeError.message}`);
+                console.log(`PR #${pr.number} merged successfully on attempt ${attempt}`);
+                return;
+              } catch (error) {
+                console.log(`Attempt ${attempt}/${maxRetries} failed: ${error.message}`);
+                if (attempt < maxRetries) {
+                  console.log(`Waiting ${delaySeconds}s before retry...`);
+                  await new Promise(r => setTimeout(r, delaySeconds * 1000));
+                }
               }
+            }
+
+            // If all retries failed, try enabling auto-merge as last resort
+            try {
+              const { data: prData } = await github.rest.pulls.get({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: pr.number,
+              });
+
+              await github.graphql(`
+                mutation($pullRequestId: ID!, $mergeMethod: PullRequestMergeMethod!) {
+                  enablePullRequestAutoMerge(input: {
+                    pullRequestId: $pullRequestId,
+                    mergeMethod: $mergeMethod
+                  }) {
+                    pullRequest { number }
+                  }
+                }
+              `, {
+                pullRequestId: prData.node_id,
+                mergeMethod: 'SQUASH',
+              });
+              console.log(`Auto-merge enabled for PR #${pr.number}`);
+            } catch (autoMergeError) {
+              console.log(`Could not enable auto-merge: ${autoMergeError.message}`);
+              // Don't fail the workflow - the PR exists and can be merged manually if needed
+              console.log(`PR #${pr.number} created but could not be auto-merged. Please merge manually or enable auto-merge in repo settings.`);
             }

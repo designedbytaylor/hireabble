@@ -9,6 +9,7 @@ import asyncio
 
 from database import (
     db, get_current_user, manager, send_email_notification, create_notification,
+    send_system_message,
     SwipeAction, ApplicationResponse, RecruiterAction, MatchResponse
 )
 
@@ -151,6 +152,8 @@ async def swipe(action: SwipeAction, current_user: dict = Depends(get_current_us
         "seeker_degree": current_user.get("degree"),
         "seeker_location": current_user.get("location"),
         "seeker_current_employer": current_user.get("current_employer"),
+        "seeker_bio": current_user.get("bio"),
+        "job_title": job.get("title", ""),
         "recruiter_id": job["recruiter_id"],
         "action": action.action,
         "is_matched": False,
@@ -358,6 +361,21 @@ async def request_references(seeker_id: str, current_user: dict = Depends(get_cu
         message=f"{current_user['name']} from {current_user.get('company', 'a company')} is requesting your references.",
         data={"request_id": request_doc["id"], "recruiter_id": current_user["id"]}
     )
+
+    # Also send a chat message in the match conversation
+    match = await db.matches.find_one({
+        "seeker_id": seeker_id,
+        "recruiter_id": current_user["id"]
+    }, {"_id": 0})
+    if match:
+        company = current_user.get('company', 'our company')
+        await send_system_message(
+            match_id=match["id"],
+            sender_id=current_user["id"],
+            sender_name=current_user["name"],
+            content=f"📋 Reference Request\n\n{current_user['name']} from {company} is requesting your professional references.\n\nYou can approve or deny this request in your Profile page.",
+            msg_type="reference_request"
+        )
 
     return {"message": "Reference request sent", "request_id": request_doc["id"]}
 

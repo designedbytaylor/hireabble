@@ -126,10 +126,12 @@ export default function RecruiterDashboard() {
   const handleViewResume = async (seekerId) => {
     setLoadingResume(true);
     try {
-      const response = await axios.get(`${API}/applicant/${seekerId}/resume`, {
-        headers: { Authorization: `Bearer ${token}` }
+      const response = await axios.get(`${API}/applicant/${seekerId}/resume/pdf`, {
+        headers: { Authorization: `Bearer ${token}` },
+        responseType: 'blob'
       });
-      setResumeData(response.data);
+      const url = window.URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }));
+      window.open(url, '_blank');
     } catch (error) {
       toast.error(error.response?.data?.detail || 'Failed to load resume');
     } finally {
@@ -552,67 +554,6 @@ export default function RecruiterDashboard() {
                   Request References
                 </Button>
               </div>
-
-              {/* Full Resume View */}
-              {resumeData && (
-                <div className="p-4 rounded-xl bg-background border border-border space-y-3 max-h-[300px] overflow-y-auto">
-                  <div className="flex items-center justify-between">
-                    <h4 className="font-semibold text-sm">Full Resume</h4>
-                    <button onClick={() => setResumeData(null)} className="text-muted-foreground hover:text-foreground">
-                      <X className="w-4 h-4" />
-                    </button>
-                  </div>
-                  {resumeData.bio && (
-                    <div>
-                      <div className="text-xs text-muted-foreground mb-1">About</div>
-                      <p className="text-sm">{resumeData.bio}</p>
-                    </div>
-                  )}
-                  {resumeData.work_history?.length > 0 && (
-                    <div>
-                      <div className="text-xs text-muted-foreground mb-1">Work Experience</div>
-                      {resumeData.work_history.map((job, i) => (
-                        <div key={i} className="mb-2">
-                          <div className="text-sm font-medium">{job.position || job.title}</div>
-                          <div className="text-xs text-muted-foreground">{job.company} {job.start_date && `| ${job.start_date} - ${job.end_date || 'Present'}`}</div>
-                          {job.description && <p className="text-xs mt-1">{job.description}</p>}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                  {resumeData.education?.length > 0 && (
-                    <div>
-                      <div className="text-xs text-muted-foreground mb-1">Education</div>
-                      {resumeData.education.map((edu, i) => (
-                        <div key={i} className="text-sm">
-                          {edu.degree} {edu.field && `in ${edu.field}`} - {edu.school} {edu.year && `(${edu.year})`}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                  {resumeData.certifications?.length > 0 && (
-                    <div>
-                      <div className="text-xs text-muted-foreground mb-1">Certifications</div>
-                      <div className="flex flex-wrap gap-1">
-                        {resumeData.certifications.map((cert, i) => (
-                          <span key={i} className="px-2 py-0.5 rounded-full bg-primary/10 text-primary text-xs">{cert}</span>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                  {resumeData.references_visible && resumeData.references?.length > 0 && (
-                    <div>
-                      <div className="text-xs text-muted-foreground mb-1">References</div>
-                      {resumeData.references.map((ref, i) => (
-                        <div key={i} className="text-sm">
-                          <span className="font-medium">{ref.name}</span> - {ref.title} at {ref.company}
-                          {ref.email && <span className="text-xs text-muted-foreground ml-2">{ref.email}</span>}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
 
               {/* Action Buttons */}
               {!selectedCandidate.recruiter_action ? (

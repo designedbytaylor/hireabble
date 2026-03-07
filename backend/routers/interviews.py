@@ -8,7 +8,7 @@ from pydantic import BaseModel
 import uuid
 
 from database import (
-    db, get_current_user, create_notification, manager, logger
+    db, get_current_user, create_notification, send_system_message, manager, logger
 )
 
 router = APIRouter(prefix="/interviews", tags=["Interview Scheduling"])
@@ -88,12 +88,37 @@ async def create_interview(data: InterviewCreate, current_user: dict = Depends(g
     await db.interviews.insert_one(interview_doc)
 
     # Notify the other party
+    notif_msg = f"{current_user['name']} wants to schedule an interview: {interview_title}"
     await create_notification(
         user_id=other_id,
         notif_type="interview",
         title="Interview Request",
-        message=f"{current_user['name']} wants to schedule an interview: {data.title}",
+        message=notif_msg,
         data={"interview_id": interview_id, "match_id": data.match_id}
+    )
+
+    # Send a chat message so it appears in the conversation
+    times_text = ""
+    for t in data.proposed_times[:3]:
+        try:
+            dt = datetime.fromisoformat(t.start.replace('Z', '+00:00'))
+            times_text += f"\n  - {dt.strftime('%b %d, %Y at %I:%M %p')}"
+        except Exception:
+            times_text += f"\n  - {t.start}"
+
+    chat_msg = f"📅 Interview Request: {interview_title}"
+    if data.interview_type:
+        chat_msg += f"\nType: {data.interview_type.replace('_', ' ').title()}"
+    if times_text:
+        chat_msg += f"\nProposed times:{times_text}"
+    chat_msg += "\n\nPlease respond in the Interviews section."
+
+    await send_system_message(
+        match_id=data.match_id,
+        sender_id=current_user["id"],
+        sender_name=current_user["name"],
+        content=chat_msg,
+        msg_type="interview_request"
     )
 
     return {k: v for k, v in interview_doc.items() if k != "_id"}

@@ -104,6 +104,10 @@ export default function NotificationBell() {
       navigate('/matches');
     } else if (notification.type === 'message' && notification.data?.match_id) {
       navigate(`/chat/${notification.data.match_id}`);
+    } else if (notification.type === 'interview') {
+      navigate('/interviews');
+    } else if (notification.type === 'reference_request') {
+      navigate('/profile');
     }
   };
 
