@@ -123,13 +123,15 @@ export default function InterviewScheduler() {
               <p className="text-muted-foreground text-sm">Schedule and manage interviews</p>
             </div>
           </div>
-          <Button
-            onClick={() => setShowCreate(true)}
-            className="bg-gradient-to-r from-primary to-secondary rounded-full px-5"
-          >
-            <Plus className="w-5 h-5 mr-2" />
-            Schedule
-          </Button>
+          {user?.role === 'recruiter' && (
+            <Button
+              onClick={() => setShowCreate(true)}
+              className="bg-gradient-to-r from-primary to-secondary rounded-full px-5"
+            >
+              <Plus className="w-5 h-5 mr-2" />
+              Schedule
+            </Button>
+          )}
         </div>
 
         {/* Quick Stats */}

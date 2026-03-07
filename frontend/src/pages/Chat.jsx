@@ -260,13 +260,15 @@ export default function Chat() {
           </div>
         </div>
 
-        <button
-          onClick={() => navigate(`/interviews?match=${matchId}`)}
-          className="p-2 rounded-lg hover:bg-primary/10 text-muted-foreground hover:text-primary transition-colors"
-          title="Schedule interview"
-        >
-          <Calendar className="w-4 h-4" />
-        </button>
+        {user?.role === 'recruiter' && (
+          <button
+            onClick={() => navigate(`/interviews?match=${matchId}`)}
+            className="p-2 rounded-lg hover:bg-primary/10 text-muted-foreground hover:text-primary transition-colors"
+            title="Schedule interview"
+          >
+            <Calendar className="w-4 h-4" />
+          </button>
+        )}
 
         <button
           onClick={() => setReportOpen(true)}
