@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { User, Mail, Briefcase, MapPin, Save, LogOut, Building2, Download, Upload, CheckCircle, AlertCircle, Lock, Eye, EyeOff, ChevronDown } from 'lucide-react';
+import { User, Mail, Briefcase, MapPin, Save, LogOut, Building2, Download, Upload, CheckCircle, AlertCircle, Lock, Eye, EyeOff, ChevronDown, Plus, Trash2, GraduationCap, Award, Clock } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
@@ -39,8 +39,15 @@ export default function Profile() {
     bio: '',
     location: '',
     company: '',
-    skills: ''
+    skills: '',
+    current_employer: '',
+    experience_years: '',
+    school: '',
+    degree: '',
   });
+  const [workHistory, setWorkHistory] = useState([]);
+  const [education, setEducation] = useState([]);
+  const [certifications, setCertifications] = useState([]);
 
   useEffect(() => {
     if (user) {
@@ -50,8 +57,15 @@ export default function Profile() {
         bio: user.bio || '',
         location: user.location || '',
         company: user.company || '',
-        skills: user.skills?.join(', ') || ''
+        skills: user.skills?.join(', ') || '',
+        current_employer: user.current_employer || '',
+        experience_years: user.experience_years || '',
+        school: user.school || '',
+        degree: user.degree || '',
       });
+      setWorkHistory(user.work_history || []);
+      setEducation(user.education || []);
+      setCertifications(user.certifications || []);
       fetchCompleteness();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -111,7 +125,11 @@ export default function Profile() {
     try {
       const updates = {
         ...formData,
-        skills: formData.skills.split(',').map(s => s.trim()).filter(Boolean)
+        skills: formData.skills.split(',').map(s => s.trim()).filter(Boolean),
+        experience_years: formData.experience_years ? parseInt(formData.experience_years) : null,
+        work_history: workHistory,
+        education: education,
+        certifications: certifications.filter(Boolean),
       };
       await updateProfile(updates);
       toast.success('Profile updated!');
@@ -327,6 +345,217 @@ export default function Profile() {
                     className="h-12 rounded-xl bg-background border-border"
                     data-testid="profile-skills-input"
                   />
+                </div>
+
+                {/* Current Employment */}
+                <div className="space-y-2">
+                  <Label htmlFor="current_employer">Current Employer</Label>
+                  <div className="relative">
+                    <Building2 className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+                    <Input
+                      id="current_employer"
+                      value={formData.current_employer}
+                      onChange={(e) => setFormData({ ...formData, current_employer: e.target.value })}
+                      placeholder="e.g., Google"
+                      className="pl-12 h-12 rounded-xl bg-background border-border"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="experience_years">Years of Experience</Label>
+                  <div className="relative">
+                    <Clock className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+                    <Input
+                      id="experience_years"
+                      type="number"
+                      min="0"
+                      value={formData.experience_years}
+                      onChange={(e) => setFormData({ ...formData, experience_years: e.target.value })}
+                      placeholder="e.g., 5"
+                      className="pl-12 h-12 rounded-xl bg-background border-border"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="school">School</Label>
+                  <div className="relative">
+                    <GraduationCap className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+                    <Input
+                      id="school"
+                      value={formData.school}
+                      onChange={(e) => setFormData({ ...formData, school: e.target.value })}
+                      placeholder="e.g., MIT"
+                      className="pl-12 h-12 rounded-xl bg-background border-border"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="degree">Degree</Label>
+                  <Input
+                    id="degree"
+                    value={formData.degree}
+                    onChange={(e) => setFormData({ ...formData, degree: e.target.value })}
+                    placeholder="e.g., B.S. Computer Science"
+                    className="h-12 rounded-xl bg-background border-border"
+                  />
+                </div>
+
+                {/* Work History */}
+                <div className="pt-4 border-t border-border space-y-3">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-base font-semibold">Work Experience</Label>
+                    <button
+                      type="button"
+                      onClick={() => setWorkHistory([...workHistory, { company: '', position: '', start_date: '', end_date: '', description: '' }])}
+                      className="flex items-center gap-1 text-sm text-primary hover:text-primary/80"
+                    >
+                      <Plus className="w-4 h-4" /> Add
+                    </button>
+                  </div>
+                  {workHistory.map((job, i) => (
+                    <div key={i} className="p-4 rounded-xl bg-background/50 border border-border space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-medium text-muted-foreground">Position {i + 1}</span>
+                        <button
+                          type="button"
+                          onClick={() => setWorkHistory(workHistory.filter((_, idx) => idx !== i))}
+                          className="text-destructive hover:text-destructive/80"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                      <Input
+                        value={job.position}
+                        onChange={(e) => { const w = [...workHistory]; w[i] = { ...w[i], position: e.target.value }; setWorkHistory(w); }}
+                        placeholder="Job Title"
+                        className="h-10 rounded-lg bg-background border-border"
+                      />
+                      <Input
+                        value={job.company}
+                        onChange={(e) => { const w = [...workHistory]; w[i] = { ...w[i], company: e.target.value }; setWorkHistory(w); }}
+                        placeholder="Company"
+                        className="h-10 rounded-lg bg-background border-border"
+                      />
+                      <div className="grid grid-cols-2 gap-2">
+                        <Input
+                          value={job.start_date}
+                          onChange={(e) => { const w = [...workHistory]; w[i] = { ...w[i], start_date: e.target.value }; setWorkHistory(w); }}
+                          placeholder="Start (e.g., Jan 2020)"
+                          className="h-10 rounded-lg bg-background border-border"
+                        />
+                        <Input
+                          value={job.end_date}
+                          onChange={(e) => { const w = [...workHistory]; w[i] = { ...w[i], end_date: e.target.value }; setWorkHistory(w); }}
+                          placeholder="End (or leave blank)"
+                          className="h-10 rounded-lg bg-background border-border"
+                        />
+                      </div>
+                      <Textarea
+                        value={job.description || ''}
+                        onChange={(e) => { const w = [...workHistory]; w[i] = { ...w[i], description: e.target.value }; setWorkHistory(w); }}
+                        placeholder="Describe your responsibilities..."
+                        className="min-h-[60px] rounded-lg bg-background border-border resize-none text-sm"
+                      />
+                    </div>
+                  ))}
+                  {workHistory.length === 0 && (
+                    <p className="text-sm text-muted-foreground text-center py-2">No work experience added yet</p>
+                  )}
+                </div>
+
+                {/* Education */}
+                <div className="pt-4 border-t border-border space-y-3">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-base font-semibold">Education</Label>
+                    <button
+                      type="button"
+                      onClick={() => setEducation([...education, { school: '', degree: '', field: '', year: '' }])}
+                      className="flex items-center gap-1 text-sm text-primary hover:text-primary/80"
+                    >
+                      <Plus className="w-4 h-4" /> Add
+                    </button>
+                  </div>
+                  {education.map((edu, i) => (
+                    <div key={i} className="p-4 rounded-xl bg-background/50 border border-border space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-medium text-muted-foreground">Education {i + 1}</span>
+                        <button
+                          type="button"
+                          onClick={() => setEducation(education.filter((_, idx) => idx !== i))}
+                          className="text-destructive hover:text-destructive/80"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                      <Input
+                        value={edu.school}
+                        onChange={(e) => { const ed = [...education]; ed[i] = { ...ed[i], school: e.target.value }; setEducation(ed); }}
+                        placeholder="School / University"
+                        className="h-10 rounded-lg bg-background border-border"
+                      />
+                      <Input
+                        value={edu.degree}
+                        onChange={(e) => { const ed = [...education]; ed[i] = { ...ed[i], degree: e.target.value }; setEducation(ed); }}
+                        placeholder="Degree (e.g., B.S., M.S., Ph.D.)"
+                        className="h-10 rounded-lg bg-background border-border"
+                      />
+                      <div className="grid grid-cols-2 gap-2">
+                        <Input
+                          value={edu.field}
+                          onChange={(e) => { const ed = [...education]; ed[i] = { ...ed[i], field: e.target.value }; setEducation(ed); }}
+                          placeholder="Field of Study"
+                          className="h-10 rounded-lg bg-background border-border"
+                        />
+                        <Input
+                          value={edu.year}
+                          onChange={(e) => { const ed = [...education]; ed[i] = { ...ed[i], year: e.target.value }; setEducation(ed); }}
+                          placeholder="Graduation Year"
+                          className="h-10 rounded-lg bg-background border-border"
+                        />
+                      </div>
+                    </div>
+                  ))}
+                  {education.length === 0 && (
+                    <p className="text-sm text-muted-foreground text-center py-2">No education added yet</p>
+                  )}
+                </div>
+
+                {/* Certifications */}
+                <div className="pt-4 border-t border-border space-y-3">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-base font-semibold">Certifications</Label>
+                    <button
+                      type="button"
+                      onClick={() => setCertifications([...certifications, ''])}
+                      className="flex items-center gap-1 text-sm text-primary hover:text-primary/80"
+                    >
+                      <Plus className="w-4 h-4" /> Add
+                    </button>
+                  </div>
+                  {certifications.map((cert, i) => (
+                    <div key={i} className="flex items-center gap-2">
+                      <Award className="w-4 h-4 text-muted-foreground shrink-0" />
+                      <Input
+                        value={cert}
+                        onChange={(e) => { const c = [...certifications]; c[i] = e.target.value; setCertifications(c); }}
+                        placeholder="e.g., AWS Solutions Architect"
+                        className="h-10 rounded-lg bg-background border-border"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setCertifications(certifications.filter((_, idx) => idx !== i))}
+                        className="text-destructive hover:text-destructive/80 shrink-0"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ))}
+                  {certifications.length === 0 && (
+                    <p className="text-sm text-muted-foreground text-center py-2">No certifications added yet</p>
+                  )}
                 </div>
 
                 {/* Video Introduction */}

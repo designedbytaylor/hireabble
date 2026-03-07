@@ -9,21 +9,21 @@ export default function Navigation() {
   const isSeeker = user?.role === 'seeker';
   
   const navItems = [
-    { 
-      icon: Home, 
-      label: 'Home', 
-      path: isSeeker ? '/dashboard' : '/recruiter' 
+    {
+      icon: Home,
+      label: 'Home',
+      path: isSeeker ? '/dashboard' : '/recruiter'
     },
     {
       icon: Heart,
       label: 'Matches',
       path: '/matches'
     },
-    {
+    ...(!isSeeker ? [{
       icon: Calendar,
       label: 'Interviews',
       path: '/interviews'
-    },
+    }] : []),
     {
       icon: User,
       label: 'Profile',

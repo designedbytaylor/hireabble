@@ -41,6 +41,29 @@ async def get_match(match_id: str, current_user: dict = Depends(get_current_user
     
     return match
 
+
+@router.get("/matches/{match_id}/profile")
+async def get_match_profile(match_id: str, current_user: dict = Depends(get_current_user)):
+    """Get the full profile of the other person in a match"""
+    match = await db.matches.find_one({"id": match_id}, {"_id": 0})
+    if not match:
+        raise HTTPException(status_code=404, detail="Match not found")
+
+    if match["seeker_id"] != current_user["id"] and match["recruiter_id"] != current_user["id"]:
+        raise HTTPException(status_code=403, detail="Not authorized")
+
+    # Get the other person's profile
+    other_id = match["seeker_id"] if current_user["id"] == match["recruiter_id"] else match["recruiter_id"]
+    profile = await db.users.find_one({"id": other_id}, {"_id": 0, "password": 0})
+    if not profile:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    return {
+        "match": match,
+        "profile": profile,
+    }
+
+
 # ==================== MESSAGES ====================
 
 @router.post("/messages", response_model=MessageResponse)
