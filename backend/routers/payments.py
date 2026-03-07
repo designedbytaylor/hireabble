@@ -1,6 +1,8 @@
 """
 Payments, Boosts, and Monetization routes for Hireabble API
-Supports Stripe + Apple Pay for in-app purchases.
+Supports:
+  - Apple In-App Purchase (StoreKit 2) for iOS App Store
+  - Stripe as web fallback
 """
 from fastapi import APIRouter, HTTPException, Depends, Request
 from typing import Optional
@@ -8,13 +10,24 @@ from datetime import datetime, timezone, timedelta
 from pydantic import BaseModel
 import uuid
 import os
+import json
 
 from database import db, get_current_user, create_notification, logger
 
 router = APIRouter(prefix="/payments", tags=["Payments & Boosts"])
 
+# ==================== CONFIG ====================
+
 STRIPE_SECRET_KEY = os.getenv("STRIPE_SECRET_KEY", "")
 STRIPE_WEBHOOK_SECRET = os.getenv("STRIPE_WEBHOOK_SECRET", "")
+
+# Apple IAP Config
+APPLE_SHARED_SECRET = os.getenv("APPLE_SHARED_SECRET", "")  # From App Store Connect
+APPLE_BUNDLE_ID = os.getenv("APPLE_BUNDLE_ID", "com.hireabble.app")
+# Set to True for production, False for sandbox testing
+APPLE_PRODUCTION = os.getenv("APPLE_ENVIRONMENT", "sandbox") == "production"
+APPLE_VERIFY_URL_PRODUCTION = "https://buy.itunes.apple.com/verifyReceipt"
+APPLE_VERIFY_URL_SANDBOX = "https://sandbox.itunes.apple.com/verifyReceipt"
 
 # Try to import stripe - graceful fallback if not installed
 try:
@@ -24,16 +37,35 @@ try:
 except ImportError:
     STRIPE_AVAILABLE = False
 
-# ==================== PRICING ====================
+# ==================== PRODUCT DEFINITIONS ====================
+# These product IDs must match exactly what you configure in App Store Connect
 
 PRODUCTS = {
-    "boost_1day": {"name": "Job Boost - 1 Day", "price": 500, "days": 1},       # $5.00
-    "boost_3day": {"name": "Job Boost - 3 Days", "price": 1200, "days": 3},     # $12.00
-    "boost_7day": {"name": "Job Boost - 7 Days", "price": 2000, "days": 7},     # $20.00
-    "super_swipes_5": {"name": "5 Super Swipes", "price": 999, "count": 5},     # $9.99
-    "super_swipes_15": {"name": "15 Super Swipes", "price": 1999, "count": 15}, # $19.99
-    "super_swipes_30": {"name": "30 Super Swipes", "price": 2999, "count": 30}, # $29.99
+    # Recruiter Boosts (Consumable IAP)
+    "boost_1day": {"name": "Job Boost - 1 Day", "price": 499, "days": 1,
+                   "apple_product_id": "com.hireabble.boost.1day"},
+    "boost_3day": {"name": "Job Boost - 3 Days", "price": 1199, "days": 3,
+                   "apple_product_id": "com.hireabble.boost.3day"},
+    "boost_7day": {"name": "Job Boost - 7 Days", "price": 1999, "days": 7,
+                   "apple_product_id": "com.hireabble.boost.7day"},
+    # Recruiter Super Swipes (Consumable IAP)
+    "super_swipes_5": {"name": "5 Recruiter Super Swipes", "price": 999, "count": 5,
+                       "apple_product_id": "com.hireabble.recruiter.superswipes.5"},
+    "super_swipes_15": {"name": "15 Recruiter Super Swipes", "price": 1999, "count": 15,
+                        "apple_product_id": "com.hireabble.recruiter.superswipes.15"},
+    "super_swipes_30": {"name": "30 Recruiter Super Swipes", "price": 2999, "count": 30,
+                        "apple_product_id": "com.hireabble.recruiter.superswipes.30"},
+    # Seeker Super Likes (Consumable IAP)
+    "seeker_superlikes_5": {"name": "5 Super Likes", "price": 499, "count": 5,
+                            "apple_product_id": "com.hireabble.seeker.superlikes.5"},
+    "seeker_superlikes_15": {"name": "15 Super Likes", "price": 999, "count": 15,
+                             "apple_product_id": "com.hireabble.seeker.superlikes.15"},
+    "seeker_superlikes_30": {"name": "30 Super Likes", "price": 1499, "count": 30,
+                             "apple_product_id": "com.hireabble.seeker.superlikes.30"},
 }
+
+# Reverse lookup: Apple product ID -> our product ID
+APPLE_TO_PRODUCT = {v["apple_product_id"]: k for k, v in PRODUCTS.items() if "apple_product_id" in v}
 
 
 # ==================== MODELS ====================
@@ -42,49 +74,195 @@ class BoostCreate(BaseModel):
     job_id: str
     product_id: str  # boost_1day, boost_3day, boost_7day
 
-class SuperSwipePurchase(BaseModel):
-    product_id: str  # super_swipes_5, super_swipes_15, super_swipes_30
-
 class CreateCheckoutSession(BaseModel):
     product_id: str
     job_id: Optional[str] = None  # Required for boosts
+
+class AppleReceiptValidation(BaseModel):
+    receipt_data: str  # Base64-encoded receipt from StoreKit
+    product_id: str    # Our product ID (e.g., "boost_1day")
+    job_id: Optional[str] = None  # For boosts
+    transaction_id: Optional[str] = None  # StoreKit transaction ID
 
 
 # ==================== PRODUCTS & PRICING ====================
 
 @router.get("/products")
-async def get_products():
-    """Get available products and pricing"""
-    return {
-        "boosts": [
-            {"id": "boost_1day", **PRODUCTS["boost_1day"]},
-            {"id": "boost_3day", **PRODUCTS["boost_3day"]},
-            {"id": "boost_7day", **PRODUCTS["boost_7day"]},
-        ],
-        "super_swipes": [
-            {"id": "super_swipes_5", **PRODUCTS["super_swipes_5"]},
-            {"id": "super_swipes_15", **PRODUCTS["super_swipes_15"]},
-            {"id": "super_swipes_30", **PRODUCTS["super_swipes_30"]},
+async def get_products(current_user: dict = Depends(get_current_user)):
+    """Get available products and pricing, including Apple IAP product IDs"""
+    role = current_user.get("role", "seeker")
+    result = {}
+
+    if role == "recruiter":
+        result["boosts"] = [
+            {"id": k, **{kk: vv for kk, vv in v.items()}} for k, v in PRODUCTS.items() if k.startswith("boost_")
         ]
+        result["super_swipes"] = [
+            {"id": k, **{kk: vv for kk, vv in v.items()}} for k, v in PRODUCTS.items() if k.startswith("super_swipes_")
+        ]
+    else:
+        result["super_likes"] = [
+            {"id": k, **{kk: vv for kk, vv in v.items()}} for k, v in PRODUCTS.items() if k.startswith("seeker_superlikes_")
+        ]
+
+    return result
+
+
+# ==================== APPLE IN-APP PURCHASE ====================
+
+@router.post("/apple/verify-receipt")
+async def verify_apple_receipt(
+    data: AppleReceiptValidation,
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Verify an Apple IAP receipt and fulfill the purchase.
+
+    The iOS app sends the receipt after a successful StoreKit purchase.
+    We validate it with Apple's servers, then grant the product.
+
+    Flow:
+    1. iOS app calls StoreKit to purchase product
+    2. StoreKit returns receipt
+    3. iOS app sends receipt to this endpoint
+    4. We verify with Apple's servers
+    5. If valid, we fulfill the purchase (activate boost, add super swipes, etc.)
+    """
+    import requests
+
+    # Check for duplicate transaction
+    if data.transaction_id:
+        existing = await db.transactions.find_one({"apple_transaction_id": data.transaction_id})
+        if existing:
+            return {"status": "already_fulfilled", "message": "This purchase has already been processed"}
+
+    # Verify with Apple
+    verify_url = APPLE_VERIFY_URL_PRODUCTION if APPLE_PRODUCTION else APPLE_VERIFY_URL_SANDBOX
+    verify_payload = {
+        "receipt-data": data.receipt_data,
+        "password": APPLE_SHARED_SECRET,
+        "exclude-old-transactions": True,
+    }
+
+    try:
+        response = requests.post(verify_url, json=verify_payload, timeout=30)
+        result = response.json()
+    except Exception as e:
+        logger.error(f"Apple receipt verification failed: {e}")
+        raise HTTPException(status_code=502, detail="Failed to verify receipt with Apple")
+
+    status = result.get("status")
+
+    # Status 21007 means sandbox receipt sent to production - retry with sandbox
+    if status == 21007:
+        try:
+            response = requests.post(APPLE_VERIFY_URL_SANDBOX, json=verify_payload, timeout=30)
+            result = response.json()
+            status = result.get("status")
+        except Exception as e:
+            logger.error(f"Apple sandbox verification failed: {e}")
+            raise HTTPException(status_code=502, detail="Failed to verify receipt with Apple")
+
+    if status != 0:
+        logger.warning(f"Apple receipt invalid, status: {status}")
+        raise HTTPException(status_code=400, detail=f"Invalid receipt (Apple status: {status})")
+
+    # Find the matching in_app purchase in the receipt
+    in_app = result.get("receipt", {}).get("in_app", [])
+    latest_receipt_info = result.get("latest_receipt_info", in_app)
+
+    # Look for our product in the receipt
+    product = PRODUCTS.get(data.product_id)
+    if not product:
+        raise HTTPException(status_code=400, detail="Invalid product ID")
+
+    apple_pid = product.get("apple_product_id")
+    found_transaction = None
+    for txn in latest_receipt_info:
+        if txn.get("product_id") == apple_pid:
+            found_transaction = txn
+            break
+
+    if not found_transaction and data.transaction_id:
+        # Accept if the transaction_id matches even if product_id didn't
+        for txn in latest_receipt_info:
+            if txn.get("transaction_id") == data.transaction_id:
+                found_transaction = txn
+                break
+
+    if not found_transaction:
+        raise HTTPException(status_code=400, detail="Product not found in receipt")
+
+    apple_txn_id = found_transaction.get("transaction_id", data.transaction_id or str(uuid.uuid4()))
+
+    # Check duplicate again with Apple's transaction ID
+    existing = await db.transactions.find_one({"apple_transaction_id": apple_txn_id})
+    if existing:
+        return {"status": "already_fulfilled", "message": "This purchase has already been processed"}
+
+    # Fulfill the purchase
+    metadata = {
+        "user_id": current_user["id"],
+        "product_id": data.product_id,
+        "job_id": data.job_id or "",
+    }
+    await fulfill_purchase(metadata, source="apple_iap", apple_transaction_id=apple_txn_id)
+
+    return {
+        "status": "success",
+        "message": f"Purchase fulfilled: {product['name']}",
+        "product_id": data.product_id,
     }
 
 
-# ==================== STRIPE CHECKOUT ====================
+@router.post("/apple/app-store-notification")
+async def apple_server_notification(request: Request):
+    """
+    Handle Apple App Store Server Notifications (v2).
+    Apple sends these when subscriptions renew, refunds happen, etc.
+
+    Configure this URL in App Store Connect:
+    Settings > App Information > App Store Server Notifications URL
+    Set to: https://your-api-domain.com/api/payments/apple/app-store-notification
+    """
+    try:
+        body = await request.json()
+        # In production, verify the JWS signed notification
+        # For now, log it
+        notification_type = body.get("notificationType", "")
+        logger.info(f"Apple notification: {notification_type}")
+
+        if notification_type == "REFUND":
+            # Handle refund - revoke the purchase
+            data = body.get("data", {})
+            transaction_id = data.get("transactionId")
+            if transaction_id:
+                await db.transactions.update_one(
+                    {"apple_transaction_id": transaction_id},
+                    {"$set": {"status": "refunded"}}
+                )
+    except Exception as e:
+        logger.error(f"Apple notification error: {e}")
+
+    return {"status": "ok"}
+
+
+# ==================== STRIPE CHECKOUT (Web Fallback) ====================
 
 @router.post("/create-checkout-session")
 async def create_checkout_session(
     data: CreateCheckoutSession,
     current_user: dict = Depends(get_current_user)
 ):
-    """Create a Stripe Checkout session (supports Apple Pay, Google Pay, cards)"""
+    """Create a Stripe Checkout session (web only - iOS must use Apple IAP)"""
     if not STRIPE_AVAILABLE:
-        raise HTTPException(status_code=503, detail="Payment processing is not configured yet. Set STRIPE_SECRET_KEY to enable payments.")
+        raise HTTPException(status_code=503, detail="Payment processing is not configured. Set STRIPE_SECRET_KEY.")
 
     product = PRODUCTS.get(data.product_id)
     if not product:
         raise HTTPException(status_code=400, detail="Invalid product")
 
-    # For boosts, verify job ownership
+    # Validate role/ownership
     if data.product_id.startswith("boost_"):
         if current_user.get("role") != "recruiter":
             raise HTTPException(status_code=403, detail="Only recruiters can boost jobs")
@@ -94,16 +272,16 @@ async def create_checkout_session(
         if not job:
             raise HTTPException(status_code=404, detail="Job not found")
 
-    # For super swipes, verify recruiter
     if data.product_id.startswith("super_swipes_"):
         if current_user.get("role") != "recruiter":
             raise HTTPException(status_code=403, detail="Only recruiters can purchase super swipes")
 
     frontend_url = os.getenv("FRONTEND_URL", "http://localhost:3000")
+    success_path = "/recruiter" if current_user.get("role") == "recruiter" else "/dashboard"
 
     try:
         session = stripe.checkout.Session.create(
-            payment_method_types=["card"],  # Apple Pay/Google Pay auto-enabled via card
+            payment_method_types=["card"],
             line_items=[{
                 "price_data": {
                     "currency": "usd",
@@ -113,8 +291,8 @@ async def create_checkout_session(
                 "quantity": 1,
             }],
             mode="payment",
-            success_url=f"{frontend_url}/recruiter?payment=success&product={data.product_id}",
-            cancel_url=f"{frontend_url}/recruiter?payment=cancelled",
+            success_url=f"{frontend_url}{success_path}?payment=success&product={data.product_id}",
+            cancel_url=f"{frontend_url}{success_path}?payment=cancelled",
             metadata={
                 "user_id": current_user["id"],
                 "product_id": data.product_id,
@@ -134,11 +312,9 @@ async def create_checkout_session(
         raise HTTPException(status_code=500, detail="Failed to create checkout session")
 
 
-# ==================== STRIPE WEBHOOK ====================
-
 @router.post("/webhook")
 async def stripe_webhook(request: Request):
-    """Handle Stripe webhook events to fulfill purchases"""
+    """Handle Stripe webhook events"""
     if not STRIPE_AVAILABLE:
         raise HTTPException(status_code=503, detail="Payments not configured")
 
@@ -153,13 +329,15 @@ async def stripe_webhook(request: Request):
     if event["type"] == "checkout.session.completed":
         session = event["data"]["object"]
         metadata = session.get("metadata", {})
-        await fulfill_purchase(metadata)
+        await fulfill_purchase(metadata, source="stripe")
 
     return {"status": "ok"}
 
 
-async def fulfill_purchase(metadata: dict):
-    """Fulfill a purchase after successful payment"""
+# ==================== FULFILLMENT ====================
+
+async def fulfill_purchase(metadata: dict, source: str = "unknown", apple_transaction_id: str = None):
+    """Fulfill a purchase after successful payment (works for both Stripe and Apple IAP)"""
     user_id = metadata.get("user_id")
     product_id = metadata.get("product_id")
     job_id = metadata.get("job_id")
@@ -178,15 +356,21 @@ async def fulfill_purchase(metadata: dict):
         "product_id": product_id,
         "job_id": job_id or None,
         "amount": product["price"],
+        "source": source,  # "apple_iap" or "stripe"
         "status": "completed",
         "created_at": datetime.now(timezone.utc).isoformat(),
     }
+    if apple_transaction_id:
+        transaction["apple_transaction_id"] = apple_transaction_id
+
     await db.transactions.insert_one(transaction)
 
     if product_id.startswith("boost_"):
         await activate_boost(user_id, job_id, product)
     elif product_id.startswith("super_swipes_"):
-        await add_super_swipes(user_id, product)
+        await add_super_swipes(user_id, product, role="recruiter")
+    elif product_id.startswith("seeker_superlikes_"):
+        await add_super_swipes(user_id, product, role="seeker")
 
 
 # ==================== BOOSTS ====================
@@ -200,12 +384,11 @@ async def activate_boost(user_id: str, job_id: str, product: dict):
         "job_id": job_id,
         "user_id": user_id,
         "boost_until": boost_end.isoformat(),
-        "multiplier": 3,  # 3x more visibility
+        "multiplier": 3,
         "created_at": datetime.now(timezone.utc).isoformat(),
     }
     await db.boosts.insert_one(boost_doc)
 
-    # Mark the job as boosted
     await db.jobs.update_one(
         {"id": job_id},
         {"$set": {"is_boosted": True, "boost_until": boost_end.isoformat()}}
@@ -239,8 +422,7 @@ async def activate_boost_direct(
     data: BoostCreate,
     current_user: dict = Depends(get_current_user)
 ):
-    """Activate a boost (for testing or when payment is handled externally).
-    In production, boosts are activated via Stripe webhook after payment."""
+    """Activate a boost (for testing or when payment is handled externally)"""
     if current_user.get("role") != "recruiter":
         raise HTTPException(status_code=403, detail="Only recruiters can boost jobs")
 
@@ -256,45 +438,49 @@ async def activate_boost_direct(
     return {"message": f"Job boosted for {product['days']} day(s)"}
 
 
-# ==================== RECRUITER SUPER SWIPES ====================
+# ==================== SUPER SWIPES / SUPER LIKES ====================
 
 @router.get("/super-swipes/balance")
 async def get_super_swipe_balance(current_user: dict = Depends(get_current_user)):
-    """Get recruiter's remaining purchased super swipes"""
-    if current_user.get("role") != "recruiter":
-        raise HTTPException(status_code=403, detail="Only recruiters can access this")
+    """Get user's remaining purchased super swipes/likes"""
+    user = await db.users.find_one({"id": current_user["id"]}, {"_id": 0, "recruiter_super_swipes": 1, "seeker_purchased_superlikes": 1})
 
-    user = await db.users.find_one({"id": current_user["id"]}, {"_id": 0, "recruiter_super_swipes": 1})
-    balance = user.get("recruiter_super_swipes", 3)  # 3 free per month
-    return {"balance": balance}
+    if current_user.get("role") == "recruiter":
+        balance = (user or {}).get("recruiter_super_swipes", 3)
+    else:
+        balance = (user or {}).get("seeker_purchased_superlikes", 0)
+
+    return {"balance": balance, "role": current_user.get("role")}
 
 
-async def add_super_swipes(user_id: str, product: dict):
-    """Add purchased super swipes to recruiter's balance"""
+async def add_super_swipes(user_id: str, product: dict, role: str = "recruiter"):
+    """Add purchased super swipes/likes to user's balance"""
     count = product.get("count", 0)
+    field = "recruiter_super_swipes" if role == "recruiter" else "seeker_purchased_superlikes"
+
     await db.users.update_one(
         {"id": user_id},
-        {"$inc": {"recruiter_super_swipes": count}}
+        {"$inc": {field: count}}
     )
+
+    label = "Super Swipes" if role == "recruiter" else "Super Likes"
     await create_notification(
         user_id=user_id,
         notif_type="payment",
-        title="Super Swipes Added!",
-        message=f"{count} Super Swipes have been added to your account.",
+        title=f"{label} Added!",
+        message=f"{count} {label} have been added to your account.",
         data={"count": count}
     )
 
 
 @router.post("/super-swipes/use")
-async def use_super_swipe(
-    current_user: dict = Depends(get_current_user)
-):
-    """Use a recruiter super swipe (marks an application with priority)"""
+async def use_super_swipe(current_user: dict = Depends(get_current_user)):
+    """Use a recruiter super swipe"""
     if current_user.get("role") != "recruiter":
         raise HTTPException(status_code=403, detail="Only recruiters can use super swipes")
 
     user = await db.users.find_one({"id": current_user["id"]}, {"_id": 0, "recruiter_super_swipes": 1})
-    balance = user.get("recruiter_super_swipes", 3)
+    balance = (user or {}).get("recruiter_super_swipes", 3)
 
     if balance <= 0:
         raise HTTPException(status_code=400, detail="No super swipes remaining. Purchase more to continue.")

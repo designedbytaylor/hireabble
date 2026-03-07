@@ -412,7 +412,6 @@ function InterviewDetail({ interview, user, onCancel }) {
 function CreateInterviewDialog({ open, onClose, matches, preselectedMatch, token, onSuccess }) {
   const [loading, setLoading] = useState(false);
   const [matchId, setMatchId] = useState(preselectedMatch || '');
-  const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [interviewType, setInterviewType] = useState('video');
   const [location, setLocation] = useState('');
@@ -438,8 +437,8 @@ function CreateInterviewDialog({ open, onClose, matches, preselectedMatch, token
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!matchId || !title) {
-      toast.error('Please select a match and add a title');
+    if (!matchId) {
+      toast.error('Please select a match');
       return;
     }
 
@@ -458,7 +457,6 @@ function CreateInterviewDialog({ open, onClose, matches, preselectedMatch, token
     try {
       await axios.post(`${API}/interviews`, {
         match_id: matchId,
-        title,
         description: description || null,
         proposed_times,
         interview_type: interviewType,
@@ -469,7 +467,6 @@ function CreateInterviewDialog({ open, onClose, matches, preselectedMatch, token
       onSuccess();
       // Reset form
       setMatchId('');
-      setTitle('');
       setDescription('');
       setTimeSlots([{ date: '', startTime: '', endTime: '' }]);
     } catch (error) {
@@ -501,16 +498,6 @@ function CreateInterviewDialog({ open, onClose, matches, preselectedMatch, token
                 ))}
               </SelectContent>
             </Select>
-          </div>
-
-          <div className="space-y-2">
-            <Label>Interview Title *</Label>
-            <Input
-              placeholder="e.g., Technical Interview Round 1"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              className="h-11 rounded-xl bg-background"
-            />
           </div>
 
           <div className="space-y-2">

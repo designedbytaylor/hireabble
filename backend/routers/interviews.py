@@ -22,7 +22,7 @@ class TimeSlot(BaseModel):
 
 class InterviewCreate(BaseModel):
     match_id: str
-    title: str
+    title: Optional[str] = None  # Auto-generated from job title if not provided
     description: Optional[str] = None
     proposed_times: List[TimeSlot]
     interview_type: str = "video"  # video, phone, in_person
@@ -60,6 +60,9 @@ async def create_interview(data: InterviewCreate, current_user: dict = Depends(g
     # Determine the other party
     other_id = match["recruiter_id"] if current_user["id"] == match["seeker_id"] else match["seeker_id"]
 
+    # Auto-generate title from job title if not provided
+    interview_title = data.title or f"Interview - {match.get('job_title', 'Position')}"
+
     interview_id = str(uuid.uuid4())
     interview_doc = {
         "id": interview_id,
@@ -67,7 +70,7 @@ async def create_interview(data: InterviewCreate, current_user: dict = Depends(g
         "created_by": current_user["id"],
         "created_by_name": current_user["name"],
         "other_party_id": other_id,
-        "title": data.title,
+        "title": interview_title,
         "description": data.description,
         "proposed_times": [t.dict() for t in data.proposed_times],
         "selected_time": None,

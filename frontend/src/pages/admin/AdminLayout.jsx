@@ -1,7 +1,8 @@
+import { useState } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useAdminAuth } from '../../context/AdminAuthContext';
 import {
-  LayoutDashboard, Users, ShieldAlert, Flag, Settings, LogOut, Shield, Briefcase, Beaker,
+  LayoutDashboard, Users, ShieldAlert, Flag, Settings, LogOut, Shield, Briefcase, Beaker, Menu, X,
 } from 'lucide-react';
 
 const navItems = [
@@ -17,35 +18,54 @@ const navItems = [
 export default function AdminLayout() {
   const { admin, logout } = useAdminAuth();
   const navigate = useNavigate();
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const handleLogout = () => {
     logout();
     navigate('/admin/login');
   };
 
+  const closeSidebar = () => setSidebarOpen(false);
+
   return (
     <div className="min-h-screen bg-gray-950 flex">
+      {/* Mobile overlay */}
+      {sidebarOpen && (
+        <div className="fixed inset-0 bg-black/60 z-40 lg:hidden" onClick={closeSidebar} />
+      )}
+
       {/* Sidebar */}
-      <aside className="w-64 bg-gray-900 border-r border-gray-800 flex flex-col fixed h-full">
-        <div className="p-6 border-b border-gray-800">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-red-500/20 border border-red-500/30 flex items-center justify-center">
-              <Shield className="w-5 h-5 text-red-400" />
+      <aside className={`
+        fixed h-full z-50 bg-gray-900 border-r border-gray-800 flex flex-col
+        w-64 transition-transform duration-300 ease-in-out
+        lg:translate-x-0
+        ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
+      `}>
+        <div className="p-4 sm:p-6 border-b border-gray-800">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-red-500/20 border border-red-500/30 flex items-center justify-center">
+                <Shield className="w-5 h-5 text-red-400" />
+              </div>
+              <div>
+                <h1 className="font-bold text-white text-lg">Hireabble</h1>
+                <p className="text-xs text-gray-500">Admin Panel</p>
+              </div>
             </div>
-            <div>
-              <h1 className="font-bold text-white text-lg">Hireabble</h1>
-              <p className="text-xs text-gray-500">Admin Panel</p>
-            </div>
+            <button onClick={closeSidebar} className="p-2 rounded-lg hover:bg-gray-800 text-gray-400 lg:hidden">
+              <X className="w-5 h-5" />
+            </button>
           </div>
         </div>
 
-        <nav className="flex-1 p-4 space-y-1">
+        <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
           {navItems.map((item) => {
             const Icon = item.icon;
             return (
               <NavLink
                 key={item.path}
                 to={item.path}
+                onClick={closeSidebar}
                 className={({ isActive }) =>
                   `flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${
                     isActive
@@ -84,8 +104,21 @@ export default function AdminLayout() {
       </aside>
 
       {/* Main content */}
-      <main className="flex-1 ml-64 p-8">
-        <Outlet />
+      <main className="flex-1 lg:ml-64 min-h-screen">
+        {/* Mobile header */}
+        <div className="lg:hidden flex items-center justify-between p-4 border-b border-gray-800 bg-gray-900/80 backdrop-blur sticky top-0 z-30">
+          <button onClick={() => setSidebarOpen(true)} className="p-2 rounded-lg hover:bg-gray-800 text-gray-400">
+            <Menu className="w-5 h-5" />
+          </button>
+          <div className="flex items-center gap-2">
+            <Shield className="w-4 h-4 text-red-400" />
+            <span className="font-bold text-white text-sm">Admin</span>
+          </div>
+          <div className="w-9" /> {/* Spacer for centering */}
+        </div>
+        <div className="p-4 sm:p-6 lg:p-8">
+          <Outlet />
+        </div>
       </main>
     </div>
   );

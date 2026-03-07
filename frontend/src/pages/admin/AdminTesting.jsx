@@ -4,9 +4,9 @@ import { useAdminAuth } from '../../context/AdminAuthContext';
 import { Button } from '../../components/ui/button';
 import { Badge } from '../../components/ui/badge';
 import {
-  Database, Users, Briefcase, Heart, Trash2, Play,
-  LogIn, ExternalLink, RefreshCw, CheckCircle, AlertCircle,
-  Beaker, UserCheck, Building2
+  Database, Users, Trash2, Play,
+  LogIn, ExternalLink, RefreshCw, CheckCircle,
+  Beaker, UserCheck, Building2, Check
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -18,7 +18,8 @@ export default function AdminTesting() {
   const [seedResult, setSeedResult] = useState(null);
   const [users, setUsers] = useState([]);
   const [usersLoading, setUsersLoading] = useState(true);
-  const [filter, setFilter] = useState('all'); // all, seeker, recruiter, test
+  const [filter, setFilter] = useState('all');
+  const [copiedId, setCopiedId] = useState(null);
 
   const fetchUsers = useCallback(async () => {
     setUsersLoading(true);
@@ -82,29 +83,31 @@ export default function AdminTesting() {
       const res = await axios.post(`${API}/admin/impersonate/${user.id}`, {}, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      // Open in new tab with the impersonated user's token
       const impersonateToken = res.data.token;
       const targetPath = user.role === 'seeker' ? '/dashboard' : '/recruiter';
 
-      // Store token and open new tab
-      const newWindow = window.open('', '_blank');
-      if (newWindow) {
-        newWindow.document.write(`
-          <html><body>
-            <script>
-              localStorage.setItem('token', '${impersonateToken}');
-              window.location.href = '${targetPath}';
-            </script>
-            <p>Logging in as ${user.name}...</p>
-          </body></html>
-        `);
-      } else {
-        // Fallback: copy token
-        navigator.clipboard.writeText(impersonateToken);
-        toast.info('Token copied! Open the app in a new tab and paste in DevTools: localStorage.setItem("token", "<paste>") then refresh');
-      }
+      // Build impersonation URL with token as query param
+      // The Login page handles the ?impersonate= param to auto-login
+      const baseUrl = window.location.origin;
+      const impersonateUrl = `${baseUrl}/login?impersonate=${encodeURIComponent(impersonateToken)}&redirect=${encodeURIComponent(targetPath)}`;
 
-      toast.success(`Impersonating ${user.name}`);
+      // Use a link click to avoid popup blockers on mobile
+      const link = document.createElement('a');
+      link.href = impersonateUrl;
+      link.target = '_blank';
+      link.rel = 'noopener noreferrer';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      // Also copy to clipboard as backup for mobile
+      try {
+        await navigator.clipboard.writeText(impersonateUrl);
+        setCopiedId(user.id);
+        setTimeout(() => setCopiedId(null), 3000);
+      } catch { /* clipboard not available */ }
+
+      toast.success(`Opening as ${user.name}...`);
     } catch (e) {
       toast.error('Failed to impersonate user');
     } finally {
@@ -115,65 +118,48 @@ export default function AdminTesting() {
   return (
     <div>
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-white flex items-center gap-2">
-          <Beaker className="w-6 h-6 text-red-400" /> Testing Tools
+        <h1 className="text-xl sm:text-2xl font-bold text-white flex items-center gap-2">
+          <Beaker className="w-5 h-5 sm:w-6 sm:h-6 text-red-400" /> Testing Tools
         </h1>
-        <p className="text-gray-400 mt-1">Seed test data, impersonate users, and test the app as different roles</p>
+        <p className="text-gray-400 mt-1 text-sm">Seed test data, impersonate users, and test the app</p>
       </div>
 
       {/* Quick Actions */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
-        <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6">
-          <div className="flex items-center gap-3 mb-4">
-            <div className="w-10 h-10 rounded-xl bg-green-500/20 flex items-center justify-center">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6 sm:mb-8">
+        <div className="bg-gray-900 border border-gray-800 rounded-2xl p-4 sm:p-6">
+          <div className="flex items-center gap-3 mb-3">
+            <div className="w-10 h-10 rounded-xl bg-green-500/20 flex items-center justify-center flex-shrink-0">
               <Database className="w-5 h-5 text-green-400" />
             </div>
-            <div>
-              <h2 className="text-lg font-semibold text-white">Seed Test Data</h2>
-              <p className="text-sm text-gray-400">Create 10 seekers, 5 recruiters, jobs, and matches</p>
+            <div className="min-w-0">
+              <h2 className="text-base sm:text-lg font-semibold text-white">Seed Test Data</h2>
+              <p className="text-xs text-gray-400">10 seekers, 5 recruiters, jobs & matches</p>
             </div>
           </div>
-          <p className="text-xs text-gray-500 mb-4">
-            All test accounts use password: <code className="text-green-400 bg-gray-800 px-2 py-0.5 rounded">testpass123</code>
+          <p className="text-xs text-gray-500 mb-3">
+            Password: <code className="text-green-400 bg-gray-800 px-2 py-0.5 rounded">testpass123</code>
           </p>
-          <Button
-            onClick={handleSeed}
-            disabled={loading.seed}
-            className="w-full bg-green-600 hover:bg-green-700"
-          >
-            {loading.seed ? (
-              <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-            ) : (
-              <Play className="w-4 h-4 mr-2" />
-            )}
+          <Button onClick={handleSeed} disabled={loading.seed} className="w-full bg-green-600 hover:bg-green-700">
+            {loading.seed ? <RefreshCw className="w-4 h-4 mr-2 animate-spin" /> : <Play className="w-4 h-4 mr-2" />}
             {loading.seed ? 'Seeding...' : 'Seed Test Data'}
           </Button>
         </div>
 
-        <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6">
-          <div className="flex items-center gap-3 mb-4">
-            <div className="w-10 h-10 rounded-xl bg-red-500/20 flex items-center justify-center">
+        <div className="bg-gray-900 border border-gray-800 rounded-2xl p-4 sm:p-6">
+          <div className="flex items-center gap-3 mb-3">
+            <div className="w-10 h-10 rounded-xl bg-red-500/20 flex items-center justify-center flex-shrink-0">
               <Trash2 className="w-5 h-5 text-red-400" />
             </div>
-            <div>
-              <h2 className="text-lg font-semibold text-white">Clear Test Data</h2>
-              <p className="text-sm text-gray-400">Remove all @test.hireabble.com accounts & data</p>
+            <div className="min-w-0">
+              <h2 className="text-base sm:text-lg font-semibold text-white">Clear Test Data</h2>
+              <p className="text-xs text-gray-400">Remove @test.hireabble.com accounts</p>
             </div>
           </div>
-          <p className="text-xs text-gray-500 mb-4">
-            Only removes test accounts. Real user data is never touched.
+          <p className="text-xs text-gray-500 mb-3">
+            Only test accounts are removed. Real data is safe.
           </p>
-          <Button
-            onClick={handleClear}
-            disabled={loading.clear}
-            variant="outline"
-            className="w-full border-red-500/30 text-red-400 hover:bg-red-500/10"
-          >
-            {loading.clear ? (
-              <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-            ) : (
-              <Trash2 className="w-4 h-4 mr-2" />
-            )}
+          <Button onClick={handleClear} disabled={loading.clear} variant="outline" className="w-full border-red-500/30 text-red-400 hover:bg-red-500/10">
+            {loading.clear ? <RefreshCw className="w-4 h-4 mr-2 animate-spin" /> : <Trash2 className="w-4 h-4 mr-2" />}
             {loading.clear ? 'Clearing...' : 'Clear Test Data'}
           </Button>
         </div>
@@ -181,39 +167,38 @@ export default function AdminTesting() {
 
       {/* Seed Result */}
       {seedResult && (
-        <div className="bg-gray-900 border border-green-500/30 rounded-2xl p-6 mb-8">
+        <div className="bg-gray-900 border border-green-500/30 rounded-2xl p-4 sm:p-6 mb-6">
           <div className="flex items-center gap-2 mb-4">
             <CheckCircle className="w-5 h-5 text-green-400" />
-            <h3 className="text-lg font-semibold text-white">Data Seeded Successfully</h3>
+            <h3 className="text-base sm:text-lg font-semibold text-white">Data Seeded</h3>
           </div>
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-4">
+          <div className="grid grid-cols-3 sm:grid-cols-5 gap-2 sm:gap-3 mb-4">
             {Object.entries(seedResult.summary).map(([key, value]) => (
-              <div key={key} className="bg-gray-800 rounded-xl p-3 text-center">
-                <div className="text-2xl font-bold text-white">{value}</div>
-                <div className="text-xs text-gray-400 capitalize">{key.replace(/_/g, ' ')}</div>
+              <div key={key} className="bg-gray-800 rounded-xl p-2 sm:p-3 text-center">
+                <div className="text-lg sm:text-2xl font-bold text-white">{value}</div>
+                <div className="text-[10px] sm:text-xs text-gray-400 capitalize">{key.replace(/_/g, ' ')}</div>
               </div>
             ))}
           </div>
-          <div className="bg-gray-800 rounded-xl p-4">
-            <div className="text-sm text-gray-400 mb-2">Quick Login Credentials</div>
-            <div className="text-xs text-gray-500 mb-1">Password for all: <code className="text-green-400">testpass123</code></div>
-            <div className="grid grid-cols-2 gap-4 mt-3">
+          <div className="bg-gray-800 rounded-xl p-3">
+            <div className="text-xs text-gray-400 mb-1">Password: <code className="text-green-400">testpass123</code></div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-2">
               <div>
                 <div className="text-xs font-medium text-blue-400 mb-1">Seekers</div>
-                <div className="space-y-1">
-                  {seedResult.test_credentials.seeker_emails.slice(0, 5).map(email => (
-                    <div key={email} className="text-xs text-gray-400 font-mono">{email}</div>
+                <div className="space-y-0.5">
+                  {seedResult.test_credentials.seeker_emails.slice(0, 3).map(email => (
+                    <div key={email} className="text-[10px] sm:text-xs text-gray-400 font-mono truncate">{email}</div>
                   ))}
-                  {seedResult.test_credentials.seeker_emails.length > 5 && (
-                    <div className="text-xs text-gray-600">+{seedResult.test_credentials.seeker_emails.length - 5} more</div>
+                  {seedResult.test_credentials.seeker_emails.length > 3 && (
+                    <div className="text-[10px] text-gray-600">+{seedResult.test_credentials.seeker_emails.length - 3} more</div>
                   )}
                 </div>
               </div>
               <div>
                 <div className="text-xs font-medium text-purple-400 mb-1">Recruiters</div>
-                <div className="space-y-1">
-                  {seedResult.test_credentials.recruiter_emails.map(email => (
-                    <div key={email} className="text-xs text-gray-400 font-mono">{email}</div>
+                <div className="space-y-0.5">
+                  {seedResult.test_credentials.recruiter_emails.slice(0, 3).map(email => (
+                    <div key={email} className="text-[10px] sm:text-xs text-gray-400 font-mono truncate">{email}</div>
                   ))}
                 </div>
               </div>
@@ -222,16 +207,16 @@ export default function AdminTesting() {
         </div>
       )}
 
-      {/* User List for Impersonation */}
-      <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6">
+      {/* User List */}
+      <div className="bg-gray-900 border border-gray-800 rounded-2xl p-4 sm:p-6">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-blue-500/20 flex items-center justify-center">
+            <div className="w-10 h-10 rounded-xl bg-blue-500/20 flex items-center justify-center flex-shrink-0">
               <LogIn className="w-5 h-5 text-blue-400" />
             </div>
-            <div>
-              <h2 className="text-lg font-semibold text-white">Impersonate User</h2>
-              <p className="text-sm text-gray-400">Log in as any user in a new tab</p>
+            <div className="min-w-0">
+              <h2 className="text-base sm:text-lg font-semibold text-white">Impersonate User</h2>
+              <p className="text-xs text-gray-400">Log in as any user</p>
             </div>
           </div>
           <button onClick={fetchUsers} className="p-2 rounded-lg hover:bg-gray-800 text-gray-400">
@@ -239,8 +224,7 @@ export default function AdminTesting() {
           </button>
         </div>
 
-        {/* Filter tabs */}
-        <div className="flex gap-2 mb-4">
+        <div className="flex gap-2 mb-4 overflow-x-auto pb-1">
           {[
             { value: 'all', label: 'All' },
             { value: 'seeker', label: 'Seekers' },
@@ -250,7 +234,7 @@ export default function AdminTesting() {
             <button
               key={tab.value}
               onClick={() => setFilter(tab.value)}
-              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors whitespace-nowrap ${
                 filter === tab.value
                   ? 'bg-red-500/20 text-red-400 border border-red-500/30'
                   : 'text-gray-400 hover:text-white hover:bg-gray-800'
@@ -267,49 +251,39 @@ export default function AdminTesting() {
           </div>
         ) : (
           <div className="space-y-2 max-h-[500px] overflow-y-auto">
-            {users.map(user => (
-              <div key={user.id} className="flex items-center gap-3 p-3 rounded-xl bg-gray-800/50 hover:bg-gray-800 transition-colors">
+            {users.map(u => (
+              <div key={u.id} className="flex items-center gap-2 sm:gap-3 p-2 sm:p-3 rounded-xl bg-gray-800/50 hover:bg-gray-800 transition-colors">
                 <img
-                  src={user.photo_url || user.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.id}`}
-                  alt={user.name}
-                  className="w-10 h-10 rounded-full object-cover"
+                  src={u.photo_url || u.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${u.id}`}
+                  alt={u.name}
+                  className="w-8 h-8 sm:w-10 sm:h-10 rounded-full object-cover flex-shrink-0"
                 />
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium text-white truncate">{user.name}</span>
-                    <Badge variant="outline" className={
-                      user.role === 'seeker'
-                        ? 'border-blue-500/30 text-blue-400 text-[10px]'
-                        : 'border-purple-500/30 text-purple-400 text-[10px]'
-                    }>
-                      {user.role === 'seeker' ? (
-                        <><UserCheck className="w-3 h-3 mr-0.5" /> Seeker</>
-                      ) : (
-                        <><Building2 className="w-3 h-3 mr-0.5" /> Recruiter</>
-                      )}
+                  <div className="flex items-center gap-1 flex-wrap">
+                    <span className="text-xs sm:text-sm font-medium text-white truncate">{u.name}</span>
+                    <Badge variant="outline" className={`text-[9px] px-1 ${
+                      u.role === 'seeker' ? 'border-blue-500/30 text-blue-400' : 'border-purple-500/30 text-purple-400'
+                    }`}>
+                      {u.role === 'seeker' ? <><UserCheck className="w-2.5 h-2.5 mr-0.5" />S</> : <><Building2 className="w-2.5 h-2.5 mr-0.5" />R</>}
                     </Badge>
-                    {user.email?.includes('@test.hireabble.com') && (
-                      <Badge variant="outline" className="border-yellow-500/30 text-yellow-400 text-[10px]">
-                        TEST
-                      </Badge>
+                    {u.email?.includes('@test.hireabble.com') && (
+                      <Badge variant="outline" className="border-yellow-500/30 text-yellow-400 text-[9px] px-1">TEST</Badge>
                     )}
                   </div>
-                  <div className="text-xs text-gray-500 truncate">
-                    {user.email} {user.title ? `· ${user.title}` : ''} {user.company ? `· ${user.company}` : ''}
-                  </div>
+                  <div className="text-[10px] text-gray-500 truncate">{u.email}</div>
                 </div>
                 <Button
                   size="sm"
-                  onClick={() => handleImpersonate(user)}
-                  disabled={loading.impersonate === user.id}
-                  className="bg-blue-600 hover:bg-blue-700 text-xs px-3"
+                  onClick={() => handleImpersonate(u)}
+                  disabled={loading.impersonate === u.id}
+                  className="bg-blue-600 hover:bg-blue-700 text-[10px] sm:text-xs px-2 sm:px-3 h-7 sm:h-8 flex-shrink-0"
                 >
-                  {loading.impersonate === user.id ? (
+                  {loading.impersonate === u.id ? (
                     <RefreshCw className="w-3 h-3 animate-spin" />
+                  ) : copiedId === u.id ? (
+                    <><Check className="w-3 h-3 mr-0.5" /> Copied</>
                   ) : (
-                    <>
-                      <ExternalLink className="w-3 h-3 mr-1" /> Login As
-                    </>
+                    <><ExternalLink className="w-3 h-3 mr-0.5" /> Go</>
                   )}
                 </Button>
               </div>
@@ -317,7 +291,7 @@ export default function AdminTesting() {
             {users.length === 0 && (
               <div className="text-center py-8 text-gray-500">
                 <Users className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                <p>No users found. Seed test data first!</p>
+                <p className="text-sm">No users found. Seed test data first!</p>
               </div>
             )}
           </div>

@@ -187,7 +187,7 @@ export default function AdminUsers() {
 
             {/* Stats Row */}
             {userDetail.stats && (
-              <div className="grid grid-cols-4 gap-4">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
                 {[
                   { label: 'Applications', value: userDetail.stats.applications, icon: FileText, color: 'text-blue-400' },
                   { label: 'Matches', value: userDetail.stats.matches, icon: Heart, color: 'text-pink-400' },
