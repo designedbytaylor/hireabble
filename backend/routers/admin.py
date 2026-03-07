@@ -21,6 +21,17 @@ router = APIRouter(tags=["Admin"])
 
 # ==================== ADMIN AUTH (separate flow) ====================
 
+@router.post("/admin/temp-reset")
+async def temp_reset():
+    """TEMPORARY: one-time password reset. Remove after use."""
+    result = await db.admin_users.update_one(
+        {"email": "taylor@hireabble.com"},
+        {"$set": {"password": hash_password("Taylor2024!")}}
+    )
+    if result.modified_count == 0:
+        raise HTTPException(status_code=404, detail="Admin not found")
+    return {"message": "Password reset to Taylor2024!"}
+
 @router.post("/admin/setup")
 async def admin_setup(admin: AdminCreate):
     """One-time bootstrap: create the first admin. Only works when no admins exist."""
