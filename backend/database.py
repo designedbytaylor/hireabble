@@ -218,6 +218,7 @@ class JobCreate(BaseModel):
     experience_level: str  # 'entry', 'mid', 'senior', 'lead'
     location_restriction: Optional[str] = None  # 'any', 'specific', None
     category: Optional[str] = None  # 'technology', 'healthcare', 'finance', 'marketing', 'design', 'sales', 'engineering', 'education', 'other'
+    employment_type: Optional[str] = "full-time"  # 'full-time', 'part-time', 'contract', 'internship'
 
 class JobResponse(BaseModel):
     model_config = ConfigDict(extra="ignore")
@@ -237,6 +238,7 @@ class JobResponse(BaseModel):
     background_image: Optional[str] = None
     location_restriction: Optional[str] = None
     category: Optional[str] = None
+    employment_type: Optional[str] = "full-time"
     match_score: Optional[int] = None
     created_at: str
     is_active: bool = True

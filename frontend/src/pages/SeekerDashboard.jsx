@@ -47,7 +47,8 @@ export default function SeekerDashboard() {
     salary_min: '',
     location: '',
     remote_only: false,
-    category: ''
+    category: '',
+    employment_type: ''
   });
   const [activeFiltersCount, setActiveFiltersCount] = useState(0);
   const [detectingLocation, setDetectingLocation] = useState(false);
@@ -103,7 +104,8 @@ export default function SeekerDashboard() {
       if (filterParams.salary_min) params.append('salary_min', filterParams.salary_min);
       if (filterParams.location) params.append('location', filterParams.location);
       if (filterParams.category) params.append('category', filterParams.category);
-      
+      if (filterParams.employment_type) params.append('employment_type', filterParams.employment_type);
+
       const url = `${API}/jobs${params.toString() ? `?${params.toString()}` : ''}`;
       const response = await axios.get(url, {
         headers: { Authorization: `Bearer ${token}` }
@@ -187,7 +189,7 @@ export default function SeekerDashboard() {
   };
 
   const handleClearFilters = () => {
-    const clearedFilters = { job_type: '', experience_level: '', salary_min: '', location: '', remote_only: false, category: '' };
+    const clearedFilters = { job_type: '', experience_level: '', salary_min: '', location: '', remote_only: false, category: '', employment_type: '' };
     setFilters(clearedFilters);
     fetchJobs(clearedFilters);
     setShowFilters(false);
@@ -572,6 +574,25 @@ export default function SeekerDashboard() {
             </div>
 
             <div className="space-y-2">
+              <Label>Employment Type</Label>
+              <Select
+                value={filters.employment_type || "all"}
+                onValueChange={(v) => setFilters({ ...filters, employment_type: v === "all" ? "" : v })}
+              >
+                <SelectTrigger className="h-11 rounded-xl bg-background">
+                  <SelectValue placeholder="All types" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Types</SelectItem>
+                  <SelectItem value="full-time">Full-time</SelectItem>
+                  <SelectItem value="part-time">Part-time</SelectItem>
+                  <SelectItem value="contract">Contract</SelectItem>
+                  <SelectItem value="internship">Internship</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
               <Label>Minimum Salary ($)</Label>
               <Input
                 type="number"
@@ -821,6 +842,11 @@ function SwipeCard({ job, onSwipe, expanded, setExpanded, swipeDirection }) {
             <span className="px-3 py-1.5 rounded-full bg-accent text-accent-foreground text-sm capitalize">
               {job.experience_level}
             </span>
+            {job.employment_type && job.employment_type !== 'full-time' && (
+              <span className="px-3 py-1.5 rounded-full bg-secondary/10 text-secondary text-sm capitalize">
+                {job.employment_type}
+              </span>
+            )}
             {job.category && job.category !== 'other' && (
               <span className="px-3 py-1.5 rounded-full bg-primary/10 text-primary text-sm capitalize">
                 {job.category}

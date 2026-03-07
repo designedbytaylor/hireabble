@@ -538,7 +538,8 @@ function JobFormDialog({ open, onClose, onSuccess, token, company, job = null, i
     job_type: 'remote',
     experience_level: 'mid',
     location_restriction: 'any',
-    category: ''
+    category: '',
+    employment_type: 'full-time'
   });
 
   useEffect(() => {
@@ -554,7 +555,8 @@ function JobFormDialog({ open, onClose, onSuccess, token, company, job = null, i
         job_type: job.job_type || 'remote',
         experience_level: job.experience_level || 'mid',
         location_restriction: job.location_restriction || 'any',
-        category: job.category || ''
+        category: job.category || '',
+        employment_type: job.employment_type || 'full-time'
       });
     } else if (!isEditing) {
       setFormData({
@@ -568,7 +570,8 @@ function JobFormDialog({ open, onClose, onSuccess, token, company, job = null, i
         job_type: 'remote',
         experience_level: 'mid',
         location_restriction: 'any',
-        category: ''
+        category: '',
+        employment_type: 'full-time'
       });
     }
   }, [job, isEditing, company]);
@@ -704,8 +707,8 @@ function JobFormDialog({ open, onClose, onSuccess, token, company, job = null, i
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Job Type</Label>
-              <Select 
-                value={formData.job_type} 
+              <Select
+                value={formData.job_type}
                 onValueChange={(v) => setFormData({ ...formData, job_type: v })}
               >
                 <SelectTrigger className="h-11 rounded-xl bg-background" data-testid="job-type-select">
@@ -720,8 +723,8 @@ function JobFormDialog({ open, onClose, onSuccess, token, company, job = null, i
             </div>
             <div className="space-y-2">
               <Label>Experience Level</Label>
-              <Select 
-                value={formData.experience_level} 
+              <Select
+                value={formData.experience_level}
                 onValueChange={(v) => setFormData({ ...formData, experience_level: v })}
               >
                 <SelectTrigger className="h-11 rounded-xl bg-background" data-testid="job-level-select">
@@ -735,6 +738,24 @@ function JobFormDialog({ open, onClose, onSuccess, token, company, job = null, i
                 </SelectContent>
               </Select>
             </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Employment Type</Label>
+            <Select
+              value={formData.employment_type}
+              onValueChange={(v) => setFormData({ ...formData, employment_type: v })}
+            >
+              <SelectTrigger className="h-11 rounded-xl bg-background">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="full-time">Full-time</SelectItem>
+                <SelectItem value="part-time">Part-time</SelectItem>
+                <SelectItem value="contract">Contract</SelectItem>
+                <SelectItem value="internship">Internship</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
 
           <div className="space-y-2">

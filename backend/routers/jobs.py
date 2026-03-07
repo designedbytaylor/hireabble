@@ -142,6 +142,7 @@ async def create_job(job: JobCreate, current_user: dict = Depends(get_current_us
         "created_at": datetime.now(timezone.utc).isoformat(),
         "location_restriction": job.location_restriction,
         "category": category,
+        "employment_type": job.employment_type or "full-time",
         "is_active": True
     }
 
@@ -179,7 +180,8 @@ async def get_jobs(
     experience_level: Optional[str] = None,
     salary_min: Optional[int] = None,
     location: Optional[str] = None,
-    category: Optional[str] = None
+    category: Optional[str] = None,
+    employment_type: Optional[str] = None
 ):
     """Get available jobs for seekers or recruiter's own jobs, with smart matching"""
 
@@ -213,6 +215,8 @@ async def get_jobs(
             query["location"] = {"$regex": location, "$options": "i"}
         if category:
             query["category"] = category
+        if employment_type:
+            query["employment_type"] = employment_type
 
         # Filter out jobs with specific location restrictions if seeker's location doesn't match
         seeker_location = current_user.get("location", "")
@@ -253,7 +257,7 @@ async def update_job(job_id: str, updates: dict, current_user: dict = Depends(ge
     
     allowed_fields = ["title", "company", "description", "requirements",
                       "salary_min", "salary_max", "location", "job_type",
-                      "experience_level", "is_active", "location_restriction", "category"]
+                      "experience_level", "is_active", "location_restriction", "category", "employment_type"]
     update_data = {k: v for k, v in updates.items() if k in allowed_fields}
 
     # Content moderation on text fields being updated
