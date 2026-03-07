@@ -91,7 +91,7 @@ export default function AdminTesting() {
       const targetPath = user.role === 'seeker' ? '/dashboard' : '/recruiter';
 
       const baseUrl = window.location.origin;
-      const impersonateUrl = `${baseUrl}/login?impersonate=${encodeURIComponent(impersonateToken)}&redirect=${encodeURIComponent(targetPath)}`;
+      const impersonateUrl = `${baseUrl}/impersonate?token=${encodeURIComponent(impersonateToken)}&redirect=${encodeURIComponent(targetPath)}`;
 
       if (newWindow) {
         // Navigate the already-opened window to the impersonation URL
