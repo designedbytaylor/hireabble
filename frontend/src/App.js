@@ -1,35 +1,47 @@
-import React from "react";
+import React, { Suspense } from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { Toaster } from "./components/ui/sonner";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import { AdminAuthProvider, useAdminAuth } from "./context/AdminAuthContext";
+
+// Eager load only the landing/auth pages (first paint)
 import Landing from "./pages/Landing";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
-import ForgotPassword from "./pages/ForgotPassword";
-import ResetPassword from "./pages/ResetPassword";
-import Onboarding from "./pages/Onboarding";
-import SeekerDashboard from "./pages/SeekerDashboard";
-import RecruiterDashboard from "./pages/RecruiterDashboard";
-import RecruiterSwipe from "./pages/RecruiterSwipe";
-import Profile from "./pages/Profile";
-import Matches from "./pages/Matches";
-import Chat from "./pages/Chat";
-import InterviewScheduler from "./pages/InterviewScheduler";
-import RecruiterAnalytics from "./pages/RecruiterAnalytics";
-import AppliedJobs from "./pages/AppliedJobs";
-import AdminLogin from "./pages/admin/AdminLogin";
-import AdminLayout from "./pages/admin/AdminLayout";
-import AdminOverview from "./pages/admin/AdminOverview";
-import AdminUsers from "./pages/admin/AdminUsers";
-import AdminJobs from "./pages/admin/AdminJobs";
-import AdminModeration from "./pages/admin/AdminModeration";
-import AdminReports from "./pages/admin/AdminReports";
-import AdminSettings from "./pages/admin/AdminSettings";
-import AdminTesting from "./pages/admin/AdminTesting";
-import Messages from "./pages/Messages";
-import Upgrade from "./pages/Upgrade";
-import Impersonate from "./pages/Impersonate";
+
+// Lazy load everything else — each becomes its own JS chunk
+const ForgotPassword = React.lazy(() => import("./pages/ForgotPassword"));
+const ResetPassword = React.lazy(() => import("./pages/ResetPassword"));
+const Onboarding = React.lazy(() => import("./pages/Onboarding"));
+const SeekerDashboard = React.lazy(() => import("./pages/SeekerDashboard"));
+const RecruiterDashboard = React.lazy(() => import("./pages/RecruiterDashboard"));
+const RecruiterSwipe = React.lazy(() => import("./pages/RecruiterSwipe"));
+const Profile = React.lazy(() => import("./pages/Profile"));
+const Matches = React.lazy(() => import("./pages/Matches"));
+const Chat = React.lazy(() => import("./pages/Chat"));
+const InterviewScheduler = React.lazy(() => import("./pages/InterviewScheduler"));
+const RecruiterAnalytics = React.lazy(() => import("./pages/RecruiterAnalytics"));
+const AppliedJobs = React.lazy(() => import("./pages/AppliedJobs"));
+const Messages = React.lazy(() => import("./pages/Messages"));
+const Upgrade = React.lazy(() => import("./pages/Upgrade"));
+const Impersonate = React.lazy(() => import("./pages/Impersonate"));
+
+// Admin pages — completely separate chunk (never loaded for regular users)
+const AdminLogin = React.lazy(() => import("./pages/admin/AdminLogin"));
+const AdminLayout = React.lazy(() => import("./pages/admin/AdminLayout"));
+const AdminOverview = React.lazy(() => import("./pages/admin/AdminOverview"));
+const AdminUsers = React.lazy(() => import("./pages/admin/AdminUsers"));
+const AdminJobs = React.lazy(() => import("./pages/admin/AdminJobs"));
+const AdminModeration = React.lazy(() => import("./pages/admin/AdminModeration"));
+const AdminReports = React.lazy(() => import("./pages/admin/AdminReports"));
+const AdminSettings = React.lazy(() => import("./pages/admin/AdminSettings"));
+const AdminTesting = React.lazy(() => import("./pages/admin/AdminTesting"));
+
+const PageSpinner = () => (
+  <div className="min-h-screen bg-background flex items-center justify-center">
+    <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+  </div>
+);
 
 const ProtectedRoute = ({ children, allowedRoles }) => {
   const { user, loading } = useAuth();
@@ -128,6 +140,7 @@ const AdminRoute = ({ children }) => {
 
 function AppRoutes() {
   return (
+    <Suspense fallback={<PageSpinner />}>
     <Routes>
       <Route path="/" element={<PublicRoute><Landing /></PublicRoute>} />
       <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
@@ -248,6 +261,7 @@ function AppRoutes() {
         <Route path="settings" element={<AdminSettings />} />
       </Route>
     </Routes>
+    </Suspense>
   );
 }
 

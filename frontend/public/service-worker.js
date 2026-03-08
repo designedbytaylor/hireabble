@@ -1,4 +1,6 @@
-const CACHE_NAME = 'hireabble-v1';
+const CACHE_NAME = 'hireabble-v2';
+const IMG_CACHE = 'hireabble-images-v1';
+const API_CACHE = 'hireabble-api-v1';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
@@ -15,9 +17,10 @@ self.addEventListener('install', (event) => {
 
 // Activate: clean old caches
 self.addEventListener('activate', (event) => {
+  const KEEP = [CACHE_NAME, IMG_CACHE, API_CACHE];
   event.waitUntil(
     caches.keys().then((keys) =>
-      Promise.all(keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k)))
+      Promise.all(keys.filter((k) => !KEEP.includes(k)).map((k) => caches.delete(k)))
     )
   );
   self.clients.claim();
@@ -78,15 +81,67 @@ self.addEventListener('notificationclick', (event) => {
   );
 });
 
-// Fetch: network-first for API, cache-first for static assets
+// Helper: is this an image request?
+function isImageRequest(url) {
+  return /\.(jpg|jpeg|png|gif|webp|svg|ico)(\?.*)?$/i.test(url) ||
+    url.includes('/uploads/');
+}
+
+// Helper: is this a cacheable GET API request?
+function isCacheableApi(url) {
+  // Cache job listings and stats briefly (stale-while-revalidate)
+  return url.includes('/api/jobs') || url.includes('/api/stats') ||
+    url.includes('/api/profile/completeness') || url.includes('/api/superlikes/remaining');
+}
+
+// Fetch strategy
 self.addEventListener('fetch', (event) => {
   const { request } = event;
+  const url = request.url;
 
-  // Skip non-GET and API/WebSocket requests
-  if (request.method !== 'GET' || request.url.includes('/api/') || request.url.includes('/ws/')) {
+  // Skip non-GET and WebSocket requests
+  if (request.method !== 'GET' || url.includes('/ws/')) {
     return;
   }
 
+  // Images: cache-first (images don't change)
+  if (isImageRequest(url)) {
+    event.respondWith(
+      caches.open(IMG_CACHE).then((cache) =>
+        cache.match(request).then((cached) => {
+          if (cached) return cached;
+          return fetch(request).then((response) => {
+            if (response && response.status === 200) {
+              cache.put(request, response.clone());
+            }
+            return response;
+          }).catch(() => cached);
+        })
+      )
+    );
+    return;
+  }
+
+  // Cacheable API: stale-while-revalidate (show cached data instantly, update in background)
+  if (isCacheableApi(url)) {
+    event.respondWith(
+      caches.open(API_CACHE).then((cache) =>
+        cache.match(request).then((cached) => {
+          const fetchPromise = fetch(request).then((response) => {
+            if (response && response.status === 200) {
+              cache.put(request, response.clone());
+            }
+            return response;
+          }).catch(() => cached);
+          // Return cached immediately if available, otherwise wait for network
+          return cached || fetchPromise;
+        })
+      )
+    );
+    return;
+  }
+
+  // Static assets: cache-first with network fallback
   event.respondWith(
     caches.match(request).then((cached) => {
       const fetched = fetch(request).then((response) => {
