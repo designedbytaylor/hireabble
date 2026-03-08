@@ -18,7 +18,7 @@ export default function NotificationBell() {
 
   useEffect(() => {
     fetchUnreadCount();
-    const interval = setInterval(fetchUnreadCount, 30000); // Poll every 30 seconds
+    const interval = setInterval(fetchUnreadCount, 60000);
     return () => clearInterval(interval);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
@@ -37,7 +37,8 @@ export default function NotificationBell() {
     if (!token) return;
     try {
       const response = await axios.get(`${API}/notifications/unread/count`, {
-        headers: { Authorization: `Bearer ${token}` }
+        headers: { Authorization: `Bearer ${token}` },
+        timeout: 5000
       });
       setUnreadCount(response.data.unread_count);
     } catch (error) {

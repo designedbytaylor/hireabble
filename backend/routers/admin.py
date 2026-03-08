@@ -703,25 +703,50 @@ async def impersonate_user(user_id: str, admin: dict = Depends(get_current_admin
 
 # ==================== TEST DATA SEEDING ====================
 
-SAMPLE_SEEKERS = [
-    {"name": "Alex Chen", "title": "Senior Frontend Engineer", "bio": "Passionate about building beautiful, performant UIs. React enthusiast with a love for design systems.", "skills": ["React", "TypeScript", "Next.js", "Tailwind CSS", "GraphQL"], "experience_years": 6, "location": "San Francisco, CA", "school": "Stanford University", "degree": "bachelors", "current_employer": "Meta"},
-    {"name": "Priya Patel", "title": "Full Stack Developer", "bio": "Building scalable web apps from database to deployment. Node.js and Python polyglot.", "skills": ["Node.js", "Python", "PostgreSQL", "AWS", "Docker", "React"], "experience_years": 4, "location": "New York, NY", "school": "NYU", "degree": "masters", "current_employer": "Stripe"},
-    {"name": "Jordan Williams", "title": "Backend Engineer", "bio": "Distributed systems engineer focused on high-throughput data pipelines and microservices.", "skills": ["Go", "Kubernetes", "gRPC", "Redis", "Kafka", "PostgreSQL"], "experience_years": 7, "location": "Seattle, WA", "school": "University of Washington", "degree": "bachelors", "current_employer": "Amazon"},
-    {"name": "Maya Rodriguez", "title": "Mobile Developer", "bio": "Cross-platform mobile dev with a focus on native performance and delightful UX.", "skills": ["React Native", "Swift", "Kotlin", "Firebase", "TypeScript"], "experience_years": 5, "location": "Austin, TX", "school": "UT Austin", "degree": "bachelors", "current_employer": "Shopify"},
-    {"name": "Sam Johnson", "title": "DevOps Engineer", "bio": "Infrastructure as code advocate. Automating all the things with Terraform and CI/CD pipelines.", "skills": ["Terraform", "AWS", "Docker", "GitHub Actions", "Python", "Linux"], "experience_years": 8, "location": "Denver, CO", "school": "Colorado School of Mines", "degree": "bachelors", "current_employer": "HashiCorp"},
-    {"name": "Emily Zhang", "title": "Data Engineer", "bio": "Turning raw data into actionable insights. Spark, Airflow, and modern data stack enthusiast.", "skills": ["Python", "Spark", "Airflow", "dbt", "SQL", "Snowflake"], "experience_years": 5, "location": "Chicago, IL", "school": "Northwestern", "degree": "masters", "current_employer": "Databricks"},
-    {"name": "Marcus Thompson", "title": "ML Engineer", "bio": "Applied ML engineer shipping production models. Focus on NLP and recommendation systems.", "skills": ["Python", "PyTorch", "TensorFlow", "MLflow", "FastAPI", "SQL"], "experience_years": 4, "location": "San Francisco, CA", "school": "UC Berkeley", "degree": "masters", "current_employer": "OpenAI"},
-    {"name": "Sofia Garcia", "title": "UI/UX Designer & Developer", "bio": "Design-engineer hybrid. I code what I design and design what I code.", "skills": ["Figma", "React", "CSS", "Framer Motion", "Storybook", "A/B Testing"], "experience_years": 6, "location": "Los Angeles, CA", "school": "ArtCenter", "degree": "bachelors", "current_employer": "Airbnb"},
-    {"name": "David Kim", "title": "Security Engineer", "bio": "AppSec and infrastructure security. Pen tester turned defensive security builder.", "skills": ["Python", "AWS Security", "OWASP", "Kubernetes", "Go", "Burp Suite"], "experience_years": 7, "location": "Remote", "school": "Georgia Tech", "degree": "masters", "current_employer": "CrowdStrike"},
-    {"name": "Rachel O'Brien", "title": "Junior Full Stack Developer", "bio": "Bootcamp grad eager to learn and grow. Built 5 full stack projects. Ready for the next challenge!", "skills": ["JavaScript", "React", "Node.js", "MongoDB", "HTML/CSS"], "experience_years": 1, "location": "Portland, OR", "school": "Hack Reactor", "degree": "certificate", "current_employer": "Freelance"},
+_FIRST_NAMES = [
+    "Alex", "Priya", "Jordan", "Maya", "Sam", "Emily", "Marcus", "Sofia", "David", "Rachel",
+    "Liam", "Ava", "Noah", "Mia", "Ethan", "Zoe", "Lucas", "Chloe", "Oliver", "Harper",
+    "Aiden", "Ella", "James", "Aria", "Leo", "Luna", "Henry", "Isla", "Owen", "Riley",
+    "Kai", "Nora", "Jack", "Lily", "Ryan", "Grace", "Caleb", "Stella", "Max", "Violet",
+    "Dylan", "Layla", "Asher", "Willow", "Wyatt", "Aurora", "Carter", "Hazel", "Jaxon", "Ivy",
 ]
-
-SAMPLE_COMPANIES = [
-    {"name": "TechVision Labs", "description": "AI-first startup building the future of computer vision for autonomous vehicles."},
-    {"name": "CloudScale Inc", "description": "Enterprise cloud infrastructure platform serving Fortune 500 companies."},
-    {"name": "GreenStack", "description": "Climate tech company using software to accelerate the clean energy transition."},
-    {"name": "FinFlow", "description": "Next-gen fintech making payment processing seamless for global businesses."},
-    {"name": "HealthBridge", "description": "Digital health platform connecting patients with personalized care."},
+_LAST_NAMES = [
+    "Chen", "Patel", "Williams", "Rodriguez", "Johnson", "Zhang", "Thompson", "Garcia", "Kim", "O'Brien",
+    "Nakamura", "Santos", "Murphy", "Nguyen", "Cohen", "Park", "Singh", "Larsen", "Okafor", "Rivera",
+    "Foster", "Tanaka", "Bell", "Ahmad", "Cruz", "Hayes", "Ito", "Morgan", "Das", "Campbell",
+    "Reyes", "Barnes", "Cho", "Ellis", "Fernandez", "Grant", "Huang", "Jensen", "Kang", "Lopez",
+    "Martin", "Nelson", "Ortiz", "Phillips", "Quinn", "Ross", "Shaw", "Torres", "Ueda", "Vargas",
+]
+_SEEKER_PROFILES = [
+    {"title": "Senior Frontend Engineer", "bio": "Passionate about building beautiful, performant UIs. React enthusiast with a love for design systems.", "skills": ["React", "TypeScript", "Next.js", "Tailwind CSS", "GraphQL"], "experience_years": 6, "school": "Stanford University", "degree": "bachelors", "current_employer": "Meta"},
+    {"title": "Full Stack Developer", "bio": "Building scalable web apps from database to deployment. Node.js and Python polyglot.", "skills": ["Node.js", "Python", "PostgreSQL", "AWS", "Docker", "React"], "experience_years": 4, "school": "NYU", "degree": "masters", "current_employer": "Stripe"},
+    {"title": "Backend Engineer", "bio": "Distributed systems engineer focused on high-throughput data pipelines and microservices.", "skills": ["Go", "Kubernetes", "gRPC", "Redis", "Kafka", "PostgreSQL"], "experience_years": 7, "school": "University of Washington", "degree": "bachelors", "current_employer": "Amazon"},
+    {"title": "Mobile Developer", "bio": "Cross-platform mobile dev with a focus on native performance and delightful UX.", "skills": ["React Native", "Swift", "Kotlin", "Firebase", "TypeScript"], "experience_years": 5, "school": "UT Austin", "degree": "bachelors", "current_employer": "Shopify"},
+    {"title": "DevOps Engineer", "bio": "Infrastructure as code advocate. Automating all the things with Terraform and CI/CD pipelines.", "skills": ["Terraform", "AWS", "Docker", "GitHub Actions", "Python", "Linux"], "experience_years": 8, "school": "Colorado School of Mines", "degree": "bachelors", "current_employer": "HashiCorp"},
+    {"title": "Data Engineer", "bio": "Turning raw data into actionable insights. Spark, Airflow, and modern data stack enthusiast.", "skills": ["Python", "Spark", "Airflow", "dbt", "SQL", "Snowflake"], "experience_years": 5, "school": "Northwestern", "degree": "masters", "current_employer": "Databricks"},
+    {"title": "ML Engineer", "bio": "Applied ML engineer shipping production models. Focus on NLP and recommendation systems.", "skills": ["Python", "PyTorch", "TensorFlow", "MLflow", "FastAPI", "SQL"], "experience_years": 4, "school": "UC Berkeley", "degree": "masters", "current_employer": "OpenAI"},
+    {"title": "UI/UX Designer & Developer", "bio": "Design-engineer hybrid. I code what I design and design what I code.", "skills": ["Figma", "React", "CSS", "Framer Motion", "Storybook", "A/B Testing"], "experience_years": 6, "school": "ArtCenter", "degree": "bachelors", "current_employer": "Airbnb"},
+    {"title": "Security Engineer", "bio": "AppSec and infrastructure security. Pen tester turned defensive security builder.", "skills": ["Python", "AWS Security", "OWASP", "Kubernetes", "Go", "Burp Suite"], "experience_years": 7, "school": "Georgia Tech", "degree": "masters", "current_employer": "CrowdStrike"},
+    {"title": "Junior Full Stack Developer", "bio": "Bootcamp grad eager to learn and grow. Built 5 full stack projects. Ready for the next challenge!", "skills": ["JavaScript", "React", "Node.js", "MongoDB", "HTML/CSS"], "experience_years": 1, "school": "Hack Reactor", "degree": "certificate", "current_employer": "Freelance"},
+]
+_LOCATIONS = ["San Francisco, CA", "New York, NY", "Seattle, WA", "Austin, TX", "Denver, CO", "Chicago, IL", "Los Angeles, CA", "Portland, OR", "Remote", "Boston, MA", "Miami, FL", "Atlanta, GA"]
+_COMPANY_NAMES = [
+    "TechVision", "CloudScale", "GreenStack", "FinFlow", "HealthBridge",
+    "DataPulse", "NovaSoft", "Quantum", "SkyLabs", "CodeForge",
+    "ByteWave", "NexGen", "Synapse", "Arclight", "VeloCity",
+]
+_COMPANY_SUFFIXES = ["Labs", "Inc", "AI", "Tech", "Systems", "Digital", "Solutions", "HQ", "Co", "Studio"]
+_COMPANY_DESCRIPTIONS = [
+    "AI-first startup building the future of computer vision for autonomous vehicles.",
+    "Enterprise cloud infrastructure platform serving Fortune 500 companies.",
+    "Climate tech company using software to accelerate the clean energy transition.",
+    "Next-gen fintech making payment processing seamless for global businesses.",
+    "Digital health platform connecting patients with personalized care.",
+    "Data analytics company helping businesses unlock insights from real-time data.",
+    "Developer tools company making engineering teams more productive.",
+    "Cybersecurity platform protecting modern cloud-native applications.",
+    "EdTech startup reimagining how people learn technical skills.",
+    "Marketplace platform connecting creators with global audiences.",
 ]
 
 SAMPLE_JOBS = [
@@ -736,6 +761,31 @@ SAMPLE_JOBS = [
     {"title": "Engineering Manager", "description": "Lead a team of 6-8 engineers building our core platform. Balance technical leadership with people development.", "requirements": ["5+ years engineering", "2+ years management", "System design"], "salary_min": 180000, "salary_max": 250000, "location": "Remote", "job_type": "remote", "experience_level": "lead"},
     {"title": "Security Engineer", "description": "Own application security for our fintech platform. Conduct security reviews, build tooling, and drive security culture.", "requirements": ["AppSec", "Python or Go", "OWASP", "Cloud security", "5+ years"], "salary_min": 160000, "salary_max": 215000, "location": "New York, NY", "job_type": "hybrid", "experience_level": "senior"},
 ]
+
+
+def _generate_unique_name(used_names: set) -> str:
+    """Generate a random unique first+last name combination."""
+    for _ in range(200):
+        name = f"{random.choice(_FIRST_NAMES)} {random.choice(_LAST_NAMES)}"
+        if name not in used_names:
+            used_names.add(name)
+            return name
+    # Fallback: add random digits
+    name = f"{random.choice(_FIRST_NAMES)} {random.choice(_LAST_NAMES)}{random.randint(10, 99)}"
+    used_names.add(name)
+    return name
+
+
+def _generate_unique_company(used_companies: set) -> dict:
+    """Generate a random unique company name and description."""
+    for _ in range(200):
+        name = f"{random.choice(_COMPANY_NAMES)} {random.choice(_COMPANY_SUFFIXES)}"
+        if name not in used_companies:
+            used_companies.add(name)
+            return {"name": name, "description": random.choice(_COMPANY_DESCRIPTIONS)}
+    name = f"{random.choice(_COMPANY_NAMES)}{random.randint(10, 99)} {random.choice(_COMPANY_SUFFIXES)}"
+    used_companies.add(name)
+    return {"name": name, "description": random.choice(_COMPANY_DESCRIPTIONS)}
 
 
 @router.post("/admin/seed-test-data")
@@ -755,28 +805,40 @@ async def seed_test_data(body: dict = {}, admin: dict = Depends(get_current_admi
     created_applications = []
     created_matches = []
     password = hash_password("testpass123")
+    used_names = set()
+    used_companies = set()
 
-    # Create seekers
-    for i in range(min(num_seekers, len(SAMPLE_SEEKERS))):
-        s = SAMPLE_SEEKERS[i]
+    # Always clear old test data first so we get fresh accounts every time
+    old_test_users = await db.users.find(
+        {"email": {"$regex": r"@test\.hireabble\.com$"}},
+        {"_id": 0, "id": 1}
+    ).to_list(1000)
+    old_ids = [u["id"] for u in old_test_users]
+    if old_ids:
+        await db.users.delete_many({"id": {"$in": old_ids}})
+        await db.applications.delete_many({"$or": [{"seeker_id": {"$in": old_ids}}, {"recruiter_id": {"$in": old_ids}}]})
+        await db.jobs.delete_many({"recruiter_id": {"$in": old_ids}})
+        await db.matches.delete_many({"$or": [{"seeker_id": {"$in": old_ids}}, {"recruiter_id": {"$in": old_ids}}]})
+        await db.messages.delete_many({"$or": [{"sender_id": {"$in": old_ids}}, {"receiver_id": {"$in": old_ids}}]})
+        await db.notifications.delete_many({"user_id": {"$in": old_ids}})
+
+    # Create seekers with random unique names
+    for i in range(num_seekers):
+        profile = _SEEKER_PROFILES[i % len(_SEEKER_PROFILES)]
+        name = _generate_unique_name(used_names)
         user_id = str(uuid.uuid4())
         email = f"seeker{i+1}@test.hireabble.com"
-
-        existing = await db.users.find_one({"email": email})
-        if existing:
-            created_seekers.append(existing)
-            continue
 
         avatar = f"https://api.dicebear.com/7.x/avataaars/svg?seed={user_id}"
         user_doc = {
             "id": user_id, "email": email, "password": password,
-            "name": s["name"], "role": "seeker", "company": None,
+            "name": name, "role": "seeker", "company": None,
             "avatar": avatar, "photo_url": None, "video_url": None,
-            "title": s["title"], "bio": s["bio"], "skills": s["skills"],
-            "experience_years": s["experience_years"], "location": s["location"],
-            "current_employer": s.get("current_employer"),
-            "previous_employers": [], "school": s.get("school"),
-            "degree": s.get("degree"), "certifications": [],
+            "title": profile["title"], "bio": profile["bio"], "skills": profile["skills"],
+            "experience_years": profile["experience_years"], "location": random.choice(_LOCATIONS),
+            "current_employer": profile.get("current_employer"),
+            "previous_employers": [], "school": profile.get("school"),
+            "degree": profile.get("degree"), "certifications": [],
             "work_preference": random.choice(["remote", "hybrid", "onsite"]),
             "desired_salary": random.randint(80, 200) * 1000,
             "available_immediately": random.choice([True, False]),
@@ -786,21 +848,17 @@ async def seed_test_data(body: dict = {}, admin: dict = Depends(get_current_admi
         await db.users.insert_one(user_doc)
         created_seekers.append(user_doc)
 
-    # Create recruiters
+    # Create recruiters with random unique company names
     for i in range(num_recruiters):
-        company = SAMPLE_COMPANIES[i % len(SAMPLE_COMPANIES)]
+        company = _generate_unique_company(used_companies)
+        recruiter_name = _generate_unique_name(used_names)
         user_id = str(uuid.uuid4())
         email = f"recruiter{i+1}@test.hireabble.com"
-
-        existing = await db.users.find_one({"email": email})
-        if existing:
-            created_recruiters.append(existing)
-            continue
 
         avatar = f"https://api.dicebear.com/7.x/avataaars/svg?seed={user_id}"
         user_doc = {
             "id": user_id, "email": email, "password": password,
-            "name": f"{company['name']} Recruiting", "role": "recruiter",
+            "name": recruiter_name, "role": "recruiter",
             "company": company["name"], "avatar": avatar,
             "photo_url": None, "video_url": None, "title": "Talent Acquisition",
             "bio": company["description"], "skills": [], "experience_years": None,
@@ -844,13 +902,6 @@ async def seed_test_data(body: dict = {}, admin: dict = Depends(get_current_admi
         random.shuffle(available_jobs)
         for j in range(min(apps_per_seeker, len(available_jobs))):
             job = available_jobs[j]
-            # Check for existing application
-            existing_app = await db.applications.find_one({
-                "seeker_id": seeker["id"], "job_id": job["id"]
-            })
-            if existing_app:
-                continue
-
             app_id = str(uuid.uuid4())
             action = random.choices(["like", "superlike"], weights=[0.7, 0.3])[0]
             app_doc = {

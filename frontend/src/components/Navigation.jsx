@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, memo, useMemo } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Home, Heart, User, Briefcase, MessageCircle, BarChart3, Calendar } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
@@ -6,7 +6,7 @@ import axios from 'axios';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
-export default function Navigation() {
+export default memo(function Navigation() {
   const location = useLocation();
   const { user, token } = useAuth();
   const [unreadMessages, setUnreadMessages] = useState(0);
@@ -15,7 +15,8 @@ export default function Navigation() {
     if (!token) return;
     try {
       const res = await axios.get(`${API}/messages/unread/count`, {
-        headers: { Authorization: `Bearer ${token}` }
+        headers: { Authorization: `Bearer ${token}` },
+        timeout: 5000
       });
       setUnreadMessages(res.data.unread_count || 0);
     } catch {
@@ -25,8 +26,7 @@ export default function Navigation() {
 
   useEffect(() => {
     fetchUnreadCount();
-    // Poll every 15 seconds for unread messages
-    const interval = setInterval(fetchUnreadCount, 15000);
+    const interval = setInterval(fetchUnreadCount, 60000);
     return () => clearInterval(interval);
   }, [fetchUnreadCount]);
 
@@ -40,7 +40,7 @@ export default function Navigation() {
 
   const isSeeker = user?.role === 'seeker';
 
-  const navItems = [
+  const navItems = useMemo(() => [
     {
       icon: Home,
       label: 'Home',
@@ -76,7 +76,7 @@ export default function Navigation() {
       label: 'Profile',
       path: '/profile'
     },
-  ];
+  ], [isSeeker, unreadMessages]);
 
   return (
     <nav className="fixed bottom-6 left-1/2 transform -translate-x-1/2 z-50">
@@ -113,4 +113,4 @@ export default function Navigation() {
       </div>
     </nav>
   );
-}
+})
