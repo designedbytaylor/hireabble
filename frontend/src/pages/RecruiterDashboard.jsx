@@ -223,7 +223,7 @@ export default function RecruiterDashboard() {
           </div>
           <div
             className="glass-card rounded-2xl p-5 hover:border-success/30 transition-colors cursor-pointer active:scale-[0.97]"
-            onClick={() => navigate('/recruiter/dashboard')}
+            onClick={() => navigate('/recruiter/applications')}
           >
             <div className="w-12 h-12 rounded-xl bg-success/20 flex items-center justify-center mb-3">
               <Users className="w-6 h-6 text-success" />
@@ -261,15 +261,17 @@ export default function RecruiterDashboard() {
 
       {/* Main Content */}
       <main className="relative z-10 px-6 md:px-8">
-        {/* Boost Prompt - Tinder-style purple gradient */}
-        <section className="mb-6">
-          <UpgradePrompt
-            title="Boost Your Job Listings"
-            subtitle="Get 3x more visibility and reach top candidates faster"
-            tierHint="recruiter_pro"
-            trigger="boost"
-          />
-        </section>
+        {/* Boost Prompt - only show if not subscribed */}
+        {!subscription?.subscribed && (
+          <section className="mb-6">
+            <UpgradePrompt
+              title="Boost Your Job Listings"
+              subtitle="Get 3x more visibility and reach top candidates faster"
+              tierHint="recruiter_pro"
+              trigger="boost"
+            />
+          </section>
+        )}
 
         {/* Recent Applications */}
         <section className="mb-8">

@@ -503,7 +503,7 @@ export default function SeekerDashboard() {
 
       {/* Filter Dialog */}
       <Dialog open={showFilters} onOpenChange={setShowFilters}>
-        <DialogContent className="max-w-md bg-card border-border">
+        <DialogContent className="max-w-md bg-card border-border max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="font-['Outfit'] flex items-center gap-2">
               <Filter className="w-5 h-5" />

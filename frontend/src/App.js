@@ -22,6 +22,7 @@ const Chat = React.lazy(() => import("./pages/Chat"));
 const InterviewScheduler = React.lazy(() => import("./pages/InterviewScheduler"));
 const RecruiterAnalytics = React.lazy(() => import("./pages/RecruiterAnalytics"));
 const AppliedJobs = React.lazy(() => import("./pages/AppliedJobs"));
+const RecruiterApplications = React.lazy(() => import("./pages/RecruiterApplications"));
 const Messages = React.lazy(() => import("./pages/Messages"));
 const Upgrade = React.lazy(() => import("./pages/Upgrade"));
 const Impersonate = React.lazy(() => import("./pages/Impersonate"));
@@ -176,6 +177,14 @@ function AppRoutes() {
         element={
           <ProtectedRoute allowedRoles={['recruiter']}>
             <RecruiterDashboard />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/recruiter/applications"
+        element={
+          <ProtectedRoute allowedRoles={['recruiter']}>
+            <RecruiterApplications />
           </ProtectedRoute>
         }
       />

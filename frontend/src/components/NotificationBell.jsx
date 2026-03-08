@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Bell, Check, Heart, MessageSquare, Briefcase } from 'lucide-react';
+import { Bell, Heart, MessageSquare, Briefcase } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
@@ -64,6 +64,10 @@ export default function NotificationBell() {
   const handleBellClick = () => {
     if (!isOpen) {
       fetchNotifications();
+      // Auto-mark all as read when opening the bell
+      if (unreadCount > 0) {
+        markAllAsRead();
+      }
     }
     setIsOpen(!isOpen);
   };
@@ -153,16 +157,6 @@ export default function NotificationBell() {
           {/* Header */}
           <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-accent/30">
             <h3 className="font-semibold text-sm">Notifications</h3>
-            {unreadCount > 0 && (
-              <button
-                onClick={markAllAsRead}
-                className="text-xs text-primary hover:underline flex items-center gap-1"
-                data-testid="mark-all-read-btn"
-              >
-                <Check className="w-3 h-3" />
-                Mark all read
-              </button>
-            )}
           </div>
 
           {/* Notification List */}
