@@ -15,7 +15,8 @@ export const AdminAuthProvider = ({ children }) => {
       if (token) {
         try {
           const response = await axios.get(`${API}/admin/me`, {
-            headers: { Authorization: `Bearer ${token}` }
+            headers: { Authorization: `Bearer ${token}` },
+            timeout: 8000
           });
           setAdmin(response.data);
         } catch (error) {

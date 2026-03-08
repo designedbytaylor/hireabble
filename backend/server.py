@@ -134,6 +134,16 @@ async def websocket_endpoint(websocket: WebSocket, token: str):
                 }
                 await db.messages.insert_one(message_doc)
 
+                # Update last_message on the match so it shows in Messages list
+                await db.matches.update_one(
+                    {"id": match_id},
+                    {"$set": {
+                        "last_message": content[:100],
+                        "last_message_sender": user_id,
+                        "last_message_at": message_doc["created_at"]
+                    }}
+                )
+
                 msg_response = {k: v for k, v in message_doc.items() if k != "_id"}
 
                 # Send confirmation back to sender
