@@ -80,6 +80,7 @@ export default function UpgradeModal({ open, onClose, trigger, highlightTier }) 
     if (open) {
       fetchTiers();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
   const fetchTiers = async () => {
