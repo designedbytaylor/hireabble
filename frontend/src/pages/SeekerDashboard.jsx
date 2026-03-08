@@ -146,6 +146,7 @@ export default function SeekerDashboard() {
     if (fetchingMoreRef.current) return;
     fetchingMoreRef.current = true;
     fetchJobs(filters, true).finally(() => { fetchingMoreRef.current = false; });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filters]);
 
   const handleSwipe = (action, exitDirection = { x: 0, y: 0 }) => {
