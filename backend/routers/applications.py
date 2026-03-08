@@ -84,6 +84,254 @@ async def get_remaining_superlikes(current_user: dict = Depends(get_current_user
         "daily_limit": DAILY_SUPERLIKE_LIMIT
     }
 
+# ==================== RECRUITER CANDIDATE DISCOVERY ====================
+
+DAILY_RECRUITER_SUPERSWIPE_LIMIT = 3
+
+@router.get("/candidates")
+async def browse_candidates(
+    current_user: dict = Depends(get_current_user),
+    location: str = None,
+    experience_level: str = None,
+    skill: str = None,
+):
+    """Browse seekers for recruiters to discover potential candidates"""
+    if current_user["role"] != "recruiter":
+        raise HTTPException(status_code=403, detail="Only recruiters can browse candidates")
+
+    # Get seekers the recruiter has already swiped on
+    already_swiped = await db.recruiter_swipes.find(
+        {"recruiter_id": current_user["id"]},
+        {"seeker_id": 1}
+    ).to_list(1000)
+    swiped_ids = [s["seeker_id"] for s in already_swiped]
+
+    # Also exclude seekers who already applied to this recruiter's jobs (they appear in applicants)
+    existing_apps = await db.applications.find(
+        {"recruiter_id": current_user["id"], "action": {"$in": ["like", "superlike"]}},
+        {"seeker_id": 1}
+    ).to_list(1000)
+    applicant_ids = [a["seeker_id"] for a in existing_apps]
+
+    exclude_ids = list(set(swiped_ids + applicant_ids + [current_user["id"]]))
+
+    query = {
+        "role": "seeker",
+        "id": {"$nin": exclude_ids},
+        "onboarding_complete": True,
+    }
+
+    # Apply filters
+    if location:
+        query["location"] = {"$regex": location, "$options": "i"}
+    if experience_level:
+        level_map = {"entry": (0, 2), "mid": (2, 5), "senior": (5, 10), "lead": (8, 99)}
+        low, high = level_map.get(experience_level, (0, 99))
+        query["experience_years"] = {"$gte": low, "$lte": high}
+    if skill:
+        query["skills"] = {"$regex": skill, "$options": "i"}
+
+    # Exclude banned/suspended users
+    query["$or"] = [
+        {"status": {"$exists": False}},
+        {"status": "active"},
+        {"status": None},
+    ]
+
+    seekers = await db.users.find(
+        query, {"_id": 0, "password": 0}
+    ).sort("created_at", -1).to_list(50)
+
+    # Get recruiter's jobs for match scoring
+    recruiter_jobs = await db.jobs.find(
+        {"recruiter_id": current_user["id"], "is_active": True},
+        {"_id": 0}
+    ).to_list(50)
+
+    # Calculate best match score across all recruiter jobs
+    from routers.jobs import calculate_job_match_score
+    for seeker in seekers:
+        best_score = 0
+        best_job = None
+        for job in recruiter_jobs:
+            score = calculate_job_match_score(seeker, job)
+            if score > best_score:
+                best_score = score
+                best_job = job
+        seeker["match_score"] = best_score
+        seeker["best_match_job"] = best_job.get("title") if best_job else None
+        seeker["best_match_job_id"] = best_job.get("id") if best_job else None
+
+    # Sort by match score descending
+    seekers.sort(key=lambda s: s.get("match_score", 0), reverse=True)
+
+    return seekers
+
+
+@router.get("/candidates/superswipes/remaining")
+async def get_remaining_superswipes(current_user: dict = Depends(get_current_user)):
+    """Get remaining super swipes for recruiter today"""
+    if current_user["role"] != "recruiter":
+        raise HTTPException(status_code=403, detail="Only recruiters can access this")
+
+    today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+    today_end = today_start + timedelta(days=1)
+
+    swipes_today = await db.recruiter_swipes.count_documents({
+        "recruiter_id": current_user["id"],
+        "action": "superlike",
+        "created_at": {"$gte": today_start.isoformat(), "$lt": today_end.isoformat()}
+    })
+
+    user_data = await db.users.find_one({"id": current_user["id"]}, {"_id": 0, "recruiter_purchased_superswipes": 1, "subscription": 1})
+    purchased = (user_data or {}).get("recruiter_purchased_superswipes", 0)
+
+    # Check subscription for higher limit
+    sub = (user_data or {}).get("subscription", {})
+    now = datetime.now(timezone.utc).isoformat()
+    daily_limit = DAILY_RECRUITER_SUPERSWIPE_LIMIT
+    if sub.get("status") == "active" and sub.get("period_end", "") >= now:
+        tier = sub.get("tier_id", "")
+        if tier == "recruiter_enterprise":
+            daily_limit = 999  # unlimited
+        elif tier == "recruiter_pro":
+            daily_limit = 10
+
+    free_remaining = max(0, daily_limit - swipes_today)
+    return {
+        "remaining": free_remaining + purchased,
+        "free_remaining": free_remaining,
+        "purchased_remaining": purchased,
+        "used_today": swipes_today,
+        "daily_limit": daily_limit,
+    }
+
+
+@router.post("/candidates/swipe")
+async def recruiter_swipe_candidate(
+    body: dict,
+    current_user: dict = Depends(get_current_user),
+):
+    """Recruiter swipes on a candidate (like, pass, superlike)"""
+    if current_user["role"] != "recruiter":
+        raise HTTPException(status_code=403, detail="Only recruiters can swipe on candidates")
+
+    seeker_id = body.get("seeker_id")
+    action = body.get("action", "like")  # like, pass, superlike
+    job_id = body.get("job_id")  # optional: which job to associate
+
+    if not seeker_id:
+        raise HTTPException(status_code=400, detail="seeker_id is required")
+    if action not in ("like", "pass", "superlike"):
+        raise HTTPException(status_code=400, detail="Action must be like, pass, or superlike")
+
+    # Check for duplicate swipe
+    existing = await db.recruiter_swipes.find_one({
+        "recruiter_id": current_user["id"],
+        "seeker_id": seeker_id,
+    })
+    if existing:
+        raise HTTPException(status_code=400, detail="Already swiped on this candidate")
+
+    # Check super swipe limits
+    if action == "superlike":
+        today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+        today_end = today_start + timedelta(days=1)
+        swipes_today = await db.recruiter_swipes.count_documents({
+            "recruiter_id": current_user["id"],
+            "action": "superlike",
+            "created_at": {"$gte": today_start.isoformat(), "$lt": today_end.isoformat()}
+        })
+        user_data = await db.users.find_one({"id": current_user["id"]}, {"_id": 0, "recruiter_purchased_superswipes": 1, "subscription": 1})
+        purchased = (user_data or {}).get("recruiter_purchased_superswipes", 0)
+
+        sub = (user_data or {}).get("subscription", {})
+        now = datetime.now(timezone.utc).isoformat()
+        daily_limit = DAILY_RECRUITER_SUPERSWIPE_LIMIT
+        if sub.get("status") == "active" and sub.get("period_end", "") >= now:
+            tier = sub.get("tier_id", "")
+            if tier == "recruiter_enterprise":
+                daily_limit = 999
+            elif tier == "recruiter_pro":
+                daily_limit = 10
+
+        free_remaining = max(0, daily_limit - swipes_today)
+        if free_remaining <= 0 and purchased <= 0:
+            raise HTTPException(status_code=400, detail="No Super Swipes remaining! Purchase more or try again tomorrow.")
+        if free_remaining <= 0 and purchased > 0:
+            await db.users.update_one(
+                {"id": current_user["id"]},
+                {"$inc": {"recruiter_purchased_superswipes": -1}}
+            )
+
+    seeker = await db.users.find_one({"id": seeker_id}, {"_id": 0, "password": 0})
+    if not seeker:
+        raise HTTPException(status_code=404, detail="Candidate not found")
+
+    # Record the swipe
+    swipe_doc = {
+        "id": str(uuid.uuid4()),
+        "recruiter_id": current_user["id"],
+        "seeker_id": seeker_id,
+        "action": action,
+        "job_id": job_id,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+    await db.recruiter_swipes.insert_one(swipe_doc)
+
+    # If recruiter liked/super-liked, create a match if seeker also applied to their jobs
+    is_matched = False
+    if action in ("like", "superlike"):
+        # Check if seeker applied to any of this recruiter's jobs
+        seeker_app = await db.applications.find_one({
+            "seeker_id": seeker_id,
+            "recruiter_id": current_user["id"],
+            "action": {"$in": ["like", "superlike"]},
+            "is_matched": False,
+        })
+        if seeker_app:
+            # Auto-match: both parties expressed interest
+            is_matched = True
+            job = await db.jobs.find_one({"id": seeker_app["job_id"]}, {"_id": 0})
+            await db.applications.update_one(
+                {"id": seeker_app["id"]},
+                {"$set": {"recruiter_action": "accept", "is_matched": True}}
+            )
+            match_doc = {
+                "id": str(uuid.uuid4()),
+                "application_id": seeker_app["id"],
+                "job_id": seeker_app["job_id"],
+                "job_title": job["title"] if job else "Unknown",
+                "company": job["company"] if job else current_user.get("company", "Unknown"),
+                "seeker_id": seeker_id,
+                "seeker_name": seeker.get("name", ""),
+                "seeker_avatar": seeker.get("avatar"),
+                "recruiter_id": current_user["id"],
+                "recruiter_name": current_user["name"],
+                "created_at": datetime.now(timezone.utc).isoformat(),
+            }
+            await db.matches.insert_one(match_doc)
+            await create_notification(
+                user_id=seeker_id,
+                notif_type="match",
+                title="It's a Match!",
+                message=f"{current_user.get('company', 'A company')} is interested in you for the {job['title'] if job else 'a'} position!",
+                data={"match_id": match_doc["id"]}
+            )
+            await manager.send_to_user(seeker_id, {"type": "new_match", "match": {k: v for k, v in match_doc.items() if k != "_id"}})
+        else:
+            # No existing application - notify seeker that a recruiter is interested
+            await create_notification(
+                user_id=seeker_id,
+                notif_type="recruiter_interest",
+                title="A recruiter is interested!",
+                message=f"{current_user.get('company', 'A company')} thinks you'd be a great fit. Check out their job listings!",
+                data={"recruiter_id": current_user["id"]}
+            )
+
+    return {"message": f"Swiped {action}", "is_matched": is_matched}
+
+
 # ==================== SWIPE ====================
 
 @router.post("/swipe")

@@ -9,6 +9,7 @@ from typing import Optional
 from datetime import datetime, timezone, timedelta
 import uuid
 import random
+import asyncio
 
 from database import (
     db, logger, manager, create_notification,
@@ -102,57 +103,73 @@ async def admin_change_password(payload: dict, admin: dict = Depends(get_current
 @router.get("/admin/analytics")
 async def get_analytics(admin: dict = Depends(get_current_admin)):
     """Platform-wide analytics for the admin dashboard."""
-    total_users = await db.users.count_documents({})
-    total_seekers = await db.users.count_documents({"role": "seeker"})
-    total_recruiters = await db.users.count_documents({"role": "recruiter"})
-    total_jobs = await db.jobs.count_documents({})
-    active_jobs = await db.jobs.count_documents({"is_active": True})
-    total_applications = await db.applications.count_documents({})
-    total_matches = await db.matches.count_documents({})
-    total_messages = await db.messages.count_documents({})
-    banned_users = await db.users.count_documents({"status": "banned"})
-    suspended_users = await db.users.count_documents({"status": "suspended"})
-    pending_reports = await db.reports.count_documents({"status": "pending"})
-    pending_moderation = await db.moderation_queue.count_documents({"status": "pending"})
+    # Run all count queries in parallel for speed
+    (
+        total_users, total_seekers, total_recruiters,
+        total_jobs, active_jobs,
+        total_applications, total_matches, total_messages,
+        banned_users, suspended_users,
+        pending_reports, pending_moderation,
+    ) = await asyncio.gather(
+        db.users.count_documents({}),
+        db.users.count_documents({"role": "seeker"}),
+        db.users.count_documents({"role": "recruiter"}),
+        db.jobs.count_documents({}),
+        db.jobs.count_documents({"is_active": True}),
+        db.applications.count_documents({}),
+        db.matches.count_documents({}),
+        db.messages.count_documents({}),
+        db.users.count_documents({"status": "banned"}),
+        db.users.count_documents({"status": "suspended"}),
+        db.reports.count_documents({"status": "pending"}),
+        db.moderation_queue.count_documents({"status": "pending"}),
+    )
 
-    # Growth data - users per day (last 14 days)
-    growth_data = []
+    # Growth data - all 14 days in parallel
+    growth_tasks = []
+    growth_days = []
     for i in range(13, -1, -1):
         day = datetime.now(timezone.utc) - timedelta(days=i)
         day_start = day.replace(hour=0, minute=0, second=0, microsecond=0).isoformat()
         day_end = (day.replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(days=1)).isoformat()
+        date_filter = {"$gte": day_start, "$lt": day_end}
+        growth_days.append(day.strftime("%b %d"))
+        growth_tasks.extend([
+            db.users.count_documents({"created_at": date_filter}),
+            db.applications.count_documents({"created_at": date_filter}),
+            db.matches.count_documents({"created_at": date_filter}),
+        ])
 
-        users_that_day = await db.users.count_documents({
-            "created_at": {"$gte": day_start, "$lt": day_end}
-        })
-        apps_that_day = await db.applications.count_documents({
-            "created_at": {"$gte": day_start, "$lt": day_end}
-        })
-        matches_that_day = await db.matches.count_documents({
-            "created_at": {"$gte": day_start, "$lt": day_end}
-        })
+    growth_results = await asyncio.gather(*growth_tasks)
+    growth_data = []
+    for idx in range(14):
+        base = idx * 3
         growth_data.append({
-            "date": day.strftime("%b %d"),
-            "users": users_that_day,
-            "applications": apps_that_day,
-            "matches": matches_that_day,
+            "date": growth_days[idx],
+            "users": growth_results[base],
+            "applications": growth_results[base + 1],
+            "matches": growth_results[base + 2],
         })
 
-    # Top locations
+    # Top locations + job type distribution in parallel
     locations_pipeline = [
         {"$match": {"location": {"$ne": None, "$ne": ""}}},
         {"$group": {"_id": "$location", "count": {"$sum": 1}}},
         {"$sort": {"count": -1}},
         {"$limit": 8},
     ]
-    top_locations = []
-    async for doc in db.users.aggregate(locations_pipeline):
-        top_locations.append({"location": doc["_id"], "count": doc["count"]})
 
-    # Job type distribution
-    job_types = {}
-    for jt in ["remote", "onsite", "hybrid"]:
-        job_types[jt] = await db.jobs.count_documents({"job_type": jt, "is_active": True})
+    job_type_counts, top_locations_cursor = await asyncio.gather(
+        asyncio.gather(
+            db.jobs.count_documents({"job_type": "remote", "is_active": True}),
+            db.jobs.count_documents({"job_type": "onsite", "is_active": True}),
+            db.jobs.count_documents({"job_type": "hybrid", "is_active": True}),
+        ),
+        db.users.aggregate(locations_pipeline).to_list(8),
+    )
+
+    top_locations = [{"location": doc["_id"], "count": doc["count"]} for doc in top_locations_cursor]
+    job_types = {"remote": job_type_counts[0], "onsite": job_type_counts[1], "hybrid": job_type_counts[2]}
 
     return {
         "users": {
@@ -224,13 +241,13 @@ async def get_user_detail(user_id: str, admin: dict = Depends(get_current_admin)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
-    # Get related stats
-    app_count = await db.applications.count_documents({"seeker_id": user_id})
-    match_count = await db.matches.count_documents({
-        "$or": [{"seeker_id": user_id}, {"recruiter_id": user_id}]
-    })
-    job_count = await db.jobs.count_documents({"recruiter_id": user_id})
-    report_count = await db.reports.count_documents({"reported_id": user_id})
+    # Get related stats in parallel
+    app_count, match_count, job_count, report_count = await asyncio.gather(
+        db.applications.count_documents({"seeker_id": user_id}),
+        db.matches.count_documents({"$or": [{"seeker_id": user_id}, {"recruiter_id": user_id}]}),
+        db.jobs.count_documents({"recruiter_id": user_id}),
+        db.reports.count_documents({"reported_id": user_id}),
+    )
 
     return {
         **user,
