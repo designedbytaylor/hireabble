@@ -101,15 +101,14 @@ export default function RecruiterSwipe() {
       setExitingCards(prev => prev.filter(c => c.id !== item.id));
     }, 500);
 
-    // Fire-and-forget API call — don't block the UI, no toasts unless match
+    // Fire-and-forget API call — don't block the UI
     if (mode === 'applicants') {
       axios.post(`${API}/applications/respond`,
         { application_id: item.id, action },
         { headers: { Authorization: `Bearer ${token}` } }
       ).then(res => {
         if (action === 'accept' || res.data?.is_matched) {
-          setMatchData({ seeker_name: item.seeker_name || item.name, job_title: item.job_title || item.title, company: user?.company });
-          setShowMatch(true);
+          toast.success("Matched! You can now message this candidate.", { duration: 2000 });
         }
       }).catch(() => {});
     } else {
