@@ -207,7 +207,7 @@ async def create_notification(user_id: str, notif_type: str, title: str, message
     return notification_doc
 
 
-async def send_system_message(match_id: str, sender_id: str, sender_name: str, content: str, msg_type: str = "system"):
+async def send_system_message(match_id: str, sender_id: str, sender_name: str, content: str, msg_type: str = "system", data: dict = None):
     """Send an auto-generated system message in a match conversation."""
     receiver_match = await db.matches.find_one({"id": match_id}, {"_id": 0})
     if not receiver_match:
@@ -223,6 +223,7 @@ async def send_system_message(match_id: str, sender_id: str, sender_name: str, c
         "receiver_id": receiver_id,
         "content": content,
         "message_type": msg_type,
+        "data": data or {},
         "created_at": datetime.now(timezone.utc).isoformat(),
         "is_read": False
     }
@@ -243,6 +244,15 @@ async def send_system_message(match_id: str, sender_id: str, sender_name: str, c
         "type": "new_message",
         "message": {k: v for k, v in message_doc.items() if k != "_id"}
     })
+
+    # Create a message notification so it shows in the notification bell
+    await create_notification(
+        user_id=receiver_id,
+        notif_type="message",
+        title="New Message",
+        message=f"{sender_name}: {content[:50]}{'...' if len(content) > 50 else ''}",
+        data={"match_id": match_id}
+    )
 
     return message_doc
 

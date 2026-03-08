@@ -120,7 +120,9 @@ export default function InterviewScheduler() {
             </button>
             <div>
               <h1 className="text-2xl font-bold font-['Outfit']">Interviews</h1>
-              <p className="text-muted-foreground text-sm">Schedule and manage interviews</p>
+              <p className="text-muted-foreground text-sm">
+                {user?.role === 'recruiter' ? 'Schedule and manage interviews' : 'View and manage your interviews'}
+              </p>
             </div>
           </div>
           {user?.role === 'recruiter' && (
@@ -693,24 +695,35 @@ function RespondDialog({ open, onClose, interview, onRespond, token, onSuccess }
           {!showSuggest ? (
             <>
               <div>
-                <Label className="mb-2 block">Select a time slot</Label>
+                <Label className="mb-2 block">
+                  Tap a time slot to select it {selectedTime === null && <span className="text-primary animate-pulse ml-1">(required to accept)</span>}
+                </Label>
                 <div className="space-y-2">
                   {interview.proposed_times?.map((slot, i) => (
                     <button
                       key={i}
                       type="button"
                       onClick={() => setSelectedTime(i)}
-                      className={`w-full p-3 rounded-xl border text-left transition-colors ${
+                      className={`w-full p-3 rounded-xl border text-left transition-all ${
                         selectedTime === i
-                          ? 'border-primary bg-primary/10'
-                          : 'border-border bg-background hover:border-primary/30'
+                          ? 'border-primary bg-primary/10 ring-2 ring-primary/30'
+                          : 'border-border bg-background hover:border-primary/30 hover:bg-primary/5'
                       }`}
                     >
-                      <div className="font-medium text-sm">
-                        {new Date(slot.start).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}
-                      </div>
-                      <div className="text-xs text-muted-foreground">
-                        {new Date(slot.start).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} - {new Date(slot.end).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      <div className="flex items-center gap-3">
+                        <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${
+                          selectedTime === i ? 'border-primary bg-primary' : 'border-muted-foreground'
+                        }`}>
+                          {selectedTime === i && <Check className="w-3 h-3 text-white" />}
+                        </div>
+                        <div>
+                          <div className="font-medium text-sm">
+                            {new Date(slot.start).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}
+                          </div>
+                          <div className="text-xs text-muted-foreground">
+                            {new Date(slot.start).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} - {new Date(slot.end).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          </div>
+                        </div>
                       </div>
                     </button>
                   ))}
