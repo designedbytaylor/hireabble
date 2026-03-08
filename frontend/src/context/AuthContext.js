@@ -45,11 +45,20 @@ export const AuthProvider = ({ children }) => {
     initAuth();
   }, [token]);
 
-  // Global axios interceptor: auto-logout banned/suspended users
+  // Global axios interceptor: auto-logout on invalid token or banned users
   useEffect(() => {
     const interceptor = axios.interceptors.response.use(
       (response) => response,
       (error) => {
+        if (error.response?.status === 401 &&
+            error.response?.data?.detail === 'User not found') {
+          // Token references a deleted user (e.g. after re-seeding test data)
+          localStorage.removeItem('token');
+          localStorage.removeItem('cached_user');
+          setToken(null);
+          setUser(null);
+          window.location.href = '/login';
+        }
         if (error.response?.status === 403 &&
             error.response?.data?.detail?.includes('banned')) {
           localStorage.removeItem('token');
@@ -92,9 +101,11 @@ export const AuthProvider = ({ children }) => {
         headers: { Authorization: `Bearer ${impersonateToken}` }
       });
       setUser(response.data);
+      localStorage.setItem('cached_user', JSON.stringify(response.data));
       return response.data;
     } catch {
       localStorage.removeItem('token');
+      localStorage.removeItem('cached_user');
       setToken(null);
       return null;
     }
