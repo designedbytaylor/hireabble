@@ -1,10 +1,42 @@
+import { useState, useEffect, useCallback } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Home, Heart, User, Briefcase, MessageCircle, BarChart3, Calendar } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import axios from 'axios';
+
+const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
 export default function Navigation() {
   const location = useLocation();
-  const { user } = useAuth();
+  const { user, token } = useAuth();
+  const [unreadMessages, setUnreadMessages] = useState(0);
+
+  const fetchUnreadCount = useCallback(async () => {
+    if (!token) return;
+    try {
+      const res = await axios.get(`${API}/messages/unread/count`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setUnreadMessages(res.data.unread_count || 0);
+    } catch {
+      // silent
+    }
+  }, [token]);
+
+  useEffect(() => {
+    fetchUnreadCount();
+    // Poll every 15 seconds for unread messages
+    const interval = setInterval(fetchUnreadCount, 15000);
+    return () => clearInterval(interval);
+  }, [fetchUnreadCount]);
+
+  // Refresh count when navigating to messages page (clears on visit)
+  useEffect(() => {
+    if (location.pathname === '/messages' || location.pathname.startsWith('/chat/')) {
+      const timer = setTimeout(fetchUnreadCount, 2000);
+      return () => clearTimeout(timer);
+    }
+  }, [location.pathname, fetchUnreadCount]);
 
   const isSeeker = user?.role === 'seeker';
 
@@ -31,7 +63,8 @@ export default function Navigation() {
     {
       icon: MessageCircle,
       label: 'Messages',
-      path: '/messages'
+      path: '/messages',
+      badge: unreadMessages
     },
     ...(isSeeker ? [{
       icon: Calendar,
@@ -56,17 +89,22 @@ export default function Navigation() {
             <Link
               key={item.path}
               to={item.path}
-              className={`flex flex-col items-center gap-1 transition-all ${
+              className={`flex flex-col items-center gap-1 transition-all relative ${
                 isActive
                   ? 'text-primary'
                   : 'text-muted-foreground hover:text-foreground'
               }`}
               data-testid={`nav-${item.label.toLowerCase()}`}
             >
-              <div className={`p-2 rounded-xl transition-all ${
+              <div className={`p-2 rounded-xl transition-all relative ${
                 isActive ? 'bg-primary/20 neon-glow' : 'hover:bg-accent'
               }`}>
                 <Icon className="w-5 h-5" />
+                {item.badge > 0 && (
+                  <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center px-1">
+                    {item.badge > 99 ? '99+' : item.badge}
+                  </span>
+                )}
               </div>
               <span className="text-xs font-medium hidden md:block">{item.label}</span>
             </Link>

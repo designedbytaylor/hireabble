@@ -218,6 +218,16 @@ async def get_messages(match_id: str, current_user: dict = Depends(get_current_u
     return messages
 
 
+@router.get("/messages/unread/count")
+async def get_unread_message_count(current_user: dict = Depends(get_current_user)):
+    """Get total count of unread messages for the current user"""
+    count = await db.messages.count_documents({
+        "receiver_id": current_user["id"],
+        "is_read": False
+    })
+    return {"unread_count": count}
+
+
 @router.post("/messages/{match_id}/read")
 async def mark_messages_read(match_id: str, current_user: dict = Depends(get_current_user)):
     """Mark all messages in a match as read by the current user."""
