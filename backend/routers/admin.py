@@ -970,7 +970,7 @@ async def seed_test_data(body: dict = {}, admin: dict = Depends(get_current_admi
         },
         "test_credentials": {
             "password": "testpass123",
-            "seeker_emails": [f"seeker{i+1}@test.hireabble.com" for i in range(min(num_seekers, len(SAMPLE_SEEKERS)))],
+            "seeker_emails": [f"seeker{i+1}@test.hireabble.com" for i in range(num_seekers)],
             "recruiter_emails": [f"recruiter{i+1}@test.hireabble.com" for i in range(num_recruiters)],
         }
     }
