@@ -118,35 +118,44 @@ export default function RecruiterSwipe() {
           </div>
         </div>
 
-        {/* Stats Bar */}
+        {/* Stats Bar - Clickable */}
         <div className="flex gap-4 overflow-x-auto pb-2">
-          <div className="glass-card rounded-2xl px-5 py-3 flex items-center gap-3 whitespace-nowrap">
+          <button
+            onClick={() => navigate('/recruiter')}
+            className="glass-card rounded-2xl px-5 py-3 flex items-center gap-3 whitespace-nowrap hover:border-primary/30 transition-colors active:scale-[0.97]"
+          >
             <div className="w-10 h-10 rounded-xl bg-primary/20 flex items-center justify-center">
               <Briefcase className="w-5 h-5 text-primary" />
             </div>
-            <div>
+            <div className="text-left">
               <div className="text-xl font-bold">{stats.active_jobs}</div>
               <div className="text-xs text-muted-foreground">Jobs</div>
             </div>
-          </div>
-          <div className="glass-card rounded-2xl px-5 py-3 flex items-center gap-3 whitespace-nowrap">
+          </button>
+          <button
+            onClick={() => navigate('/recruiter')}
+            className="glass-card rounded-2xl px-5 py-3 flex items-center gap-3 whitespace-nowrap hover:border-success/30 transition-colors active:scale-[0.97]"
+          >
             <div className="w-10 h-10 rounded-xl bg-success/20 flex items-center justify-center">
               <Users className="w-5 h-5 text-success" />
             </div>
-            <div>
+            <div className="text-left">
               <div className="text-xl font-bold">{stats.total_applications}</div>
               <div className="text-xs text-muted-foreground">Applicants</div>
             </div>
-          </div>
-          <div className="glass-card rounded-2xl px-5 py-3 flex items-center gap-3 whitespace-nowrap">
+          </button>
+          <button
+            onClick={() => navigate('/matches')}
+            className="glass-card rounded-2xl px-5 py-3 flex items-center gap-3 whitespace-nowrap hover:border-pink-500/30 transition-colors active:scale-[0.97]"
+          >
             <div className="w-10 h-10 rounded-xl bg-pink-500/20 flex items-center justify-center">
               <Heart className="w-5 h-5 text-pink-500" />
             </div>
-            <div>
+            <div className="text-left">
               <div className="text-xl font-bold">{stats.matches}</div>
               <div className="text-xs text-muted-foreground">Matches</div>
             </div>
-          </div>
+          </button>
         </div>
       </header>
 

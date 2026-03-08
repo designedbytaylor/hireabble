@@ -230,17 +230,34 @@ async def get_jobs(
 
         jobs = await db.jobs.find(query, {"_id": 0}).sort("created_at", -1).to_list(100)
 
-        # Calculate match scores
+        # Calculate match scores and check recruiter subscription status
         now = datetime.now(timezone.utc).isoformat()
+        recruiter_ids = list(set(j.get("recruiter_id") for j in jobs if j.get("recruiter_id")))
+        recruiter_subs = {}
+        if recruiter_ids:
+            recruiters = await db.users.find(
+                {"id": {"$in": recruiter_ids}},
+                {"_id": 0, "id": 1, "subscription": 1}
+            ).to_list(None)
+            for r in recruiters:
+                sub = r.get("subscription", {})
+                if sub.get("status") == "active" and sub.get("period_end", "") >= now:
+                    recruiter_subs[r["id"]] = sub.get("tier_id", "")
+
         for job in jobs:
             job["match_score"] = calculate_job_match_score(current_user, job)
             # Check if job is actively boosted
             job["is_boosted"] = bool(job.get("is_boosted") and job.get("boost_until", "") >= now)
+            # Subscribers get a match score bonus (+15 for pro, +10 for enterprise already has other perks)
+            rec_tier = recruiter_subs.get(job.get("recruiter_id"), "")
+            if rec_tier:
+                job["is_premium_listing"] = True
+                job["match_score"] = min(100, job["match_score"] + 15)
 
-        # Sort: boosted jobs first (interleaved), then by match score
+        # Sort: boosted jobs first (interleaved), then premium listings get priority, then by match score
         boosted = [j for j in jobs if j.get("is_boosted")]
         regular = [j for j in jobs if not j.get("is_boosted")]
-        regular.sort(key=lambda j: j["match_score"], reverse=True)
+        regular.sort(key=lambda j: (1 if j.get("is_premium_listing") else 0, j["match_score"]), reverse=True)
 
         # Interleave boosted jobs at positions 0, 3, 7, etc. for natural feel
         result = list(regular)
