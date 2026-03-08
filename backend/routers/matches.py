@@ -18,7 +18,7 @@ router = APIRouter(tags=["Matches & Messages"])
 
 @router.get("/matches", response_model=List[MatchResponse])
 async def get_matches(current_user: dict = Depends(get_current_user)):
-    """Get user's matches"""
+    """Get user's matches with unread message counts"""
     query = {
         "$or": [
             {"seeker_id": current_user["id"]},
@@ -26,6 +26,23 @@ async def get_matches(current_user: dict = Depends(get_current_user)):
         ]
     }
     matches = await db.matches.find(query, {"_id": 0}).sort("created_at", -1).to_list(100)
+
+    # Batch-fetch unread counts for all matches
+    if matches:
+        match_ids = [m["id"] for m in matches]
+        pipeline = [
+            {"$match": {
+                "match_id": {"$in": match_ids},
+                "receiver_id": current_user["id"],
+                "is_read": False
+            }},
+            {"$group": {"_id": "$match_id", "count": {"$sum": 1}}}
+        ]
+        unread_results = await db.messages.aggregate(pipeline).to_list(None)
+        unread_map = {r["_id"]: r["count"] for r in unread_results}
+        for m in matches:
+            m["unread_count"] = unread_map.get(m["id"], 0)
+
     return matches
 
 @router.get("/matches/{match_id}")
