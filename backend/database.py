@@ -390,6 +390,8 @@ class MessageResponse(BaseModel):
     content: str
     created_at: str
     is_read: bool = False
+    message_type: Optional[str] = None
+    data: Optional[dict] = None
 
 class NotificationResponse(BaseModel):
     model_config = ConfigDict(extra="ignore")

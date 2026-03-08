@@ -231,6 +231,24 @@ export default function Chat() {
     }
   };
 
+  const uploadImage = async () => {
+    if (!imagePreview) return null;
+    try {
+      // Convert base64 to blob
+      const res = await fetch(imagePreview);
+      const blob = await res.blob();
+      const formData = new FormData();
+      formData.append('file', blob, `image-${Date.now()}.jpg`);
+      const uploadRes = await axios.post(`${API}/upload/chat-image`, formData, {
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'multipart/form-data' }
+      });
+      return uploadRes.data.url;
+    } catch (err) {
+      toast.error('Failed to upload image');
+      return null;
+    }
+  };
+
   const handleSend = async (e) => {
     e.preventDefault();
     const hasText = newMessage.trim();
@@ -246,7 +264,9 @@ export default function Chat() {
       if (!videoUrl) return;
       messageContent = messageContent ? `[Video: ${videoUrl}] ${messageContent}` : `[Video: ${videoUrl}]`;
     } else if (hasImage) {
-      messageContent = messageContent ? `[Image] ${messageContent}` : '[Image shared]';
+      const imageUrl = await uploadImage();
+      if (!imageUrl) return;
+      messageContent = messageContent ? `[Image: ${imageUrl}] ${messageContent}` : `[Image: ${imageUrl}]`;
     }
 
     setNewMessage('');
@@ -458,22 +478,7 @@ export default function Chat() {
                         : 'bg-card border border-border rounded-bl-md'
                     }`}
                   >
-                    {msg.content?.match(/\[Video: (https?:\/\/[^\]]+)\]/) ? (
-                      <>
-                        <video
-                          src={msg.content.match(/\[Video: (https?:\/\/[^\]]+)\]/)[1]}
-                          controls
-                          playsInline
-                          className="rounded-lg max-w-full mb-1"
-                          style={{ maxHeight: '200px' }}
-                        />
-                        {msg.content.replace(/\[Video: https?:\/\/[^\]]+\]\s*/, '').trim() && (
-                          <p className="text-sm">{msg.content.replace(/\[Video: https?:\/\/[^\]]+\]\s*/, '').trim()}</p>
-                        )}
-                      </>
-                    ) : (
-                      <p className="text-sm">{msg.content}</p>
-                    )}
+                    <MessageContent content={msg.content} />
                   </div>
                   <div className={`flex items-center gap-1 mt-1 ${isOwn ? 'justify-end' : 'justify-start'}`}>
                     <p className="text-xs text-muted-foreground">
@@ -613,6 +618,56 @@ export default function Chat() {
       </footer>
     </div>
   );
+}
+
+function MessageContent({ content }) {
+  if (!content) return null;
+
+  // Video message: [Video: URL]
+  const videoMatch = content.match(/\[Video: (https?:\/\/[^\]]+)\]/);
+  if (videoMatch) {
+    const videoUrl = videoMatch[1];
+    const rest = content.replace(/\[Video: https?:\/\/[^\]]+\]\s*/, '').trim();
+    return (
+      <>
+        <video
+          src={videoUrl}
+          controls
+          playsInline
+          className="rounded-lg max-w-full mb-1"
+          style={{ maxHeight: '200px' }}
+        />
+        {rest && <p className="text-sm">{rest}</p>}
+      </>
+    );
+  }
+
+  // Image message: [Image: URL]
+  const imageMatch = content.match(/\[Image: (https?:\/\/[^\]]+|\/uploads\/[^\]]+)\]/);
+  if (imageMatch) {
+    const imageUrl = imageMatch[1];
+    const rest = content.replace(/\[Image: [^\]]+\]\s*/, '').trim();
+    const fullUrl = imageUrl.startsWith('/') ? `${process.env.REACT_APP_BACKEND_URL}${imageUrl}` : imageUrl;
+    return (
+      <>
+        <img
+          src={fullUrl}
+          alt="Shared image"
+          className="rounded-lg max-w-full cursor-pointer mb-1"
+          style={{ maxHeight: '250px' }}
+          onClick={() => window.open(fullUrl, '_blank')}
+        />
+        {rest && <p className="text-sm">{rest}</p>}
+      </>
+    );
+  }
+
+  // Legacy "[Image shared]" text (old messages before upload was added)
+  if (content === '[Image shared]') {
+    return <p className="text-sm italic text-muted-foreground">Image shared</p>;
+  }
+
+  return <p className="text-sm">{content}</p>;
 }
 
 function InterviewRequestMessage({ msg, user, isOwn, onRespond, navigate }) {

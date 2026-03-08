@@ -495,10 +495,14 @@ async def get_my_applications(current_user: dict = Depends(get_current_user)):
         {"_id": 0}
     ).sort("created_at", -1).to_list(200)
 
-    # Enrich with job details
+    # Batch-fetch all referenced jobs in one query instead of N+1
+    job_ids = list(set(app["job_id"] for app in applications))
+    jobs_list = await db.jobs.find({"id": {"$in": job_ids}}, {"_id": 0}).to_list(None) if job_ids else []
+    jobs_map = {j["id"]: j for j in jobs_list}
+
     result = []
     for app in applications:
-        job = await db.jobs.find_one({"id": app["job_id"]}, {"_id": 0})
+        job = jobs_map.get(app["job_id"])
         status = "matched" if app.get("is_matched") else (
             "declined" if app.get("recruiter_action") == "reject" else "pending"
         )

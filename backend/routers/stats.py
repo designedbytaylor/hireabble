@@ -5,6 +5,7 @@ from fastapi import APIRouter, HTTPException, Depends
 from fastapi.responses import StreamingResponse
 from datetime import datetime, timezone, timedelta
 import io
+import asyncio
 
 # PDF Generation
 from reportlab.lib.pagesizes import letter
@@ -25,24 +26,24 @@ router = APIRouter(tags=["Stats & Utilities"])
 @router.get("/stats")
 async def get_stats(current_user: dict = Depends(get_current_user)):
     """Get user statistics"""
+    uid = current_user["id"]
     if current_user["role"] == "seeker":
-        applications = await db.applications.count_documents({"seeker_id": current_user["id"]})
-        superlikes = await db.applications.count_documents({
-            "seeker_id": current_user["id"],
-            "action": "superlike"
-        })
-        matches = await db.matches.count_documents({"seeker_id": current_user["id"]})
-        
+        applications, superlikes, matches = await asyncio.gather(
+            db.applications.count_documents({"seeker_id": uid}),
+            db.applications.count_documents({"seeker_id": uid, "action": "superlike"}),
+            db.matches.count_documents({"seeker_id": uid}),
+        )
         return {
             "applications_sent": applications,
             "super_likes_used": superlikes,
             "matches": matches
         }
     else:
-        jobs = await db.jobs.count_documents({"recruiter_id": current_user["id"]})
-        applications = await db.applications.count_documents({"recruiter_id": current_user["id"]})
-        matches = await db.matches.count_documents({"recruiter_id": current_user["id"]})
-        
+        jobs, applications, matches = await asyncio.gather(
+            db.jobs.count_documents({"recruiter_id": uid}),
+            db.applications.count_documents({"recruiter_id": uid}),
+            db.matches.count_documents({"recruiter_id": uid}),
+        )
         return {
             "jobs_posted": jobs,
             "applications_received": applications,
@@ -56,50 +57,48 @@ async def get_recruiter_stats(current_user: dict = Depends(get_current_user)):
         raise HTTPException(status_code=403, detail="Only recruiters can access this")
 
     uid = current_user["id"]
+    week_ago = (datetime.now(timezone.utc) - timedelta(days=7)).isoformat()
 
-    active_jobs = await db.jobs.count_documents({"recruiter_id": uid, "is_active": True})
-    total_jobs = await db.jobs.count_documents({"recruiter_id": uid})
-    total_applications = await db.applications.count_documents({"recruiter_id": uid})
-    pending_applications = await db.applications.count_documents({"recruiter_id": uid, "recruiter_action": None})
-    super_likes = await db.applications.count_documents({"recruiter_id": uid, "action": "superlike"})
-    matches = await db.matches.count_documents({"recruiter_id": uid})
-    interviews_scheduled = await db.interviews.count_documents({"recruiter_id": uid, "status": "accepted"})
-    interviews_pending = await db.interviews.count_documents({"recruiter_id": uid, "status": "pending"})
+    # Run all count queries in parallel
+    (
+        active_jobs, total_jobs, total_applications, pending_applications,
+        super_likes, matches, interviews_scheduled, interviews_pending,
+        responded, weekly_apps, jobs_list,
+    ) = await asyncio.gather(
+        db.jobs.count_documents({"recruiter_id": uid, "is_active": True}),
+        db.jobs.count_documents({"recruiter_id": uid}),
+        db.applications.count_documents({"recruiter_id": uid}),
+        db.applications.count_documents({"recruiter_id": uid, "recruiter_action": None}),
+        db.applications.count_documents({"recruiter_id": uid, "action": "superlike"}),
+        db.matches.count_documents({"recruiter_id": uid}),
+        db.interviews.count_documents({"recruiter_id": uid, "status": "accepted"}),
+        db.interviews.count_documents({"recruiter_id": uid, "status": "pending"}),
+        db.applications.count_documents({"recruiter_id": uid, "recruiter_action": {"$ne": None}}),
+        db.applications.count_documents({"recruiter_id": uid, "created_at": {"$gte": week_ago}}),
+        db.jobs.find({"recruiter_id": uid}, {"_id": 0, "id": 1, "title": 1}).to_list(50),
+    )
 
-    # Application response rate
-    responded = await db.applications.count_documents({
-        "recruiter_id": uid,
-        "recruiter_action": {"$ne": None}
-    })
     response_rate = round((responded / total_applications * 100) if total_applications > 0 else 0)
-
-    # Match rate (matches / total applications)
     match_rate = round((matches / total_applications * 100) if total_applications > 0 else 0)
 
-    # Weekly new applications (last 7 days)
-    week_ago = (datetime.now(timezone.utc) - timedelta(days=7)).isoformat()
-    weekly_apps = await db.applications.count_documents({
-        "recruiter_id": uid,
-        "created_at": {"$gte": week_ago}
-    })
-
-    # Applications per job (for top jobs)
-    jobs_list = await db.jobs.find(
-        {"recruiter_id": uid},
-        {"_id": 0, "id": 1, "title": 1}
-    ).to_list(50)
-
-    top_jobs = []
-    for job in jobs_list:
-        app_count = await db.applications.count_documents({"job_id": job["id"]})
-        match_count = await db.matches.count_documents({"job_id": job["id"]})
-        top_jobs.append({
-            "job_id": job["id"],
-            "title": job["title"],
-            "applications": app_count,
-            "matches": match_count,
-        })
-    top_jobs.sort(key=lambda j: j["applications"], reverse=True)
+    # Get per-job stats in parallel (not one-by-one)
+    if jobs_list:
+        job_stats = await asyncio.gather(*[
+            asyncio.gather(
+                db.applications.count_documents({"job_id": job["id"]}),
+                db.matches.count_documents({"job_id": job["id"]}),
+            )
+            for job in jobs_list
+        ])
+        top_jobs = [{
+            "job_id": jobs_list[i]["id"],
+            "title": jobs_list[i]["title"],
+            "applications": job_stats[i][0],
+            "matches": job_stats[i][1],
+        } for i in range(len(jobs_list))]
+        top_jobs.sort(key=lambda j: j["applications"], reverse=True)
+    else:
+        top_jobs = []
 
     return {
         "active_jobs": active_jobs,

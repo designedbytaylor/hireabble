@@ -95,8 +95,8 @@ export default function SeekerDashboard() {
     }
   };
 
-  const fetchJobs = async (filterParams = filters) => {
-    setLoading(true);
+  const fetchJobs = async (filterParams = filters, append = false) => {
+    if (!append) setLoading(true);
     try {
       const params = new URLSearchParams();
       if (filterParams.remote_only) {
@@ -114,8 +114,16 @@ export default function SeekerDashboard() {
       const response = await axios.get(url, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      setJobs(response.data);
-      setCurrentIndex(0);
+      if (append) {
+        setJobs(prev => {
+          const existingIds = new Set(prev.map(j => j.id));
+          const newJobs = response.data.filter(j => !existingIds.has(j.id));
+          return [...prev, ...newJobs];
+        });
+      } else {
+        setJobs(response.data);
+        setCurrentIndex(0);
+      }
     } catch (error) {
       console.error('Failed to fetch jobs:', error);
     } finally {
@@ -176,10 +184,17 @@ export default function SeekerDashboard() {
         );
       }
       
-      setCurrentIndex(prev => prev + 1);
+      const nextIndex = currentIndex + 1;
+      setCurrentIndex(nextIndex);
       setSwipeDirection(null);
       setIsAnimating(false);
+      setExpandedCard(false);
       fetchStats();
+
+      // Auto-fetch more jobs when running low (3 cards left) - endless Tinder-style
+      if (nextIndex >= jobs.length - 3) {
+        fetchJobs(filters, true);
+      }
     } catch (error) {
       toast.error(error.response?.data?.detail || 'Failed to submit');
       setSwipeDirection(null);

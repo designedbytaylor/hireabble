@@ -177,6 +177,41 @@ async def delete_video(current_user: dict = Depends(get_current_user)):
     return {"message": "Video deleted successfully"}
 
 
+@router.post("/upload/chat-image")
+async def upload_chat_image(
+    file: UploadFile = File(...),
+    current_user: dict = Depends(get_current_user)
+):
+    """Upload an image for chat messages"""
+    if file.content_type not in ALLOWED_IMAGE_TYPES:
+        raise HTTPException(status_code=400, detail="Only image files are allowed")
+
+    contents = await file.read()
+    if len(contents) > MAX_IMAGE_SIZE:
+        raise HTTPException(status_code=400, detail="Image size exceeds 5MB limit")
+
+    ext = file.filename.split('.')[-1] if '.' in file.filename else 'jpg'
+    filename = f"chat_{current_user['id']}_{uuid.uuid4().hex[:8]}.{ext}"
+
+    if _USE_SUPABASE:
+        supabase = _get_supabase()
+        try:
+            supabase.storage.from_(PHOTO_BUCKET).upload(
+                filename,
+                contents,
+                file_options={"content-type": file.content_type}
+            )
+        except Exception as e:
+            logger.error(f"Supabase chat image upload failed: {e}")
+            raise HTTPException(status_code=500, detail="Failed to upload image")
+        image_url = _public_url(PHOTO_BUCKET, filename)
+    else:
+        image_url = _save_local("photos", filename, contents)
+
+    logger.info(f"Chat image uploaded by user {current_user['id']}: {filename}")
+    return {"url": image_url, "filename": filename}
+
+
 @router.post("/upload/chat-video")
 async def upload_chat_video(
     file: UploadFile = File(...),
@@ -193,18 +228,20 @@ async def upload_chat_video(
     ext = file.filename.split('.')[-1] if '.' in file.filename else 'webm'
     filename = f"chat_{current_user['id']}_{uuid.uuid4().hex[:8]}.{ext}"
 
-    supabase = _get_supabase()
+    if _USE_SUPABASE:
+        supabase = _get_supabase()
+        try:
+            supabase.storage.from_(VIDEO_BUCKET).upload(
+                filename,
+                contents,
+                file_options={"content-type": file.content_type}
+            )
+        except Exception as e:
+            logger.error(f"Supabase chat video upload failed: {e}")
+            raise HTTPException(status_code=500, detail="Failed to upload video")
+        video_url = _public_url(VIDEO_BUCKET, filename)
+    else:
+        video_url = _save_local("videos", filename, contents)
 
-    try:
-        supabase.storage.from_(VIDEO_BUCKET).upload(
-            filename,
-            contents,
-            file_options={"content-type": file.content_type}
-        )
-    except Exception as e:
-        logger.error(f"Supabase chat video upload failed: {e}")
-        raise HTTPException(status_code=500, detail="Failed to upload video")
-
-    video_url = _public_url(VIDEO_BUCKET, filename)
     logger.info(f"Chat video uploaded by user {current_user['id']}: {filename}")
     return {"url": video_url, "filename": filename}
