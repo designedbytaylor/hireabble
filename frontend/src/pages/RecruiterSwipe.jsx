@@ -26,8 +26,6 @@ export default function RecruiterSwipe() {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState({ active_jobs: 0, total_applications: 0, super_likes: 0, matches: 0 });
-  const [swipeDirection, setSwipeDirection] = useState(null);
-  const [isAnimating, setIsAnimating] = useState(false);
   const [expandedCard, setExpandedCard] = useState(false);
   const [superSwipesRemaining, setSuperSwipesRemaining] = useState(null);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
@@ -75,34 +73,34 @@ export default function RecruiterSwipe() {
     }
   };
 
-  const handleSwipe = async (action) => {
+  const handleSwipe = (action) => {
     const items = mode === 'applicants' ? applications : candidates;
-    if (currentIndex >= items.length || isAnimating) return;
+    if (currentIndex >= items.length) return;
 
-    setIsAnimating(true);
-    setSwipeDirection(action === 'accept' || action === 'superlike' ? 'right' : 'left');
+    const item = items[currentIndex];
 
-    await new Promise(resolve => setTimeout(resolve, 200));
+    // Advance index IMMEDIATELY — next card is already visible in the stack
+    setCurrentIndex(prev => prev + 1);
+    setExpandedCard(false);
 
-    try {
-      if (mode === 'applicants') {
-        const app = items[currentIndex];
-        await axios.post(`${API}/applications/respond`,
-          { application_id: app.id, action },
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
+    // Fire-and-forget API call — don't block the UI
+    if (mode === 'applicants') {
+      axios.post(`${API}/applications/respond`,
+        { application_id: item.id, action },
+        { headers: { Authorization: `Bearer ${token}` } }
+      ).then(() => {
         if (action === 'accept') {
           toast.success("It's a match! You can now message this candidate.");
-        } else {
-          toast.info('Application passed');
         }
-      } else {
-        const candidate = items[currentIndex];
-        const swipeAction = action === 'accept' ? 'like' : action === 'superlike' ? 'superlike' : 'pass';
-        const res = await axios.post(`${API}/candidates/swipe`,
-          { seeker_id: candidate.id, action: swipeAction, job_id: candidate.best_match_job_id },
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
+      }).catch(error => {
+        toast.error(error.response?.data?.detail || 'Failed to respond');
+      });
+    } else {
+      const swipeAction = action === 'accept' ? 'like' : action === 'superlike' ? 'superlike' : 'pass';
+      axios.post(`${API}/candidates/swipe`,
+        { seeker_id: item.id, action: swipeAction, job_id: item.best_match_job_id },
+        { headers: { Authorization: `Bearer ${token}` } }
+      ).then(res => {
         if (res.data.is_matched) {
           toast.success("It's a match! You can now message this candidate.");
         } else if (swipeAction === 'superlike') {
@@ -110,24 +108,14 @@ export default function RecruiterSwipe() {
           setSuperSwipesRemaining(prev => prev ? { ...prev, remaining: prev.remaining - 1 } : prev);
         } else if (swipeAction === 'like') {
           toast.success('Liked! They\'ll be notified of your interest.');
-        } else {
-          toast.info('Passed');
         }
-      }
-
-      setCurrentIndex(prev => prev + 1);
-      setSwipeDirection(null);
-      setIsAnimating(false);
-      setExpandedCard(false);
-      if (mode === 'applicants') fetchData();
-    } catch (error) {
-      const detail = error.response?.data?.detail || 'Failed to respond';
-      if (detail.includes('Super Swipes remaining')) {
-        setShowUpgradeModal(true);
-      }
-      toast.error(detail);
-      setSwipeDirection(null);
-      setIsAnimating(false);
+      }).catch(error => {
+        const detail = error.response?.data?.detail || 'Failed to respond';
+        if (detail.includes('Super Swipes remaining')) {
+          setShowUpgradeModal(true);
+        }
+        toast.error(detail);
+      });
     }
   };
 
@@ -244,33 +232,39 @@ export default function RecruiterSwipe() {
             <>
               {/* Card Stack */}
               <div className="relative aspect-[3/4] card-stack" data-testid="applicant-deck">
-                {items.slice(currentIndex + 1, currentIndex + 3).map((_, i) => (
+                {/* Background cards — real content for instant reveal */}
+                {items.slice(currentIndex + 1, currentIndex + 3).map((bgItem, i) => (
                   <div
-                    key={i}
-                    className="absolute inset-0 rounded-3xl bg-card border border-border"
+                    key={bgItem.id || i}
+                    className="absolute inset-0 rounded-3xl overflow-hidden"
                     style={{
-                      transform: `scale(${1 - (i + 1) * 0.05}) translateY(${(i + 1) * 15}px)`,
-                      opacity: 1 - (i + 1) * 0.3,
-                      zIndex: -i - 1
+                      transform: `scale(${1 - (i + 1) * 0.04}) translateY(${(i + 1) * 12}px)`,
+                      zIndex: -(i + 1)
                     }}
-                  />
+                  >
+                    {mode === 'applicants' ? (
+                      <StaticApplicantCard app={bgItem} />
+                    ) : (
+                      <StaticCandidateCard candidate={bgItem} />
+                    )}
+                  </div>
                 ))}
 
                 {mode === 'applicants' ? (
                   <ApplicantCard
+                    key={currentItem.id}
                     app={currentItem}
                     onSwipe={(action) => handleSwipe(action)}
                     expanded={expandedCard}
                     setExpanded={setExpandedCard}
-                    swipeDirection={swipeDirection}
                   />
                 ) : (
                   <CandidateCard
+                    key={currentItem.id}
                     candidate={currentItem}
                     onSwipe={(action) => handleSwipe(action)}
                     expanded={expandedCard}
                     setExpanded={setExpandedCard}
-                    swipeDirection={swipeDirection}
                   />
                 )}
               </div>
@@ -384,7 +378,7 @@ export default function RecruiterSwipe() {
   );
 }
 
-function ApplicantCard({ app, onSwipe, expanded, setExpanded, swipeDirection }) {
+function ApplicantCard({ app, onSwipe, expanded, setExpanded }) {
   const x = useMotionValue(0);
   const y = useMotionValue(0);
   const rotate = useTransform(x, [-200, 200], [-25, 25]);
@@ -392,79 +386,38 @@ function ApplicantCard({ app, onSwipe, expanded, setExpanded, swipeDirection }) 
   const acceptOpacity = useTransform(x, [0, 60], [0, 1]);
   const rejectOpacity = useTransform(x, [-60, 0], [1, 0]);
 
-  useEffect(() => {
-    if (swipeDirection) {
-      const toX = swipeDirection === 'right' ? 1500 : -1500;
+  const handleDragEnd = (_, info) => {
+    const threshold = 60;
+    const velThreshold = 300;
+
+    if (info.offset.x > threshold || info.velocity.x > velThreshold) {
+      onSwipe('accept');
+    } else if (info.offset.x < -threshold || info.velocity.x < -velThreshold) {
+      onSwipe('reject');
+    } else {
+      // Spring back
       const startX = x.get();
+      const startY = y.get();
       const startTime = Date.now();
       const duration = 200;
 
       const animate = () => {
         const elapsed = Date.now() - startTime;
         const progress = Math.min(elapsed / duration, 1);
-        const easeProgress = 1 - Math.pow(1 - progress, 3);
-        x.set(startX + (toX - startX) * easeProgress);
+        const ease = 1 - Math.pow(1 - progress, 4);
+        x.set(startX * (1 - ease));
+        y.set(startY * (1 - ease));
         if (progress < 1) requestAnimationFrame(animate);
       };
       requestAnimationFrame(animate);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [swipeDirection]);
-
-  const handleDragEnd = (_, info) => {
-    const threshold = 60;
-    const velThreshold = 300;
-
-    if (info.offset.x > threshold || info.velocity.x > velThreshold) {
-      animateOut(1500, 'accept');
-    } else if (info.offset.x < -threshold || info.velocity.x < -velThreshold) {
-      animateOut(-1500, 'reject');
-    } else {
-      springBack();
-    }
-  };
-
-  const springBack = () => {
-    const startX = x.get();
-    const startY = y.get();
-    const startTime = Date.now();
-    const duration = 200;
-
-    const animate = () => {
-      const elapsed = Date.now() - startTime;
-      const progress = Math.min(elapsed / duration, 1);
-      const ease = 1 - Math.pow(1 - progress, 4);
-      x.set(startX * (1 - ease));
-      y.set(startY * (1 - ease));
-      if (progress < 1) requestAnimationFrame(animate);
-    };
-    requestAnimationFrame(animate);
-  };
-
-  const animateOut = (toX, action) => {
-    const startX = x.get();
-    const startTime = Date.now();
-    const duration = 150;
-
-    const animate = () => {
-      const elapsed = Date.now() - startTime;
-      const progress = Math.min(elapsed / duration, 1);
-      const ease = progress * progress;
-      x.set(startX + (toX - startX) * ease);
-      if (progress < 1) {
-        requestAnimationFrame(animate);
-      } else {
-        onSwipe(action);
-      }
-    };
-    requestAnimationFrame(animate);
   };
 
   return (
     <motion.div
-      className="absolute inset-0 cursor-grab active:cursor-grabbing"
+      className="absolute inset-0 cursor-grab active:cursor-grabbing z-[5]"
       style={{ x, y, rotate }}
-      drag={!swipeDirection}
+      drag
       dragConstraints={false}
       dragElastic={0.9}
       onDragEnd={handleDragEnd}
@@ -586,7 +539,7 @@ function ApplicantCard({ app, onSwipe, expanded, setExpanded, swipeDirection }) 
   );
 }
 
-function CandidateCard({ candidate, onSwipe, expanded, setExpanded, swipeDirection }) {
+function CandidateCard({ candidate, onSwipe, expanded, setExpanded }) {
   const x = useMotionValue(0);
   const y = useMotionValue(0);
   const rotate = useTransform(x, [-200, 200], [-25, 25]);
@@ -594,72 +547,31 @@ function CandidateCard({ candidate, onSwipe, expanded, setExpanded, swipeDirecti
   const acceptOpacity = useTransform(x, [0, 60], [0, 1]);
   const rejectOpacity = useTransform(x, [-60, 0], [1, 0]);
 
-  useEffect(() => {
-    if (swipeDirection) {
-      const toX = swipeDirection === 'right' ? 1500 : -1500;
+  const handleDragEnd = (_, info) => {
+    const threshold = 60;
+    const velThreshold = 300;
+
+    if (info.offset.x > threshold || info.velocity.x > velThreshold) {
+      onSwipe('accept');
+    } else if (info.offset.x < -threshold || info.velocity.x < -velThreshold) {
+      onSwipe('reject');
+    } else {
+      // Spring back
       const startX = x.get();
+      const startY = y.get();
       const startTime = Date.now();
       const duration = 200;
 
       const animate = () => {
         const elapsed = Date.now() - startTime;
         const progress = Math.min(elapsed / duration, 1);
-        const easeProgress = 1 - Math.pow(1 - progress, 3);
-        x.set(startX + (toX - startX) * easeProgress);
+        const ease = 1 - Math.pow(1 - progress, 4);
+        x.set(startX * (1 - ease));
+        y.set(startY * (1 - ease));
         if (progress < 1) requestAnimationFrame(animate);
       };
       requestAnimationFrame(animate);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [swipeDirection]);
-
-  const handleDragEnd = (_, info) => {
-    const threshold = 60;
-    const velThreshold = 300;
-
-    if (info.offset.x > threshold || info.velocity.x > velThreshold) {
-      animateOut(1500, 'accept');
-    } else if (info.offset.x < -threshold || info.velocity.x < -velThreshold) {
-      animateOut(-1500, 'reject');
-    } else {
-      springBack();
-    }
-  };
-
-  const springBack = () => {
-    const startX = x.get();
-    const startY = y.get();
-    const startTime = Date.now();
-    const duration = 200;
-
-    const animate = () => {
-      const elapsed = Date.now() - startTime;
-      const progress = Math.min(elapsed / duration, 1);
-      const ease = 1 - Math.pow(1 - progress, 4);
-      x.set(startX * (1 - ease));
-      y.set(startY * (1 - ease));
-      if (progress < 1) requestAnimationFrame(animate);
-    };
-    requestAnimationFrame(animate);
-  };
-
-  const animateOut = (toX, action) => {
-    const startX = x.get();
-    const startTime = Date.now();
-    const duration = 150;
-
-    const animate = () => {
-      const elapsed = Date.now() - startTime;
-      const progress = Math.min(elapsed / duration, 1);
-      const ease = progress * progress;
-      x.set(startX + (toX - startX) * ease);
-      if (progress < 1) {
-        requestAnimationFrame(animate);
-      } else {
-        onSwipe(action);
-      }
-    };
-    requestAnimationFrame(animate);
   };
 
   const matchScore = candidate.match_score || 0;
@@ -667,9 +579,9 @@ function CandidateCard({ candidate, onSwipe, expanded, setExpanded, swipeDirecti
 
   return (
     <motion.div
-      className="absolute inset-0 cursor-grab active:cursor-grabbing"
+      className="absolute inset-0 cursor-grab active:cursor-grabbing z-[5]"
       style={{ x, y, rotate }}
-      drag={!swipeDirection}
+      drag
       dragConstraints={false}
       dragElastic={0.9}
       onDragEnd={handleDragEnd}
@@ -797,5 +709,83 @@ function CandidateCard({ candidate, onSwipe, expanded, setExpanded, swipeDirecti
         </div>
       </div>
     </motion.div>
+  );
+}
+
+// Static background cards — show real content so next card is instantly visible
+function StaticApplicantCard({ app }) {
+  return (
+    <div className="w-full h-full rounded-3xl overflow-hidden relative gradient-border bg-card">
+      <div className="absolute inset-0">
+        <div className="h-[45%] relative overflow-hidden">
+          <img
+            src={getPhotoUrl(app.seeker_photo || app.seeker_avatar, app.seeker_id)}
+            alt={app.seeker_name}
+            className="w-full h-full object-cover"
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-card via-transparent to-transparent" />
+        </div>
+        <div className="absolute inset-0 top-[40%] bg-card" />
+      </div>
+      {app.action === 'superlike' && (
+        <div className="absolute top-4 right-4 z-20 px-3 py-1 rounded-full bg-gradient-to-r from-secondary to-pink-500 text-white text-xs font-bold flex items-center gap-1 shadow-lg">
+          <Star className="w-3 h-3 fill-white" /> Super Like
+        </div>
+      )}
+      <div className="absolute inset-0 top-[35%] flex flex-col p-6 z-10">
+        <h2 className="text-2xl font-bold font-['Outfit']">{app.seeker_name}</h2>
+        <p className="text-primary text-sm mt-1">{app.seeker_title || 'Job Seeker'}</p>
+        <div className="flex flex-wrap gap-2 mt-4">
+          {app.seeker_experience && (
+            <span className="px-3 py-1.5 rounded-full bg-primary/20 text-primary text-sm flex items-center gap-1">
+              <Clock className="w-3.5 h-3.5" />
+              {app.seeker_experience}+ yrs
+            </span>
+          )}
+          {app.seeker_location && (
+            <span className="px-3 py-1.5 rounded-full bg-secondary/20 text-secondary text-sm flex items-center gap-1">
+              <MapPin className="w-3.5 h-3.5" />
+              {app.seeker_location}
+            </span>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function StaticCandidateCard({ candidate }) {
+  return (
+    <div className="w-full h-full rounded-3xl overflow-hidden relative gradient-border bg-card">
+      <div className="absolute inset-0">
+        <div className="h-[45%] relative overflow-hidden">
+          <img
+            src={getPhotoUrl(candidate.photo_url || candidate.avatar, candidate.id)}
+            alt={candidate.name}
+            className="w-full h-full object-cover"
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-card via-transparent to-transparent" />
+        </div>
+        <div className="absolute inset-0 top-[40%] bg-card" />
+      </div>
+      <div className="absolute inset-0 top-[35%] flex flex-col p-6 z-10">
+        <h2 className="text-2xl font-bold font-['Outfit']">{candidate.name}</h2>
+        <p className="text-primary text-sm mt-1">{candidate.title || 'Job Seeker'}</p>
+        <div className="flex flex-wrap gap-2 mt-4">
+          {candidate.experience_years && (
+            <span className="px-3 py-1.5 rounded-full bg-primary/20 text-primary text-sm flex items-center gap-1">
+              <Clock className="w-3.5 h-3.5" />
+              {candidate.experience_years}+ yrs
+            </span>
+          )}
+          {candidate.location && (
+            <span className="px-3 py-1.5 rounded-full bg-secondary/20 text-secondary text-sm flex items-center gap-1">
+              <MapPin className="w-3.5 h-3.5" />
+              {candidate.location}
+            </span>
+          )}
+        </div>
+      </div>
+    </div>
   );
 }
