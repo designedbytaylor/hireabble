@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Send, Briefcase, User, Wifi, WifiOff, Flag, Calendar, CheckCheck, Check, Image, X, Video, Square, Loader2, Clock, Phone, MapPin } from 'lucide-react';
+import { ArrowLeft, Send, Briefcase, User, Wifi, WifiOff, Flag, Calendar, CheckCheck, Check, Image, X, Video, Square, Loader2, Clock, Phone, MapPin, FileText } from 'lucide-react';
 import ReportDialog from '../components/ReportDialog';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -432,6 +432,19 @@ export default function Chat() {
               );
             }
 
+            // Special rendering for reference request messages
+            if (msg.message_type === 'reference_request') {
+              return (
+                <ReferenceRequestMessage
+                  key={msg.id}
+                  msg={msg}
+                  user={user}
+                  isOwn={isOwn}
+                  token={token}
+                />
+              );
+            }
+
             return (
               <div
                 key={msg.id}
@@ -779,6 +792,90 @@ function InterviewRequestMessage({ msg, user, isOwn, onRespond, navigate }) {
             <div className="py-2 rounded-xl bg-green-500/10 text-green-500 text-sm text-center font-medium">
               Response sent
             </div>
+          </div>
+        )}
+
+        {/* Timestamp */}
+        <div className="px-4 pb-2">
+          <p className="text-xs text-muted-foreground text-center">
+            {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ReferenceRequestMessage({ msg, user, isOwn, token }) {
+  const [responded, setResponded] = useState(false);
+  const [responseStatus, setResponseStatus] = useState(null);
+  const requestId = msg.data?.request_id;
+  const isRecipient = !isOwn; // Seeker receives the reference request
+  const recruiterName = msg.data?.recruiter_name || 'A recruiter';
+  const company = msg.data?.company || '';
+
+  const handleRespond = async (approve) => {
+    if (!requestId) return;
+    try {
+      await axios.post(`${API}/references/respond/${requestId}`,
+        { approve },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      setResponded(true);
+      setResponseStatus(approve ? 'approved' : 'denied');
+      toast.success(approve ? 'References shared!' : 'Request declined');
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Failed to respond');
+    }
+  };
+
+  return (
+    <div className="flex justify-center my-3">
+      <div className="w-[90%] max-w-sm rounded-2xl border border-secondary/30 bg-card overflow-hidden">
+        {/* Header */}
+        <div className="bg-secondary/10 px-4 py-3 flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-secondary/20 flex items-center justify-center">
+            <FileText className="w-5 h-5 text-secondary" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="font-bold text-sm font-['Outfit']">Reference Request</p>
+            <p className="text-xs text-muted-foreground">
+              {isOwn ? `You requested references` : `${recruiterName}${company ? ` from ${company}` : ''}`}
+            </p>
+          </div>
+          {responded && (
+            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+              responseStatus === 'approved' ? 'bg-success/20 text-success' : 'bg-destructive/20 text-destructive'
+            }`}>
+              {responseStatus === 'approved' ? 'Shared' : 'Declined'}
+            </span>
+          )}
+        </div>
+
+        {/* Content */}
+        <div className="px-4 py-3">
+          <p className="text-sm text-muted-foreground">
+            {isOwn
+              ? 'You requested to see their professional references.'
+              : 'is requesting to see your professional references.'}
+          </p>
+        </div>
+
+        {/* Action buttons for recipient (seeker) */}
+        {isRecipient && !responded && requestId && (
+          <div className="px-4 pb-3 flex gap-2">
+            <button
+              onClick={() => handleRespond(false)}
+              className="flex-1 py-2.5 rounded-xl border border-red-500/30 text-red-500 text-sm font-medium hover:bg-red-500/10 transition-colors flex items-center justify-center gap-1.5"
+            >
+              <X className="w-4 h-4" /> Deny
+            </button>
+            <button
+              onClick={() => handleRespond(true)}
+              className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-primary to-secondary text-white text-sm font-medium transition-colors flex items-center justify-center gap-1.5 hover:opacity-90"
+            >
+              <Check className="w-4 h-4" /> Approve
+            </button>
           </div>
         )}
 

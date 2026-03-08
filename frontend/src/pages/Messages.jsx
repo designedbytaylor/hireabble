@@ -69,70 +69,76 @@ export default function Messages() {
 
       <main className="relative z-10 px-6 md:px-8">
         <div className="max-w-lg mx-auto">
-          {matches.length > 0 ? (
-            <div className="space-y-2">
-              {matches.map((match) => {
-                const isSeeker = user?.role === 'seeker';
-                const name = isSeeker ? (match.company || match.recruiter_name) : match.seeker_name;
-                const subtitle = match.job_title;
+          {(() => {
+            // Only show matches that have actual messages (not empty "No messages yet")
+            const withMessages = matches.filter(m => m.last_message);
+            const withoutMessages = matches.filter(m => !m.last_message);
 
-                return (
-                  <button
-                    key={match.id}
-                    onClick={() => navigate(`/chat/${match.id}`)}
-                    className="w-full glass-card rounded-2xl p-4 hover:border-primary/30 transition-colors text-left flex items-center gap-4"
-                  >
-                    {isSeeker ? (
-                      <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary to-secondary flex items-center justify-center shrink-0">
-                        <Building2 className="w-6 h-6 text-white" />
-                      </div>
-                    ) : (
-                      <img
-                        src={getPhotoUrl(match.seeker_avatar, match.seeker_id)}
-                        alt={match.seeker_name}
-                        className="w-12 h-12 rounded-xl object-cover border-2 border-primary/50 shrink-0"
-                      />
-                    )}
+            return (
+              <>
+                {withMessages.length > 0 ? (
+                  <div className="space-y-2">
+                    {withMessages.map((match) => {
+                      const isSeeker = user?.role === 'seeker';
+                      const name = isSeeker ? (match.company || match.recruiter_name) : match.seeker_name;
+                      const subtitle = match.job_title;
 
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between">
-                        <h3 className="font-semibold truncate">{name}</h3>
-                        {match.last_message_at && (
-                          <span className="text-xs text-muted-foreground shrink-0 ml-2">
-                            {formatTime(match.last_message_at)}
-                          </span>
-                        )}
-                      </div>
-                      <p className="text-xs text-muted-foreground">{subtitle}</p>
-                      {match.last_message ? (
-                        <p className="text-sm text-muted-foreground truncate mt-1">
-                          {match.last_message_sender === user?.id ? 'You: ' : ''}{match.last_message}
-                        </p>
-                      ) : (
-                        <p className="text-sm text-muted-foreground/50 italic mt-1">No messages yet</p>
-                      )}
+                      return (
+                        <button
+                          key={match.id}
+                          onClick={() => navigate(`/chat/${match.id}`)}
+                          className="w-full glass-card rounded-2xl p-4 hover:border-primary/30 transition-colors text-left flex items-center gap-4"
+                        >
+                          {isSeeker ? (
+                            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary to-secondary flex items-center justify-center shrink-0">
+                              <Building2 className="w-6 h-6 text-white" />
+                            </div>
+                          ) : (
+                            <img
+                              src={getPhotoUrl(match.seeker_avatar, match.seeker_id)}
+                              alt={match.seeker_name}
+                              className="w-12 h-12 rounded-xl object-cover border-2 border-primary/50 shrink-0"
+                            />
+                          )}
+
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center justify-between">
+                              <h3 className="font-semibold truncate">{name}</h3>
+                              {match.last_message_at && (
+                                <span className="text-xs text-muted-foreground shrink-0 ml-2">
+                                  {formatTime(match.last_message_at)}
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-xs text-muted-foreground">{subtitle}</p>
+                            <p className="text-sm text-muted-foreground truncate mt-1">
+                              {match.last_message_sender === user?.id ? 'You: ' : ''}{match.last_message}
+                            </p>
+                          </div>
+
+                          {match.unread_count > 0 && (
+                            <span className="w-6 h-6 rounded-full bg-primary text-xs font-bold flex items-center justify-center shrink-0">
+                              {match.unread_count}
+                            </span>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="glass-card rounded-3xl p-12 text-center">
+                    <div className="w-20 h-20 rounded-full bg-primary/20 flex items-center justify-center mx-auto mb-6">
+                      <MessageCircle className="w-10 h-10 text-primary" />
                     </div>
-
-                    {match.unread_count > 0 && (
-                      <span className="w-6 h-6 rounded-full bg-primary text-xs font-bold flex items-center justify-center shrink-0">
-                        {match.unread_count}
-                      </span>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-          ) : (
-            <div className="glass-card rounded-3xl p-12 text-center">
-              <div className="w-20 h-20 rounded-full bg-primary/20 flex items-center justify-center mx-auto mb-6">
-                <MessageCircle className="w-10 h-10 text-primary" />
-              </div>
-              <h2 className="text-2xl font-bold font-['Outfit'] mb-3">No Messages</h2>
-              <p className="text-muted-foreground max-w-xs mx-auto">
-                When you match with someone, you can start chatting here.
-              </p>
-            </div>
-          )}
+                    <h2 className="text-2xl font-bold font-['Outfit'] mb-3">No Messages</h2>
+                    <p className="text-muted-foreground max-w-xs mx-auto">
+                      Messages from chats, interview requests, and reference requests will appear here.
+                    </p>
+                  </div>
+                )}
+              </>
+            );
+          })()}
         </div>
       </main>
 

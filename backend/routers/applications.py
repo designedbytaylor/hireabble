@@ -205,14 +205,34 @@ async def get_applications(
         query["job_id"] = job_id
 
     applications = await db.applications.find(query, {"_id": 0}).sort("created_at", -1).to_list(100)
-    # Sort: superlikes first (priority applicants), then regular
-    applications.sort(key=lambda a: (0 if a.get("action") == "superlike" else 1, a.get("created_at", "")), reverse=False)
-    # Re-reverse so newest first within each group
+
+    # Check seeker subscription status for priority sorting
+    now = datetime.now(timezone.utc).isoformat()
+    seeker_ids = list(set(a.get("seeker_id") for a in applications if a.get("seeker_id")))
+    premium_seekers = set()
+    if seeker_ids:
+        seekers = await db.users.find(
+            {"id": {"$in": seeker_ids}},
+            {"_id": 0, "id": 1, "subscription": 1}
+        ).to_list(None)
+        for s in seekers:
+            sub = s.get("subscription", {})
+            if sub.get("status") == "active" and sub.get("period_end", "") >= now:
+                premium_seekers.add(s["id"])
+
+    # Mark premium applicants
+    for app in applications:
+        if app.get("seeker_id") in premium_seekers:
+            app["is_premium_seeker"] = True
+
+    # Sort: superlikes first, then premium seekers, then regular - newest first within each group
     superlikes = [a for a in applications if a.get("action") == "superlike"]
-    regulars = [a for a in applications if a.get("action") != "superlike"]
+    premium_regulars = [a for a in applications if a.get("action") != "superlike" and a.get("is_premium_seeker")]
+    regulars = [a for a in applications if a.get("action") != "superlike" and not a.get("is_premium_seeker")]
     superlikes.sort(key=lambda a: a.get("created_at", ""), reverse=True)
+    premium_regulars.sort(key=lambda a: a.get("created_at", ""), reverse=True)
     regulars.sort(key=lambda a: a.get("created_at", ""), reverse=True)
-    applications = superlikes + regulars
+    applications = superlikes + premium_regulars + regulars
     return applications
 
 
@@ -373,8 +393,9 @@ async def request_references(seeker_id: str, current_user: dict = Depends(get_cu
             match_id=match["id"],
             sender_id=current_user["id"],
             sender_name=current_user["name"],
-            content=f"📋 Reference Request\n\n{current_user['name']} from {company} is requesting your professional references.\n\nYou can approve or deny this request in your Profile page.",
-            msg_type="reference_request"
+            content=f"📋 Reference Request\n\n{current_user['name']} from {company} is requesting your professional references.",
+            msg_type="reference_request",
+            data={"request_id": request_doc["id"], "recruiter_id": current_user["id"], "recruiter_name": current_user["name"], "company": company}
         )
 
     return {"message": "Reference request sent", "request_id": request_doc["id"]}
