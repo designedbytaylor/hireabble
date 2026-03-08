@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, memo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence, useMotionValue, useTransform } from 'framer-motion';
 import { X, Heart, Star, Briefcase, MapPin, DollarSign, Building2, Clock, ChevronDown, Filter, SlidersHorizontal, Zap, CheckCircle, Globe, Wifi, Navigation2, Info, Calendar } from 'lucide-react';
@@ -58,10 +58,13 @@ export default function SeekerDashboard() {
   const [detectingLocation, setDetectingLocation] = useState(false);
 
   useEffect(() => {
-    fetchJobs();
-    fetchStats();
-    fetchProfileCompleteness();
-    fetchSuperLikesRemaining();
+    // Fire all initial API calls in parallel — don't wait for one to finish before starting the next
+    Promise.all([
+      fetchJobs(),
+      fetchStats(),
+      fetchProfileCompleteness(),
+      fetchSuperLikesRemaining(),
+    ]);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -148,6 +151,21 @@ export default function SeekerDashboard() {
     fetchJobs(filters, true).finally(() => { fetchingMoreRef.current = false; });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filters]);
+
+  // Preload images for the next few cards so swipes feel instant
+  useEffect(() => {
+    const upcoming = jobs.slice(currentIndex, currentIndex + 5);
+    upcoming.forEach((job) => {
+      if (job.background_image) {
+        const img = new Image();
+        img.src = job.background_image;
+      }
+      if (job.company_logo) {
+        const img = new Image();
+        img.src = job.company_logo;
+      }
+    });
+  }, [currentIndex, jobs]);
 
   const handleSwipe = (action, exitDirection = { x: 0, y: 0 }) => {
     if (currentIndex >= jobs.length) return;
@@ -257,10 +275,10 @@ export default function SeekerDashboard() {
 
   return (
     <div className="min-h-screen bg-background pb-24">
-      {/* Background Effects */}
-      <div className="fixed inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-0 left-1/4 w-96 h-96 bg-primary/10 rounded-full blur-[150px]" />
-        <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-secondary/10 rounded-full blur-[150px]" />
+      {/* Background Effects — reduced blur for mobile perf */}
+      <div className="fixed inset-0 overflow-hidden pointer-events-none will-change-transform">
+        <div className="absolute top-0 left-1/4 w-96 h-96 bg-primary/10 rounded-full blur-3xl" />
+        <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-secondary/10 rounded-full blur-3xl" />
       </div>
 
       {/* Header */}
@@ -713,8 +731,8 @@ const formatSalary = (min, max) => {
   return `Up to ${format(max)}`;
 };
 
-// Static card for the background stack — no drag, no animation, just content
-function StaticJobCard({ job }) {
+// Static card for the background stack — memoized to avoid re-renders on every swipe
+const StaticJobCard = memo(function StaticJobCard({ job }) {
   return (
     <div className="w-full h-full rounded-3xl overflow-hidden relative gradient-border">
       <div className="absolute inset-0">
@@ -756,7 +774,7 @@ function StaticJobCard({ job }) {
       </div>
     </div>
   );
-}
+});
 
 // Card that's been swiped — animates off-screen then disappears
 function ExitingCard({ card }) {

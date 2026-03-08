@@ -4,9 +4,10 @@ A Tinder-style job matching platform
 
 This is the main entry point that combines all routers.
 """
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Request, Response
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.cors import CORSMiddleware
+from starlette.middleware.gzip import GZipMiddleware
 from pathlib import Path
 from datetime import datetime, timezone
 import json
@@ -29,6 +30,9 @@ app = FastAPI(
 # Mount static files for uploads
 app.mount("/uploads", StaticFiles(directory=str(UPLOADS_DIR)), name="uploads")
 
+# GZip compression — compress responses > 500 bytes (huge win on mobile)
+app.add_middleware(GZipMiddleware, minimum_size=500)
+
 # CORS middleware
 app.add_middleware(
     CORSMiddleware,
@@ -37,6 +41,20 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+# Cache headers for uploads (images/videos) — browsers will cache for 1 hour
+@app.middleware("http")
+async def add_cache_headers(request: Request, call_next):
+    response = await call_next(request)
+    path = request.url.path
+    # Long cache for uploaded media (images, videos)
+    if path.startswith("/uploads/"):
+        response.headers["Cache-Control"] = "public, max-age=3600, immutable"
+    # Cache API responses that don't change often
+    elif path in ("/api/health", "/"):
+        response.headers["Cache-Control"] = "public, max-age=60"
+    return response
 
 # Include all routers with /api prefix
 app.include_router(auth.router, prefix="/api")
@@ -204,8 +222,14 @@ async def startup():
     await db.jobs.create_index("recruiter_id")
     await db.applications.create_index("id", unique=True)
     await db.applications.create_index([("job_id", 1), ("seeker_id", 1)])
+    await db.applications.create_index("seeker_id")
+    await db.applications.create_index("recruiter_id")
+    await db.applications.create_index([("seeker_id", 1), ("created_at", -1)])
     await db.matches.create_index("id", unique=True)
+    await db.matches.create_index([("seeker_id", 1), ("recruiter_id", 1)])
+    await db.matches.create_index("last_message_at")
     await db.messages.create_index("match_id")
+    await db.messages.create_index([("receiver_id", 1), ("is_read", 1)])
     await db.notifications.create_index([("user_id", 1), ("is_read", 1)])
     await db.password_reset_tokens.create_index("token", unique=True)
     await db.password_reset_tokens.create_index("expires_at", expireAfterSeconds=0)
