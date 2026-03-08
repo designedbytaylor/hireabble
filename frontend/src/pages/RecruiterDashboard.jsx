@@ -49,6 +49,7 @@ export default function RecruiterDashboard() {
   const [resumeData, setResumeData] = useState(null);
   const [loadingResume, setLoadingResume] = useState(false);
   const [requestingRefs, setRequestingRefs] = useState(false);
+  const [subscription, setSubscription] = useState(null);
 
   useEffect(() => {
     fetchData();
@@ -57,14 +58,16 @@ export default function RecruiterDashboard() {
 
   const fetchData = async () => {
     try {
-      const [statsRes, jobsRes, appsRes] = await Promise.all([
+      const [statsRes, jobsRes, appsRes, subRes] = await Promise.all([
         axios.get(`${API}/stats/recruiter`, { headers: { Authorization: `Bearer ${token}` } }),
         axios.get(`${API}/jobs/recruiter`, { headers: { Authorization: `Bearer ${token}` } }),
-        axios.get(`${API}/applications`, { headers: { Authorization: `Bearer ${token}` } })
+        axios.get(`${API}/applications`, { headers: { Authorization: `Bearer ${token}` } }),
+        axios.get(`${API}/payments/subscription`, { headers: { Authorization: `Bearer ${token}` } })
       ]);
       setStats(statsRes.data);
       setJobs(jobsRes.data);
       setApplications(appsRes.data);
+      setSubscription(subRes.data);
     } catch (error) {
       console.error('Failed to fetch data:', error);
     } finally {
@@ -279,7 +282,7 @@ export default function RecruiterDashboard() {
               {applications.slice(0, 10).map((app, appIndex) => (
                 <PremiumBlur
                   key={app.id}
-                  isUnlocked={appIndex < 3}
+                  isUnlocked={subscription?.subscribed || appIndex < 3}
                   tierHint="recruiter_pro"
                   trigger="blurred"
                 >
