@@ -821,6 +821,8 @@ async def seed_test_data(body: dict = {}, admin: dict = Depends(get_current_admi
         await db.matches.delete_many({"$or": [{"seeker_id": {"$in": old_ids}}, {"recruiter_id": {"$in": old_ids}}]})
         await db.messages.delete_many({"$or": [{"sender_id": {"$in": old_ids}}, {"receiver_id": {"$in": old_ids}}]})
         await db.notifications.delete_many({"user_id": {"$in": old_ids}})
+        await db.recruiter_swipes.delete_many({"$or": [{"recruiter_id": {"$in": old_ids}}, {"seeker_id": {"$in": old_ids}}]})
+        await db.interviews.delete_many({"$or": [{"seeker_id": {"$in": old_ids}}, {"recruiter_id": {"$in": old_ids}}]})
 
     # Create seekers with random unique names
     for i in range(num_seekers):
@@ -1005,6 +1007,10 @@ async def clear_test_data(admin: dict = Depends(get_current_admin)):
     ]})
     messages_del = await db.messages.delete_many({"sender_id": {"$in": test_user_ids}})
     notif_del = await db.notifications.delete_many({"user_id": {"$in": test_user_ids}})
+    swipes_del = await db.recruiter_swipes.delete_many({"$or": [
+        {"recruiter_id": {"$in": test_user_ids}},
+        {"seeker_id": {"$in": test_user_ids}},
+    ]})
     users_del = await db.users.delete_many({"id": {"$in": test_user_ids}})
 
     return {
@@ -1017,5 +1023,6 @@ async def clear_test_data(admin: dict = Depends(get_current_admin)):
             "interviews": interviews_del.deleted_count,
             "messages": messages_del.deleted_count,
             "notifications": notif_del.deleted_count,
+            "recruiter_swipes": swipes_del.deleted_count,
         }
     }
