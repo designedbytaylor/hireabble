@@ -45,6 +45,7 @@ export default function SeekerDashboard() {
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [exitingCards, setExitingCards] = useState([]); // cards animating off-screen
   const fetchingMoreRef = useRef(false);
+  const swipedIdsRef = useRef(new Set());
   const [filters, setFilters] = useState({
     job_type: '',
     experience_level: '',
@@ -167,7 +168,7 @@ export default function SeekerDashboard() {
     });
   }, [currentIndex, jobs]);
 
-  const handleSwipe = (action, exitDirection = { x: 0, y: 0 }) => {
+  const handleSwipe = (action, exitDirection = { x: 0, y: 0 }, dragPos = { x: 0, y: 0 }) => {
     if (currentIndex >= jobs.length) return;
 
     // Check super like limit before sending - show paywall
@@ -178,13 +179,17 @@ export default function SeekerDashboard() {
 
     const job = jobs[currentIndex];
 
+    // Prevent double-swiping the same job
+    if (swipedIdsRef.current.has(job.id)) return;
+    swipedIdsRef.current.add(job.id);
+
     // Advance index IMMEDIATELY — next card is already visible in the stack
     const nextIndex = currentIndex + 1;
     setCurrentIndex(nextIndex);
     setExpandedCard(false);
 
-    // Add to exiting cards for fly-out animation
-    setExitingCards(prev => [...prev, { job, action, exitDirection, id: job.id }]);
+    // Add to exiting cards — start from where the user released the drag
+    setExitingCards(prev => [...prev, { job, action, exitDirection, id: job.id, startX: dragPos.x, startY: dragPos.y }]);
 
     // Clean up exiting cards after animation completes
     setTimeout(() => {
@@ -776,13 +781,13 @@ const StaticJobCard = memo(function StaticJobCard({ job }) {
   );
 });
 
-// Card that's been swiped — animates off-screen then disappears
+// Card that's been swiped — animates off-screen from where user released it
 function ExitingCard({ card }) {
-  const { exitDirection, action } = card;
+  const { exitDirection, action, startX = 0, startY = 0 } = card;
   return (
     <motion.div
       className="absolute inset-0 z-10"
-      initial={{ x: 0, y: 0, rotate: 0 }}
+      initial={{ x: startX, y: startY, rotate: startX > 0 ? (startX / 200) * 25 : startX < 0 ? (startX / 200) * 25 : 0 }}
       animate={{
         x: exitDirection.x,
         y: exitDirection.y,
@@ -826,13 +831,14 @@ function SwipeCard({ job, onSwipe, expanded, setExpanded }) {
   const handleDragEnd = (_, info) => {
     const swipeThreshold = 60;
     const velocityThreshold = 300;
+    const pos = { x: x.get(), y: y.get() };
 
     if (info.offset.y < -swipeThreshold || info.velocity.y < -velocityThreshold) {
-      onSwipe('superlike', { x: 0, y: -1500 });
+      onSwipe('superlike', { x: 0, y: -1500 }, pos);
     } else if (info.offset.x > swipeThreshold || info.velocity.x > velocityThreshold) {
-      onSwipe('like', { x: 1500, y: 0 });
+      onSwipe('like', { x: 1500, y: 0 }, pos);
     } else if (info.offset.x < -swipeThreshold || info.velocity.x < -velocityThreshold) {
-      onSwipe('pass', { x: -1500, y: 0 });
+      onSwipe('pass', { x: -1500, y: 0 }, pos);
     } else {
       // Spring back
       const startX = x.get();
