@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { User, Mail, Briefcase, MapPin, Save, LogOut, Building2, Download, Upload, CheckCircle, AlertCircle, Lock, Eye, EyeOff, ChevronDown, Plus, Trash2, GraduationCap, Award, Clock, Navigation2, Bell, BellOff } from 'lucide-react';
+import { User, Mail, Briefcase, MapPin, Save, LogOut, Building2, Download, Upload, CheckCircle, AlertCircle, Lock, Eye, EyeOff, ChevronDown, Plus, Trash2, GraduationCap, Award, Clock, Navigation2, Bell, BellOff, CreditCard, Crown, ExternalLink } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
@@ -56,6 +56,7 @@ export default function Profile() {
   const [references, setReferences] = useState([]);
   const [referencesHidden, setReferencesHidden] = useState(true);
   const [referenceRequests, setReferenceRequests] = useState([]);
+  const [subscription, setSubscription] = useState(null);
 
   useEffect(() => {
     if (user) {
@@ -78,6 +79,7 @@ export default function Profile() {
       setReferencesHidden(user.references_hidden !== false);
       fetchCompleteness();
       fetchReferenceRequests();
+      fetchSubscription();
     }
     // Check push notification status
     if (pushSupported) {
@@ -112,6 +114,17 @@ export default function Profile() {
       setReferenceRequests(response.data);
     } catch (error) {
       console.error('Failed to fetch reference requests:', error);
+    }
+  };
+
+  const fetchSubscription = async () => {
+    try {
+      const response = await axios.get(`${API}/payments/subscription`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setSubscription(response.data);
+    } catch (error) {
+      // Subscription endpoint may not exist for all users
     }
   };
 
@@ -303,14 +316,16 @@ export default function Profile() {
       {/* Profile Card */}
       <main className="relative z-10 px-6 md:px-8">
         <div className="max-w-lg mx-auto">
-          {/* Upgrade Banner */}
-          <div className="mb-6">
-            <UpgradePrompt
-              title={user?.role === 'recruiter' ? 'Upgrade to Pro' : 'Upgrade to Plus'}
-              subtitle="Unlock premium features and stand out from the crowd"
-              tierHint={user?.role === 'recruiter' ? 'recruiter_pro' : 'seeker_plus'}
-            />
-          </div>
+          {/* Upgrade Banner - hide if subscribed */}
+          {!subscription?.subscribed && (
+            <div className="mb-6">
+              <UpgradePrompt
+                title={user?.role === 'recruiter' ? 'Upgrade to Pro' : 'Upgrade to Plus'}
+                subtitle="Unlock premium features and stand out from the crowd"
+                tierHint={user?.role === 'recruiter' ? 'recruiter_pro' : 'seeker_plus'}
+              />
+            </div>
+          )}
 
           {/* Avatar Section */}
           <div className="glass-card rounded-3xl p-8 mb-6 text-center">
@@ -345,6 +360,38 @@ export default function Profile() {
               {user?.role}
             </span>
           </div>
+
+          {/* Subscription Management */}
+          {subscription?.subscribed && (
+            <div className="glass-card rounded-2xl p-5 mb-6">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-500 to-yellow-400 flex items-center justify-center">
+                  <Crown className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <h3 className="font-semibold font-['Outfit']">
+                    {subscription.plan_name || (user?.role === 'recruiter' ? 'Recruiter Pro' : 'Seeker Plus')}
+                  </h3>
+                  <p className="text-xs text-muted-foreground">Active subscription</p>
+                </div>
+              </div>
+              {subscription.period_end && (
+                <p className="text-sm text-muted-foreground mb-3">
+                  Renews {new Date(subscription.period_end).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+                </p>
+              )}
+              <a
+                href="https://apps.apple.com/account/subscriptions"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-2 text-sm text-primary hover:underline"
+              >
+                <CreditCard className="w-4 h-4" />
+                Manage Subscription
+                <ExternalLink className="w-3 h-3" />
+              </a>
+            </div>
+          )}
 
           {/* Profile Completeness (Seeker Only) */}
           {user?.role === 'seeker' && (

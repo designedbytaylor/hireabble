@@ -354,6 +354,7 @@ class ApplicationResponse(BaseModel):
     seeker_degree: Optional[str] = None
     seeker_location: Optional[str] = None
     seeker_current_employer: Optional[str] = None
+    job_title: Optional[str] = None
     action: str
     is_matched: bool = False
     recruiter_action: Optional[str] = None
