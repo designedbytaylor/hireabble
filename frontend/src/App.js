@@ -27,6 +27,7 @@ import AdminReports from "./pages/admin/AdminReports";
 import AdminSettings from "./pages/admin/AdminSettings";
 import AdminTesting from "./pages/admin/AdminTesting";
 import Messages from "./pages/Messages";
+import Upgrade from "./pages/Upgrade";
 import Impersonate from "./pages/Impersonate";
 
 const ProtectedRoute = ({ children, allowedRoles }) => {
@@ -217,6 +218,15 @@ function AppRoutes() {
         element={
           <ProtectedRoute allowedRoles={['recruiter']}>
             <RecruiterAnalytics />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/upgrade"
+        element={
+          <ProtectedRoute>
+            <Upgrade />
           </ProtectedRoute>
         }
       />

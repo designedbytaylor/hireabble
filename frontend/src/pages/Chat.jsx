@@ -605,8 +605,12 @@ export default function Chat() {
 function InterviewRequestMessage({ msg, user, isOwn, onRespond, navigate }) {
   const [selectedTime, setSelectedTime] = useState(null);
   const [responded, setResponded] = useState(false);
+  const [showSuggestTime, setShowSuggestTime] = useState(false);
+  const [suggestedDate, setSuggestedDate] = useState('');
+  const [suggestedTime, setSuggestedTime] = useState('');
   const interviewId = msg.data?.interview_id;
   const isRecipient = !isOwn; // The seeker receives the interview request
+  const interviewStatus = msg.data?.status;
 
   // Parse proposed times from message content
   const lines = msg.content?.split('\n') || [];
@@ -626,6 +630,12 @@ function InterviewRequestMessage({ msg, user, isOwn, onRespond, navigate }) {
     setResponded(true);
   };
 
+  const handleSuggestNewTime = () => {
+    setShowSuggestTime(true);
+  };
+
+  const isAlreadyResolved = interviewStatus === 'accepted' || interviewStatus === 'declined';
+
   return (
     <div className="flex justify-center my-3">
       <div className="w-[90%] max-w-sm rounded-2xl border border-primary/30 bg-card overflow-hidden">
@@ -638,23 +648,30 @@ function InterviewRequestMessage({ msg, user, isOwn, onRespond, navigate }) {
             <p className="font-bold text-sm font-['Outfit'] truncate">{titleLine.replace('📅 ', '')}</p>
             {typeLine && <p className="text-xs text-muted-foreground">{typeLine}</p>}
           </div>
+          {isAlreadyResolved && (
+            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+              interviewStatus === 'accepted' ? 'bg-success/20 text-success' : 'bg-destructive/20 text-destructive'
+            }`}>
+              {interviewStatus === 'accepted' ? 'Accepted' : 'Declined'}
+            </span>
+          )}
         </div>
 
         {/* Time slots */}
         <div className="px-4 py-3 space-y-2">
           <p className="text-xs text-muted-foreground font-medium">
-            {isRecipient && !responded ? 'Select a time to accept:' : 'Proposed times:'}
+            {isRecipient && !responded && !isAlreadyResolved ? 'Select a time to accept:' : 'Proposed times:'}
           </p>
           {timeLines.map((line, i) => (
             <button
               key={i}
               type="button"
-              disabled={!isRecipient || responded}
+              disabled={!isRecipient || responded || isAlreadyResolved}
               onClick={() => setSelectedTime(i)}
               className={`w-full p-2.5 rounded-xl border text-left text-sm transition-colors ${
                 selectedTime === i
                   ? 'border-primary bg-primary/10 text-primary'
-                  : isRecipient && !responded
+                  : isRecipient && !responded && !isAlreadyResolved
                     ? 'border-border bg-background hover:border-primary/30'
                     : 'border-border bg-background'
               }`}
@@ -667,27 +684,82 @@ function InterviewRequestMessage({ msg, user, isOwn, onRespond, navigate }) {
           ))}
         </div>
 
-        {/* Action buttons for recipient (seeker) */}
-        {isRecipient && !responded && (
-          <div className="px-4 pb-3 flex gap-2">
-            <button
-              onClick={handleDecline}
-              className="flex-1 py-2 rounded-xl border border-red-500/30 text-red-500 text-sm font-medium hover:bg-red-500/10 transition-colors flex items-center justify-center gap-1"
-            >
-              <X className="w-4 h-4" /> Decline
-            </button>
-            <button
-              onClick={handleAccept}
-              disabled={selectedTime === null}
-              className={`flex-1 py-2 rounded-xl text-sm font-medium transition-colors flex items-center justify-center gap-1 ${
-                selectedTime !== null
-                  ? 'bg-gradient-to-r from-primary to-secondary text-white'
-                  : 'bg-muted text-muted-foreground cursor-not-allowed'
-              }`}
-            >
-              <Check className="w-4 h-4" /> Accept
-            </button>
-          </div>
+        {/* Action buttons for recipient (seeker) - Approve, Deny, Suggest New Time */}
+        {isRecipient && !responded && !isAlreadyResolved && (
+          <>
+            {!showSuggestTime ? (
+              <div className="px-4 pb-3 space-y-2">
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleDecline}
+                    className="flex-1 py-2.5 rounded-xl border border-red-500/30 text-red-500 text-sm font-medium hover:bg-red-500/10 transition-colors flex items-center justify-center gap-1.5"
+                  >
+                    <X className="w-4 h-4" /> Deny
+                  </button>
+                  <button
+                    onClick={handleAccept}
+                    disabled={selectedTime === null}
+                    className={`flex-1 py-2.5 rounded-xl text-sm font-medium transition-colors flex items-center justify-center gap-1.5 ${
+                      selectedTime !== null
+                        ? 'bg-gradient-to-r from-primary to-secondary text-white'
+                        : 'bg-muted text-muted-foreground cursor-not-allowed'
+                    }`}
+                  >
+                    <Check className="w-4 h-4" /> Approve
+                  </button>
+                </div>
+                <button
+                  onClick={handleSuggestNewTime}
+                  className="w-full py-2.5 rounded-xl border border-amber-500/30 text-amber-500 text-sm font-medium hover:bg-amber-500/10 transition-colors flex items-center justify-center gap-1.5"
+                >
+                  <Clock className="w-4 h-4" /> Suggest New Time
+                </button>
+              </div>
+            ) : (
+              <div className="px-4 pb-3 space-y-2">
+                <p className="text-xs text-muted-foreground font-medium">Suggest an alternative:</p>
+                <input
+                  type="date"
+                  value={suggestedDate}
+                  onChange={(e) => setSuggestedDate(e.target.value)}
+                  className="w-full p-2.5 rounded-xl border border-border bg-background text-sm"
+                  min={new Date().toISOString().split('T')[0]}
+                />
+                <input
+                  type="time"
+                  value={suggestedTime}
+                  onChange={(e) => setSuggestedTime(e.target.value)}
+                  className="w-full p-2.5 rounded-xl border border-border bg-background text-sm"
+                />
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setShowSuggestTime(false)}
+                    className="flex-1 py-2.5 rounded-xl border border-border text-muted-foreground text-sm font-medium hover:bg-accent transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={async () => {
+                      if (!suggestedDate || !suggestedTime) {
+                        toast.error('Please select both date and time');
+                        return;
+                      }
+                      // Decline the current request and send a message suggesting new time
+                      await onRespond(interviewId, 'decline', null);
+                      setResponded(true);
+                      setShowSuggestTime(false);
+                      // The parent will need to send a follow-up message
+                      toast.success(`New time suggested: ${suggestedDate} at ${suggestedTime}. Send a message to confirm.`);
+                    }}
+                    disabled={!suggestedDate || !suggestedTime}
+                    className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-yellow-400 text-white text-sm font-medium disabled:opacity-50 transition-colors flex items-center justify-center gap-1.5"
+                  >
+                    <Send className="w-3.5 h-3.5" /> Send
+                  </button>
+                </div>
+              </div>
+            )}
+          </>
         )}
 
         {/* View in interviews link */}

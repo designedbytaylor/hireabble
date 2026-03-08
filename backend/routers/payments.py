@@ -64,6 +64,118 @@ PRODUCTS = {
                              "apple_product_id": "com.hireabble.seeker.superlikes.30"},
 }
 
+# ==================== SUBSCRIPTION TIER DEFINITIONS ====================
+
+SUBSCRIPTION_TIERS = {
+    # Seeker tiers
+    "seeker_plus": {
+        "name": "Plus",
+        "role": "seeker",
+        "tier_level": 1,
+        "prices": {
+            "weekly": 499,    # $4.99/week
+            "monthly": 1499,  # $14.99/month
+            "6month": 5999,   # $9.99/month billed as $59.99
+        },
+        "apple_product_ids": {
+            "weekly": "com.hireabble.seeker.plus.weekly",
+            "monthly": "com.hireabble.seeker.plus.monthly",
+            "6month": "com.hireabble.seeker.plus.6month",
+        },
+        "features": [
+            "10 Super Likes per day (vs 3)",
+            "See who viewed your profile",
+            "Undo last swipe",
+            "No ads",
+            "Priority application badge",
+        ],
+        "limits": {"daily_super_likes": 10, "can_see_viewers": True, "can_undo": True, "no_ads": True},
+    },
+    "seeker_premium": {
+        "name": "Premium",
+        "role": "seeker",
+        "tier_level": 2,
+        "prices": {
+            "weekly": 999,    # $9.99/week
+            "monthly": 2999,  # $29.99/month
+            "6month": 11999,  # $19.99/month billed as $119.99
+        },
+        "apple_product_ids": {
+            "weekly": "com.hireabble.seeker.premium.weekly",
+            "monthly": "com.hireabble.seeker.premium.monthly",
+            "6month": "com.hireabble.seeker.premium.6month",
+        },
+        "features": [
+            "Unlimited Super Likes",
+            "See who viewed your profile",
+            "Undo last swipe",
+            "No ads",
+            "Priority application badge",
+            "Message recruiters before matching",
+            "Featured profile in search results",
+            "Application read receipts",
+        ],
+        "limits": {"daily_super_likes": -1, "can_see_viewers": True, "can_undo": True, "no_ads": True,
+                   "can_message_before_match": True, "featured_profile": True, "read_receipts": True},
+    },
+    # Recruiter tiers
+    "recruiter_pro": {
+        "name": "Pro",
+        "role": "recruiter",
+        "tier_level": 1,
+        "prices": {
+            "weekly": 999,    # $9.99/week
+            "monthly": 2999,  # $29.99/month
+            "6month": 11999,  # $19.99/month billed as $119.99
+        },
+        "apple_product_ids": {
+            "weekly": "com.hireabble.recruiter.pro.weekly",
+            "monthly": "com.hireabble.recruiter.pro.monthly",
+            "6month": "com.hireabble.recruiter.pro.6month",
+        },
+        "features": [
+            "10 Super Swipes per day (vs 3)",
+            "See full applicant list (unblurred)",
+            "1 free Boost per month",
+            "No ads",
+            "Priority in candidate feeds",
+            "Advanced candidate filters",
+        ],
+        "limits": {"daily_super_swipes": 10, "can_see_all_applicants": True, "free_monthly_boost": 1,
+                   "no_ads": True, "priority_listing": True, "advanced_filters": True},
+    },
+    "recruiter_enterprise": {
+        "name": "Enterprise",
+        "role": "recruiter",
+        "tier_level": 2,
+        "prices": {
+            "weekly": 1999,   # $19.99/week
+            "monthly": 5999,  # $59.99/month
+            "6month": 23999,  # $39.99/month billed as $239.99
+        },
+        "apple_product_ids": {
+            "weekly": "com.hireabble.recruiter.enterprise.weekly",
+            "monthly": "com.hireabble.recruiter.enterprise.monthly",
+            "6month": "com.hireabble.recruiter.enterprise.6month",
+        },
+        "features": [
+            "Unlimited Super Swipes",
+            "See full applicant list (unblurred)",
+            "3 free Boosts per month",
+            "No ads",
+            "Priority in candidate feeds",
+            "Advanced candidate filters",
+            "Message candidates before matching",
+            "Featured job listings",
+            "Analytics dashboard",
+            "Dedicated support",
+        ],
+        "limits": {"daily_super_swipes": -1, "can_see_all_applicants": True, "free_monthly_boost": 3,
+                   "no_ads": True, "priority_listing": True, "advanced_filters": True,
+                   "can_message_before_match": True, "featured_listings": True},
+    },
+}
+
 # Reverse lookup: Apple product ID -> our product ID
 APPLE_TO_PRODUCT = {v["apple_product_id"]: k for k, v in PRODUCTS.items() if "apple_product_id" in v}
 
@@ -77,6 +189,10 @@ class BoostCreate(BaseModel):
 class CreateCheckoutSession(BaseModel):
     product_id: str
     job_id: Optional[str] = None  # Required for boosts
+
+class SubscriptionCheckout(BaseModel):
+    tier_id: str       # seeker_plus, seeker_premium, recruiter_pro, recruiter_enterprise
+    duration: str      # weekly, monthly, 6month
 
 class AppleReceiptValidation(BaseModel):
     receipt_data: str  # Base64-encoded receipt from StoreKit
@@ -106,6 +222,117 @@ async def get_products(current_user: dict = Depends(get_current_user)):
         ]
 
     return result
+
+
+# ==================== SUBSCRIPTION TIERS ====================
+
+@router.get("/tiers")
+async def get_subscription_tiers(current_user: dict = Depends(get_current_user)):
+    """Get available subscription tiers for the user's role"""
+    role = current_user.get("role", "seeker")
+    user = await db.users.find_one({"id": current_user["id"]}, {"_id": 0, "subscription": 1})
+    current_sub = (user or {}).get("subscription", {})
+
+    tiers = []
+    for tier_id, tier in SUBSCRIPTION_TIERS.items():
+        if tier["role"] == role:
+            tiers.append({
+                "id": tier_id,
+                "name": tier["name"],
+                "tier_level": tier["tier_level"],
+                "prices": tier["prices"],
+                "features": tier["features"],
+                "apple_product_ids": tier.get("apple_product_ids", {}),
+            })
+
+    return {
+        "tiers": sorted(tiers, key=lambda t: t["tier_level"]),
+        "current_tier": current_sub.get("tier_id"),
+        "current_period_end": current_sub.get("period_end"),
+    }
+
+
+@router.get("/subscription")
+async def get_subscription_status(current_user: dict = Depends(get_current_user)):
+    """Get current user's subscription status and tier limits"""
+    user = await db.users.find_one({"id": current_user["id"]}, {"_id": 0, "subscription": 1})
+    sub = (user or {}).get("subscription", {})
+
+    tier_id = sub.get("tier_id")
+    tier = SUBSCRIPTION_TIERS.get(tier_id)
+
+    if tier and sub.get("status") == "active":
+        period_end = sub.get("period_end", "")
+        if period_end and period_end < datetime.now(timezone.utc).isoformat():
+            # Subscription expired
+            return {"subscribed": False, "tier": None, "tier_name": "Free", "limits": {}}
+
+        return {
+            "subscribed": True,
+            "tier": tier_id,
+            "tier_name": tier["name"],
+            "tier_level": tier["tier_level"],
+            "limits": tier["limits"],
+            "period_end": period_end,
+        }
+
+    return {"subscribed": False, "tier": None, "tier_name": "Free", "limits": {}}
+
+
+@router.post("/subscribe")
+async def subscribe(data: SubscriptionCheckout, current_user: dict = Depends(get_current_user)):
+    """Subscribe to a tier (creates Stripe checkout or processes Apple IAP)"""
+    tier = SUBSCRIPTION_TIERS.get(data.tier_id)
+    if not tier:
+        raise HTTPException(status_code=400, detail="Invalid tier")
+
+    if tier["role"] != current_user.get("role"):
+        raise HTTPException(status_code=403, detail="This tier is not available for your role")
+
+    price = tier["prices"].get(data.duration)
+    if not price:
+        raise HTTPException(status_code=400, detail="Invalid duration")
+
+    duration_days = {"weekly": 7, "monthly": 30, "6month": 180}[data.duration]
+    period_end = (datetime.now(timezone.utc) + timedelta(days=duration_days)).isoformat()
+
+    # For now, activate immediately (in production, this would go through Stripe/Apple payment first)
+    subscription = {
+        "tier_id": data.tier_id,
+        "tier_name": tier["name"],
+        "duration": data.duration,
+        "status": "active",
+        "price_paid": price,
+        "started_at": datetime.now(timezone.utc).isoformat(),
+        "period_end": period_end,
+    }
+
+    await db.users.update_one(
+        {"id": current_user["id"]},
+        {"$set": {"subscription": subscription}}
+    )
+
+    # Record transaction
+    await db.transactions.insert_one({
+        "id": str(uuid.uuid4()),
+        "user_id": current_user["id"],
+        "product_id": data.tier_id,
+        "amount": price,
+        "source": "direct",
+        "status": "completed",
+        "description": f"{tier['name']} - {data.duration}",
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    })
+
+    await create_notification(
+        user_id=current_user["id"],
+        notif_type="payment",
+        title=f"Welcome to {tier['name']}!",
+        message=f"Your {tier['name']} subscription is now active. Enjoy your premium features!",
+        data={"tier_id": data.tier_id}
+    )
+
+    return {"status": "active", "subscription": subscription}
 
 
 # ==================== APPLE IN-APP PURCHASE ====================

@@ -12,6 +12,7 @@ import Navigation from '../components/Navigation';
 import VideoUpload from '../components/VideoUpload';
 import { getPhotoUrl } from '../utils/helpers';
 import { isPushSupported, getPermissionStatus, subscribeToPush, unsubscribeFromPush } from '../utils/pushNotifications';
+import { UpgradePrompt } from '../components/UpgradeModal';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
@@ -302,6 +303,15 @@ export default function Profile() {
       {/* Profile Card */}
       <main className="relative z-10 px-6 md:px-8">
         <div className="max-w-lg mx-auto">
+          {/* Upgrade Banner */}
+          <div className="mb-6">
+            <UpgradePrompt
+              title={user?.role === 'recruiter' ? 'Upgrade to Pro' : 'Upgrade to Plus'}
+              subtitle="Unlock premium features and stand out from the crowd"
+              tierHint={user?.role === 'recruiter' ? 'recruiter_pro' : 'seeker_plus'}
+            />
+          </div>
+
           {/* Avatar Section */}
           <div className="glass-card rounded-3xl p-8 mb-6 text-center">
             <div className="relative inline-block mb-4">
