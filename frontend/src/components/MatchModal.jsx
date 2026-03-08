@@ -2,7 +2,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { X, Heart, MessageCircle } from 'lucide-react';
 import { Button } from './ui/button';
 
-export default function MatchModal({ match, onClose }) {
+export default function MatchModal({ match, onClose, onMessage }) {
   if (!match) return null;
 
   return (
@@ -14,7 +14,7 @@ export default function MatchModal({ match, onClose }) {
         className="fixed inset-0 z-50 flex items-center justify-center p-6"
       >
         {/* Backdrop */}
-        <motion.div 
+        <motion.div
           className="absolute inset-0 bg-black/80 backdrop-blur-sm"
           onClick={onClose}
         />
@@ -25,23 +25,24 @@ export default function MatchModal({ match, onClose }) {
             <motion.div
               key={i}
               className="confetti-piece rounded-sm"
-              initial={{ 
-                x: Math.random() * window.innerWidth, 
+              initial={{
+                x: Math.random() * (typeof window !== 'undefined' ? window.innerWidth : 400),
                 y: -20,
                 rotate: 0,
                 opacity: 1
               }}
-              animate={{ 
-                y: window.innerHeight + 20,
+              animate={{
+                y: (typeof window !== 'undefined' ? window.innerHeight : 800) + 20,
                 rotate: Math.random() * 720,
                 opacity: 0
               }}
-              transition={{ 
+              transition={{
                 duration: 2 + Math.random() * 2,
                 delay: Math.random() * 0.5,
                 ease: 'easeOut'
               }}
               style={{
+                position: 'absolute',
                 backgroundColor: ['#6366f1', '#d946ef', '#10b981', '#f43f5e', '#fbbf24'][Math.floor(Math.random() * 5)],
                 width: 8 + Math.random() * 8,
                 height: 8 + Math.random() * 8,
@@ -92,19 +93,21 @@ export default function MatchModal({ match, onClose }) {
             transition={{ delay: 0.4 }}
             className="text-muted-foreground mb-6"
           >
-            You and {match.company || match.seeker_name} have liked each other
+            You and {match.seeker_name || match.company} have liked each other
           </motion.p>
 
           {/* Match Details */}
-          <motion.div
-            initial={{ y: 20, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            transition={{ delay: 0.5 }}
-            className="p-4 rounded-2xl bg-background border border-border mb-6"
-          >
-            <div className="font-medium">{match.job_title}</div>
-            <div className="text-sm text-muted-foreground">{match.company}</div>
-          </motion.div>
+          {match.job_title && (
+            <motion.div
+              initial={{ y: 20, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              transition={{ delay: 0.5 }}
+              className="p-4 rounded-2xl bg-background border border-border mb-6"
+            >
+              <div className="font-medium">{match.job_title}</div>
+              {match.company && <div className="text-sm text-muted-foreground">{match.company}</div>}
+            </motion.div>
+          )}
 
           {/* Actions */}
           <motion.div
@@ -121,6 +124,7 @@ export default function MatchModal({ match, onClose }) {
               Keep Swiping
             </Button>
             <Button
+              onClick={onMessage || onClose}
               className="flex-1 rounded-full bg-gradient-to-r from-primary to-secondary"
             >
               <MessageCircle className="w-4 h-4 mr-2" />

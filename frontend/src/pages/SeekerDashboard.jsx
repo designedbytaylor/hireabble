@@ -196,27 +196,20 @@ export default function SeekerDashboard() {
       setExitingCards(prev => prev.filter(c => c.id !== job.id));
     }, 500);
 
-    // Fire-and-forget API call — don't block the UI
+    // Fire-and-forget API call — don't block the UI, no toasts
     axios.post(`${API}/swipe`,
       { job_id: job.id, action },
       { headers: { Authorization: `Bearer ${token}` } }
     ).then(response => {
-      if (action === 'like') {
-        toast.success('Application sent!');
-      } else if (action === 'superlike') {
-        const remaining = response.data.remaining_superlikes;
-        setSuperLikesRemaining(remaining);
-        toast.success(
-          <div className="flex items-center gap-2">
-            <Star className="w-5 h-5 text-yellow-400 fill-yellow-400" />
-            <span>Super Like sent! ({remaining} remaining today)</span>
-          </div>,
-          { duration: 2500 }
-        );
+      if (action === 'superlike') {
+        setSuperLikesRemaining(response.data.remaining_superlikes);
       }
       fetchStats();
     }).catch(error => {
-      toast.error(error.response?.data?.detail || 'Failed to submit');
+      // Only surface errors that actually block the user (e.g. no superlikes left)
+      if (error.response?.status === 400) {
+        toast.error(error.response?.data?.detail || 'Failed to submit');
+      }
     });
 
     // Auto-fetch more jobs when running low (5 cards buffer) - endless Tinder-style
@@ -715,6 +708,7 @@ export default function SeekerDashboard() {
         <MatchModal
           match={matchData}
           onClose={() => setShowMatch(false)}
+          onMessage={() => { setShowMatch(false); navigate('/matches'); }}
         />
       )}
 

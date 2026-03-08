@@ -14,6 +14,7 @@ import Navigation from '../components/Navigation';
 import NotificationBell from '../components/NotificationBell';
 import { getPhotoUrl } from '../utils/helpers';
 import UpgradeModal from '../components/UpgradeModal';
+import MatchModal from '../components/MatchModal';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -30,6 +31,8 @@ export default function RecruiterSwipe() {
   const [exitingCards, setExitingCards] = useState([]);
   const [superSwipesRemaining, setSuperSwipesRemaining] = useState(null);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+  const [showMatch, setShowMatch] = useState(false);
+  const [matchData, setMatchData] = useState(null);
   const swipedIdsRef = useRef(new Set());
 
   useEffect(() => {
@@ -98,18 +101,17 @@ export default function RecruiterSwipe() {
       setExitingCards(prev => prev.filter(c => c.id !== item.id));
     }, 500);
 
-    // Fire-and-forget API call — don't block the UI
+    // Fire-and-forget API call — don't block the UI, no toasts unless match
     if (mode === 'applicants') {
       axios.post(`${API}/applications/respond`,
         { application_id: item.id, action },
         { headers: { Authorization: `Bearer ${token}` } }
-      ).then(() => {
-        if (action === 'accept') {
-          toast.success("It's a match! You can now message this candidate.");
+      ).then(res => {
+        if (action === 'accept' || res.data?.is_matched) {
+          setMatchData({ seeker_name: item.seeker_name || item.name, job_title: item.job_title || item.title, company: user?.company });
+          setShowMatch(true);
         }
-      }).catch(error => {
-        toast.error(error.response?.data?.detail || 'Failed to respond');
-      });
+      }).catch(() => {});
     } else {
       const swipeAction = action === 'accept' ? 'like' : action === 'superlike' ? 'superlike' : 'pass';
       axios.post(`${API}/candidates/swipe`,
@@ -117,19 +119,20 @@ export default function RecruiterSwipe() {
         { headers: { Authorization: `Bearer ${token}` } }
       ).then(res => {
         if (res.data.is_matched) {
-          toast.success("It's a match! You can now message this candidate.");
-        } else if (swipeAction === 'superlike') {
-          toast.success('Super Swipe sent! They\'ll be notified.');
+          setMatchData({ seeker_name: item.name, job_title: item.best_match_job_title || item.title, company: user?.company });
+          setShowMatch(true);
+        }
+        if (swipeAction === 'superlike') {
           setSuperSwipesRemaining(prev => prev ? { ...prev, remaining: prev.remaining - 1 } : prev);
-        } else if (swipeAction === 'like') {
-          toast.success('Liked! They\'ll be notified of your interest.');
         }
       }).catch(error => {
-        const detail = error.response?.data?.detail || 'Failed to respond';
+        const detail = error.response?.data?.detail || '';
         if (detail.includes('Super Swipes remaining')) {
           setShowUpgradeModal(true);
         }
-        toast.error(detail);
+        if (error.response?.status === 400) {
+          toast.error(detail || 'Failed to respond');
+        }
       });
     }
   };
@@ -395,6 +398,14 @@ export default function RecruiterSwipe() {
         trigger="super_swipes"
         highlightTier="recruiter_pro"
       />
+
+      {showMatch && (
+        <MatchModal
+          match={matchData}
+          onClose={() => setShowMatch(false)}
+          onMessage={() => { setShowMatch(false); navigate('/matches'); }}
+        />
+      )}
     </div>
   );
 }
