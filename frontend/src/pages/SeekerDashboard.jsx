@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence, useMotionValue, useTransform } from 'framer-motion';
 import { X, Heart, Star, Briefcase, MapPin, DollarSign, Building2, Clock, ChevronDown, Filter, SlidersHorizontal, Zap, CheckCircle, Globe, Wifi, Navigation2, Info, Calendar } from 'lucide-react';
@@ -42,9 +42,9 @@ export default function SeekerDashboard() {
   const [showFilters, setShowFilters] = useState(false);
   const [profileComplete, setProfileComplete] = useState(false);
   const [superLikesRemaining, setSuperLikesRemaining] = useState(3);
-  const [swipeDirection, setSwipeDirection] = useState(null); // 'left', 'right', 'up'
-  const [isAnimating, setIsAnimating] = useState(false);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+  const [exitingCards, setExitingCards] = useState([]); // cards animating off-screen
+  const fetchingMoreRef = useRef(false);
   const [filters, setFilters] = useState({
     job_type: '',
     experience_level: '',
@@ -142,34 +142,41 @@ export default function SeekerDashboard() {
     }
   };
 
-  const handleSwipe = async (action, fromDrag = false) => {
-    if (currentIndex >= jobs.length || isAnimating) return;
-    
+  const prefetchJobs = useCallback(() => {
+    if (fetchingMoreRef.current) return;
+    fetchingMoreRef.current = true;
+    fetchJobs(filters, true).finally(() => { fetchingMoreRef.current = false; });
+  }, [filters]);
+
+  const handleSwipe = (action, exitDirection = { x: 0, y: 0 }) => {
+    if (currentIndex >= jobs.length) return;
+
     // Check super like limit before sending - show paywall
     if (action === 'superlike' && superLikesRemaining <= 0) {
       setShowUpgradeModal(true);
       return;
     }
-    
+
     const job = jobs[currentIndex];
-    
-    // If triggered from button, animate the card first
-    if (!fromDrag) {
-      setIsAnimating(true);
-      if (action === 'like') setSwipeDirection('right');
-      else if (action === 'pass') setSwipeDirection('left');
-      else if (action === 'superlike') setSwipeDirection('up');
-      
-      // Wait for animation to complete before API call
-      await new Promise(resolve => setTimeout(resolve, 200));
-    }
-    
-    try {
-      const response = await axios.post(`${API}/swipe`, 
-        { job_id: job.id, action },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      
+
+    // Advance index IMMEDIATELY — next card is already visible in the stack
+    const nextIndex = currentIndex + 1;
+    setCurrentIndex(nextIndex);
+    setExpandedCard(false);
+
+    // Add to exiting cards for fly-out animation
+    setExitingCards(prev => [...prev, { job, action, exitDirection, id: job.id }]);
+
+    // Clean up exiting cards after animation completes
+    setTimeout(() => {
+      setExitingCards(prev => prev.filter(c => c.id !== job.id));
+    }, 300);
+
+    // Fire-and-forget API call — don't block the UI
+    axios.post(`${API}/swipe`,
+      { job_id: job.id, action },
+      { headers: { Authorization: `Bearer ${token}` } }
+    ).then(response => {
       if (action === 'like') {
         toast.success('Application sent!');
       } else if (action === 'superlike') {
@@ -183,22 +190,14 @@ export default function SeekerDashboard() {
           { duration: 2500 }
         );
       }
-      
-      const nextIndex = currentIndex + 1;
-      setCurrentIndex(nextIndex);
-      setSwipeDirection(null);
-      setIsAnimating(false);
-      setExpandedCard(false);
       fetchStats();
-
-      // Auto-fetch more jobs when running low (3 cards left) - endless Tinder-style
-      if (nextIndex >= jobs.length - 3) {
-        fetchJobs(filters, true);
-      }
-    } catch (error) {
+    }).catch(error => {
       toast.error(error.response?.data?.detail || 'Failed to submit');
-      setSwipeDirection(null);
-      setIsAnimating(false);
+    });
+
+    // Auto-fetch more jobs when running low (5 cards buffer) - endless Tinder-style
+    if (nextIndex >= jobs.length - 5) {
+      prefetchJobs();
     }
   };
 
@@ -379,33 +378,39 @@ export default function SeekerDashboard() {
             <>
               {/* Card Stack */}
               <div className="relative aspect-[3/4] card-stack" data-testid="swipe-deck">
-                {/* Background cards for depth effect */}
-                {jobs.slice(currentIndex + 1, currentIndex + 3).map((_, i) => (
-                  <div 
-                    key={i}
-                    className="absolute inset-0 rounded-3xl bg-card border border-border"
+                {/* Background cards — real job cards for instant reveal */}
+                {jobs.slice(currentIndex + 1, currentIndex + 3).map((bgJob, i) => (
+                  <div
+                    key={bgJob.id}
+                    className="absolute inset-0 rounded-3xl overflow-hidden"
                     style={{
-                      transform: `scale(${1 - (i + 1) * 0.05}) translateY(${(i + 1) * 15}px)`,
-                      opacity: 1 - (i + 1) * 0.3,
-                      zIndex: -i - 1
+                      transform: `scale(${1 - (i + 1) * 0.04}) translateY(${(i + 1) * 12}px)`,
+                      zIndex: -(i + 1),
                     }}
-                  />
+                  >
+                    <StaticJobCard job={bgJob} />
+                  </div>
+                ))}
+
+                {/* Exiting cards (animating off-screen) */}
+                {exitingCards.map((card) => (
+                  <ExitingCard key={`exit-${card.id}`} card={card} />
                 ))}
 
                 {/* Main Swipeable Card */}
-                <SwipeCard 
+                <SwipeCard
+                  key={currentJob.id}
                   job={currentJob}
-                  onSwipe={(action) => handleSwipe(action, true)}
+                  onSwipe={(action, exitDir) => handleSwipe(action, exitDir)}
                   expanded={expandedCard}
                   setExpanded={setExpandedCard}
-                  swipeDirection={swipeDirection}
                 />
               </div>
 
               {/* Action Buttons */}
               <div className="flex justify-center items-center gap-5 mt-8">
                 <button
-                  onClick={() => handleSwipe('pass')}
+                  onClick={() => handleSwipe('pass', { x: -1500, y: 0 })}
                   className="w-16 h-16 rounded-full bg-destructive/10 border border-destructive/30 flex items-center justify-center hover:scale-110 hover:neon-glow-red transition-all duration-300"
                   data-testid="pass-btn"
                 >
@@ -413,11 +418,11 @@ export default function SeekerDashboard() {
                 </button>
                 <div className="relative">
                   <button
-                    onClick={() => handleSwipe('superlike')}
+                    onClick={() => handleSwipe('superlike', { x: 0, y: -1500 })}
                     disabled={superLikesRemaining <= 0}
                     className={`w-20 h-20 rounded-full bg-secondary/10 border border-secondary/30 flex items-center justify-center transition-all duration-300 ${
-                      superLikesRemaining > 0 
-                        ? 'hover:scale-110 hover:neon-glow-pink' 
+                      superLikesRemaining > 0
+                        ? 'hover:scale-110 hover:neon-glow-pink'
                         : 'opacity-50 cursor-not-allowed'
                     }`}
                     data-testid="superlike-btn"
@@ -426,15 +431,15 @@ export default function SeekerDashboard() {
                   </button>
                   {/* Super Like Counter Badge */}
                   <span className={`absolute -top-1 -right-1 w-6 h-6 rounded-full text-xs font-bold flex items-center justify-center ${
-                    superLikesRemaining > 0 
-                      ? 'bg-secondary text-white' 
+                    superLikesRemaining > 0
+                      ? 'bg-secondary text-white'
                       : 'bg-muted text-muted-foreground'
                   }`}>
                     {superLikesRemaining}
                   </span>
                 </div>
                 <button
-                  onClick={() => handleSwipe('like')}
+                  onClick={() => handleSwipe('like', { x: 1500, y: 0 })}
                   className="w-16 h-16 rounded-full bg-success/10 border border-success/30 flex items-center justify-center hover:scale-110 hover:neon-glow-green transition-all duration-300"
                   data-testid="like-btn"
                 >
@@ -699,123 +704,139 @@ export default function SeekerDashboard() {
   );
 }
 
-function SwipeCard({ job, onSwipe, expanded, setExpanded, swipeDirection }) {
+const formatSalary = (min, max) => {
+  if (!min && !max) return null;
+  const format = (n) => n >= 1000 ? `$${Math.round(n/1000)}k` : `$${n}`;
+  if (min && max) return `${format(min)} - ${format(max)}`;
+  if (min) return `${format(min)}+`;
+  return `Up to ${format(max)}`;
+};
+
+// Static card for the background stack — no drag, no animation, just content
+function StaticJobCard({ job }) {
+  return (
+    <div className="w-full h-full rounded-3xl overflow-hidden relative gradient-border">
+      <div className="absolute inset-0">
+        <img src={job.background_image} alt="Background" className="w-full h-full object-cover" />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/60 to-black/30" />
+      </div>
+      {job.is_boosted && (
+        <div className="absolute top-4 right-4 z-20 px-3 py-1 rounded-full bg-gradient-to-r from-amber-500 to-orange-500 text-white text-xs font-bold flex items-center gap-1 shadow-lg">
+          <Zap className="w-3 h-3" /> Promoted
+        </div>
+      )}
+      <div className="absolute inset-0 flex flex-col justify-end p-6 z-10">
+        <div className="flex items-center gap-3 mb-4">
+          <img src={job.company_logo} alt={job.company} className="w-12 h-12 rounded-xl object-cover border border-white/20" />
+          <div>
+            <div className="text-sm text-muted-foreground">{job.company}</div>
+            <div className="text-xs text-muted-foreground flex items-center gap-1">
+              <Clock className="w-3 h-3" />
+              {new Date(job.created_at).toLocaleDateString()}
+            </div>
+          </div>
+        </div>
+        <h2 className="text-2xl md:text-3xl font-bold font-['Outfit'] mb-3">{job.title}</h2>
+        <div className="flex flex-wrap gap-2 mb-4">
+          {formatSalary(job.salary_min, job.salary_max) && (
+            <span className="px-3 py-1.5 rounded-full bg-primary/20 text-primary text-sm flex items-center gap-1">
+              <DollarSign className="w-3.5 h-3.5" />
+              {formatSalary(job.salary_min, job.salary_max)}
+            </span>
+          )}
+          <span className="px-3 py-1.5 rounded-full bg-secondary/20 text-secondary text-sm flex items-center gap-1">
+            <MapPin className="w-3.5 h-3.5" />
+            {job.location}
+          </span>
+          <span className="px-3 py-1.5 rounded-full bg-accent text-accent-foreground text-sm capitalize">
+            {job.job_type}
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Card that's been swiped — animates off-screen then disappears
+function ExitingCard({ card }) {
+  const { exitDirection, action } = card;
+  return (
+    <motion.div
+      className="absolute inset-0 z-10"
+      initial={{ x: 0, y: 0, rotate: 0 }}
+      animate={{
+        x: exitDirection.x,
+        y: exitDirection.y,
+        rotate: exitDirection.x > 0 ? 20 : exitDirection.x < 0 ? -20 : 0,
+      }}
+      transition={{ duration: 0.25, ease: 'easeIn' }}
+    >
+      <div className="w-full h-full rounded-3xl overflow-hidden relative gradient-border">
+        <div className="absolute inset-0">
+          <img src={card.job.background_image} alt="Background" className="w-full h-full object-cover" />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/60 to-black/30" />
+        </div>
+        {/* Stamp overlay */}
+        {action === 'like' && (
+          <div className="absolute top-8 right-8 px-6 py-2 rounded-full bg-success border-2 border-success font-bold text-white transform rotate-12 z-20">APPLY</div>
+        )}
+        {action === 'pass' && (
+          <div className="absolute top-8 left-8 px-6 py-2 rounded-full bg-destructive border-2 border-destructive font-bold text-white transform -rotate-12 z-20">PASS</div>
+        )}
+        {action === 'superlike' && (
+          <div className="absolute top-8 left-1/2 -translate-x-1/2 px-6 py-2 rounded-full bg-secondary border-2 border-secondary font-bold text-white z-20">SUPER LIKE</div>
+        )}
+        <div className="absolute inset-0 flex flex-col justify-end p-6 z-10">
+          <h2 className="text-2xl font-bold font-['Outfit'] mb-3">{card.job.title}</h2>
+        </div>
+      </div>
+    </motion.div>
+  );
+}
+
+function SwipeCard({ job, onSwipe, expanded, setExpanded }) {
   const x = useMotionValue(0);
   const y = useMotionValue(0);
   const rotate = useTransform(x, [-200, 200], [-25, 25]);
 
-  // Indicator opacities - show sooner for snappier feedback
+  // Indicator opacities
   const likeOpacity = useTransform(x, [0, 60], [0, 1]);
   const passOpacity = useTransform(x, [-60, 0], [1, 0]);
   const superlikeOpacity = useTransform(y, [-60, 0], [1, 0]);
 
-  // Handle button-triggered swipes
-  useEffect(() => {
-    if (swipeDirection) {
-      const toX = swipeDirection === 'right' ? 1500 : swipeDirection === 'left' ? -1500 : 0;
-      const toY = swipeDirection === 'up' ? -1500 : 0;
+  const handleDragEnd = (_, info) => {
+    const swipeThreshold = 60;
+    const velocityThreshold = 300;
 
+    if (info.offset.y < -swipeThreshold || info.velocity.y < -velocityThreshold) {
+      onSwipe('superlike', { x: 0, y: -1500 });
+    } else if (info.offset.x > swipeThreshold || info.velocity.x > velocityThreshold) {
+      onSwipe('like', { x: 1500, y: 0 });
+    } else if (info.offset.x < -swipeThreshold || info.velocity.x < -velocityThreshold) {
+      onSwipe('pass', { x: -1500, y: 0 });
+    } else {
+      // Spring back
       const startX = x.get();
       const startY = y.get();
       const startTime = Date.now();
       const duration = 200;
-
       const animate = () => {
         const elapsed = Date.now() - startTime;
         const progress = Math.min(elapsed / duration, 1);
-        const easeProgress = 1 - Math.pow(1 - progress, 3);
-
-        x.set(startX + (toX - startX) * easeProgress);
-        y.set(startY + (toY - startY) * easeProgress);
-
-        if (progress < 1) {
-          requestAnimationFrame(animate);
-        }
+        const ease = 1 - Math.pow(1 - progress, 4);
+        x.set(startX * (1 - ease));
+        y.set(startY * (1 - ease));
+        if (progress < 1) requestAnimationFrame(animate);
       };
-
       requestAnimationFrame(animate);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [swipeDirection]);
-
-  const handleDragEnd = (_, info) => {
-    const swipeThreshold = 60;
-    const velocityThreshold = 300;
-    const velocity = info.velocity;
-
-    // Lower thresholds = easier to trigger swipe, feels snappier like Tinder
-    if (info.offset.y < -swipeThreshold || velocity.y < -velocityThreshold) {
-      animateCardOut(0, -1500, 'superlike');
-    } else if (info.offset.x > swipeThreshold || velocity.x > velocityThreshold) {
-      animateCardOut(1500, 0, 'like');
-    } else if (info.offset.x < -swipeThreshold || velocity.x < -velocityThreshold) {
-      animateCardOut(-1500, 0, 'pass');
-    } else {
-      // Spring back to center smoothly
-      animateSpringBack();
-    }
-  };
-
-  const animateSpringBack = () => {
-    const startX = x.get();
-    const startY = y.get();
-    const startTime = Date.now();
-    const duration = 200;
-
-    const animate = () => {
-      const elapsed = Date.now() - startTime;
-      const progress = Math.min(elapsed / duration, 1);
-      // Elastic ease out
-      const easeProgress = 1 - Math.pow(1 - progress, 4);
-
-      x.set(startX * (1 - easeProgress));
-      y.set(startY * (1 - easeProgress));
-
-      if (progress < 1) {
-        requestAnimationFrame(animate);
-      }
-    };
-
-    requestAnimationFrame(animate);
-  };
-
-  const animateCardOut = (toX, toY, action) => {
-    const startX = x.get();
-    const startY = y.get();
-    const startTime = Date.now();
-    const duration = 150; // Much faster fly-out
-
-    const animate = () => {
-      const elapsed = Date.now() - startTime;
-      const progress = Math.min(elapsed / duration, 1);
-      const easeProgress = progress * progress; // ease-in for fast acceleration
-
-      x.set(startX + (toX - startX) * easeProgress);
-      y.set(startY + (toY - startY) * easeProgress);
-
-      if (progress < 1) {
-        requestAnimationFrame(animate);
-      } else {
-        onSwipe(action);
-      }
-    };
-
-    requestAnimationFrame(animate);
-  };
-
-  const formatSalary = (min, max) => {
-    if (!min && !max) return null;
-    const format = (n) => n >= 1000 ? `$${Math.round(n/1000)}k` : `$${n}`;
-    if (min && max) return `${format(min)} - ${format(max)}`;
-    if (min) return `${format(min)}+`;
-    return `Up to ${format(max)}`;
   };
 
   return (
     <motion.div
-      className="absolute inset-0 cursor-grab active:cursor-grabbing"
+      className="absolute inset-0 cursor-grab active:cursor-grabbing z-[5]"
       style={{ x, y, rotate }}
-      drag={!swipeDirection}
+      drag
       dragConstraints={false}
       dragElastic={0.9}
       onDragEnd={handleDragEnd}
@@ -825,28 +846,24 @@ function SwipeCard({ job, onSwipe, expanded, setExpanded, swipeDirection }) {
       <div className="w-full h-full rounded-3xl overflow-hidden relative gradient-border">
         {/* Background Image */}
         <div className="absolute inset-0">
-          <img 
-            src={job.background_image} 
-            alt="Background"
-            className="w-full h-full object-cover"
-          />
+          <img src={job.background_image} alt="Background" className="w-full h-full object-cover" />
           <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/60 to-black/30" />
         </div>
 
         {/* Swipe Indicators */}
-        <motion.div 
+        <motion.div
           className="absolute top-8 right-8 px-6 py-2 rounded-full bg-success border-2 border-success font-bold text-white transform rotate-12 z-20"
           style={{ opacity: likeOpacity }}
         >
           APPLY
         </motion.div>
-        <motion.div 
+        <motion.div
           className="absolute top-8 left-8 px-6 py-2 rounded-full bg-destructive border-2 border-destructive font-bold text-white transform -rotate-12 z-20"
           style={{ opacity: passOpacity }}
         >
           PASS
         </motion.div>
-        <motion.div 
+        <motion.div
           className="absolute top-8 left-1/2 -translate-x-1/2 px-6 py-2 rounded-full bg-secondary border-2 border-secondary font-bold text-white z-20"
           style={{ opacity: superlikeOpacity }}
         >
@@ -862,13 +879,8 @@ function SwipeCard({ job, onSwipe, expanded, setExpanded, swipeDirection }) {
 
         {/* Content */}
         <div className="absolute inset-0 flex flex-col justify-end p-6 z-10">
-          {/* Company Logo & Name */}
           <div className="flex items-center gap-3 mb-4">
-            <img
-              src={job.company_logo}
-              alt={job.company}
-              className="w-12 h-12 rounded-xl object-cover border border-white/20"
-            />
+            <img src={job.company_logo} alt={job.company} className="w-12 h-12 rounded-xl object-cover border border-white/20" />
             <div>
               <div className="text-sm text-muted-foreground">{job.company}</div>
               <div className="text-xs text-muted-foreground flex items-center gap-1">
@@ -878,7 +890,6 @@ function SwipeCard({ job, onSwipe, expanded, setExpanded, swipeDirection }) {
             </div>
           </div>
 
-          {/* Job Title + Match Score */}
           <div className="flex items-start justify-between gap-3 mb-3">
             <h2 className="text-2xl md:text-3xl font-bold font-['Outfit']">{job.title}</h2>
             {job.match_score != null && (
@@ -893,7 +904,6 @@ function SwipeCard({ job, onSwipe, expanded, setExpanded, swipeDirection }) {
             )}
           </div>
 
-          {/* Tags */}
           <div className="flex flex-wrap gap-2 mb-4">
             {formatSalary(job.salary_min, job.salary_max) && (
               <span className="px-3 py-1.5 rounded-full bg-primary/20 text-primary text-sm flex items-center gap-1">
@@ -923,15 +933,14 @@ function SwipeCard({ job, onSwipe, expanded, setExpanded, swipeDirection }) {
             )}
           </div>
 
-          {/* Expandable Description */}
-          <button 
+          <button
             onClick={(e) => { e.stopPropagation(); setExpanded(!expanded); }}
             className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
           >
             <ChevronDown className={`w-4 h-4 transition-transform ${expanded ? 'rotate-180' : ''}`} />
             {expanded ? 'Hide details' : 'Show details'}
           </button>
-          
+
           <AnimatePresence>
             {expanded && (
               <motion.div
