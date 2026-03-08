@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { Home, Heart, User, Briefcase, MessageCircle, BarChart3 } from 'lucide-react';
+import { Home, Heart, User, Briefcase, MessageCircle, BarChart3, Calendar } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 export default function Navigation() {
@@ -33,6 +33,11 @@ export default function Navigation() {
       label: 'Messages',
       path: '/messages'
     },
+    ...(isSeeker ? [{
+      icon: Calendar,
+      label: 'Interviews',
+      path: '/interviews'
+    }] : []),
     {
       icon: User,
       label: 'Profile',
@@ -42,18 +47,18 @@ export default function Navigation() {
 
   return (
     <nav className="fixed bottom-6 left-1/2 transform -translate-x-1/2 z-50">
-      <div className="glass rounded-full px-6 py-3 flex items-center gap-6">
+      <div className="glass rounded-full px-4 py-3 flex items-center gap-4">
         {navItems.map((item) => {
           const Icon = item.icon;
           const isActive = location.pathname === item.path;
-          
+
           return (
             <Link
               key={item.path}
               to={item.path}
               className={`flex flex-col items-center gap-1 transition-all ${
-                isActive 
-                  ? 'text-primary' 
+                isActive
+                  ? 'text-primary'
                   : 'text-muted-foreground hover:text-foreground'
               }`}
               data-testid={`nav-${item.label.toLowerCase()}`}

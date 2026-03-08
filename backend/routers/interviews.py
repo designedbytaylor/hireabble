@@ -118,7 +118,8 @@ async def create_interview(data: InterviewCreate, current_user: dict = Depends(g
         sender_id=current_user["id"],
         sender_name=current_user["name"],
         content=chat_msg,
-        msg_type="interview_request"
+        msg_type="interview_request",
+        data={"interview_id": interview_id, "match_id": data.match_id}
     )
 
     return {k: v for k, v in interview_doc.items() if k != "_id"}

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence, useMotionValue, useTransform } from 'framer-motion';
-import { X, Heart, Star, Briefcase, MapPin, DollarSign, Building2, Clock, ChevronDown, Filter, SlidersHorizontal, Zap, CheckCircle, Globe, Wifi, Navigation2, Info } from 'lucide-react';
+import { X, Heart, Star, Briefcase, MapPin, DollarSign, Building2, Clock, ChevronDown, Filter, SlidersHorizontal, Zap, CheckCircle, Globe, Wifi, Navigation2, Info, Calendar } from 'lucide-react';
 import { toast } from 'sonner';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
@@ -255,6 +255,13 @@ export default function SeekerDashboard() {
           </div>
           <div className="flex items-center gap-3">
             <NotificationBell />
+            <button
+              onClick={() => navigate('/interviews')}
+              className="p-2 rounded-xl hover:bg-accent transition-colors"
+              title="Interviews"
+            >
+              <Calendar className="w-5 h-5 text-muted-foreground" />
+            </button>
             <button
               onClick={() => setShowFilters(true)}
               className="relative p-2 rounded-xl hover:bg-accent transition-colors"

@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Send, Briefcase, User, Wifi, WifiOff, Flag, Calendar, CheckCheck, Check, Image, X, Video, Square, Loader2 } from 'lucide-react';
+import { ArrowLeft, Send, Briefcase, User, Wifi, WifiOff, Flag, Calendar, CheckCheck, Check, Image, X, Video, Square, Loader2, Clock, Phone, MapPin } from 'lucide-react';
 import ReportDialog from '../components/ReportDialog';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -285,6 +285,18 @@ export default function Chat() {
     }
   };
 
+  const handleInterviewRespond = async (interviewId, action, selectedTimeIndex) => {
+    try {
+      await axios.put(`${API}/interviews/${interviewId}/respond`,
+        { action, selected_time_index: selectedTimeIndex },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      toast.success(action === 'accept' ? 'Interview accepted!' : 'Interview declined');
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Failed to respond');
+    }
+  };
+
   const otherPerson = match ? (
     user?.role === 'seeker'
       ? { name: match.recruiter_name, subtitle: match.company }
@@ -405,6 +417,20 @@ export default function Chat() {
             const isOwn = msg.sender_id === user?.id;
             const isLastOwn = isOwn && (idx === groupedMessages.length - 1 ||
               groupedMessages[idx + 1]?.sender_id !== user?.id);
+
+            // Special rendering for interview request messages
+            if (msg.message_type === 'interview_request') {
+              return (
+                <InterviewRequestMessage
+                  key={msg.id}
+                  msg={msg}
+                  user={user}
+                  isOwn={isOwn}
+                  onRespond={handleInterviewRespond}
+                  navigate={navigate}
+                />
+              );
+            }
 
             return (
               <div
@@ -572,6 +598,125 @@ export default function Chat() {
           </Button>
         </form>
       </footer>
+    </div>
+  );
+}
+
+function InterviewRequestMessage({ msg, user, isOwn, onRespond, navigate }) {
+  const [selectedTime, setSelectedTime] = useState(null);
+  const [responded, setResponded] = useState(false);
+  const interviewId = msg.data?.interview_id;
+  const isRecipient = !isOwn; // The seeker receives the interview request
+
+  // Parse proposed times from message content
+  const lines = msg.content?.split('\n') || [];
+  const titleLine = lines[0] || '';
+  const typeLine = lines.find(l => l.startsWith('Type:'));
+  const timeLines = lines.filter(l => l.trim().startsWith('- '));
+
+  const handleAccept = async () => {
+    if (selectedTime === null || !interviewId) return;
+    await onRespond(interviewId, 'accept', selectedTime);
+    setResponded(true);
+  };
+
+  const handleDecline = async () => {
+    if (!interviewId) return;
+    await onRespond(interviewId, 'decline', null);
+    setResponded(true);
+  };
+
+  return (
+    <div className="flex justify-center my-3">
+      <div className="w-[90%] max-w-sm rounded-2xl border border-primary/30 bg-card overflow-hidden">
+        {/* Header */}
+        <div className="bg-primary/10 px-4 py-3 flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-primary/20 flex items-center justify-center">
+            <Calendar className="w-5 h-5 text-primary" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="font-bold text-sm font-['Outfit'] truncate">{titleLine.replace('📅 ', '')}</p>
+            {typeLine && <p className="text-xs text-muted-foreground">{typeLine}</p>}
+          </div>
+        </div>
+
+        {/* Time slots */}
+        <div className="px-4 py-3 space-y-2">
+          <p className="text-xs text-muted-foreground font-medium">
+            {isRecipient && !responded ? 'Select a time to accept:' : 'Proposed times:'}
+          </p>
+          {timeLines.map((line, i) => (
+            <button
+              key={i}
+              type="button"
+              disabled={!isRecipient || responded}
+              onClick={() => setSelectedTime(i)}
+              className={`w-full p-2.5 rounded-xl border text-left text-sm transition-colors ${
+                selectedTime === i
+                  ? 'border-primary bg-primary/10 text-primary'
+                  : isRecipient && !responded
+                    ? 'border-border bg-background hover:border-primary/30'
+                    : 'border-border bg-background'
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                <Clock className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />
+                <span>{line.replace(/^\s*-\s*/, '')}</span>
+              </div>
+            </button>
+          ))}
+        </div>
+
+        {/* Action buttons for recipient (seeker) */}
+        {isRecipient && !responded && (
+          <div className="px-4 pb-3 flex gap-2">
+            <button
+              onClick={handleDecline}
+              className="flex-1 py-2 rounded-xl border border-red-500/30 text-red-500 text-sm font-medium hover:bg-red-500/10 transition-colors flex items-center justify-center gap-1"
+            >
+              <X className="w-4 h-4" /> Decline
+            </button>
+            <button
+              onClick={handleAccept}
+              disabled={selectedTime === null}
+              className={`flex-1 py-2 rounded-xl text-sm font-medium transition-colors flex items-center justify-center gap-1 ${
+                selectedTime !== null
+                  ? 'bg-gradient-to-r from-primary to-secondary text-white'
+                  : 'bg-muted text-muted-foreground cursor-not-allowed'
+              }`}
+            >
+              <Check className="w-4 h-4" /> Accept
+            </button>
+          </div>
+        )}
+
+        {/* View in interviews link */}
+        {interviewId && (
+          <div className="px-4 pb-3">
+            <button
+              onClick={() => navigate('/interviews')}
+              className="w-full text-xs text-primary hover:underline text-center"
+            >
+              View in Interviews
+            </button>
+          </div>
+        )}
+
+        {responded && (
+          <div className="px-4 pb-3">
+            <div className="py-2 rounded-xl bg-green-500/10 text-green-500 text-sm text-center font-medium">
+              Response sent
+            </div>
+          </div>
+        )}
+
+        {/* Timestamp */}
+        <div className="px-4 pb-2">
+          <p className="text-xs text-muted-foreground text-center">
+            {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+          </p>
+        </div>
+      </div>
     </div>
   );
 }
