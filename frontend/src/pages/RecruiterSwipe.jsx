@@ -27,6 +27,7 @@ export default function RecruiterSwipe() {
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState({ active_jobs: 0, total_applications: 0, super_likes: 0, matches: 0 });
   const [expandedCard, setExpandedCard] = useState(false);
+  const [exitingCards, setExitingCards] = useState([]);
   const [superSwipesRemaining, setSuperSwipesRemaining] = useState(null);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
 
@@ -73,7 +74,7 @@ export default function RecruiterSwipe() {
     }
   };
 
-  const handleSwipe = (action) => {
+  const handleSwipe = (action, exitDirection = { x: 0, y: 0 }) => {
     const items = mode === 'applicants' ? applications : candidates;
     if (currentIndex >= items.length) return;
 
@@ -82,6 +83,15 @@ export default function RecruiterSwipe() {
     // Advance index IMMEDIATELY — next card is already visible in the stack
     setCurrentIndex(prev => prev + 1);
     setExpandedCard(false);
+
+    // Add exiting card for fly-out animation
+    const exitDir = exitDirection.x || exitDirection.y
+      ? exitDirection
+      : action === 'reject' ? { x: -1500, y: 0 } : { x: 1500, y: 0 };
+    setExitingCards(prev => [...prev, { item, action, exitDirection: exitDir, id: item.id, mode }]);
+    setTimeout(() => {
+      setExitingCards(prev => prev.filter(c => c.id !== item.id));
+    }, 300);
 
     // Fire-and-forget API call — don't block the UI
     if (mode === 'applicants') {
@@ -250,11 +260,17 @@ export default function RecruiterSwipe() {
                   </div>
                 ))}
 
+                {/* Exiting cards (animating off-screen) */}
+                {exitingCards.map((card) => (
+                  <ExitingRecruiterCard key={`exit-${card.id}`} card={card} />
+                ))}
+
+                {/* Main Swipeable Card */}
                 {mode === 'applicants' ? (
                   <ApplicantCard
                     key={currentItem.id}
                     app={currentItem}
-                    onSwipe={(action) => handleSwipe(action)}
+                    onSwipe={(action, exitDir) => handleSwipe(action, exitDir)}
                     expanded={expandedCard}
                     setExpanded={setExpandedCard}
                   />
@@ -262,7 +278,7 @@ export default function RecruiterSwipe() {
                   <CandidateCard
                     key={currentItem.id}
                     candidate={currentItem}
-                    onSwipe={(action) => handleSwipe(action)}
+                    onSwipe={(action, exitDir) => handleSwipe(action, exitDir)}
                     expanded={expandedCard}
                     setExpanded={setExpandedCard}
                   />
@@ -272,7 +288,7 @@ export default function RecruiterSwipe() {
               {/* Action Buttons */}
               <div className="flex justify-center items-center gap-5 mt-8">
                 <button
-                  onClick={() => handleSwipe('reject')}
+                  onClick={() => handleSwipe('reject', { x: -1500, y: 0 })}
                   className="w-16 h-16 rounded-full bg-destructive/10 border border-destructive/30 flex items-center justify-center hover:scale-110 hover:neon-glow-red transition-all duration-300"
                   data-testid="reject-btn"
                 >
@@ -286,7 +302,7 @@ export default function RecruiterSwipe() {
                         setShowUpgradeModal(true);
                         return;
                       }
-                      handleSwipe('superlike');
+                      handleSwipe('superlike', { x: 0, y: -1500 });
                     }}
                     className="w-14 h-14 rounded-full bg-secondary/10 border border-secondary/30 flex items-center justify-center hover:scale-110 transition-all duration-300 relative"
                     data-testid="superswipe-btn"
@@ -301,7 +317,7 @@ export default function RecruiterSwipe() {
                 )}
 
                 <button
-                  onClick={() => handleSwipe('accept')}
+                  onClick={() => handleSwipe('accept', { x: 1500, y: 0 })}
                   className="w-20 h-20 rounded-full bg-success/10 border border-success/30 flex items-center justify-center hover:scale-110 hover:neon-glow-green transition-all duration-300"
                   data-testid="accept-btn"
                 >
@@ -391,9 +407,9 @@ function ApplicantCard({ app, onSwipe, expanded, setExpanded }) {
     const velThreshold = 300;
 
     if (info.offset.x > threshold || info.velocity.x > velThreshold) {
-      onSwipe('accept');
+      onSwipe('accept', { x: 1500, y: 0 });
     } else if (info.offset.x < -threshold || info.velocity.x < -velThreshold) {
-      onSwipe('reject');
+      onSwipe('reject', { x: -1500, y: 0 });
     } else {
       // Spring back
       const startX = x.get();
@@ -552,9 +568,9 @@ function CandidateCard({ candidate, onSwipe, expanded, setExpanded }) {
     const velThreshold = 300;
 
     if (info.offset.x > threshold || info.velocity.x > velThreshold) {
-      onSwipe('accept');
+      onSwipe('accept', { x: 1500, y: 0 });
     } else if (info.offset.x < -threshold || info.velocity.x < -velThreshold) {
-      onSwipe('reject');
+      onSwipe('reject', { x: -1500, y: 0 });
     } else {
       // Spring back
       const startX = x.get();
@@ -706,6 +722,53 @@ function CandidateCard({ candidate, onSwipe, expanded, setExpanded }) {
               </motion.div>
             )}
           </AnimatePresence>
+        </div>
+      </div>
+    </motion.div>
+  );
+}
+
+// Card that's been swiped — animates off-screen then disappears
+function ExitingRecruiterCard({ card }) {
+  const { exitDirection, action, item, mode: cardMode } = card;
+  const photoUrl = cardMode === 'applicants'
+    ? getPhotoUrl(item.seeker_photo || item.seeker_avatar, item.seeker_id)
+    : getPhotoUrl(item.photo_url || item.avatar, item.id);
+  const name = cardMode === 'applicants' ? item.seeker_name : item.name;
+  const title = cardMode === 'applicants' ? (item.seeker_title || 'Job Seeker') : (item.title || 'Job Seeker');
+
+  return (
+    <motion.div
+      className="absolute inset-0 z-10"
+      initial={{ x: 0, y: 0, rotate: 0 }}
+      animate={{
+        x: exitDirection.x,
+        y: exitDirection.y,
+        rotate: exitDirection.x > 0 ? 20 : exitDirection.x < 0 ? -20 : 0,
+      }}
+      transition={{ duration: 0.25, ease: 'easeIn' }}
+    >
+      <div className="w-full h-full rounded-3xl overflow-hidden relative gradient-border bg-card">
+        <div className="absolute inset-0">
+          <div className="h-[45%] relative overflow-hidden">
+            <img src={photoUrl} alt={name} className="w-full h-full object-cover" />
+            <div className="absolute inset-0 bg-gradient-to-t from-card via-transparent to-transparent" />
+          </div>
+          <div className="absolute inset-0 top-[40%] bg-card" />
+        </div>
+        {/* Stamp overlay */}
+        {action === 'accept' && (
+          <div className="absolute top-8 right-8 px-6 py-2 rounded-full bg-success border-2 border-success font-bold text-white transform rotate-12 z-20">MATCH</div>
+        )}
+        {action === 'reject' && (
+          <div className="absolute top-8 left-8 px-6 py-2 rounded-full bg-destructive border-2 border-destructive font-bold text-white transform -rotate-12 z-20">PASS</div>
+        )}
+        {action === 'superlike' && (
+          <div className="absolute top-8 left-1/2 -translate-x-1/2 px-6 py-2 rounded-full bg-secondary border-2 border-secondary font-bold text-white z-20">SUPER SWIPE</div>
+        )}
+        <div className="absolute inset-0 top-[35%] flex flex-col p-6 z-10">
+          <h2 className="text-2xl font-bold font-['Outfit']">{name}</h2>
+          <p className="text-primary text-sm mt-1">{title}</p>
         </div>
       </div>
     </motion.div>
