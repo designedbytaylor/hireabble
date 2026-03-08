@@ -25,6 +25,7 @@ import {
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { getPhotoUrl } from '../utils/helpers';
+import UpgradeModal from '../components/UpgradeModal';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -43,6 +44,7 @@ export default function SeekerDashboard() {
   const [superLikesRemaining, setSuperLikesRemaining] = useState(3);
   const [swipeDirection, setSwipeDirection] = useState(null); // 'left', 'right', 'up'
   const [isAnimating, setIsAnimating] = useState(false);
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [filters, setFilters] = useState({
     job_type: '',
     experience_level: '',
@@ -135,9 +137,9 @@ export default function SeekerDashboard() {
   const handleSwipe = async (action, fromDrag = false) => {
     if (currentIndex >= jobs.length || isAnimating) return;
     
-    // Check super like limit before sending
+    // Check super like limit before sending - show paywall
     if (action === 'superlike' && superLikesRemaining <= 0) {
-      toast.error('No Super Likes remaining today! Try again tomorrow.', { duration: 3000 });
+      setShowUpgradeModal(true);
       return;
     }
     
@@ -664,13 +666,20 @@ export default function SeekerDashboard() {
       </Dialog>
 
       <Navigation />
-      
+
       {showMatch && (
-        <MatchModal 
+        <MatchModal
           match={matchData}
           onClose={() => setShowMatch(false)}
         />
       )}
+
+      <UpgradeModal
+        open={showUpgradeModal}
+        onClose={() => setShowUpgradeModal(false)}
+        trigger="super_likes"
+        highlightTier="seeker_plus"
+      />
     </div>
   );
 }

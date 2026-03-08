@@ -30,6 +30,7 @@ import { useAuth } from '../context/AuthContext';
 import Navigation from '../components/Navigation';
 import NotificationBell from '../components/NotificationBell';
 import { getPhotoUrl } from '../utils/helpers';
+import { UpgradePrompt, PremiumBlur } from '../components/UpgradeModal';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -203,21 +204,29 @@ export default function RecruiterDashboard() {
           </div>
         </div>
 
-        {/* Stats Grid - Bento Style */}
+        {/* Stats Grid - Bento Style (Clickable) */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <div className="glass-card rounded-2xl p-5 hover:border-primary/30 transition-colors">
+          <div
+            className="glass-card rounded-2xl p-5 hover:border-primary/30 transition-colors cursor-pointer active:scale-[0.97]"
+            onClick={() => {/* scroll to jobs section below */
+              document.getElementById('your-jobs-section')?.scrollIntoView({ behavior: 'smooth' });
+            }}
+          >
             <div className="w-12 h-12 rounded-xl bg-primary/20 flex items-center justify-center mb-3">
               <Briefcase className="w-6 h-6 text-primary" />
             </div>
             <div className="text-3xl font-bold font-['Outfit']">{stats.active_jobs}</div>
-            <div className="text-sm text-muted-foreground">Active Jobs</div>
+            <div className="text-sm text-muted-foreground flex items-center gap-1">Active Jobs <ChevronRight className="w-3 h-3" /></div>
           </div>
-          <div className="glass-card rounded-2xl p-5 hover:border-success/30 transition-colors">
+          <div
+            className="glass-card rounded-2xl p-5 hover:border-success/30 transition-colors cursor-pointer active:scale-[0.97]"
+            onClick={() => navigate('/recruiter/dashboard')}
+          >
             <div className="w-12 h-12 rounded-xl bg-success/20 flex items-center justify-center mb-3">
               <Users className="w-6 h-6 text-success" />
             </div>
             <div className="text-3xl font-bold font-['Outfit']">{stats.total_applications}</div>
-            <div className="text-sm text-muted-foreground">Applications</div>
+            <div className="text-sm text-muted-foreground flex items-center gap-1">Applications <ChevronRight className="w-3 h-3" /></div>
           </div>
           <div className="glass-card rounded-2xl p-5 hover:border-secondary/30 transition-colors">
             <div className="w-12 h-12 rounded-xl bg-secondary/20 flex items-center justify-center mb-3">
@@ -234,18 +243,31 @@ export default function RecruiterDashboard() {
               </span>
             </div>
           </div>
-          <div className="glass-card rounded-2xl p-5 hover:border-pink-500/30 transition-colors">
+          <div
+            className="glass-card rounded-2xl p-5 hover:border-pink-500/30 transition-colors cursor-pointer active:scale-[0.97]"
+            onClick={() => navigate('/matches')}
+          >
             <div className="w-12 h-12 rounded-xl bg-pink-500/20 flex items-center justify-center mb-3">
               <Heart className="w-6 h-6 text-pink-500" />
             </div>
             <div className="text-3xl font-bold font-['Outfit']">{stats.matches}</div>
-            <div className="text-sm text-muted-foreground">Matches</div>
+            <div className="text-sm text-muted-foreground flex items-center gap-1">Matches <ChevronRight className="w-3 h-3" /></div>
           </div>
         </div>
       </header>
 
       {/* Main Content */}
       <main className="relative z-10 px-6 md:px-8">
+        {/* Boost Prompt - Tinder-style purple gradient */}
+        <section className="mb-6">
+          <UpgradePrompt
+            title="Boost Your Job Listings"
+            subtitle="Get 3x more visibility and reach top candidates faster"
+            tierHint="recruiter_pro"
+            trigger="boost"
+          />
+        </section>
+
         {/* Recent Applications */}
         <section className="mb-8">
           <div className="flex items-center justify-between mb-4">
@@ -254,9 +276,14 @@ export default function RecruiterDashboard() {
           
           {applications.length > 0 ? (
             <div className="flex gap-4 overflow-x-auto pb-4">
-              {applications.slice(0, 10).map((app) => (
-                <div 
+              {applications.slice(0, 10).map((app, appIndex) => (
+                <PremiumBlur
                   key={app.id}
+                  isUnlocked={appIndex < 3}
+                  tierHint="recruiter_pro"
+                  trigger="blurred"
+                >
+                <div
                   className="glass-card rounded-2xl p-4 min-w-[220px] flex-shrink-0 relative cursor-pointer hover:border-primary/30 transition-colors"
                   onClick={() => setSelectedCandidate(app)}
                 >
@@ -299,14 +326,15 @@ export default function RecruiterDashboard() {
                   
                   {app.recruiter_action && (
                     <div className={`mt-3 py-2 rounded-lg text-center text-sm ${
-                      app.recruiter_action === 'accept' 
-                        ? 'bg-success/10 text-success' 
+                      app.recruiter_action === 'accept'
+                        ? 'bg-success/10 text-success'
                         : 'bg-muted text-muted-foreground'
                     }`}>
                       {app.recruiter_action === 'accept' ? 'Matched!' : 'Declined'}
                     </div>
                   )}
                 </div>
+                </PremiumBlur>
               ))}
             </div>
           ) : (
@@ -318,7 +346,7 @@ export default function RecruiterDashboard() {
         </section>
 
         {/* Your Jobs */}
-        <section>
+        <section id="your-jobs-section">
           <h2 className="text-xl font-bold font-['Outfit'] mb-4">Your Jobs</h2>
           
           {jobs.length > 0 ? (
