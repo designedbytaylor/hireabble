@@ -96,7 +96,7 @@ export default function RecruiterSwipe() {
     setExitingCards(prev => [...prev, { item, action, exitDirection: exitDir, id: item.id, mode, startX: dragPos.x, startY: dragPos.y }]);
     setTimeout(() => {
       setExitingCards(prev => prev.filter(c => c.id !== item.id));
-    }, 300);
+    }, 500);
 
     // Fire-and-forget API call — don't block the UI
     if (mode === 'applicants') {
@@ -738,11 +738,7 @@ function CandidateCard({ candidate, onSwipe, expanded, setExpanded }) {
 // Card that's been swiped — animates off-screen then disappears
 function ExitingRecruiterCard({ card }) {
   const { exitDirection, action, item, mode: cardMode, startX = 0, startY = 0 } = card;
-  // useMotionValue ensures position is set synchronously on mount — no flash
-  const x = useMotionValue(startX);
-  const y = useMotionValue(startY);
   const startRotate = startX !== 0 ? (startX / 200) * 25 : 0;
-  const rotate = useMotionValue(startRotate);
   const photoUrl = cardMode === 'applicants'
     ? getPhotoUrl(item.seeker_photo || item.seeker_avatar, item.seeker_id)
     : getPhotoUrl(item.photo_url || item.avatar, item.id);
@@ -751,8 +747,8 @@ function ExitingRecruiterCard({ card }) {
 
   return (
     <motion.div
-      className="absolute inset-0 z-10"
-      style={{ x, y, rotate }}
+      className="absolute inset-0 z-10 pointer-events-none"
+      initial={{ x: startX, y: startY, rotate: startRotate }}
       animate={{
         x: exitDirection.x,
         y: exitDirection.y,
