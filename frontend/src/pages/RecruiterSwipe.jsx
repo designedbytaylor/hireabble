@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence, useMotionValue, useTransform } from 'framer-motion';
 import {
@@ -30,6 +30,7 @@ export default function RecruiterSwipe() {
   const [exitingCards, setExitingCards] = useState([]);
   const [superSwipesRemaining, setSuperSwipesRemaining] = useState(null);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+  const swipedIdsRef = useRef(new Set());
 
   useEffect(() => {
     fetchData();
@@ -74,21 +75,25 @@ export default function RecruiterSwipe() {
     }
   };
 
-  const handleSwipe = (action, exitDirection = { x: 0, y: 0 }) => {
+  const handleSwipe = (action, exitDirection = { x: 0, y: 0 }, dragPos = { x: 0, y: 0 }) => {
     const items = mode === 'applicants' ? applications : candidates;
     if (currentIndex >= items.length) return;
 
     const item = items[currentIndex];
 
+    // Prevent double-swiping
+    if (swipedIdsRef.current.has(item.id)) return;
+    swipedIdsRef.current.add(item.id);
+
     // Advance index IMMEDIATELY — next card is already visible in the stack
     setCurrentIndex(prev => prev + 1);
     setExpandedCard(false);
 
-    // Add exiting card for fly-out animation
+    // Add exiting card — start from where the user released the drag
     const exitDir = exitDirection.x || exitDirection.y
       ? exitDirection
       : action === 'reject' ? { x: -1500, y: 0 } : { x: 1500, y: 0 };
-    setExitingCards(prev => [...prev, { item, action, exitDirection: exitDir, id: item.id, mode }]);
+    setExitingCards(prev => [...prev, { item, action, exitDirection: exitDir, id: item.id, mode, startX: dragPos.x, startY: dragPos.y }]);
     setTimeout(() => {
       setExitingCards(prev => prev.filter(c => c.id !== item.id));
     }, 300);
@@ -270,7 +275,7 @@ export default function RecruiterSwipe() {
                   <ApplicantCard
                     key={currentItem.id}
                     app={currentItem}
-                    onSwipe={(action, exitDir) => handleSwipe(action, exitDir)}
+                    onSwipe={(action, exitDir, dragPos) => handleSwipe(action, exitDir, dragPos)}
                     expanded={expandedCard}
                     setExpanded={setExpandedCard}
                   />
@@ -278,7 +283,7 @@ export default function RecruiterSwipe() {
                   <CandidateCard
                     key={currentItem.id}
                     candidate={currentItem}
-                    onSwipe={(action, exitDir) => handleSwipe(action, exitDir)}
+                    onSwipe={(action, exitDir, dragPos) => handleSwipe(action, exitDir, dragPos)}
                     expanded={expandedCard}
                     setExpanded={setExpandedCard}
                   />
@@ -406,10 +411,11 @@ function ApplicantCard({ app, onSwipe, expanded, setExpanded }) {
     const threshold = 60;
     const velThreshold = 300;
 
+    const pos = { x: x.get(), y: y.get() };
     if (info.offset.x > threshold || info.velocity.x > velThreshold) {
-      onSwipe('accept', { x: 1500, y: 0 });
+      onSwipe('accept', { x: 1500, y: 0 }, pos);
     } else if (info.offset.x < -threshold || info.velocity.x < -velThreshold) {
-      onSwipe('reject', { x: -1500, y: 0 });
+      onSwipe('reject', { x: -1500, y: 0 }, pos);
     } else {
       // Spring back
       const startX = x.get();
@@ -567,10 +573,11 @@ function CandidateCard({ candidate, onSwipe, expanded, setExpanded }) {
     const threshold = 60;
     const velThreshold = 300;
 
+    const pos = { x: x.get(), y: y.get() };
     if (info.offset.x > threshold || info.velocity.x > velThreshold) {
-      onSwipe('accept', { x: 1500, y: 0 });
+      onSwipe('accept', { x: 1500, y: 0 }, pos);
     } else if (info.offset.x < -threshold || info.velocity.x < -velThreshold) {
-      onSwipe('reject', { x: -1500, y: 0 });
+      onSwipe('reject', { x: -1500, y: 0 }, pos);
     } else {
       // Spring back
       const startX = x.get();
@@ -730,7 +737,7 @@ function CandidateCard({ candidate, onSwipe, expanded, setExpanded }) {
 
 // Card that's been swiped — animates off-screen then disappears
 function ExitingRecruiterCard({ card }) {
-  const { exitDirection, action, item, mode: cardMode } = card;
+  const { exitDirection, action, item, mode: cardMode, startX = 0, startY = 0 } = card;
   const photoUrl = cardMode === 'applicants'
     ? getPhotoUrl(item.seeker_photo || item.seeker_avatar, item.seeker_id)
     : getPhotoUrl(item.photo_url || item.avatar, item.id);
@@ -740,7 +747,7 @@ function ExitingRecruiterCard({ card }) {
   return (
     <motion.div
       className="absolute inset-0 z-10"
-      initial={{ x: 0, y: 0, rotate: 0 }}
+      initial={{ x: startX, y: startY, rotate: startX > 0 ? (startX / 200) * 25 : startX < 0 ? (startX / 200) * 25 : 0 }}
       animate={{
         x: exitDirection.x,
         y: exitDirection.y,
