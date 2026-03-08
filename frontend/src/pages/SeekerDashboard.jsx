@@ -425,7 +425,7 @@ export default function SeekerDashboard() {
                 <SwipeCard
                   key={currentJob.id}
                   job={currentJob}
-                  onSwipe={(action, exitDir) => handleSwipe(action, exitDir)}
+                  onSwipe={handleSwipe}
                   expanded={expandedCard}
                   setExpanded={setExpandedCard}
                 />
@@ -784,10 +784,15 @@ const StaticJobCard = memo(function StaticJobCard({ job }) {
 // Card that's been swiped — animates off-screen from where user released it
 function ExitingCard({ card }) {
   const { exitDirection, action, startX = 0, startY = 0 } = card;
+  // useMotionValue ensures position is set synchronously on mount — no flash
+  const x = useMotionValue(startX);
+  const y = useMotionValue(startY);
+  const startRotate = startX !== 0 ? (startX / 200) * 25 : 0;
+  const rotate = useMotionValue(startRotate);
   return (
     <motion.div
       className="absolute inset-0 z-10"
-      initial={{ x: startX, y: startY, rotate: startX > 0 ? (startX / 200) * 25 : startX < 0 ? (startX / 200) * 25 : 0 }}
+      style={{ x, y, rotate }}
       animate={{
         x: exitDirection.x,
         y: exitDirection.y,

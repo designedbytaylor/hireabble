@@ -5,10 +5,23 @@ const AuthContext = createContext(null);
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
+// Global timeout so no request hangs indefinitely on slow mobile networks
+axios.defaults.timeout = 10000;
+
 export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(null);
+  // Hydrate cached user immediately so pages render without waiting for network
+  const [user, setUser] = useState(() => {
+    try {
+      const cached = localStorage.getItem('cached_user');
+      return cached ? JSON.parse(cached) : null;
+    } catch { return null; }
+  });
   const [token, setToken] = useState(localStorage.getItem('token'));
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(() => {
+    // If we have cached user data, skip loading state entirely
+    const hasCached = !!localStorage.getItem('cached_user');
+    return !hasCached && !!localStorage.getItem('token');
+  });
 
   useEffect(() => {
     const initAuth = async () => {
@@ -16,12 +29,14 @@ export const AuthProvider = ({ children }) => {
         try {
           const response = await axios.get(`${API}/auth/me`, {
             headers: { Authorization: `Bearer ${token}` },
-            timeout: 8000
+            timeout: 3000
           });
           setUser(response.data);
+          localStorage.setItem('cached_user', JSON.stringify(response.data));
         } catch (error) {
           console.error('Auth initialization failed:', error);
           localStorage.removeItem('token');
+          localStorage.removeItem('cached_user');
           setToken(null);
         }
       }
@@ -38,6 +53,7 @@ export const AuthProvider = ({ children }) => {
         if (error.response?.status === 403 &&
             error.response?.data?.detail?.includes('banned')) {
           localStorage.removeItem('token');
+          localStorage.removeItem('cached_user');
           setToken(null);
           setUser(null);
           window.location.href = '/login?reason=banned';
@@ -52,6 +68,7 @@ export const AuthProvider = ({ children }) => {
     const response = await axios.post(`${API}/auth/login`, { email, password });
     const { token: newToken, user: userData } = response.data;
     localStorage.setItem('token', newToken);
+    localStorage.setItem('cached_user', JSON.stringify(userData));
     setToken(newToken);
     setUser(userData);
     return userData;
@@ -61,6 +78,7 @@ export const AuthProvider = ({ children }) => {
     const response = await axios.post(`${API}/auth/register`, userData);
     const { token: newToken, user: newUser } = response.data;
     localStorage.setItem('token', newToken);
+    localStorage.setItem('cached_user', JSON.stringify(newUser));
     setToken(newToken);
     setUser(newUser);
     return newUser;
@@ -84,6 +102,7 @@ export const AuthProvider = ({ children }) => {
 
   const logout = () => {
     localStorage.removeItem('token');
+    localStorage.removeItem('cached_user');
     setToken(null);
     setUser(null);
   };
@@ -93,6 +112,7 @@ export const AuthProvider = ({ children }) => {
       headers: { Authorization: `Bearer ${token}` }
     });
     setUser(response.data);
+    localStorage.setItem('cached_user', JSON.stringify(response.data));
     return response.data;
   };
 

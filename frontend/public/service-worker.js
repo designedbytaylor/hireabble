@@ -1,6 +1,6 @@
-const CACHE_NAME = 'hireabble-v2';
+const CACHE_NAME = 'hireabble-v3';
 const IMG_CACHE = 'hireabble-images-v1';
-const API_CACHE = 'hireabble-api-v1';
+const API_CACHE = 'hireabble-api-v2';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
@@ -89,9 +89,12 @@ function isImageRequest(url) {
 
 // Helper: is this a cacheable GET API request?
 function isCacheableApi(url) {
-  // Cache job listings and stats briefly (stale-while-revalidate)
+  // Cache frequently-accessed data (stale-while-revalidate)
   return url.includes('/api/jobs') || url.includes('/api/stats') ||
-    url.includes('/api/profile/completeness') || url.includes('/api/superlikes/remaining');
+    url.includes('/api/profile/completeness') || url.includes('/api/superlikes/remaining') ||
+    url.includes('/api/matches') || url.includes('/api/applications') ||
+    url.includes('/api/notifications/unread/count') || url.includes('/api/messages/unread/count') ||
+    url.includes('/api/candidates');
 }
 
 // Fetch strategy

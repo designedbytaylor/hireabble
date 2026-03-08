@@ -275,7 +275,7 @@ export default function RecruiterSwipe() {
                   <ApplicantCard
                     key={currentItem.id}
                     app={currentItem}
-                    onSwipe={(action, exitDir, dragPos) => handleSwipe(action, exitDir, dragPos)}
+                    onSwipe={handleSwipe}
                     expanded={expandedCard}
                     setExpanded={setExpandedCard}
                   />
@@ -283,7 +283,7 @@ export default function RecruiterSwipe() {
                   <CandidateCard
                     key={currentItem.id}
                     candidate={currentItem}
-                    onSwipe={(action, exitDir, dragPos) => handleSwipe(action, exitDir, dragPos)}
+                    onSwipe={handleSwipe}
                     expanded={expandedCard}
                     setExpanded={setExpandedCard}
                   />
@@ -738,6 +738,11 @@ function CandidateCard({ candidate, onSwipe, expanded, setExpanded }) {
 // Card that's been swiped — animates off-screen then disappears
 function ExitingRecruiterCard({ card }) {
   const { exitDirection, action, item, mode: cardMode, startX = 0, startY = 0 } = card;
+  // useMotionValue ensures position is set synchronously on mount — no flash
+  const x = useMotionValue(startX);
+  const y = useMotionValue(startY);
+  const startRotate = startX !== 0 ? (startX / 200) * 25 : 0;
+  const rotate = useMotionValue(startRotate);
   const photoUrl = cardMode === 'applicants'
     ? getPhotoUrl(item.seeker_photo || item.seeker_avatar, item.seeker_id)
     : getPhotoUrl(item.photo_url || item.avatar, item.id);
@@ -747,7 +752,7 @@ function ExitingRecruiterCard({ card }) {
   return (
     <motion.div
       className="absolute inset-0 z-10"
-      initial={{ x: startX, y: startY, rotate: startX > 0 ? (startX / 200) * 25 : startX < 0 ? (startX / 200) * 25 : 0 }}
+      style={{ x, y, rotate }}
       animate={{
         x: exitDirection.x,
         y: exitDirection.y,
