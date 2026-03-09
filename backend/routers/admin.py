@@ -17,6 +17,7 @@ from database import (
     AdminLogin, AdminCreate, ReportCreate, get_current_user, JobCreate,
 )
 from content_filter import check_text, BANNED_WORDS
+from cache import invalidate_user
 
 router = APIRouter(tags=["Admin"])
 
@@ -965,12 +966,13 @@ def _generate_unique_company(used_companies: set) -> dict:
 async def seed_test_data(body: dict = {}, admin: dict = Depends(get_current_admin)):
     """
     Seed the platform with realistic test data.
-    Optional body: { "seekers": 10, "recruiters": 5, "jobs_per_recruiter": 2, "applications_per_seeker": 3 }
+    Optional body: { "seekers": 10, "recruiters": 5, "jobs_per_recruiter": 2 }
+    Pass "create_applications": true to also generate sample applications (default: fresh accounts with 0 applied).
     """
     num_seekers = body.get("seekers", 10)
     num_recruiters = body.get("recruiters", 5)
     jobs_per_recruiter = body.get("jobs_per_recruiter", 2)
-    apps_per_seeker = body.get("applications_per_seeker", 3)
+    apps_per_seeker = body.get("applications_per_seeker", 0)
 
     created_seekers = []
     created_recruiters = []
@@ -1135,6 +1137,10 @@ async def seed_test_data(body: dict = {}, admin: dict = Depends(get_current_admi
             await db.matches.insert_one(match_doc)
             created_matches.append(match_doc)
 
+    # Invalidate caches for all seeded users so dashboard returns fresh data
+    for u in created_seekers + created_recruiters:
+        invalidate_user(u["id"])
+
     return {
         "message": "Test data seeded successfully!",
         "summary": {
@@ -1189,6 +1195,10 @@ async def clear_test_data(admin: dict = Depends(get_current_admin)):
         {"seeker_id": {"$in": test_user_ids}},
     ]})
     users_del = await db.users.delete_many({"id": {"$in": test_user_ids}})
+
+    # Invalidate caches for all deleted users
+    for uid in test_user_ids:
+        invalidate_user(uid)
 
     return {
         "message": "Test data cleared",
