@@ -29,6 +29,18 @@ router = APIRouter(tags=["Stats & Utilities"])
 
 DAILY_SUPERLIKE_LIMIT = 3
 
+def _get_seeker_daily_superlike_limit(user: dict) -> int:
+    """Return the daily super like limit based on seeker subscription tier."""
+    sub = user.get("subscription", {})
+    now = datetime.now(timezone.utc).isoformat()
+    if sub.get("status") == "active" and sub.get("period_end", "") >= now:
+        tier = sub.get("tier_id", "")
+        if tier == "seeker_premium":
+            return 999
+        elif tier == "seeker_plus":
+            return 10
+    return DAILY_SUPERLIKE_LIMIT
+
 @router.get("/dashboard")
 async def get_seeker_dashboard(current_user: dict = Depends(get_current_user)):
     """Batched endpoint: returns everything the seeker dashboard needs in one request.
@@ -59,7 +71,7 @@ async def get_seeker_dashboard(current_user: dict = Depends(get_current_user)):
             "seeker_id": uid, "action": "superlike",
             "created_at": {"$gte": today_start.isoformat(), "$lt": today_end.isoformat()}
         }),
-        db.users.find_one({"id": uid}, {"_id": 0, "seeker_purchased_superlikes": 1}),
+        db.users.find_one({"id": uid}, {"_id": 0, "seeker_purchased_superlikes": 1, "subscription": 1}),
         db.messages.count_documents({"receiver_id": uid, "is_read": False}),
         db.notifications.count_documents({"user_id": uid, "is_read": False}),
     )
@@ -132,9 +144,10 @@ async def get_seeker_dashboard(current_user: dict = Depends(get_current_user)):
         else:
             missing.append(field_labels.get(field, field))
 
-    # Superlikes remaining
+    # Superlikes remaining (respects subscription tier limits)
     purchased = (user_data or {}).get("seeker_purchased_superlikes", 0)
-    free_remaining = max(0, DAILY_SUPERLIKE_LIMIT - superlikes_today)
+    daily_limit = _get_seeker_daily_superlike_limit(user_data or {})
+    free_remaining = max(0, daily_limit - superlikes_today)
 
     return {
         "jobs": result_jobs,

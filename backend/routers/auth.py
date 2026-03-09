@@ -17,6 +17,7 @@ from database import (
     ResetPasswordRequest, ChangePasswordRequest
 )
 from content_filter import check_fields, is_severe
+from cache import invalidate_user
 
 # OAuth Configuration
 GOOGLE_CLIENT_ID = os.environ.get('GOOGLE_CLIENT_ID', '')
@@ -279,7 +280,9 @@ async def update_profile(updates: dict, current_user: dict = Depends(get_current
             {"id": current_user["id"]},
             {"$set": update_data}
         )
-    
+        # Invalidate auth cache so subsequent requests use fresh profile data
+        invalidate_user(current_user["id"])
+
     updated_user = await db.users.find_one({"id": current_user["id"]}, {"_id": 0, "password": 0})
     return updated_user
 

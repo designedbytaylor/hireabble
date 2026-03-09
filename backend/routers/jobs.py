@@ -181,7 +181,9 @@ async def get_jobs(
     salary_min: Optional[int] = None,
     location: Optional[str] = None,
     category: Optional[str] = None,
-    employment_type: Optional[str] = None
+    employment_type: Optional[str] = None,
+    skip: int = 0,
+    limit: int = 100
 ):
     """Get available jobs for seekers or recruiter's own jobs, with smart matching"""
 
@@ -228,7 +230,8 @@ async def get_jobs(
                 {"location": {"$regex": seeker_location.split(",")[0].strip(), "$options": "i"}},
             ]
 
-        jobs = await db.jobs.find(query, {"_id": 0}).sort("created_at", -1).to_list(100)
+        clamped_limit = min(limit, 200)
+        jobs = await db.jobs.find(query, {"_id": 0}).sort("created_at", -1).skip(skip).to_list(clamped_limit)
 
         # Calculate match scores and check recruiter subscription status
         now = datetime.now(timezone.utc).isoformat()

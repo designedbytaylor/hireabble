@@ -20,6 +20,7 @@ import jwt as pyjwt
 
 # Import database and shared utilities
 from database import db, manager, UPLOADS_DIR, logger, JWT_SECRET, JWT_ALGORITHM, create_notification
+from content_filter import check_text, is_severe
 
 # Import routers
 from routers import auth, jobs, applications, matches, notifications, uploads, stats, admin, interviews, payments
@@ -155,6 +156,15 @@ async def websocket_endpoint(websocket: WebSocket, token: str):
                 if not match:
                     continue
                 if match["seeker_id"] != user_id and match["recruiter_id"] != user_id:
+                    continue
+
+                # Content moderation
+                is_clean, violations = check_text(content)
+                if not is_clean and is_severe(violations):
+                    await websocket.send_json({
+                        "type": "error",
+                        "message": "Message contains prohibited content."
+                    })
                     continue
 
                 # Determine receiver
