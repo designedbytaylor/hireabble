@@ -29,7 +29,7 @@ async def get_stats(current_user: dict = Depends(get_current_user)):
     uid = current_user["id"]
     if current_user["role"] == "seeker":
         applications, superlikes, matches = await asyncio.gather(
-            db.applications.count_documents({"seeker_id": uid}),
+            db.applications.count_documents({"seeker_id": uid, "action": {"$in": ["like", "superlike"]}}),
             db.applications.count_documents({"seeker_id": uid, "action": "superlike"}),
             db.matches.count_documents({"seeker_id": uid}),
         )
