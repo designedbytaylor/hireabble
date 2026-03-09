@@ -12,6 +12,7 @@ from database import (
     send_system_message,
     SwipeAction, ApplicationResponse, RecruiterAction, MatchResponse
 )
+from cache import invalidate_user
 
 router = APIRouter(tags=["Applications"])
 
@@ -409,8 +410,17 @@ async def swipe(action: SwipeAction, current_user: dict = Depends(get_current_us
         "created_at": datetime.now(timezone.utc).isoformat()
     }
     
-    await db.applications.insert_one(application_doc)
-    
+    try:
+        await db.applications.insert_one(application_doc)
+    except Exception as e:
+        # Unique index violation — race condition duplicate
+        if "duplicate key" in str(e).lower() or "E11000" in str(e):
+            raise HTTPException(status_code=400, detail="Already swiped on this job")
+        raise
+
+    # Invalidate cached stats so next dashboard/stats fetch returns fresh data
+    invalidate_user(current_user["id"])
+
     # Return remaining super likes if it was a superlike action
     remaining_superlikes = None
     if action.action == "superlike":
@@ -427,11 +437,51 @@ async def swipe(action: SwipeAction, current_user: dict = Depends(get_current_us
         user_data = await db.users.find_one({"id": current_user["id"]}, {"_id": 0, "seeker_purchased_superlikes": 1})
         purchased_remaining = (user_data or {}).get("seeker_purchased_superlikes", 0)
         remaining_superlikes = max(0, DAILY_SUPERLIKE_LIMIT - superlikes_today) + purchased_remaining
-    
+
+    # Check if recruiter has already swiped on this seeker → auto-match
+    match_response = None
+    if action.action in ("like", "superlike"):
+        recruiter_swipe = await db.recruiter_swipes.find_one({
+            "recruiter_id": job["recruiter_id"],
+            "seeker_id": current_user["id"],
+            "action": {"$in": ["like", "superlike"]},
+        })
+        if recruiter_swipe:
+            match_id = str(uuid.uuid4())
+            match_doc = {
+                "id": match_id,
+                "application_id": application_id,
+                "job_id": action.job_id,
+                "job_title": job.get("title", "Unknown"),
+                "company": job.get("company", "Unknown"),
+                "seeker_id": current_user["id"],
+                "seeker_name": current_user["name"],
+                "seeker_avatar": current_user.get("avatar"),
+                "recruiter_id": job["recruiter_id"],
+                "recruiter_name": job.get("recruiter_name", ""),
+                "created_at": datetime.now(timezone.utc).isoformat(),
+            }
+            await db.matches.insert_one(match_doc)
+            await db.applications.update_one(
+                {"id": application_id},
+                {"$set": {"recruiter_action": "accept", "is_matched": True}}
+            )
+            match_response = {k: v for k, v in match_doc.items() if k != "_id"}
+
+            # Notify recruiter
+            await create_notification(
+                user_id=job["recruiter_id"],
+                notif_type="match",
+                title="It's a Match!",
+                message=f"{current_user['name']} applied to {job.get('title', 'your position')} - mutual interest!",
+                data={"match_id": match_id, "job_id": action.job_id}
+            )
+
     return {
-        "message": f"Swiped {action.action}", 
+        "message": f"Swiped {action.action}",
         "application_id": application_id,
-        "remaining_superlikes": remaining_superlikes
+        "remaining_superlikes": remaining_superlikes,
+        "match": match_response,
     }
 
 # ==================== RECRUITER APPLICATIONS ====================
@@ -602,6 +652,10 @@ async def respond_to_application(response: RecruiterAction, current_user: dict =
                 )
             ))
     
+    # Invalidate caches for both parties
+    invalidate_user(current_user["id"])
+    invalidate_user(application["seeker_id"])
+
     return {"message": f"Application {response.action}ed", "is_matched": is_matched}
 
 
