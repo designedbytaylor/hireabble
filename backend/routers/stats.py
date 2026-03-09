@@ -25,6 +25,260 @@ from cache import (
 
 router = APIRouter(tags=["Stats & Utilities"])
 
+# ==================== BATCHED DASHBOARD (single request instead of 6-8) ====================
+
+DAILY_SUPERLIKE_LIMIT = 3
+
+@router.get("/dashboard")
+async def get_seeker_dashboard(current_user: dict = Depends(get_current_user)):
+    """Batched endpoint: returns everything the seeker dashboard needs in one request.
+    Replaces 6+ separate API calls with a single round trip."""
+
+    if current_user["role"] != "seeker":
+        raise HTTPException(status_code=403, detail="Seeker only")
+
+    uid = current_user["id"]
+    today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+    today_end = today_start + timedelta(days=1)
+    now = datetime.now(timezone.utc).isoformat()
+
+    # --- Run ALL queries in parallel (server-side, near-zero latency to DB) ---
+    (
+        swiped_jobs_cursor,
+        applications_count, superlikes_count, matches_count,
+        superlikes_today,
+        user_data,
+        unread_messages,
+        unread_notifications,
+    ) = await asyncio.gather(
+        db.applications.find({"seeker_id": uid}, {"job_id": 1}).to_list(1000),
+        db.applications.count_documents({"seeker_id": uid, "action": {"$in": ["like", "superlike"]}}),
+        db.applications.count_documents({"seeker_id": uid, "action": "superlike"}),
+        db.matches.count_documents({"seeker_id": uid}),
+        db.applications.count_documents({
+            "seeker_id": uid, "action": "superlike",
+            "created_at": {"$gte": today_start.isoformat(), "$lt": today_end.isoformat()}
+        }),
+        db.users.find_one({"id": uid}, {"_id": 0, "seeker_purchased_superlikes": 1}),
+        db.messages.count_documents({"receiver_id": uid, "is_read": False}),
+        db.notifications.count_documents({"user_id": uid, "is_read": False}),
+    )
+
+    swiped_job_ids = [s["job_id"] for s in swiped_jobs_cursor]
+
+    # Fetch available jobs (excluding already-swiped)
+    job_query = {"id": {"$nin": swiped_job_ids}, "is_active": True}
+    seeker_location = current_user.get("location", "")
+    if seeker_location:
+        job_query["$or"] = [
+            {"location_restriction": None},
+            {"location_restriction": "any"},
+            {"location_restriction": {"$exists": False}},
+            {"location": {"$regex": seeker_location.split(",")[0].strip(), "$options": "i"}},
+        ]
+
+    jobs = await db.jobs.find(job_query, {"_id": 0}).sort("created_at", -1).to_list(100)
+
+    # Batch-fetch recruiter subscriptions
+    recruiter_ids = list(set(j.get("recruiter_id") for j in jobs if j.get("recruiter_id")))
+    recruiter_subs = {}
+    if recruiter_ids:
+        recruiters = await db.users.find(
+            {"id": {"$in": recruiter_ids}},
+            {"_id": 0, "id": 1, "subscription": 1}
+        ).to_list(len(recruiter_ids))
+        for r in recruiters:
+            sub = r.get("subscription", {})
+            if sub.get("status") == "active" and sub.get("period_end", "") >= now:
+                recruiter_subs[r["id"]] = sub.get("tier_id", "")
+
+    # Score and sort jobs
+    from routers.jobs import calculate_job_match_score
+    for job in jobs:
+        job["match_score"] = calculate_job_match_score(current_user, job)
+        job["is_boosted"] = bool(job.get("is_boosted") and job.get("boost_until", "") >= now)
+        rec_tier = recruiter_subs.get(job.get("recruiter_id"), "")
+        if rec_tier:
+            job["is_premium_listing"] = True
+            job["match_score"] = min(100, job["match_score"] + 15)
+
+    boosted = [j for j in jobs if j.get("is_boosted")]
+    regular = [j for j in jobs if not j.get("is_boosted")]
+    regular.sort(key=lambda j: (1 if j.get("is_premium_listing") else 0, j["match_score"]), reverse=True)
+    result_jobs = list(regular)
+    boost_positions = [0, 3, 7, 12, 18]
+    for i, bj in enumerate(boosted):
+        pos = boost_positions[i] if i < len(boost_positions) else len(result_jobs)
+        pos = min(pos, len(result_jobs))
+        result_jobs.insert(pos, bj)
+
+    # Profile completeness (computed from current_user, no extra DB call)
+    fields_to_check = {
+        "name": 10, "title": 15, "bio": 10, "skills": 15,
+        "experience_years": 10, "location": 10, "photo_url": 15,
+        "school": 5, "degree": 5, "current_employer": 5
+    }
+    completeness_total = 0
+    missing = []
+    field_labels = {
+        "name": "name", "title": "job title", "bio": "bio", "skills": "skills",
+        "experience_years": "experience", "location": "location", "photo_url": "photo",
+        "school": "education", "degree": "degree", "current_employer": "employer"
+    }
+    for field, weight in fields_to_check.items():
+        value = current_user.get(field)
+        if value and (not isinstance(value, list) or len(value) > 0):
+            completeness_total += weight
+        else:
+            missing.append(field_labels.get(field, field))
+
+    # Superlikes remaining
+    purchased = (user_data or {}).get("seeker_purchased_superlikes", 0)
+    free_remaining = max(0, DAILY_SUPERLIKE_LIMIT - superlikes_today)
+
+    return {
+        "jobs": result_jobs,
+        "stats": {
+            "applications_sent": applications_count,
+            "super_likes_used": superlikes_count,
+            "matches": matches_count,
+        },
+        "completeness": {
+            "percentage": completeness_total,
+            "missing_fields": missing,
+            "is_complete": completeness_total >= 80,
+        },
+        "superlikes": {
+            "remaining": free_remaining + purchased,
+            "free_remaining": free_remaining,
+            "purchased_remaining": purchased,
+            "used_today": superlikes_today,
+            "daily_limit": DAILY_SUPERLIKE_LIMIT,
+        },
+        "unread_messages": unread_messages,
+        "unread_notifications": unread_notifications,
+    }
+
+
+@router.get("/recruiter/dashboard-data")
+async def get_recruiter_dashboard_data(current_user: dict = Depends(get_current_user)):
+    """Batched endpoint: returns everything the recruiter dashboard needs in one request."""
+
+    if current_user["role"] != "recruiter":
+        raise HTTPException(status_code=403, detail="Recruiter only")
+
+    uid = current_user["id"]
+    now_iso = datetime.now(timezone.utc).isoformat()
+    week_ago = (datetime.now(timezone.utc) - timedelta(days=7)).isoformat()
+
+    # --- All count + list queries in parallel ---
+    (
+        active_jobs, total_jobs, total_applications, pending_applications,
+        super_likes, matches_count, interviews_scheduled, interviews_pending,
+        responded, weekly_apps, jobs_list,
+        recruiter_jobs,
+        raw_applications,
+        user_sub_data,
+        unread_messages, unread_notifications,
+    ) = await asyncio.gather(
+        db.jobs.count_documents({"recruiter_id": uid, "is_active": True}),
+        db.jobs.count_documents({"recruiter_id": uid}),
+        db.applications.count_documents({"recruiter_id": uid}),
+        db.applications.count_documents({"recruiter_id": uid, "recruiter_action": None}),
+        db.applications.count_documents({"recruiter_id": uid, "action": "superlike"}),
+        db.matches.count_documents({"recruiter_id": uid}),
+        db.interviews.count_documents({"recruiter_id": uid, "status": "accepted"}),
+        db.interviews.count_documents({"recruiter_id": uid, "status": "pending"}),
+        db.applications.count_documents({"recruiter_id": uid, "recruiter_action": {"$ne": None}}),
+        db.applications.count_documents({"recruiter_id": uid, "created_at": {"$gte": week_ago}}),
+        db.jobs.find({"recruiter_id": uid}, {"_id": 0, "id": 1, "title": 1}).to_list(50),
+        db.jobs.find({"recruiter_id": uid}, {"_id": 0}).sort("created_at", -1).to_list(100),
+        db.applications.find(
+            {"recruiter_id": uid, "action": {"$in": ["like", "superlike"]}}, {"_id": 0}
+        ).sort("created_at", -1).to_list(100),
+        db.users.find_one({"id": uid}, {"_id": 0, "subscription": 1}),
+        db.messages.count_documents({"receiver_id": uid, "is_read": False}),
+        db.notifications.count_documents({"user_id": uid, "is_read": False}),
+    )
+
+    # Per-job stats aggregation
+    response_rate = round((responded / total_applications * 100) if total_applications > 0 else 0)
+    match_rate = round((matches_count / total_applications * 100) if total_applications > 0 else 0)
+    top_jobs = []
+    if jobs_list:
+        job_ids = [job["id"] for job in jobs_list]
+        job_title_map = {job["id"]: job["title"] for job in jobs_list}
+        app_counts, match_counts = await asyncio.gather(
+            db.applications.aggregate([
+                {"$match": {"job_id": {"$in": job_ids}}},
+                {"$group": {"_id": "$job_id", "count": {"$sum": 1}}}
+            ]).to_list(100),
+            db.matches.aggregate([
+                {"$match": {"job_id": {"$in": job_ids}}},
+                {"$group": {"_id": "$job_id", "count": {"$sum": 1}}}
+            ]).to_list(100),
+        )
+        app_map = {doc["_id"]: doc["count"] for doc in app_counts}
+        match_map = {doc["_id"]: doc["count"] for doc in match_counts}
+        top_jobs = [{
+            "job_id": jid, "title": job_title_map[jid],
+            "applications": app_map.get(jid, 0), "matches": match_map.get(jid, 0),
+        } for jid in job_ids]
+        top_jobs.sort(key=lambda j: j["applications"], reverse=True)
+
+    # Mark premium seekers in applications
+    seeker_ids = list(set(a.get("seeker_id") for a in raw_applications if a.get("seeker_id")))
+    premium_seekers = set()
+    if seeker_ids:
+        seekers = await db.users.find(
+            {"id": {"$in": seeker_ids}}, {"_id": 0, "id": 1, "subscription": 1}
+        ).to_list(len(seeker_ids))
+        for s in seekers:
+            sub = s.get("subscription", {})
+            if sub.get("status") == "active" and sub.get("period_end", "") >= now_iso:
+                premium_seekers.add(s["id"])
+    for app in raw_applications:
+        if app.get("seeker_id") in premium_seekers:
+            app["is_premium_seeker"] = True
+    sl = [a for a in raw_applications if a.get("action") == "superlike"]
+    pr = [a for a in raw_applications if a.get("action") != "superlike" and a.get("is_premium_seeker")]
+    rg = [a for a in raw_applications if a.get("action") != "superlike" and not a.get("is_premium_seeker")]
+    applications = sl + pr + rg
+
+    # Subscription status
+    sub = (user_sub_data or {}).get("subscription", {})
+    from routers.payments import SUBSCRIPTION_TIERS
+    tier_id = sub.get("tier_id")
+    tier = SUBSCRIPTION_TIERS.get(tier_id)
+    if tier and sub.get("status") == "active":
+        period_end = sub.get("period_end", "")
+        if period_end and period_end >= now_iso:
+            subscription = {
+                "subscribed": True, "tier": tier_id, "tier_name": tier["name"],
+                "tier_level": tier["tier_level"], "limits": tier["limits"], "period_end": period_end,
+            }
+        else:
+            subscription = {"subscribed": False, "tier": None, "tier_name": "Free", "limits": {}}
+    else:
+        subscription = {"subscribed": False, "tier": None, "tier_name": "Free", "limits": {}}
+
+    return {
+        "stats": {
+            "active_jobs": active_jobs, "total_jobs": total_jobs,
+            "total_applications": total_applications, "pending_applications": pending_applications,
+            "super_likes": super_likes, "matches": matches_count,
+            "interviews_scheduled": interviews_scheduled, "interviews_pending": interviews_pending,
+            "response_rate": response_rate, "match_rate": match_rate,
+            "weekly_applications": weekly_apps, "top_jobs": top_jobs[:10],
+        },
+        "jobs": recruiter_jobs,
+        "applications": applications,
+        "subscription": subscription,
+        "unread_messages": unread_messages,
+        "unread_notifications": unread_notifications,
+    }
+
+
 # ==================== STATS ====================
 
 @router.get("/stats")

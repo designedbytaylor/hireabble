@@ -58,16 +58,15 @@ export default function RecruiterDashboard() {
 
   const fetchData = async () => {
     try {
-      const [statsRes, jobsRes, appsRes, subRes] = await Promise.all([
-        axios.get(`${API}/stats/recruiter`, { headers: { Authorization: `Bearer ${token}` } }),
-        axios.get(`${API}/jobs/recruiter`, { headers: { Authorization: `Bearer ${token}` } }),
-        axios.get(`${API}/applications`, { headers: { Authorization: `Bearer ${token}` } }),
-        axios.get(`${API}/payments/subscription`, { headers: { Authorization: `Bearer ${token}` } })
-      ]);
-      setStats(statsRes.data);
-      setJobs(jobsRes.data);
-      setApplications(appsRes.data);
-      setSubscription(subRes.data);
+      // Single batched call replaces 4 separate API requests
+      const response = await axios.get(`${API}/recruiter/dashboard-data`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = response.data;
+      setStats(data.stats);
+      setJobs(data.jobs);
+      setApplications(data.applications);
+      setSubscription(data.subscription);
     } catch (error) {
       console.error('Failed to fetch data:', error);
     } finally {

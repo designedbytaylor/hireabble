@@ -58,14 +58,28 @@ export default function SeekerDashboard() {
   const [activeFiltersCount, setActiveFiltersCount] = useState(0);
   const [detectingLocation, setDetectingLocation] = useState(false);
 
+  // Batched dashboard: single API call replaces 6+ separate requests
+  const fetchDashboard = async () => {
+    setLoading(true);
+    try {
+      const response = await axios.get(`${API}/dashboard`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = response.data;
+      setJobs(data.jobs);
+      setCurrentIndex(0);
+      setStats(data.stats);
+      setProfileComplete(data.completeness.is_complete);
+      setSuperLikesRemaining(data.superlikes.remaining);
+    } catch (error) {
+      console.error('Failed to fetch dashboard:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    // Fire all initial API calls in parallel — don't wait for one to finish before starting the next
-    Promise.all([
-      fetchJobs(),
-      fetchStats(),
-      fetchProfileCompleteness(),
-      fetchSuperLikesRemaining(),
-    ]);
+    fetchDashboard();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -85,17 +99,6 @@ export default function SeekerDashboard() {
       setSuperLikesRemaining(response.data.remaining);
     } catch (error) {
       console.error('Failed to fetch super likes:', error);
-    }
-  };
-
-  const fetchProfileCompleteness = async () => {
-    try {
-      const response = await axios.get(`${API}/profile/completeness`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      setProfileComplete(response.data.is_complete);
-    } catch (error) {
-      console.error('Failed to fetch profile completeness:', error);
     }
   };
 
@@ -132,17 +135,6 @@ export default function SeekerDashboard() {
       console.error('Failed to fetch jobs:', error);
     } finally {
       setLoading(false);
-    }
-  };
-
-  const fetchStats = async () => {
-    try {
-      const response = await axios.get(`${API}/stats`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      setStats(response.data);
-    } catch (error) {
-      console.error('Failed to fetch stats:', error);
     }
   };
 
