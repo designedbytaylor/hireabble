@@ -496,34 +496,37 @@ async def get_my_applications(current_user: dict = Depends(get_current_user)):
     ).sort("created_at", -1).to_list(200)
 
     # Batch-fetch all referenced jobs in one query instead of N+1
-    job_ids = list(set(app["job_id"] for app in applications))
+    job_ids = list(set(app.get("job_id") for app in applications if app.get("job_id")))
     jobs_list = await db.jobs.find({"id": {"$in": job_ids}}, {"_id": 0}).to_list(len(job_ids)) if job_ids else []
     jobs_map = {j["id"]: j for j in jobs_list}
 
     result = []
     for app in applications:
-        job = jobs_map.get(app["job_id"])
+        job = jobs_map.get(app.get("job_id"))
         status = "matched" if app.get("is_matched") else (
             "declined" if app.get("recruiter_action") == "reject" else "pending"
         )
+        app_id = app.get("id") or str(app.get("_id", ""))
+        if not app_id or not app.get("job_id"):
+            continue  # Skip malformed application docs
         result.append({
-            "id": app["id"],
-            "job_id": app["job_id"],
-            "action": app["action"],
+            "id": app_id,
+            "job_id": app.get("job_id"),
+            "action": app.get("action", "like"),
             "status": status,
             "recruiter_action": app.get("recruiter_action"),
             "is_matched": app.get("is_matched", False),
-            "created_at": app["created_at"],
+            "created_at": app.get("created_at", ""),
             "job": {
-                "title": job["title"] if job else "Job Removed",
-                "company": job["company"] if job else "",
+                "title": job.get("title", "Job Removed") if job else "Job Removed",
+                "company": job.get("company", "") if job else "",
                 "location": job.get("location", "") if job else "",
                 "job_type": job.get("job_type", "") if job else "",
                 "salary_min": job.get("salary_min") if job else None,
                 "salary_max": job.get("salary_max") if job else None,
                 "company_logo": job.get("company_logo") if job else None,
                 "employment_type": job.get("employment_type", "full-time") if job else "",
-            } if True else None,
+            },
         })
 
     return result

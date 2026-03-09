@@ -1071,68 +1071,69 @@ async def seed_test_data(body: dict = {}, admin: dict = Depends(get_current_admi
             await db.jobs.insert_one(job_doc)
             created_jobs.append(job_doc)
 
-    # Create applications (seekers applying to jobs)
-    for seeker in created_seekers:
-        available_jobs = list(created_jobs)
-        random.shuffle(available_jobs)
-        for j in range(min(apps_per_seeker, len(available_jobs))):
-            job = available_jobs[j]
-            app_id = str(uuid.uuid4())
-            action = random.choices(["like", "superlike"], weights=[0.7, 0.3])[0]
-            app_doc = {
-                "id": app_id,
-                "job_id": job["id"],
-                "recruiter_id": job["recruiter_id"],
-                "seeker_id": seeker["id"],
-                "seeker_name": seeker["name"],
-                "seeker_title": seeker.get("title"),
-                "seeker_skills": seeker.get("skills", []),
-                "seeker_avatar": seeker.get("avatar"),
-                "seeker_photo": seeker.get("photo_url"),
-                "seeker_video": seeker.get("video_url"),
-                "seeker_experience": seeker.get("experience_years"),
-                "seeker_school": seeker.get("school"),
-                "seeker_degree": seeker.get("degree"),
-                "seeker_location": seeker.get("location"),
-                "seeker_current_employer": seeker.get("current_employer"),
-                "action": action,
-                "is_matched": False,
-                "recruiter_action": None,
-                "created_at": (datetime.now(timezone.utc) - timedelta(days=random.randint(0, 14))).isoformat(),
-            }
-            await db.applications.insert_one(app_doc)
-            created_applications.append(app_doc)
+    # Only create applications/matches if explicitly requested (default: fresh accounts at 0)
+    if apps_per_seeker > 0 and body.get("create_applications", False):
+        for seeker in created_seekers:
+            available_jobs = list(created_jobs)
+            random.shuffle(available_jobs)
+            for j in range(min(apps_per_seeker, len(available_jobs))):
+                job = available_jobs[j]
+                app_id = str(uuid.uuid4())
+                action = random.choices(["like", "superlike"], weights=[0.7, 0.3])[0]
+                app_doc = {
+                    "id": app_id,
+                    "job_id": job["id"],
+                    "recruiter_id": job["recruiter_id"],
+                    "seeker_id": seeker["id"],
+                    "seeker_name": seeker["name"],
+                    "seeker_title": seeker.get("title"),
+                    "seeker_skills": seeker.get("skills", []),
+                    "seeker_avatar": seeker.get("avatar"),
+                    "seeker_photo": seeker.get("photo_url"),
+                    "seeker_video": seeker.get("video_url"),
+                    "seeker_experience": seeker.get("experience_years"),
+                    "seeker_school": seeker.get("school"),
+                    "seeker_degree": seeker.get("degree"),
+                    "seeker_location": seeker.get("location"),
+                    "seeker_current_employer": seeker.get("current_employer"),
+                    "action": action,
+                    "is_matched": False,
+                    "recruiter_action": None,
+                    "created_at": (datetime.now(timezone.utc) - timedelta(days=random.randint(0, 14))).isoformat(),
+                }
+                await db.applications.insert_one(app_doc)
+                created_applications.append(app_doc)
 
-    # Create some matches (randomly accept some applications)
-    apps_to_match = random.sample(
-        created_applications,
-        min(len(created_applications) // 3, len(created_applications))
-    )
-    for app in apps_to_match:
-        job = await db.jobs.find_one({"id": app["job_id"]}, {"_id": 0})
-        if not job:
-            continue
-
-        await db.applications.update_one(
-            {"id": app["id"]},
-            {"$set": {"is_matched": True, "recruiter_action": "accept"}}
+        # Create some matches (randomly accept some applications)
+        apps_to_match = random.sample(
+            created_applications,
+            min(len(created_applications) // 3, len(created_applications))
         )
+        for app in apps_to_match:
+            job = await db.jobs.find_one({"id": app["job_id"]}, {"_id": 0})
+            if not job:
+                continue
 
-        match_id = str(uuid.uuid4())
-        match_doc = {
-            "id": match_id,
-            "job_id": app["job_id"],
-            "job_title": job.get("title", ""),
-            "company": job.get("company", ""),
-            "seeker_id": app["seeker_id"],
-            "seeker_name": app["seeker_name"],
-            "seeker_avatar": app.get("seeker_avatar"),
-            "recruiter_id": job["recruiter_id"],
-            "recruiter_name": job.get("recruiter_name", ""),
-            "created_at": datetime.now(timezone.utc).isoformat(),
-        }
-        await db.matches.insert_one(match_doc)
-        created_matches.append(match_doc)
+            await db.applications.update_one(
+                {"id": app["id"]},
+                {"$set": {"is_matched": True, "recruiter_action": "accept"}}
+            )
+
+            match_id = str(uuid.uuid4())
+            match_doc = {
+                "id": match_id,
+                "job_id": app["job_id"],
+                "job_title": job.get("title", ""),
+                "company": job.get("company", ""),
+                "seeker_id": app["seeker_id"],
+                "seeker_name": app["seeker_name"],
+                "seeker_avatar": app.get("seeker_avatar"),
+                "recruiter_id": job["recruiter_id"],
+                "recruiter_name": job.get("recruiter_name", ""),
+                "created_at": datetime.now(timezone.utc).isoformat(),
+            }
+            await db.matches.insert_one(match_doc)
+            created_matches.append(match_doc)
 
     return {
         "message": "Test data seeded successfully!",
@@ -1178,7 +1179,10 @@ async def clear_test_data(admin: dict = Depends(get_current_admin)):
         {"seeker_id": {"$in": test_user_ids}},
         {"recruiter_id": {"$in": test_user_ids}},
     ]})
-    messages_del = await db.messages.delete_many({"sender_id": {"$in": test_user_ids}})
+    messages_del = await db.messages.delete_many({"$or": [
+        {"sender_id": {"$in": test_user_ids}},
+        {"receiver_id": {"$in": test_user_ids}},
+    ]})
     notif_del = await db.notifications.delete_many({"user_id": {"$in": test_user_ids}})
     swipes_del = await db.recruiter_swipes.delete_many({"$or": [
         {"recruiter_id": {"$in": test_user_ids}},
