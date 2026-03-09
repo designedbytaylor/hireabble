@@ -67,6 +67,9 @@ async def add_cache_headers(request: Request, call_next):
     # Read-only API data that changes infrequently — browser can reuse for 30s
     elif path in ("/api/oauth/config",):
         response.headers["Cache-Control"] = "public, max-age=30"
+    # Batched dashboard endpoints — short cache for snappy back-nav
+    elif path in ("/api/dashboard", "/api/recruiter/dashboard-data"):
+        response.headers["Cache-Control"] = "private, max-age=10, stale-while-revalidate=30"
     # User-specific data — private cache, short TTL to reduce refetches on back-nav
     elif path.startswith("/api/stats") or path.startswith("/api/profile/completeness") or path.startswith("/api/superlikes/remaining"):
         response.headers["Cache-Control"] = "private, max-age=15, stale-while-revalidate=30"
