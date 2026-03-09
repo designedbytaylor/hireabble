@@ -188,15 +188,28 @@ export default function SeekerDashboard() {
       setExitingCards(prev => prev.filter(c => c.id !== job.id));
     }, 500);
 
+    // Optimistically update stats immediately so UI feels instant
+    if (action === 'like') {
+      setStats(prev => ({ ...prev, applications_sent: prev.applications_sent + 1 }));
+    } else if (action === 'superlike') {
+      setStats(prev => ({ ...prev, super_likes_used: prev.super_likes_used + 1 }));
+      setSuperLikesRemaining(prev => Math.max(0, prev - 1));
+    }
+
     // Fire-and-forget API call — don't block the UI, no toasts
     axios.post(`${API}/swipe`,
       { job_id: job.id, action },
       { headers: { Authorization: `Bearer ${token}` } }
     ).then(response => {
-      if (action === 'superlike') {
+      if (action === 'superlike' && response.data.remaining_superlikes != null) {
         setSuperLikesRemaining(response.data.remaining_superlikes);
       }
-      fetchStats();
+      // Check for match
+      if (response.data.match) {
+        setStats(prev => ({ ...prev, matches: prev.matches + 1 }));
+        setMatchData(response.data.match);
+        setShowMatch(true);
+      }
     }).catch(error => {
       // Only surface errors that actually block the user (e.g. no superlikes left)
       if (error.response?.status === 400) {
@@ -264,7 +277,7 @@ export default function SeekerDashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-background pb-24">
+    <div className="min-h-screen bg-background pb-24 overflow-x-hidden">
       {/* Background Effects — reduced blur for mobile perf */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none will-change-transform">
         <div className="absolute top-0 left-1/4 w-96 h-96 bg-primary/10 rounded-full blur-3xl" />
@@ -387,7 +400,7 @@ export default function SeekerDashboard() {
           {currentJob ? (
             <>
               {/* Card Stack */}
-              <div className="relative aspect-[3/4] card-stack" data-testid="swipe-deck">
+              <div className="relative aspect-[3/4] card-stack overflow-hidden" data-testid="swipe-deck">
                 {/* Background cards — real job cards for instant reveal */}
                 {jobs.slice(currentIndex + 1, currentIndex + 3).map((bgJob, i) => (
                   <div
@@ -857,10 +870,10 @@ function SwipeCard({ job, onSwipe, expanded, setExpanded }) {
   return (
     <motion.div
       className="absolute inset-0 cursor-grab active:cursor-grabbing z-[5]"
-      style={{ x, y, rotate }}
+      style={{ x, y, rotate, touchAction: 'none' }}
       drag
-      dragConstraints={false}
-      dragElastic={0.9}
+      dragConstraints={{ left: 0, right: 0, top: 0, bottom: 0 }}
+      dragElastic={1}
       onDragEnd={handleDragEnd}
       whileTap={{ cursor: 'grabbing' }}
       data-testid="job-card"
