@@ -249,7 +249,7 @@ async def startup():
     await db.jobs.create_index("id", unique=True)
     await db.jobs.create_index("recruiter_id")
     await db.applications.create_index("id", unique=True)
-    await db.applications.create_index([("job_id", 1), ("seeker_id", 1)])
+    await db.applications.create_index([("job_id", 1), ("seeker_id", 1)], unique=True)
     await db.applications.create_index("seeker_id")
     await db.applications.create_index("recruiter_id")
     await db.applications.create_index([("seeker_id", 1), ("created_at", -1)])
