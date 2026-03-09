@@ -514,7 +514,7 @@ export default function Profile() {
 
           {/* Resume Upload & Download (Seeker Only) */}
           {user?.role === 'seeker' && (
-            <div className="flex gap-3 mb-6">
+            <div className="flex flex-col sm:flex-row gap-3 mb-6">
               <input
                 ref={resumeInputRef}
                 type="file"
