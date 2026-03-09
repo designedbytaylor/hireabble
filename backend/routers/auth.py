@@ -7,7 +7,7 @@ import uuid
 import asyncio
 
 import os
-import requests as http_requests
+import httpx
 
 from database import (
     db, security, logger, RESEND_API_KEY,
@@ -344,23 +344,24 @@ async def google_oauth(body: dict):
 
     try:
         # Exchange code for tokens
-        token_resp = http_requests.post("https://oauth2.googleapis.com/token", data={
-            "code": code,
-            "client_id": GOOGLE_CLIENT_ID,
-            "client_secret": GOOGLE_CLIENT_SECRET,
-            "redirect_uri": redirect_uri,
-            "grant_type": "authorization_code",
-        }, timeout=10)
-        token_data = token_resp.json()
+        async with httpx.AsyncClient(timeout=10) as client:
+            token_resp = await client.post("https://oauth2.googleapis.com/token", data={
+                "code": code,
+                "client_id": GOOGLE_CLIENT_ID,
+                "client_secret": GOOGLE_CLIENT_SECRET,
+                "redirect_uri": redirect_uri,
+                "grant_type": "authorization_code",
+            })
+            token_data = token_resp.json()
 
-        if "error" in token_data:
-            raise HTTPException(status_code=400, detail=token_data.get("error_description", "Google auth failed"))
+            if "error" in token_data:
+                raise HTTPException(status_code=400, detail=token_data.get("error_description", "Google auth failed"))
 
-        # Get user info
-        userinfo_resp = http_requests.get("https://www.googleapis.com/oauth2/v2/userinfo", headers={
-            "Authorization": f"Bearer {token_data['access_token']}"
-        }, timeout=10)
-        userinfo = userinfo_resp.json()
+            # Get user info
+            userinfo_resp = await client.get("https://www.googleapis.com/oauth2/v2/userinfo", headers={
+                "Authorization": f"Bearer {token_data['access_token']}"
+            })
+            userinfo = userinfo_resp.json()
 
         email = userinfo.get("email")
         name = userinfo.get("name", email.split("@")[0])
@@ -391,35 +392,36 @@ async def github_oauth(body: dict):
 
     try:
         # Exchange code for access token
-        token_resp = http_requests.post("https://github.com/login/oauth/access_token", json={
-            "client_id": GITHUB_CLIENT_ID,
-            "client_secret": GITHUB_CLIENT_SECRET,
-            "code": code,
-        }, headers={"Accept": "application/json"}, timeout=10)
-        token_data = token_resp.json()
+        async with httpx.AsyncClient(timeout=10) as client:
+            token_resp = await client.post("https://github.com/login/oauth/access_token", json={
+                "client_id": GITHUB_CLIENT_ID,
+                "client_secret": GITHUB_CLIENT_SECRET,
+                "code": code,
+            }, headers={"Accept": "application/json"})
+            token_data = token_resp.json()
 
-        if "error" in token_data:
-            raise HTTPException(status_code=400, detail=token_data.get("error_description", "GitHub auth failed"))
+            if "error" in token_data:
+                raise HTTPException(status_code=400, detail=token_data.get("error_description", "GitHub auth failed"))
 
-        access_token = token_data.get("access_token")
+            access_token = token_data.get("access_token")
 
-        # Get user info
-        user_resp = http_requests.get("https://api.github.com/user", headers={
-            "Authorization": f"Bearer {access_token}",
-            "Accept": "application/json"
-        }, timeout=10)
-        github_user = user_resp.json()
-
-        # Get primary email (may need separate call if email is private)
-        email = github_user.get("email")
-        if not email:
-            emails_resp = http_requests.get("https://api.github.com/user/emails", headers={
+            # Get user info
+            user_resp = await client.get("https://api.github.com/user", headers={
                 "Authorization": f"Bearer {access_token}",
                 "Accept": "application/json"
-            }, timeout=10)
-            emails = emails_resp.json()
-            primary = next((e for e in emails if e.get("primary")), None)
-            email = primary["email"] if primary else None
+            })
+            github_user = user_resp.json()
+
+            # Get primary email (may need separate call if email is private)
+            email = github_user.get("email")
+            if not email:
+                emails_resp = await client.get("https://api.github.com/user/emails", headers={
+                    "Authorization": f"Bearer {access_token}",
+                    "Accept": "application/json"
+                })
+                emails = emails_resp.json()
+                primary = next((e for e in emails if e.get("primary")), None)
+                email = primary["email"] if primary else None
 
         if not email:
             raise HTTPException(status_code=400, detail="Could not retrieve email from GitHub")

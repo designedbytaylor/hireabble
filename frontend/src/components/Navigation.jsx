@@ -6,6 +6,31 @@ import axios from 'axios';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
+// Prefetch route data on hover/touch to make navigation feel instant
+const prefetchedRoutes = new Set();
+const prefetchRoute = (path, token) => {
+  if (prefetchedRoutes.has(path) || !token) return;
+  prefetchedRoutes.add(path);
+
+  const headers = { Authorization: `Bearer ${token}` };
+  const opts = { headers, timeout: 5000 };
+
+  // Prefetch the data each route needs
+  if (path === '/dashboard') {
+    axios.get(`${API}/jobs`, opts).catch(() => {});
+    axios.get(`${API}/stats`, opts).catch(() => {});
+  } else if (path === '/recruiter') {
+    axios.get(`${API}/applications/recruiter`, opts).catch(() => {});
+    axios.get(`${API}/stats`, opts).catch(() => {});
+  } else if (path === '/matches') {
+    axios.get(`${API}/matches`, opts).catch(() => {});
+  } else if (path === '/messages') {
+    axios.get(`${API}/matches`, opts).catch(() => {});
+  } else if (path === '/applied') {
+    axios.get(`${API}/applications/seeker`, opts).catch(() => {});
+  }
+};
+
 export default memo(function Navigation() {
   const location = useLocation();
   const { user, token } = useAuth();
@@ -90,6 +115,8 @@ export default memo(function Navigation() {
                   : 'text-muted-foreground hover:text-foreground'
               }`}
               data-testid={`nav-${item.label.toLowerCase()}`}
+              onMouseEnter={() => prefetchRoute(item.path, token)}
+              onTouchStart={() => prefetchRoute(item.path, token)}
             >
               <div className={`p-2 rounded-xl transition-all relative ${
                 isActive ? 'bg-primary/20 neon-glow' : 'hover:bg-accent'
