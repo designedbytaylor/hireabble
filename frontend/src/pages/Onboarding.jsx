@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   User, Briefcase, MapPin, GraduationCap, Building2,
   DollarSign, Clock, ArrowRight, ArrowLeft, Camera, CheckCircle2,
-  Wrench, Upload, X, Globe, Navigation2
+  Wrench, Upload, X, Globe, Navigation2, FileText, Loader2
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -18,12 +18,14 @@ import {
 } from '../components/ui/select';
 import { toast } from 'sonner';
 import { useAuth } from '../context/AuthContext';
+import { isPushSupported, subscribeToPush } from '../utils/pushNotifications';
 import axios from 'axios';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 
 const STEPS = [
+  { id: 'resume', title: 'Speed up your signup', subtitle: 'Upload a resume to autofill your profile' },
   { id: 'photo', title: 'Your Photo', subtitle: 'Add a professional photo' },
   { id: 'role', title: 'What do you do?', subtitle: 'Your current or desired role' },
   { id: 'experience', title: 'Experience', subtitle: 'How long have you been working?' },
@@ -43,6 +45,9 @@ export default function Onboarding() {
   const fileInputRef = useRef(null);
   
   const [detectingLocation, setDetectingLocation] = useState(false);
+  const [parsingResume, setParsingResume] = useState(false);
+  const [resumeUploaded, setResumeUploaded] = useState(false);
+  const resumeInputRef = useRef(null);
 
   const [formData, setFormData] = useState({
     photo_url: '',
@@ -103,6 +108,77 @@ export default function Onboarding() {
       },
       { timeout: 10000 }
     );
+  };
+
+  const handleResumeUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.type !== 'application/pdf') {
+      toast.error('Please select a PDF file');
+      return;
+    }
+
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error('Resume must be less than 10MB');
+      return;
+    }
+
+    setParsingResume(true);
+    try {
+      const formDataUpload = new FormData();
+      formDataUpload.append('file', file);
+
+      const response = await axios.post(`${API}/upload/resume`, formDataUpload, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'multipart/form-data'
+        }
+      });
+
+      const parsed = response.data.parsed;
+
+      // Autofill form data from parsed resume
+      setFormData(prev => ({
+        ...prev,
+        title: parsed.title || prev.title,
+        skills: parsed.skills?.length > 0 ? parsed.skills.join(', ') : prev.skills,
+        certifications: parsed.certifications?.length > 0 ? parsed.certifications.join(', ') : prev.certifications,
+        current_employer: parsed.work_history?.[0]?.company || prev.current_employer,
+        previous_employers: parsed.work_history?.slice(1).map(w => w.company).filter(Boolean).join(', ') || prev.previous_employers,
+        school: parsed.education?.[0]?.school || prev.school,
+        degree: prev.degree, // Keep dropdown selection
+        location: parsed.location || prev.location,
+      }));
+
+      // Try to map degree
+      if (parsed.education?.[0]?.degree) {
+        const degreeText = parsed.education[0].degree.toLowerCase();
+        const degreeMap = {
+          'high school': 'high_school',
+          'associate': 'associates',
+          'bachelor': 'bachelors', 'b.s': 'bachelors', 'b.a': 'bachelors', 'bs': 'bachelors', 'ba': 'bachelors', 'b.sc': 'bachelors',
+          'master': 'masters', 'm.s': 'masters', 'm.a': 'masters', 'ms': 'masters', 'ma': 'masters', 'mba': 'masters', 'm.b.a': 'masters', 'm.sc': 'masters',
+          'ph.d': 'phd', 'phd': 'phd', 'doctor': 'phd',
+          'bootcamp': 'bootcamp', 'certificate': 'bootcamp',
+        };
+        for (const [key, value] of Object.entries(degreeMap)) {
+          if (degreeText.includes(key)) {
+            setFormData(prev => ({ ...prev, degree: value }));
+            break;
+          }
+        }
+      }
+
+      setResumeUploaded(true);
+      toast.success('Resume parsed! Your details have been filled in.');
+      // Auto-advance to next step
+      setCurrentStep(1);
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Failed to parse resume');
+    } finally {
+      setParsingResume(false);
+    }
   };
 
   const handlePhotoUpload = async (e) => {
@@ -178,6 +254,10 @@ export default function Onboarding() {
       
       await updateProfile(updates);
       toast.success('Profile complete! Start swiping!');
+      // Auto-enable push notifications
+      if (isPushSupported()) {
+        subscribeToPush(token).catch(() => {});
+      }
       navigate('/dashboard');
     } catch (error) {
       toast.error('Failed to save profile');
@@ -253,6 +333,79 @@ export default function Onboarding() {
               </div>
 
               {/* Step Content */}
+              {step.id === 'resume' && (
+                <div className="space-y-6">
+                  <div className="flex flex-col items-center">
+                    <div className="w-20 h-20 rounded-2xl bg-primary/20 flex items-center justify-center mb-6">
+                      <FileText className="w-10 h-10 text-primary" />
+                    </div>
+                    {resumeUploaded ? (
+                      <div className="w-full p-4 rounded-xl bg-success/10 border border-success/20 text-center mb-4">
+                        <CheckCircle2 className="w-8 h-8 text-success mx-auto mb-2" />
+                        <p className="text-sm font-medium text-success">Resume uploaded & parsed!</p>
+                        <p className="text-xs text-muted-foreground mt-1">Your details have been filled in. Review them in the next steps.</p>
+                      </div>
+                    ) : (
+                      <p className="text-sm text-muted-foreground text-center mb-4">
+                        Already have a resume? Upload it and we'll fill in your details automatically.
+                      </p>
+                    )}
+                  </div>
+
+                  <input
+                    ref={resumeInputRef}
+                    type="file"
+                    accept=".pdf,application/pdf"
+                    onChange={handleResumeUpload}
+                    className="hidden"
+                    data-testid="resume-file-input"
+                  />
+
+                  <Button
+                    type="button"
+                    onClick={() => resumeInputRef.current?.click()}
+                    disabled={parsingResume}
+                    className="w-full h-14 rounded-xl bg-gradient-to-r from-primary to-secondary hover:opacity-90 text-base"
+                    data-testid="upload-resume-btn"
+                  >
+                    {parsingResume ? (
+                      <>
+                        <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                        Parsing resume...
+                      </>
+                    ) : (
+                      <>
+                        <Upload className="w-5 h-5 mr-2" />
+                        Upload Resume (PDF)
+                      </>
+                    )}
+                  </Button>
+
+                  <div className="relative">
+                    <div className="absolute inset-0 flex items-center">
+                      <span className="w-full border-t border-border" />
+                    </div>
+                    <div className="relative flex justify-center text-xs uppercase">
+                      <span className="bg-background px-2 text-muted-foreground">or</span>
+                    </div>
+                  </div>
+
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setCurrentStep(1)}
+                    className="w-full h-12 rounded-xl"
+                    data-testid="no-resume-btn"
+                  >
+                    I don't have a resume right now
+                  </Button>
+
+                  <p className="text-xs text-muted-foreground text-center">
+                    No worries — you can fill in your details manually or upload a resume later from your profile.
+                  </p>
+                </div>
+              )}
+
               {step.id === 'photo' && (
                 <div className="space-y-6">
                   <div className="flex flex-col items-center">
@@ -298,34 +451,19 @@ export default function Onboarding() {
                     data-testid="photo-file-input"
                   />
                   
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => fileInputRef.current?.click()}
-                    disabled={uploadingPhoto}
-                    className="w-full h-12 rounded-xl"
-                    data-testid="upload-photo-btn"
-                  >
-                    <Upload className="w-5 h-5 mr-2" />
-                    {uploadingPhoto ? 'Uploading...' : 'Upload Photo'}
-                  </Button>
-                  
-                  <div className="relative">
-                    <div className="absolute inset-0 flex items-center">
-                      <span className="w-full border-t border-border" />
-                    </div>
-                    <div className="relative flex justify-center text-xs uppercase">
-                      <span className="bg-background px-2 text-muted-foreground">or paste URL</span>
-                    </div>
-                  </div>
-                  
-                  <Input
-                    placeholder="https://example.com/your-photo.jpg"
-                    value={formData.photo_url}
-                    onChange={(e) => handleChange('photo_url', e.target.value)}
-                    className="h-12 rounded-xl bg-card border-border"
-                    data-testid="photo-url-input"
-                  />
+                  {!formData.photo_url && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={uploadingPhoto}
+                      className="w-full h-12 rounded-xl"
+                      data-testid="upload-photo-btn"
+                    >
+                      <Upload className="w-5 h-5 mr-2" />
+                      {uploadingPhoto ? 'Uploading...' : 'Upload Photo'}
+                    </Button>
+                  )}
                 </div>
               )}
 

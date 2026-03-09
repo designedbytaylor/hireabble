@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { User, Mail, Briefcase, MapPin, Save, LogOut, Building2, Download, Upload, CheckCircle, AlertCircle, Lock, Eye, EyeOff, ChevronDown, Plus, Trash2, GraduationCap, Award, Clock, Navigation2, Bell, BellOff, CreditCard, Crown, ExternalLink } from 'lucide-react';
+import { User, Mail, Briefcase, MapPin, Save, LogOut, Building2, Download, Upload, CheckCircle, AlertCircle, Lock, Eye, EyeOff, ChevronDown, Plus, Trash2, GraduationCap, Award, Clock, Navigation2, Bell, BellOff, CreditCard, Crown, ExternalLink, FileText, Loader2 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
@@ -56,7 +56,9 @@ export default function Profile() {
   const [references, setReferences] = useState([]);
   const [referencesHidden, setReferencesHidden] = useState(true);
   const [referenceRequests, setReferenceRequests] = useState([]);
-  const [subscription, setSubscription] = useState(null);
+  const [subscription, setSubscription] = useState(undefined); // undefined = loading, null = no subscription
+  const [parsingResume, setParsingResume] = useState(false);
+  const resumeInputRef = useRef(null);
 
   useEffect(() => {
     if (user) {
@@ -81,9 +83,17 @@ export default function Profile() {
       fetchReferenceRequests();
       fetchSubscription();
     }
-    // Check push notification status
+    // Check push notification status - auto-enable on first visit
     if (pushSupported) {
-      setPushEnabled(getPermissionStatus() === 'granted');
+      const permStatus = getPermissionStatus();
+      if (permStatus === 'granted') {
+        setPushEnabled(true);
+      } else if (permStatus === 'default' && !user?.push_subscription) {
+        // Auto-prompt for push notifications on first profile visit
+        subscribeToPush(token).then((ok) => {
+          if (ok) setPushEnabled(true);
+        });
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
@@ -125,6 +135,7 @@ export default function Profile() {
       setSubscription(response.data);
     } catch (error) {
       // Subscription endpoint may not exist for all users
+      setSubscription(null);
     }
   };
 
@@ -172,6 +183,71 @@ export default function Profile() {
       toast.error('Failed to upload photo');
     } finally {
       setUploadingPhoto(false);
+    }
+  };
+
+  const handleResumeUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.type !== 'application/pdf') {
+      toast.error('Please select a PDF file');
+      return;
+    }
+
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error('Resume must be less than 10MB');
+      return;
+    }
+
+    setParsingResume(true);
+    try {
+      const formDataUpload = new FormData();
+      formDataUpload.append('file', file);
+
+      const response = await axios.post(`${API}/upload/resume`, formDataUpload, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'multipart/form-data'
+        }
+      });
+
+      const parsed = response.data.parsed;
+
+      // Autofill form data
+      setFormData(prev => ({
+        ...prev,
+        title: parsed.title || prev.title,
+        bio: parsed.bio || prev.bio,
+        skills: parsed.skills?.length > 0 ? parsed.skills.join(', ') : prev.skills,
+        current_employer: parsed.work_history?.[0]?.company || prev.current_employer,
+        location: parsed.location || prev.location,
+        school: parsed.education?.[0]?.school || prev.school,
+        degree: parsed.education?.[0]?.degree || prev.degree,
+      }));
+
+      // Set work history
+      if (parsed.work_history?.length > 0) {
+        setWorkHistory(parsed.work_history);
+      }
+
+      // Set education
+      if (parsed.education?.length > 0) {
+        setEducation(parsed.education);
+      }
+
+      // Set certifications
+      if (parsed.certifications?.length > 0) {
+        setCertifications(parsed.certifications);
+      }
+
+      toast.success('Resume parsed! Your details have been filled in. Review and save your profile.');
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Failed to parse resume');
+    } finally {
+      setParsingResume(false);
+      // Reset the input so the same file can be re-uploaded
+      if (resumeInputRef.current) resumeInputRef.current.value = '';
     }
   };
 
@@ -316,8 +392,8 @@ export default function Profile() {
       {/* Profile Card */}
       <main className="relative z-10 px-6 md:px-8">
         <div className="max-w-lg mx-auto">
-          {/* Upgrade Banner - hide if subscribed */}
-          {!subscription?.subscribed && (
+          {/* Upgrade Banner - hide if subscribed or still loading subscription status */}
+          {subscription !== undefined && !subscription?.subscribed && (
             <div className="mb-6">
               <UpgradePrompt
                 title={user?.role === 'recruiter' ? 'Upgrade to Pro' : 'Upgrade to Plus'}
@@ -431,17 +507,39 @@ export default function Profile() {
             </div>
           )}
 
-          {/* Resume Download (Seeker Only) */}
+          {/* Resume Upload & Download (Seeker Only) */}
           {user?.role === 'seeker' && (
-            <Button
-              variant="outline"
-              onClick={handleDownloadResume}
-              className="w-full h-12 rounded-xl mb-6 border-primary/30 text-primary hover:bg-primary/10"
-              data-testid="download-resume-btn"
-            >
-              <Download className="w-5 h-5 mr-2" />
-              Download Resume PDF
-            </Button>
+            <div className="flex gap-3 mb-6">
+              <input
+                ref={resumeInputRef}
+                type="file"
+                accept=".pdf,application/pdf"
+                onChange={handleResumeUpload}
+                className="hidden"
+              />
+              <Button
+                variant="outline"
+                onClick={() => resumeInputRef.current?.click()}
+                disabled={parsingResume}
+                className="flex-1 h-12 rounded-xl border-secondary/30 text-secondary hover:bg-secondary/10"
+                data-testid="upload-resume-btn"
+              >
+                {parsingResume ? (
+                  <><Loader2 className="w-5 h-5 mr-2 animate-spin" /> Parsing...</>
+                ) : (
+                  <><FileText className="w-5 h-5 mr-2" /> Upload Resume to Autofill</>
+                )}
+              </Button>
+              <Button
+                variant="outline"
+                onClick={handleDownloadResume}
+                className="flex-1 h-12 rounded-xl border-primary/30 text-primary hover:bg-primary/10"
+                data-testid="download-resume-btn"
+              >
+                <Download className="w-5 h-5 mr-2" />
+                Download Resume PDF
+              </Button>
+            </div>
           )}
 
           {/* Edit Form */}

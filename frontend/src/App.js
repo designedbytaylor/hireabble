@@ -25,6 +25,7 @@ const AppliedJobs = React.lazy(() => import("./pages/AppliedJobs"));
 const RecruiterApplications = React.lazy(() => import("./pages/RecruiterApplications"));
 const Messages = React.lazy(() => import("./pages/Messages"));
 const Upgrade = React.lazy(() => import("./pages/Upgrade"));
+const CompanyJobs = React.lazy(() => import("./pages/CompanyJobs"));
 const Impersonate = React.lazy(() => import("./pages/Impersonate"));
 
 // Admin pages — completely separate chunk (never loaded for regular users)
@@ -246,6 +247,14 @@ function AppRoutes() {
         }
       />
 
+      <Route
+        path="/company/:recruiterId"
+        element={
+          <ProtectedRoute allowedRoles={['seeker']}>
+            <CompanyJobs />
+          </ProtectedRoute>
+        }
+      />
       <Route
         path="/upgrade"
         element={
