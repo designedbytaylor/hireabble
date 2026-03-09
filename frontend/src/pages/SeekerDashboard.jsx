@@ -250,6 +250,10 @@ export default function SeekerDashboard() {
       if (action === 'superlike' && response.data.remaining_superlikes != null) {
         setSuperLikesRemaining(response.data.remaining_superlikes);
       }
+      // Sync applied count with server truth
+      if (response.data.applications_sent != null) {
+        setStats(prev => ({ ...prev, applications_sent: response.data.applications_sent }));
+      }
       // Check for match
       if (response.data.match) {
         setStats(prev => ({ ...prev, matches: prev.matches + 1 }));
