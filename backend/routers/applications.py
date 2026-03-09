@@ -492,11 +492,18 @@ async def swipe(action: SwipeAction, current_user: dict = Depends(get_current_us
                 data={"match_id": match_id, "job_id": action.job_id}
             )
 
+    # Return updated counts so frontend can sync with server truth
+    applications_sent = await db.applications.count_documents({
+        "seeker_id": current_user["id"],
+        "action": {"$in": ["like", "superlike"]}
+    })
+
     return {
         "message": f"Swiped {action.action}",
         "application_id": application_id,
         "remaining_superlikes": remaining_superlikes,
         "match": match_response,
+        "applications_sent": applications_sent,
     }
 
 # ==================== RECRUITER APPLICATIONS ====================

@@ -998,6 +998,8 @@ async def seed_test_data(body: dict = {}, admin: dict = Depends(get_current_admi
         await db.notifications.delete_many({"user_id": {"$in": old_ids}})
         await db.recruiter_swipes.delete_many({"$or": [{"recruiter_id": {"$in": old_ids}}, {"seeker_id": {"$in": old_ids}}]})
         await db.interviews.delete_many({"$or": [{"seeker_id": {"$in": old_ids}}, {"recruiter_id": {"$in": old_ids}}]})
+        for uid in old_ids:
+            invalidate_user(uid)
 
     # Create seekers with random unique names
     for i in range(num_seekers):
