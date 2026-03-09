@@ -190,8 +190,13 @@ export default function Profile() {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (file.type !== 'application/pdf') {
-      toast.error('Please select a PDF file');
+    const allowedTypes = [
+      'application/pdf',
+      'application/msword',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    ];
+    if (!allowedTypes.includes(file.type)) {
+      toast.error('Please select a PDF or Word document (.pdf, .doc, .docx)');
       return;
     }
 
@@ -513,7 +518,7 @@ export default function Profile() {
               <input
                 ref={resumeInputRef}
                 type="file"
-                accept=".pdf,application/pdf"
+                accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
                 onChange={handleResumeUpload}
                 className="hidden"
               />

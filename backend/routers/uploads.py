@@ -436,10 +436,155 @@ async def upload_chat_video(
 # ==================== RESUME PARSING ====================
 
 MAX_RESUME_SIZE = 10 * 1024 * 1024  # 10MB
-ALLOWED_RESUME_TYPES = ["application/pdf"]
+ALLOWED_RESUME_TYPES = [
+    "application/pdf",
+    "application/msword",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+]
 
-def _parse_resume_text(text: str) -> dict:
-    """Extract structured data from resume text using pattern matching."""
+async def _parse_resume_with_ai(text: str) -> dict:
+    """Extract structured data from resume text using Claude AI for accurate parsing."""
+    import json as json_module
+
+    default_result = {
+        "name": None,
+        "title": None,
+        "email": None,
+        "phone": None,
+        "location": None,
+        "skills": [],
+        "work_history": [],
+        "education": [],
+        "certifications": [],
+        "bio": None,
+    }
+
+    if not text.strip():
+        return default_result
+
+    api_key = os.environ.get("ANTHROPIC_API_KEY")
+    if not api_key:
+        logger.warning("ANTHROPIC_API_KEY not set — falling back to basic parsing")
+        return _parse_resume_basic(text)
+
+    try:
+        import anthropic
+        client = anthropic.Anthropic(api_key=api_key)
+
+        prompt = f"""Parse the following resume text and extract structured data. Return ONLY valid JSON with no extra text.
+
+The JSON must have exactly this structure:
+{{
+  "name": "Full Name",
+  "title": "Most recent job title or professional title",
+  "email": "email@example.com",
+  "phone": "phone number",
+  "location": "City, State",
+  "skills": ["skill1", "skill2", ...],
+  "work_history": [
+    {{
+      "company": "Company Name",
+      "position": "Job Title",
+      "start_date": "Month Year",
+      "end_date": "Month Year or empty string if current",
+      "description": "Brief description of responsibilities"
+    }}
+  ],
+  "education": [
+    {{
+      "school": "University Name",
+      "degree": "Degree type (e.g., Bachelor of Science)",
+      "field": "Field of study",
+      "year": "Graduation year"
+    }}
+  ],
+  "certifications": ["cert1", "cert2", ...],
+  "bio": "Brief professional summary if available, otherwise null"
+}}
+
+Rules:
+- For "title": Use the person's most recent or primary job title (e.g., "Software Engineer", "Course Coordinator"). Do NOT use parts of their name.
+- For "skills": Extract actual technical/professional skills. Look for a skills section. Include programming languages, tools, and technologies. Do NOT include random words from descriptions.
+- For "work_history": Each position should be a separate entry with the actual job title and company name correctly identified.
+- For "education": Extract the full school name, complete degree, field of study, and graduation year.
+- Use null for any field you cannot confidently determine.
+- Limit skills to the top 20 most relevant ones.
+- Limit work_history to 10 entries max.
+
+Resume text:
+{text}"""
+
+        message = client.messages.create(
+            model="claude-haiku-4-5-20251001",
+            max_tokens=2000,
+            messages=[{"role": "user", "content": prompt}],
+        )
+
+        response_text = message.content[0].text.strip()
+
+        # Extract JSON from response (handle potential markdown code blocks)
+        if response_text.startswith("```"):
+            # Remove markdown code block wrapper
+            lines = response_text.split("\n")
+            json_lines = []
+            in_block = False
+            for line in lines:
+                if line.startswith("```") and not in_block:
+                    in_block = True
+                    continue
+                elif line.startswith("```") and in_block:
+                    break
+                elif in_block:
+                    json_lines.append(line)
+            response_text = "\n".join(json_lines)
+
+        parsed = json_module.loads(response_text)
+
+        # Validate and ensure correct structure
+        result = {
+            "name": parsed.get("name"),
+            "title": parsed.get("title"),
+            "email": parsed.get("email"),
+            "phone": parsed.get("phone"),
+            "location": parsed.get("location"),
+            "skills": parsed.get("skills", [])[:30],
+            "work_history": [],
+            "education": [],
+            "certifications": parsed.get("certifications", [])[:15],
+            "bio": parsed.get("bio"),
+        }
+
+        # Validate work_history entries
+        for entry in parsed.get("work_history", [])[:10]:
+            if isinstance(entry, dict):
+                result["work_history"].append({
+                    "company": entry.get("company", ""),
+                    "position": entry.get("position", ""),
+                    "start_date": entry.get("start_date", ""),
+                    "end_date": entry.get("end_date", ""),
+                    "description": entry.get("description", ""),
+                })
+
+        # Validate education entries
+        for entry in parsed.get("education", [])[:5]:
+            if isinstance(entry, dict):
+                result["education"].append({
+                    "school": entry.get("school", ""),
+                    "degree": entry.get("degree", ""),
+                    "field": entry.get("field", ""),
+                    "year": entry.get("year", ""),
+                })
+
+        logger.info(f"AI resume parsing successful: {len(result['skills'])} skills, {len(result['work_history'])} positions")
+        return result
+
+    except Exception as e:
+        logger.error(f"AI resume parsing failed: {e} — falling back to basic parsing")
+        return _parse_resume_basic(text)
+
+
+def _parse_resume_basic(text: str) -> dict:
+    """Basic fallback resume parsing using pattern matching when AI is unavailable."""
     result = {
         "name": None,
         "title": None,
@@ -470,178 +615,19 @@ def _parse_resume_text(text: str) -> dict:
         if 10 <= len(digits) <= 15:
             result["phone"] = candidate
 
-    # Common section headers
-    skill_headers = re.compile(r'(?i)^(skills|technical skills|core competencies|technologies|proficiencies|expertise|key skills)', re.MULTILINE)
-    work_headers = re.compile(r'(?i)^(work experience|experience|professional experience|employment|employment history|work history)', re.MULTILINE)
-    edu_headers = re.compile(r'(?i)^(education|academic|academic background|qualifications)', re.MULTILINE)
-    cert_headers = re.compile(r'(?i)^(certifications?|licenses?|professional development|certificates)', re.MULTILINE)
-    summary_headers = re.compile(r'(?i)^(summary|objective|profile|professional summary|about me|about|career objective)', re.MULTILINE)
-
-    # Split text into sections
-    section_pattern = re.compile(
-        r'(?i)^(skills|technical skills|core competencies|technologies|proficiencies|expertise|key skills|'
-        r'work experience|experience|professional experience|employment|employment history|work history|'
-        r'education|academic|academic background|qualifications|'
-        r'certifications?|licenses?|professional development|certificates|'
-        r'summary|objective|profile|professional summary|about me|about|career objective|'
-        r'projects|references|volunteer|interests|languages|awards|honors|publications)\s*[:\-]?\s*$',
-        re.MULTILINE
-    )
-
-    sections = {}
-    matches = list(section_pattern.finditer(text))
-    for i, m in enumerate(matches):
-        header = m.group(1).lower().strip()
-        start = m.end()
-        end = matches[i + 1].start() if i + 1 < len(matches) else len(text)
-        sections[header] = text[start:end].strip()
-
-    # Extract name - typically the first non-empty line before any section
-    first_section_pos = matches[0].start() if matches else len(text)
-    header_lines = [l.strip() for l in text[:first_section_pos].split('\n') if l.strip()]
-    # Filter out email/phone/links from candidate name lines
-    name_candidates = [l for l in header_lines[:3]
+    # Name: first non-empty line that's not email/phone
+    name_candidates = [l for l in lines[:3]
                        if not re.search(r'@|http|www\.|[\d\s\-\(\)]{10,}', l) and len(l) < 60]
     if name_candidates:
         result["name"] = name_candidates[0]
-        # Second line might be a title
-        if len(name_candidates) > 1:
-            candidate_title = name_candidates[1]
-            if len(candidate_title) < 80 and not re.search(r'@|http|[\d]{5,}', candidate_title):
-                result["title"] = candidate_title
 
-    # Location - look for city, state patterns
+    # Location: city, state pattern
     location_match = re.search(
         r'(?i)([A-Z][a-z]+(?:\s[A-Z][a-z]+)*,\s*[A-Z]{2}(?:\s+\d{5})?)',
-        text[:first_section_pos]
+        text[:500]
     )
     if location_match:
         result["location"] = re.sub(r'\s+\d{5}$', '', location_match.group(1))
-
-    # Extract skills
-    for key in sections:
-        if skill_headers.match(key):
-            skill_text = sections[key]
-            # Skills can be comma-separated, pipe-separated, bullet-separated, or newline-separated
-            skills = re.split(r'[,\|•·●■◆▪\n]+', skill_text)
-            result["skills"] = [s.strip().strip('- ').strip() for s in skills
-                               if s.strip() and len(s.strip()) < 50 and len(s.strip()) > 1][:30]
-            break
-
-    # Extract work history
-    for key in sections:
-        if work_headers.match(key):
-            work_text = sections[key]
-            # Try to parse individual positions
-            # Look for patterns like: "Position at Company" or "Company | Position" or date ranges
-            position_blocks = re.split(r'\n(?=\S)', work_text)
-            for block in position_blocks:
-                if not block.strip() or len(block.strip()) < 5:
-                    continue
-                entry = {"company": "", "position": "", "start_date": "", "end_date": "", "description": ""}
-                block_lines = [l.strip() for l in block.split('\n') if l.strip()]
-                if not block_lines:
-                    continue
-
-                # First line often contains position and/or company
-                first_line = block_lines[0]
-                # Look for date range
-                date_match = re.search(
-                    r'(\w+\.?\s*\d{4})\s*[-–—to]+\s*(\w+\.?\s*\d{4}|[Pp]resent|[Cc]urrent)',
-                    block
-                )
-                if date_match:
-                    entry["start_date"] = date_match.group(1).strip()
-                    end = date_match.group(2).strip()
-                    entry["end_date"] = "" if end.lower() in ("present", "current") else end
-
-                # Try to find position/company from first 2 lines
-                if '|' in first_line or ' at ' in first_line.lower() or ' - ' in first_line:
-                    parts = re.split(r'\s*[\|–—]\s*|\s+at\s+|\s+-\s+', first_line, maxsplit=1)
-                    if len(parts) == 2:
-                        entry["position"] = parts[0].strip()
-                        entry["company"] = re.sub(r'\s*\(?\d{4}.*$', '', parts[1]).strip()
-                elif len(block_lines) >= 2:
-                    entry["position"] = first_line
-                    entry["company"] = re.sub(r'\s*\(?\d{4}.*$', '', block_lines[1]).strip()
-                else:
-                    entry["position"] = first_line
-
-                # Description from remaining lines (bullet points)
-                desc_lines = [l.strip('•·●■◆▪- ').strip() for l in block_lines[2:] if l.strip()]
-                if desc_lines:
-                    entry["description"] = '. '.join(desc_lines[:3])
-
-                if entry["position"] or entry["company"]:
-                    result["work_history"].append(entry)
-
-            result["work_history"] = result["work_history"][:10]
-            break
-
-    # Extract education
-    for key in sections:
-        if edu_headers.match(key):
-            edu_text = sections[key]
-            edu_blocks = re.split(r'\n(?=\S)', edu_text)
-            for block in edu_blocks:
-                if not block.strip() or len(block.strip()) < 5:
-                    continue
-                entry = {"school": "", "degree": "", "field": "", "year": ""}
-                block_lines = [l.strip() for l in block.split('\n') if l.strip()]
-                if not block_lines:
-                    continue
-
-                # Look for degree patterns
-                degree_match = re.search(
-                    r'(?i)(Bachelor|Master|Ph\.?D|Doctor|Associate|B\.?S\.?|B\.?A\.?|M\.?S\.?|M\.?A\.?|M\.?B\.?A\.?|'
-                    r'B\.?Sc|M\.?Sc|High School|GED|Diploma)[^,\n]*',
-                    block
-                )
-                if degree_match:
-                    degree_text = degree_match.group(0).strip()
-                    # Try to split degree and field
-                    field_match = re.search(r'(?i)(?:in|of)\s+(.+)', degree_text)
-                    if field_match:
-                        entry["field"] = field_match.group(1).strip()
-                        entry["degree"] = degree_text[:field_match.start()].strip().rstrip(' in of')
-                    else:
-                        entry["degree"] = degree_text
-
-                # Year
-                year_match = re.search(r'20\d{2}|19\d{2}', block)
-                if year_match:
-                    entry["year"] = year_match.group(0)
-
-                # School name
-                for line in block_lines:
-                    if degree_match and degree_match.group(0) in line:
-                        continue
-                    if re.search(r'(?i)(university|college|institute|school|academy)', line):
-                        entry["school"] = re.sub(r'\s*[-–—|,]\s*\d{4}.*$', '', line).strip()
-                        break
-                if not entry["school"] and block_lines:
-                    entry["school"] = re.sub(r'\s*[-–—|,]\s*\d{4}.*$', '', block_lines[0]).strip()
-
-                if entry["school"] or entry["degree"]:
-                    result["education"].append(entry)
-
-            result["education"] = result["education"][:5]
-            break
-
-    # Extract certifications
-    for key in sections:
-        if cert_headers.match(key):
-            cert_text = sections[key]
-            certs = re.split(r'[•·●■◆▪\n]+', cert_text)
-            result["certifications"] = [c.strip().strip('- ').strip() for c in certs
-                                        if c.strip() and len(c.strip()) > 2][:15]
-            break
-
-    # Extract summary/bio
-    for key in sections:
-        if summary_headers.match(key):
-            result["bio"] = sections[key][:500].strip()
-            break
 
     return result
 
@@ -656,33 +642,53 @@ async def upload_resume(
         raise HTTPException(status_code=403, detail="Only job seekers can upload resumes")
 
     if file.content_type not in ALLOWED_RESUME_TYPES:
-        raise HTTPException(status_code=400, detail="Only PDF files are accepted")
+        raise HTTPException(status_code=400, detail="Only PDF and Word documents (.pdf, .doc, .docx) are accepted")
 
     contents = await file.read()
     if len(contents) > MAX_RESUME_SIZE:
         raise HTTPException(status_code=400, detail="Resume must be less than 10MB")
 
-    # Extract text from PDF
-    try:
-        from PyPDF2 import PdfReader
-        reader = PdfReader(io.BytesIO(contents))
-        text = ""
-        for page in reader.pages:
-            page_text = page.extract_text()
-            if page_text:
-                text += page_text + "\n"
-    except Exception as e:
-        logger.error(f"PDF parsing failed: {e}")
-        raise HTTPException(status_code=400, detail="Could not read PDF. Please ensure it is a valid, text-based PDF.")
+    # Extract text based on file type
+    text = ""
+    if file.content_type == "application/pdf":
+        try:
+            from PyPDF2 import PdfReader
+            reader = PdfReader(io.BytesIO(contents))
+            for page in reader.pages:
+                page_text = page.extract_text()
+                if page_text:
+                    text += page_text + "\n"
+        except Exception as e:
+            logger.error(f"PDF parsing failed: {e}")
+            raise HTTPException(status_code=400, detail="Could not read PDF. Please ensure it is a valid, text-based PDF.")
+    elif file.content_type in (
+        "application/msword",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    ):
+        try:
+            from docx import Document
+            doc = Document(io.BytesIO(contents))
+            for para in doc.paragraphs:
+                if para.text.strip():
+                    text += para.text + "\n"
+            # Also extract text from tables (common in resumes)
+            for table in doc.tables:
+                for row in table.rows:
+                    row_text = "\t".join(cell.text.strip() for cell in row.cells if cell.text.strip())
+                    if row_text:
+                        text += row_text + "\n"
+        except Exception as e:
+            logger.error(f"Word document parsing failed: {e}")
+            raise HTTPException(status_code=400, detail="Could not read Word document. Please ensure it is a valid .docx file.")
 
     if not text.strip():
         raise HTTPException(
             status_code=400,
-            detail="Could not extract text from this PDF. It may be a scanned image. Please try a text-based PDF."
+            detail="Could not extract text from this file. It may be a scanned image. Please try a text-based document."
         )
 
-    # Parse the extracted text
-    parsed = _parse_resume_text(text)
+    # Parse the extracted text using AI
+    parsed = await _parse_resume_with_ai(text)
 
     logger.info(f"Resume parsed for user {current_user['id']}: found {len(parsed.get('work_history', []))} positions, {len(parsed.get('skills', []))} skills")
     return {"parsed": parsed, "raw_text_length": len(text)}
