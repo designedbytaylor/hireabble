@@ -868,7 +868,10 @@ async def impersonate_user(user_id: str, admin: dict = Depends(get_current_admin
     """Generate a login token for any user (admin impersonation)."""
     user = await db.users.find_one({"id": user_id}, {"_id": 0, "password": 0})
     if not user:
-        raise HTTPException(status_code=404, detail="User not found")
+        raise HTTPException(status_code=404, detail="User not found — they may have been deleted during a reseed")
+
+    # Clear any stale auth cache so the impersonated session gets fresh data
+    invalidate_user(user_id)
 
     token = create_token(user["id"], user["role"])
     logger.info(f"Admin {admin['id']} impersonating user {user_id} ({user['email']})")

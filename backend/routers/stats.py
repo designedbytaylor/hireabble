@@ -152,6 +152,7 @@ async def get_seeker_dashboard(current_user: dict = Depends(get_current_user)):
 
     return {
         "jobs": result_jobs,
+        "swiped_job_ids": swiped_job_ids,
         "stats": {
             "applications_sent": applications_count,
             "super_likes_used": superlikes_count,
