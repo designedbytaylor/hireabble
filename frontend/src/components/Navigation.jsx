@@ -71,11 +71,6 @@ export default memo(function Navigation() {
       label: 'Interviews',
       path: '/interviews'
     }] : []),
-    {
-      icon: User,
-      label: 'Profile',
-      path: '/profile'
-    },
   ], [isSeeker, unreadMessages]);
 
   return (

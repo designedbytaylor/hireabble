@@ -155,7 +155,7 @@ export default function RecruiterSwipe() {
       </div>
 
       {/* Header */}
-      <header className="relative z-10 p-6 md:p-8">
+      <header className="relative z-20 p-6 md:p-8">
         <div className="flex items-center justify-between mb-4">
           <div>
             <h1 className="text-2xl font-bold font-['Outfit']">
@@ -172,6 +172,12 @@ export default function RecruiterSwipe() {
             >
               <BarChart3 className="w-5 h-5 text-muted-foreground" />
             </button>
+            <img
+              src={getPhotoUrl(user?.photo_url, user?.id) || user?.avatar}
+              alt="Avatar"
+              onClick={() => navigate('/profile')}
+              className="w-10 h-10 rounded-full border-2 border-primary object-cover cursor-pointer hover:opacity-80 transition-opacity"
+            />
           </div>
         </div>
 
@@ -411,7 +417,6 @@ export default function RecruiterSwipe() {
 
 function ApplicantCard({ app, onSwipe, expanded, setExpanded }) {
   const x = useMotionValue(0);
-  const y = useMotionValue(0);
   const rotate = useTransform(x, [-200, 200], [-25, 25]);
 
   const acceptOpacity = useTransform(x, [0, 60], [0, 1]);
@@ -421,7 +426,7 @@ function ApplicantCard({ app, onSwipe, expanded, setExpanded }) {
     const threshold = 60;
     const velThreshold = 300;
 
-    const pos = { x: x.get(), y: y.get() };
+    const pos = { x: x.get(), y: 0 };
     if (info.offset.x > threshold || info.velocity.x > velThreshold) {
       onSwipe('accept', { x: 1500, y: 0 }, pos);
     } else if (info.offset.x < -threshold || info.velocity.x < -velThreshold) {
@@ -429,7 +434,6 @@ function ApplicantCard({ app, onSwipe, expanded, setExpanded }) {
     } else {
       // Spring back
       const startX = x.get();
-      const startY = y.get();
       const startTime = Date.now();
       const duration = 200;
 
@@ -438,7 +442,6 @@ function ApplicantCard({ app, onSwipe, expanded, setExpanded }) {
         const progress = Math.min(elapsed / duration, 1);
         const ease = 1 - Math.pow(1 - progress, 4);
         x.set(startX * (1 - ease));
-        y.set(startY * (1 - ease));
         if (progress < 1) requestAnimationFrame(animate);
       };
       requestAnimationFrame(animate);
@@ -448,8 +451,8 @@ function ApplicantCard({ app, onSwipe, expanded, setExpanded }) {
   return (
     <motion.div
       className="absolute inset-0 cursor-grab active:cursor-grabbing z-[5]"
-      style={{ x, y, rotate }}
-      drag
+      style={{ x, rotate }}
+      drag="x"
       dragConstraints={false}
       dragElastic={0.9}
       onDragEnd={handleDragEnd}
@@ -573,7 +576,6 @@ function ApplicantCard({ app, onSwipe, expanded, setExpanded }) {
 
 function CandidateCard({ candidate, onSwipe, expanded, setExpanded }) {
   const x = useMotionValue(0);
-  const y = useMotionValue(0);
   const rotate = useTransform(x, [-200, 200], [-25, 25]);
 
   const acceptOpacity = useTransform(x, [0, 60], [0, 1]);
@@ -583,7 +585,7 @@ function CandidateCard({ candidate, onSwipe, expanded, setExpanded }) {
     const threshold = 60;
     const velThreshold = 300;
 
-    const pos = { x: x.get(), y: y.get() };
+    const pos = { x: x.get(), y: 0 };
     if (info.offset.x > threshold || info.velocity.x > velThreshold) {
       onSwipe('accept', { x: 1500, y: 0 }, pos);
     } else if (info.offset.x < -threshold || info.velocity.x < -velThreshold) {
@@ -591,7 +593,6 @@ function CandidateCard({ candidate, onSwipe, expanded, setExpanded }) {
     } else {
       // Spring back
       const startX = x.get();
-      const startY = y.get();
       const startTime = Date.now();
       const duration = 200;
 
@@ -600,7 +601,6 @@ function CandidateCard({ candidate, onSwipe, expanded, setExpanded }) {
         const progress = Math.min(elapsed / duration, 1);
         const ease = 1 - Math.pow(1 - progress, 4);
         x.set(startX * (1 - ease));
-        y.set(startY * (1 - ease));
         if (progress < 1) requestAnimationFrame(animate);
       };
       requestAnimationFrame(animate);
@@ -613,8 +613,8 @@ function CandidateCard({ candidate, onSwipe, expanded, setExpanded }) {
   return (
     <motion.div
       className="absolute inset-0 cursor-grab active:cursor-grabbing z-[5]"
-      style={{ x, y, rotate }}
-      drag
+      style={{ x, rotate }}
+      drag="x"
       dragConstraints={false}
       dragElastic={0.9}
       onDragEnd={handleDragEnd}

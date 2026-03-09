@@ -280,7 +280,7 @@ export default function SeekerDashboard() {
       </div>
 
       {/* Header */}
-      <header className="relative z-10 p-6 md:p-8">
+      <header className="relative z-20 p-6 md:p-8">
         <div className="flex items-center justify-between mb-8">
           <div>
             <h1 className="text-2xl font-bold font-['Outfit']">Hi, {user?.name?.split(' ')[0]}!</h1>
@@ -307,10 +307,11 @@ export default function SeekerDashboard() {
                 </span>
               )}
             </button>
-            <img 
+            <img
               src={getPhotoUrl(user?.photo_url, user?.id) || user?.avatar}
               alt="Avatar"
-              className="w-10 h-10 rounded-full border-2 border-primary object-cover"
+              onClick={() => navigate('/profile')}
+              className="w-10 h-10 rounded-full border-2 border-primary object-cover cursor-pointer hover:opacity-80 transition-opacity"
             />
           </div>
         </div>
