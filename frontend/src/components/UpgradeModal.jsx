@@ -67,7 +67,7 @@ function getSavingsPercent(tier, duration) {
   return Math.round((1 - actual / weeklyMonthly) * 100);
 }
 
-export default function UpgradeModal({ open, onClose, trigger, highlightTier }) {
+export default function UpgradeModal({ open, onClose, onSubscribed, trigger, highlightTier }) {
   const { token, user } = useAuth();
   const [tiers, setTiers] = useState([]);
   const [currentTier, setCurrentTier] = useState(null);
@@ -115,8 +115,21 @@ export default function UpgradeModal({ open, onClose, trigger, highlightTier }) 
       );
       toast.success('Subscription activated! Welcome to premium.');
       onClose?.();
-      // Reload page to reflect new subscription
-      window.location.reload();
+      // Refresh user data to reflect new subscription
+      if (onSubscribed) {
+        onSubscribed();
+      } else {
+        // Fallback: re-fetch user data via auth endpoint
+        try {
+          const meRes = await axios.get(`${API}/auth/me`, {
+            headers: { Authorization: `Bearer ${token}` }
+          });
+          localStorage.setItem('cached_user', JSON.stringify(meRes.data));
+          window.location.reload();
+        } catch {
+          window.location.reload();
+        }
+      }
     } catch (err) {
       toast.error(err.response?.data?.detail || 'Failed to subscribe');
     } finally {
@@ -137,7 +150,7 @@ export default function UpgradeModal({ open, onClose, trigger, highlightTier }) 
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center"
+          className="fixed inset-0 z-[200] flex items-center justify-center p-4"
         >
           {/* Backdrop */}
           <motion.div
@@ -154,7 +167,7 @@ export default function UpgradeModal({ open, onClose, trigger, highlightTier }) 
             animate={{ y: 0, opacity: 1 }}
             exit={{ y: '100%', opacity: 0 }}
             transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-            className="relative w-full max-w-md max-h-[90vh] overflow-y-auto bg-background rounded-t-3xl sm:rounded-3xl"
+            className="relative w-full max-w-md max-h-[85vh] overflow-y-auto bg-background rounded-3xl"
           >
             {/* Close button */}
             <button

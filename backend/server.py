@@ -247,5 +247,16 @@ async def startup():
     await db.interviews.create_index([("created_by", 1), ("status", 1)])
     await db.interviews.create_index([("other_party_id", 1), ("status", 1)])
 
+    # Performance indexes
+    await db.jobs.create_index([("recruiter_id", 1), ("is_active", 1)])
+    await db.jobs.create_index("is_active")
+    await db.applications.create_index([("recruiter_id", 1), ("action", 1), ("created_at", -1)])
+    await db.applications.create_index("job_id")
+    await db.messages.create_index([("match_id", 1), ("is_read", 1)])
+    await db.messages.create_index([("match_id", 1), ("created_at", -1)])
+    await db.matches.create_index("seeker_id")
+    await db.matches.create_index("recruiter_id")
+    await db.matches.create_index("job_id")
+
     logger.info("Database indexes created")
     logger.info("Hireabble API started successfully!")
