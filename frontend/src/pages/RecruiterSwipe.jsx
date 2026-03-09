@@ -40,6 +40,34 @@ export default function RecruiterSwipe() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // WebSocket listener for async match notifications
+  useEffect(() => {
+    if (!token) return;
+    const WS_URL = process.env.REACT_APP_BACKEND_URL?.replace('https://', 'wss://').replace('http://', 'ws://');
+    if (!WS_URL) return;
+    let ws;
+    try {
+      ws = new WebSocket(`${WS_URL}/ws/${token}`);
+      ws.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          if (data.type === 'new_match' && data.match) {
+            setMatchData({
+              seeker_name: data.match.seeker_name,
+              job_title: data.match.job_title,
+              company: data.match.company || user?.company,
+            });
+            setShowMatch(true);
+            setStats(prev => ({ ...prev, matches: (prev.matches || 0) + 1 }));
+          }
+        } catch { /* ignore parse errors */ }
+      };
+      ws.onerror = () => {};
+    } catch { /* ignore connection errors */ }
+    return () => { if (ws) ws.close(); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token]);
+
   useEffect(() => {
     if (mode === 'discover' && candidates.length === 0) {
       fetchCandidates();
@@ -116,11 +144,8 @@ export default function RecruiterSwipe() {
       axios.post(`${API}/candidates/swipe`,
         { seeker_id: item.id, action: swipeAction, job_id: item.best_match_job_id },
         { headers: { Authorization: `Bearer ${token}` } }
-      ).then(res => {
-        if (res.data.is_matched) {
-          setMatchData({ seeker_name: item.name, job_title: item.best_match_job_title || item.title, company: user?.company });
-          setShowMatch(true);
-        }
+      ).then(() => {
+        // Match detection is async — delivered via WebSocket new_match event
         if (swipeAction === 'superlike') {
           setSuperSwipesRemaining(prev => prev ? { ...prev, remaining: prev.remaining - 1 } : prev);
         }

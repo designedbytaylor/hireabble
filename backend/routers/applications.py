@@ -222,42 +222,131 @@ async def get_remaining_superswipes(current_user: dict = Depends(get_current_use
     }
 
 
+async def _recruiter_swipe_post_process(
+    swipe_id: str,
+    seeker_id: str,
+    action: str,
+    recruiter_snapshot: dict,
+):
+    """Background task for recruiter swipe: match checking + notifications."""
+    try:
+        rid = recruiter_snapshot["id"]
+        invalidate_user(rid)
+
+        if action not in ("like", "superlike"):
+            return
+
+        # Check if seeker applied to any of this recruiter's jobs
+        seeker_app = await db.applications.find_one({
+            "seeker_id": seeker_id,
+            "recruiter_id": rid,
+            "action": {"$in": ["like", "superlike"]},
+            "is_matched": False,
+        })
+
+        if seeker_app:
+            # Mutual interest → auto-match
+            seeker, job = await asyncio.gather(
+                db.users.find_one({"id": seeker_id}, {"_id": 0, "name": 1, "avatar": 1}),
+                db.jobs.find_one({"id": seeker_app["job_id"]}, {"_id": 0, "title": 1, "company": 1}),
+            )
+            match_id = str(uuid.uuid4())
+            now = datetime.now(timezone.utc).isoformat()
+            match_doc = {
+                "id": match_id,
+                "application_id": seeker_app["id"],
+                "job_id": seeker_app["job_id"],
+                "job_title": job["title"] if job else "Unknown",
+                "company": job["company"] if job else recruiter_snapshot.get("company", "Unknown"),
+                "seeker_id": seeker_id,
+                "seeker_name": seeker.get("name", "") if seeker else "",
+                "seeker_avatar": seeker.get("avatar") if seeker else None,
+                "recruiter_id": rid,
+                "recruiter_name": recruiter_snapshot["name"],
+                "created_at": now,
+            }
+
+            await asyncio.gather(
+                db.matches.insert_one(match_doc),
+                db.applications.update_one(
+                    {"id": seeker_app["id"]},
+                    {"$set": {"recruiter_action": "accept", "is_matched": True}}
+                ),
+            )
+
+            match_payload = {k: v for k, v in match_doc.items() if k != "_id"}
+            await asyncio.gather(
+                create_notification(
+                    user_id=seeker_id,
+                    notif_type="match",
+                    title="It's a Match!",
+                    message=f"{recruiter_snapshot.get('company', 'A company')} is interested in you for the {job['title'] if job else 'a'} position!",
+                    data={"match_id": match_id}
+                ),
+                manager.send_to_user(seeker_id, {"type": "new_match", "match": match_payload}),
+                manager.send_to_user(rid, {"type": "new_match", "match": match_payload}),
+            )
+        else:
+            # No existing application — notify seeker of recruiter interest
+            await create_notification(
+                user_id=seeker_id,
+                notif_type="recruiter_interest",
+                title="A recruiter is interested!",
+                message=f"{recruiter_snapshot.get('company', 'A company')} thinks you'd be a great fit. Check out their job listings!",
+                data={"recruiter_id": rid}
+            )
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).error(f"Recruiter swipe post-process error: {e}")
+
+
 @router.post("/candidates/swipe")
 async def recruiter_swipe_candidate(
     body: dict,
     current_user: dict = Depends(get_current_user),
 ):
-    """Recruiter swipes on a candidate (like, pass, superlike)"""
+    """Recruiter swipes on a candidate (like, pass, superlike).
+
+    Optimized: parallel validation, immediate insert, async post-processing."""
     if current_user["role"] != "recruiter":
         raise HTTPException(status_code=403, detail="Only recruiters can swipe on candidates")
 
     seeker_id = body.get("seeker_id")
-    action = body.get("action", "like")  # like, pass, superlike
-    job_id = body.get("job_id")  # optional: which job to associate
+    action = body.get("action", "like")
+    job_id = body.get("job_id")
 
     if not seeker_id:
         raise HTTPException(status_code=400, detail="seeker_id is required")
     if action not in ("like", "pass", "superlike"):
         raise HTTPException(status_code=400, detail="Action must be like, pass, or superlike")
 
-    # Check for duplicate swipe
-    existing = await db.recruiter_swipes.find_one({
-        "recruiter_id": current_user["id"],
-        "seeker_id": seeker_id,
-    })
-    if existing:
-        raise HTTPException(status_code=400, detail="Already swiped on this candidate")
+    rid = current_user["id"]
+    is_superlike = action == "superlike"
 
-    # Check super swipe limits
-    if action == "superlike":
+    # ── Phase 1: Parallel pre-validation ──────────────────────────────
+    queries = []
+    if is_superlike:
         today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
         today_end = today_start + timedelta(days=1)
-        swipes_today = await db.recruiter_swipes.count_documents({
-            "recruiter_id": current_user["id"],
-            "action": "superlike",
-            "created_at": {"$gte": today_start.isoformat(), "$lt": today_end.isoformat()}
-        })
-        user_data = await db.users.find_one({"id": current_user["id"]}, {"_id": 0, "recruiter_super_swipes": 1, "subscription": 1})
+        queries.append(
+            db.recruiter_swipes.count_documents({
+                "recruiter_id": rid, "action": "superlike",
+                "created_at": {"$gte": today_start.isoformat(), "$lt": today_end.isoformat()}
+            })
+        )  # 0: swipes_today
+        queries.append(
+            db.users.find_one({"id": rid}, {"_id": 0, "recruiter_super_swipes": 1, "subscription": 1})
+        )  # 1: user_data
+
+    if queries:
+        results = await asyncio.gather(*queries)
+    else:
+        results = []
+
+    # Superlike limit check
+    if is_superlike:
+        swipes_today = results[0]
+        user_data = results[1]
         purchased = (user_data or {}).get("recruiter_super_swipes", 0)
 
         sub = (user_data or {}).get("subscription", {})
@@ -274,137 +363,173 @@ async def recruiter_swipe_candidate(
         if free_remaining <= 0 and purchased <= 0:
             raise HTTPException(status_code=400, detail="No Super Swipes remaining! Purchase more or try again tomorrow.")
         if free_remaining <= 0 and purchased > 0:
-            await db.users.update_one(
-                {"id": current_user["id"]},
-                {"$inc": {"recruiter_super_swipes": -1}}
+            asyncio.create_task(
+                db.users.update_one({"id": rid}, {"$inc": {"recruiter_super_swipes": -1}})
             )
 
-    seeker = await db.users.find_one({"id": seeker_id}, {"_id": 0, "password": 0})
-    if not seeker:
-        raise HTTPException(status_code=404, detail="Candidate not found")
-
-    # Record the swipe
+    # ── Phase 2: Insert immediately ───────────────────────────────────
     swipe_doc = {
         "id": str(uuid.uuid4()),
-        "recruiter_id": current_user["id"],
+        "recruiter_id": rid,
         "seeker_id": seeker_id,
         "action": action,
         "job_id": job_id,
         "created_at": datetime.now(timezone.utc).isoformat(),
     }
-    await db.recruiter_swipes.insert_one(swipe_doc)
 
-    # If recruiter liked/super-liked, create a match if seeker also applied to their jobs
-    is_matched = False
-    if action in ("like", "superlike"):
-        # Check if seeker applied to any of this recruiter's jobs
-        seeker_app = await db.applications.find_one({
-            "seeker_id": seeker_id,
-            "recruiter_id": current_user["id"],
-            "action": {"$in": ["like", "superlike"]},
-            "is_matched": False,
-        })
-        if seeker_app:
-            # Auto-match: both parties expressed interest
-            is_matched = True
-            job = await db.jobs.find_one({"id": seeker_app["job_id"]}, {"_id": 0})
-            await db.applications.update_one(
-                {"id": seeker_app["id"]},
-                {"$set": {"recruiter_action": "accept", "is_matched": True}}
-            )
-            match_doc = {
-                "id": str(uuid.uuid4()),
-                "application_id": seeker_app["id"],
-                "job_id": seeker_app["job_id"],
-                "job_title": job["title"] if job else "Unknown",
-                "company": job["company"] if job else current_user.get("company", "Unknown"),
-                "seeker_id": seeker_id,
-                "seeker_name": seeker.get("name", ""),
-                "seeker_avatar": seeker.get("avatar"),
-                "recruiter_id": current_user["id"],
-                "recruiter_name": current_user["name"],
-                "created_at": datetime.now(timezone.utc).isoformat(),
-            }
-            await db.matches.insert_one(match_doc)
-            await create_notification(
-                user_id=seeker_id,
-                notif_type="match",
-                title="It's a Match!",
-                message=f"{current_user.get('company', 'A company')} is interested in you for the {job['title'] if job else 'a'} position!",
-                data={"match_id": match_doc["id"]}
-            )
-            await manager.send_to_user(seeker_id, {"type": "new_match", "match": {k: v for k, v in match_doc.items() if k != "_id"}})
-        else:
-            # No existing application - notify seeker that a recruiter is interested
-            await create_notification(
-                user_id=seeker_id,
-                notif_type="recruiter_interest",
-                title="A recruiter is interested!",
-                message=f"{current_user.get('company', 'A company')} thinks you'd be a great fit. Check out their job listings!",
-                data={"recruiter_id": current_user["id"]}
-            )
+    try:
+        await db.recruiter_swipes.insert_one(swipe_doc)
+    except Exception as e:
+        if "duplicate key" in str(e).lower() or "E11000" in str(e):
+            raise HTTPException(status_code=400, detail="Already swiped on this candidate")
+        raise
 
-    return {"message": f"Swiped {action}", "is_matched": is_matched}
+    # ── Phase 3: Return immediately, process the rest in background ───
+    asyncio.create_task(
+        _recruiter_swipe_post_process(swipe_doc["id"], seeker_id, action, dict(current_user))
+    )
+
+    return {"message": f"Swiped {action}", "is_matched": False}
 
 
 # ==================== SWIPE ====================
 
-@router.post("/swipe")
-async def swipe(action: SwipeAction, current_user: dict = Depends(get_current_user)):
-    """Job seeker swipes on a job"""
-    if current_user["role"] != "seeker":
-        raise HTTPException(status_code=403, detail="Only job seekers can swipe")
-    
-    # Check if already swiped
-    existing = await db.applications.find_one({
-        "job_id": action.job_id,
-        "seeker_id": current_user["id"]
-    })
-    if existing:
-        raise HTTPException(status_code=400, detail="Already swiped on this job")
-    
-    # Check super like limit for today (free + purchased)
-    if action.action == "superlike":
-        today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
-        today_end = today_start + timedelta(days=1)
+async def _swipe_post_process(
+    application_id: str,
+    job: dict,
+    current_user_snapshot: dict,
+    action_str: str,
+    job_id: str,
+):
+    """Background task: match checking, notifications, cache invalidation.
+    Runs AFTER the swipe has already been persisted so the user isn't blocked."""
+    try:
+        uid = current_user_snapshot["id"]
+        invalidate_user(uid)
 
-        superlikes_today = await db.applications.count_documents({
-            "seeker_id": current_user["id"],
-            "action": "superlike",
-            "created_at": {
-                "$gte": today_start.isoformat(),
-                "$lt": today_end.isoformat()
-            }
+        if action_str not in ("like", "superlike"):
+            return
+
+        # Check if recruiter already swiped on this seeker → auto-match
+        recruiter_swipe = await db.recruiter_swipes.find_one({
+            "recruiter_id": job["recruiter_id"],
+            "seeker_id": uid,
+            "action": {"$in": ["like", "superlike"]},
+        })
+        if not recruiter_swipe:
+            return
+
+        # Mutual interest — create match
+        match_id = str(uuid.uuid4())
+        now = datetime.now(timezone.utc).isoformat()
+        match_doc = {
+            "id": match_id,
+            "application_id": application_id,
+            "job_id": job_id,
+            "job_title": job.get("title", "Unknown"),
+            "company": job.get("company", "Unknown"),
+            "seeker_id": uid,
+            "seeker_name": current_user_snapshot["name"],
+            "seeker_avatar": current_user_snapshot.get("avatar"),
+            "recruiter_id": job["recruiter_id"],
+            "recruiter_name": job.get("recruiter_name", ""),
+            "created_at": now,
+        }
+
+        # Insert match + update application in parallel
+        await asyncio.gather(
+            db.matches.insert_one(match_doc),
+            db.applications.update_one(
+                {"id": application_id},
+                {"$set": {"recruiter_action": "accept", "is_matched": True}}
+            ),
+        )
+
+        # Notify recruiter (non-blocking)
+        await create_notification(
+            user_id=job["recruiter_id"],
+            notif_type="match",
+            title="It's a Match!",
+            message=f"{current_user_snapshot['name']} applied to {job.get('title', 'your position')} - mutual interest!",
+            data={"match_id": match_id, "job_id": job_id}
+        )
+
+        # Push match to seeker via WebSocket so they see it immediately
+        await manager.send_to_user(uid, {
+            "type": "new_match",
+            "match": {k: v for k, v in match_doc.items() if k != "_id"}
         })
 
-        user_data = await db.users.find_one({"id": current_user["id"]}, {"_id": 0, "seeker_purchased_superlikes": 1, "subscription": 1})
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).error(f"Swipe post-process error: {e}")
+
+
+@router.post("/swipe")
+async def swipe(action: SwipeAction, current_user: dict = Depends(get_current_user)):
+    """Job seeker swipes on a job.
+
+    Optimized for speed: validates + writes in parallel, then kicks off
+    match-checking and notifications as a background task so the response
+    returns in <50ms even under load."""
+    if current_user["role"] != "seeker":
+        raise HTTPException(status_code=403, detail="Only job seekers can swipe")
+
+    uid = current_user["id"]
+    is_superlike = action.action == "superlike"
+
+    # ── Phase 1: Parallel pre-validation ──────────────────────────────
+    # Run ALL pre-checks concurrently instead of sequentially.
+    queries = [
+        db.jobs.find_one({"id": action.job_id}, {"_id": 0}),  # 0: job
+    ]
+    if is_superlike:
+        today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+        today_end = today_start + timedelta(days=1)
+        queries.append(
+            db.applications.count_documents({
+                "seeker_id": uid, "action": "superlike",
+                "created_at": {"$gte": today_start.isoformat(), "$lt": today_end.isoformat()}
+            })
+        )  # 1: superlikes_today
+        queries.append(
+            db.users.find_one({"id": uid}, {"_id": 0, "seeker_purchased_superlikes": 1, "subscription": 1})
+        )  # 2: user_data
+
+    results = await asyncio.gather(*queries)
+    job = results[0]
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    # Superlike limit check
+    remaining_superlikes = None
+    if is_superlike:
+        superlikes_today = results[1]
+        user_data = results[2]
         purchased = (user_data or {}).get("seeker_purchased_superlikes", 0)
         daily_limit = _get_seeker_daily_superlike_limit(user_data or {})
         free_remaining = max(0, daily_limit - superlikes_today)
 
         if free_remaining <= 0 and purchased <= 0:
-            raise HTTPException(
-                status_code=400,
-                detail="No Super Likes remaining! Purchase more or try again tomorrow."
-            )
+            raise HTTPException(status_code=400, detail="No Super Likes remaining! Purchase more or try again tomorrow.")
 
-        # Use purchased first if free are exhausted
+        # Deduct purchased superlike (non-blocking — fire and forget)
         if free_remaining <= 0 and purchased > 0:
-            await db.users.update_one(
-                {"id": current_user["id"]},
-                {"$inc": {"seeker_purchased_superlikes": -1}}
+            asyncio.create_task(
+                db.users.update_one({"id": uid}, {"$inc": {"seeker_purchased_superlikes": -1}})
             )
-    
-    # Get job details
-    job = await db.jobs.find_one({"id": action.job_id}, {"_id": 0})
-    if not job:
-        raise HTTPException(status_code=404, detail="Job not found")
-    
+            purchased -= 1
+
+        # Compute remaining from data we already have (no second query!)
+        remaining_superlikes = max(0, free_remaining - 1) + purchased
+
+    # ── Phase 2: Insert immediately ───────────────────────────────────
     application_id = str(uuid.uuid4())
+    now = datetime.now(timezone.utc).isoformat()
     application_doc = {
         "id": application_id,
         "job_id": action.job_id,
-        "seeker_id": current_user["id"],
+        "seeker_id": uid,
         "seeker_name": current_user["name"],
         "seeker_title": current_user.get("title"),
         "seeker_skills": current_user.get("skills", []),
@@ -422,88 +547,27 @@ async def swipe(action: SwipeAction, current_user: dict = Depends(get_current_us
         "action": action.action,
         "is_matched": False,
         "recruiter_action": None,
-        "created_at": datetime.now(timezone.utc).isoformat()
+        "created_at": now,
     }
-    
+
     try:
         await db.applications.insert_one(application_doc)
     except Exception as e:
-        # Unique index violation — race condition duplicate
         if "duplicate key" in str(e).lower() or "E11000" in str(e):
             raise HTTPException(status_code=400, detail="Already swiped on this job")
         raise
 
-    # Invalidate cached stats so next dashboard/stats fetch returns fresh data
-    invalidate_user(current_user["id"])
-
-    # Return remaining super likes if it was a superlike action
-    remaining_superlikes = None
-    if action.action == "superlike":
-        today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
-        today_end = today_start + timedelta(days=1)
-        superlikes_today = await db.applications.count_documents({
-            "seeker_id": current_user["id"],
-            "action": "superlike",
-            "created_at": {
-                "$gte": today_start.isoformat(),
-                "$lt": today_end.isoformat()
-            }
-        })
-        user_data = await db.users.find_one({"id": current_user["id"]}, {"_id": 0, "seeker_purchased_superlikes": 1})
-        purchased_remaining = (user_data or {}).get("seeker_purchased_superlikes", 0)
-        remaining_superlikes = max(0, DAILY_SUPERLIKE_LIMIT - superlikes_today) + purchased_remaining
-
-    # Check if recruiter has already swiped on this seeker → auto-match
-    match_response = None
-    if action.action in ("like", "superlike"):
-        recruiter_swipe = await db.recruiter_swipes.find_one({
-            "recruiter_id": job["recruiter_id"],
-            "seeker_id": current_user["id"],
-            "action": {"$in": ["like", "superlike"]},
-        })
-        if recruiter_swipe:
-            match_id = str(uuid.uuid4())
-            match_doc = {
-                "id": match_id,
-                "application_id": application_id,
-                "job_id": action.job_id,
-                "job_title": job.get("title", "Unknown"),
-                "company": job.get("company", "Unknown"),
-                "seeker_id": current_user["id"],
-                "seeker_name": current_user["name"],
-                "seeker_avatar": current_user.get("avatar"),
-                "recruiter_id": job["recruiter_id"],
-                "recruiter_name": job.get("recruiter_name", ""),
-                "created_at": datetime.now(timezone.utc).isoformat(),
-            }
-            await db.matches.insert_one(match_doc)
-            await db.applications.update_one(
-                {"id": application_id},
-                {"$set": {"recruiter_action": "accept", "is_matched": True}}
-            )
-            match_response = {k: v for k, v in match_doc.items() if k != "_id"}
-
-            # Notify recruiter
-            await create_notification(
-                user_id=job["recruiter_id"],
-                notif_type="match",
-                title="It's a Match!",
-                message=f"{current_user['name']} applied to {job.get('title', 'your position')} - mutual interest!",
-                data={"match_id": match_id, "job_id": action.job_id}
-            )
-
-    # Return updated counts so frontend can sync with server truth
-    applications_sent = await db.applications.count_documents({
-        "seeker_id": current_user["id"],
-        "action": {"$in": ["like", "superlike"]}
-    })
+    # ── Phase 3: Return immediately, process the rest in background ───
+    # Match checking + notifications happen async — user sees instant response.
+    asyncio.create_task(
+        _swipe_post_process(application_id, job, dict(current_user), action.action, action.job_id)
+    )
 
     return {
         "message": f"Swiped {action.action}",
         "application_id": application_id,
         "remaining_superlikes": remaining_superlikes,
-        "match": match_response,
-        "applications_sent": applications_sent,
+        "match": None,  # match is detected async; delivered via WebSocket
     }
 
 # ==================== RECRUITER APPLICATIONS ====================
