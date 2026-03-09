@@ -242,8 +242,8 @@ export default function SeekerDashboard() {
       setSuperLikesRemaining(prev => Math.max(0, prev - 1));
     }
 
-    // Fire-and-forget API call — don't block the UI, no toasts
-    const swipePromise = axios.post(`${API}/swipe`,
+    // Fire-and-forget API call — don't block the UI
+    const sendSwipe = (retryCount = 0) => axios.post(`${API}/swipe`,
       { job_id: job.id, action },
       { headers: { Authorization: `Bearer ${token}` } }
     ).then(response => {
@@ -257,14 +257,32 @@ export default function SeekerDashboard() {
         setShowMatch(true);
       }
     }).catch(error => {
-      if (error.response?.status === 400) {
-        const detail = error.response?.data?.detail || 'Failed to submit';
-        // Don't show "already swiped" as an error — it's a stale-data edge case, not a user mistake
-        if (!detail.toLowerCase().includes('already swiped')) {
-          toast.error(detail);
-        }
+      const status = error.response?.status;
+      const detail = error.response?.data?.detail || '';
+
+      // "Already swiped" is fine — stale-data edge case, not a user mistake
+      if (status === 400 && detail.toLowerCase().includes('already swiped')) {
+        return;
       }
-    }).finally(() => {
+
+      // Retry once on server/network errors (500, timeout, network failure)
+      if (retryCount < 1 && (!status || status >= 500)) {
+        return new Promise(resolve => setTimeout(resolve, 1000)).then(() => sendSwipe(retryCount + 1));
+      }
+
+      // Revert optimistic stat update on permanent failure
+      if (action === 'like') {
+        setStats(prev => ({ ...prev, applications_sent: Math.max(0, prev.applications_sent - 1) }));
+      } else if (action === 'superlike') {
+        setStats(prev => ({ ...prev, super_likes_used: Math.max(0, prev.super_likes_used - 1) }));
+        setSuperLikesRemaining(prev => prev + 1);
+      }
+
+      const msg = detail || error.message || 'Failed to save swipe';
+      toast.error(msg);
+    });
+
+    const swipePromise = sendSwipe().finally(() => {
       pendingSwipesRef.current = pendingSwipesRef.current.filter(p => p !== swipePromise);
       globalPendingSwipes = globalPendingSwipes.filter(p => p !== swipePromise);
     });
