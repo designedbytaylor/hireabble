@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Heart, MessageCircle, Briefcase, Building2, Calendar, ChevronRight,
-  X, MapPin, GraduationCap, Clock, User, Mail, ArrowLeft, Star,
+  X, MapPin, GraduationCap, Clock, User, Mail, ArrowLeft, Star, FileText, Award, Download,
 } from 'lucide-react';
 import { Badge } from '../components/ui/badge';
 import { Button } from '../components/ui/button';
@@ -301,6 +301,61 @@ export default function Matches() {
                   ))}
                 </div>
               </div>
+            )}
+
+            {/* References */}
+            {isRecruiterViewing && p.references?.length > 0 && (
+              <div className="glass-card rounded-2xl p-6">
+                <h2 className="font-bold font-['Outfit'] mb-3">References</h2>
+                <div className="space-y-4">
+                  {p.references.map((ref, i) => (
+                    <div key={i} className={`${i > 0 ? 'pt-4 border-t border-border' : ''}`}>
+                      <h3 className="font-semibold">{ref.name}</h3>
+                      {ref.title && <p className="text-primary text-sm">{ref.title}{ref.company ? ` at ${ref.company}` : ''}</p>}
+                      {ref.email && (
+                        <p className="text-muted-foreground text-xs mt-1 flex items-center gap-1">
+                          <Mail className="w-3 h-3" /> {ref.email}
+                        </p>
+                      )}
+                      {ref.phone && (
+                        <p className="text-muted-foreground text-xs mt-0.5">{ref.phone}</p>
+                      )}
+                      {ref.relationship && (
+                        <p className="text-muted-foreground text-xs mt-0.5 italic">{ref.relationship}</p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Download Resume PDF button for recruiters */}
+            {isRecruiterViewing && (
+              <button
+                onClick={async () => {
+                  try {
+                    const response = await axios.get(`${API}/applicant/${p.id}/resume/pdf`, {
+                      headers: { Authorization: `Bearer ${token}` },
+                      responseType: 'blob'
+                    });
+                    const url = window.URL.createObjectURL(new Blob([response.data]));
+                    const link = document.createElement('a');
+                    link.href = url;
+                    link.setAttribute('download', `${p.name?.replace(' ', '_') || 'resume'}_Resume.pdf`);
+                    document.body.appendChild(link);
+                    link.click();
+                    link.remove();
+                    window.URL.revokeObjectURL(url);
+                    toast.success('Resume downloaded!');
+                  } catch {
+                    toast.error('Failed to download resume');
+                  }
+                }}
+                className="glass-card rounded-2xl p-4 flex items-center justify-center gap-2 text-primary hover:bg-primary/10 transition-colors cursor-pointer w-full"
+              >
+                <Download className="w-4 h-4" />
+                <span className="font-semibold text-sm">Download Resume PDF</span>
+              </button>
             )}
           </div>
         </main>

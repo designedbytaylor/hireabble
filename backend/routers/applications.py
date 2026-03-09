@@ -462,7 +462,7 @@ async def get_applications(
         seekers = await db.users.find(
             {"id": {"$in": seeker_ids}},
             {"_id": 0, "id": 1, "subscription": 1}
-        ).to_list(None)
+        ).to_list(len(seeker_ids))
         for s in seekers:
             sub = s.get("subscription", {})
             if sub.get("status") == "active" and sub.get("period_end", "") >= now:
@@ -497,7 +497,7 @@ async def get_my_applications(current_user: dict = Depends(get_current_user)):
 
     # Batch-fetch all referenced jobs in one query instead of N+1
     job_ids = list(set(app["job_id"] for app in applications))
-    jobs_list = await db.jobs.find({"id": {"$in": job_ids}}, {"_id": 0}).to_list(None) if job_ids else []
+    jobs_list = await db.jobs.find({"id": {"$in": job_ids}}, {"_id": 0}).to_list(len(job_ids)) if job_ids else []
     jobs_map = {j["id"]: j for j in jobs_list}
 
     result = []

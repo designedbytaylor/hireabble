@@ -38,7 +38,7 @@ async def get_matches(current_user: dict = Depends(get_current_user)):
             }},
             {"$group": {"_id": "$match_id", "count": {"$sum": 1}}}
         ]
-        unread_results = await db.messages.aggregate(pipeline).to_list(None)
+        unread_results = await db.messages.aggregate(pipeline).to_list(len(match_ids))
         unread_map = {r["_id"]: r["count"] for r in unread_results}
         for m in matches:
             m["unread_count"] = unread_map.get(m["id"], 0)

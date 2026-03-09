@@ -27,6 +27,9 @@ const Messages = React.lazy(() => import("./pages/Messages"));
 const Upgrade = React.lazy(() => import("./pages/Upgrade"));
 const CompanyJobs = React.lazy(() => import("./pages/CompanyJobs"));
 const Impersonate = React.lazy(() => import("./pages/Impersonate"));
+const TermsOfService = React.lazy(() => import("./pages/TermsOfService"));
+const PrivacyPolicy = React.lazy(() => import("./pages/PrivacyPolicy"));
+const CookiePolicy = React.lazy(() => import("./pages/CookiePolicy"));
 
 // Admin pages — completely separate chunk (never loaded for regular users)
 const AdminLogin = React.lazy(() => import("./pages/admin/AdminLogin"));
@@ -263,6 +266,11 @@ function AppRoutes() {
           </ProtectedRoute>
         }
       />
+
+      {/* Legal pages — always accessible */}
+      <Route path="/terms" element={<TermsOfService />} />
+      <Route path="/privacy" element={<PrivacyPolicy />} />
+      <Route path="/cookie-policy" element={<CookiePolicy />} />
 
       {/* Admin impersonation — no PublicRoute wrapper so it always works */}
       <Route path="/impersonate" element={<Impersonate />} />

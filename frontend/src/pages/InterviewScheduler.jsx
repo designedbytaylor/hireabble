@@ -417,11 +417,23 @@ function CreateInterviewDialog({ open, onClose, matches, preselectedMatch, token
   const [description, setDescription] = useState('');
   const [interviewType, setInterviewType] = useState('video');
   const [location, setLocation] = useState('');
-  const [timeSlots, setTimeSlots] = useState([{ date: '', startTime: '', endTime: '' }]);
+  const [timeSlots, setTimeSlots] = useState([{ date: '', startTime: '' }]);
+
+  // Generate 15-min interval time options (6 AM to 9 PM)
+  const timeOptions = [];
+  for (let h = 6; h <= 21; h++) {
+    for (let m = 0; m < 60; m += 15) {
+      const hour24 = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+      const ampm = h >= 12 ? 'PM' : 'AM';
+      const hour12 = h > 12 ? h - 12 : h === 0 ? 12 : h;
+      const label = `${hour12}:${String(m).padStart(2, '0')} ${ampm}`;
+      timeOptions.push({ value: hour24, label });
+    }
+  }
 
   const addTimeSlot = () => {
     if (timeSlots.length < 5) {
-      setTimeSlots([...timeSlots, { date: '', startTime: '', endTime: '' }]);
+      setTimeSlots([...timeSlots, { date: '', startTime: '' }]);
     }
   };
 
@@ -444,16 +456,17 @@ function CreateInterviewDialog({ open, onClose, matches, preselectedMatch, token
       return;
     }
 
-    const validSlots = timeSlots.filter(s => s.date && s.startTime && s.endTime);
+    const validSlots = timeSlots.filter(s => s.date && s.startTime);
     if (validSlots.length === 0) {
       toast.error('Please add at least one time slot');
       return;
     }
 
-    const proposed_times = validSlots.map(s => ({
-      start: new Date(`${s.date}T${s.startTime}`).toISOString(),
-      end: new Date(`${s.date}T${s.endTime}`).toISOString(),
-    }));
+    const proposed_times = validSlots.map(s => {
+      const start = new Date(`${s.date}T${s.startTime}`);
+      const end = new Date(start.getTime() + 60 * 60 * 1000); // Auto 1-hour duration
+      return { start: start.toISOString(), end: end.toISOString() };
+    });
 
     setLoading(true);
     try {
@@ -470,7 +483,7 @@ function CreateInterviewDialog({ open, onClose, matches, preselectedMatch, token
       // Reset form
       setMatchId('');
       setDescription('');
-      setTimeSlots([{ date: '', startTime: '', endTime: '' }]);
+      setTimeSlots([{ date: '', startTime: '' }]);
     } catch (error) {
       toast.error(error.response?.data?.detail || 'Failed to schedule interview');
     } finally {
@@ -556,27 +569,24 @@ function CreateInterviewDialog({ open, onClose, matches, preselectedMatch, token
                   <Input
                     type="date"
                     value={slot.date}
+                    min={new Date().toISOString().split('T')[0]}
                     onChange={(e) => updateTimeSlot(i, 'date', e.target.value)}
                     className="h-10 rounded-lg bg-background text-sm"
+                    onClick={(e) => e.target.showPicker?.()}
                   />
                 </div>
                 <div className="flex-1 space-y-1">
-                  <Label className="text-xs text-muted-foreground">Start</Label>
-                  <Input
-                    type="time"
-                    value={slot.startTime}
-                    onChange={(e) => updateTimeSlot(i, 'startTime', e.target.value)}
-                    className="h-10 rounded-lg bg-background text-sm"
-                  />
-                </div>
-                <div className="flex-1 space-y-1">
-                  <Label className="text-xs text-muted-foreground">End</Label>
-                  <Input
-                    type="time"
-                    value={slot.endTime}
-                    onChange={(e) => updateTimeSlot(i, 'endTime', e.target.value)}
-                    className="h-10 rounded-lg bg-background text-sm"
-                  />
+                  <Label className="text-xs text-muted-foreground">Time</Label>
+                  <Select value={slot.startTime} onValueChange={(val) => updateTimeSlot(i, 'startTime', val)}>
+                    <SelectTrigger className="h-10 rounded-lg bg-background text-sm">
+                      <SelectValue placeholder="Select time" />
+                    </SelectTrigger>
+                    <SelectContent className="max-h-48">
+                      {timeOptions.map(opt => (
+                        <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
                 {timeSlots.length > 1 && (
                   <button type="button" onClick={() => removeTimeSlot(i)} className="p-2 text-muted-foreground hover:text-red-500">
@@ -610,12 +620,24 @@ function RespondDialog({ open, onClose, interview, onRespond, token, onSuccess }
   const [selectedTime, setSelectedTime] = useState(null);
   const [message, setMessage] = useState('');
   const [showSuggest, setShowSuggest] = useState(false);
-  const [suggestedSlots, setSuggestedSlots] = useState([{ date: '', startTime: '', endTime: '' }]);
+  const [suggestedSlots, setSuggestedSlots] = useState([{ date: '', startTime: '' }]);
   const [suggestLoading, setSuggestLoading] = useState(false);
+
+  // Generate 15-min interval time options (6 AM to 9 PM)
+  const timeOptions = [];
+  for (let h = 6; h <= 21; h++) {
+    for (let m = 0; m < 60; m += 15) {
+      const hour24 = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+      const ampm = h >= 12 ? 'PM' : 'AM';
+      const hour12 = h > 12 ? h - 12 : h === 0 ? 12 : h;
+      const label = `${hour12}:${String(m).padStart(2, '0')} ${ampm}`;
+      timeOptions.push({ value: hour24, label });
+    }
+  }
 
   const addSuggestedSlot = () => {
     if (suggestedSlots.length < 5) {
-      setSuggestedSlots([...suggestedSlots, { date: '', startTime: '', endTime: '' }]);
+      setSuggestedSlots([...suggestedSlots, { date: '', startTime: '' }]);
     }
   };
 
@@ -632,16 +654,17 @@ function RespondDialog({ open, onClose, interview, onRespond, token, onSuccess }
   };
 
   const handleSuggestTimes = async () => {
-    const validSlots = suggestedSlots.filter(s => s.date && s.startTime && s.endTime);
+    const validSlots = suggestedSlots.filter(s => s.date && s.startTime);
     if (validSlots.length === 0) {
       toast.error('Please add at least one suggested time');
       return;
     }
 
-    const proposed_times = validSlots.map(s => ({
-      start: new Date(`${s.date}T${s.startTime}`).toISOString(),
-      end: new Date(`${s.date}T${s.endTime}`).toISOString(),
-    }));
+    const proposed_times = validSlots.map(s => {
+      const start = new Date(`${s.date}T${s.startTime}`);
+      const end = new Date(start.getTime() + 60 * 60 * 1000);
+      return { start: start.toISOString(), end: end.toISOString() };
+    });
 
     setSuggestLoading(true);
     try {
@@ -652,7 +675,7 @@ function RespondDialog({ open, onClose, interview, onRespond, token, onSuccess }
 
       toast.success('Alternative times suggested! The recruiter will be notified.');
       setShowSuggest(false);
-      setSuggestedSlots([{ date: '', startTime: '', endTime: '' }]);
+      setSuggestedSlots([{ date: '', startTime: '' }]);
       setMessage('');
       onClose();
       if (onSuccess) onSuccess();
@@ -789,27 +812,24 @@ function RespondDialog({ open, onClose, interview, onRespond, token, onSuccess }
                       <Input
                         type="date"
                         value={slot.date}
+                        min={new Date().toISOString().split('T')[0]}
                         onChange={(e) => updateSuggestedSlot(i, 'date', e.target.value)}
                         className="h-10 rounded-lg bg-background text-sm"
+                        onClick={(e) => e.target.showPicker?.()}
                       />
                     </div>
                     <div className="flex-1 space-y-1">
-                      <Label className="text-xs text-muted-foreground">Start</Label>
-                      <Input
-                        type="time"
-                        value={slot.startTime}
-                        onChange={(e) => updateSuggestedSlot(i, 'startTime', e.target.value)}
-                        className="h-10 rounded-lg bg-background text-sm"
-                      />
-                    </div>
-                    <div className="flex-1 space-y-1">
-                      <Label className="text-xs text-muted-foreground">End</Label>
-                      <Input
-                        type="time"
-                        value={slot.endTime}
-                        onChange={(e) => updateSuggestedSlot(i, 'endTime', e.target.value)}
-                        className="h-10 rounded-lg bg-background text-sm"
-                      />
+                      <Label className="text-xs text-muted-foreground">Time</Label>
+                      <Select value={slot.startTime} onValueChange={(val) => updateSuggestedSlot(i, 'startTime', val)}>
+                        <SelectTrigger className="h-10 rounded-lg bg-background text-sm">
+                          <SelectValue placeholder="Select time" />
+                        </SelectTrigger>
+                        <SelectContent className="max-h-48">
+                          {timeOptions.map(opt => (
+                            <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </div>
                     {suggestedSlots.length > 1 && (
                       <button type="button" onClick={() => removeSuggestedSlot(i)} className="p-2 text-muted-foreground hover:text-red-500">

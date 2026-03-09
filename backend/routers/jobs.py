@@ -238,7 +238,7 @@ async def get_jobs(
             recruiters = await db.users.find(
                 {"id": {"$in": recruiter_ids}},
                 {"_id": 0, "id": 1, "subscription": 1}
-            ).to_list(None)
+            ).to_list(len(recruiter_ids))
             for r in recruiters:
                 sub = r.get("subscription", {})
                 if sub.get("status") == "active" and sub.get("period_end", "") >= now:
