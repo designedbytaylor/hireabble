@@ -119,16 +119,17 @@ export default function UpgradeModal({ open, onClose, onSubscribed, trigger, hig
       if (onSubscribed) {
         onSubscribed();
       } else {
-        // Fallback: re-fetch user data via auth endpoint
+        // Re-fetch user data and force a React re-render
         try {
           const meRes = await axios.get(`${API}/auth/me`, {
             headers: { Authorization: `Bearer ${token}` }
           });
           localStorage.setItem('cached_user', JSON.stringify(meRes.data));
-          window.location.reload();
         } catch {
-          window.location.reload();
+          // ignore fetch failure
         }
+        // Use location.assign for reliable mobile reload (window.location.reload can produce white screen on iOS)
+        window.location.assign(window.location.pathname);
       }
     } catch (err) {
       toast.error(err.response?.data?.detail || 'Failed to subscribe');
