@@ -347,6 +347,35 @@ async def review_moderation_item(
             await db.jobs.update_one({"id": content_id}, {"$set": {"is_active": False}})
         elif content_type == "user":
             await db.users.update_one({"id": content_id}, {"$set": {"status": "suspended"}})
+        elif content_type == "media":
+            # Remove the flagged media
+            media = await db.media_uploads.find_one({"id": content_id})
+            if media:
+                await db.media_uploads.update_one(
+                    {"id": content_id},
+                    {"$set": {"status": "removed", "reviewed_by": admin["id"],
+                              "reviewed_at": datetime.now(timezone.utc).isoformat()}}
+                )
+                # Clear from user profile
+                user_id = media.get("user_id")
+                category = media.get("category")
+                url = media.get("url")
+                if category == "profile_photo":
+                    user = await db.users.find_one({"id": user_id})
+                    if user and user.get("photo_url") == url:
+                        await db.users.update_one({"id": user_id}, {"$set": {"photo_url": None}})
+                elif category == "video_intro":
+                    user = await db.users.find_one({"id": user_id})
+                    if user and user.get("video_url") == url:
+                        await db.users.update_one({"id": user_id}, {"$set": {"video_url": None}})
+                # Notify user and issue strike
+                await create_notification(
+                    user_id=user_id, notif_type="moderation",
+                    title="Content Removed",
+                    message=f"Your uploaded {media.get('media_type', 'content')} was removed for violating community guidelines.",
+                    data={"media_id": content_id}
+                )
+                await db.users.update_one({"id": user_id}, {"$inc": {"strikes": 1}})
 
     # If approved, unflag the content
     if action == "approve":
@@ -356,6 +385,12 @@ async def review_moderation_item(
             await db.jobs.update_one({"id": content_id}, {"$set": {"is_flagged": False}})
         elif content_type == "user":
             await db.users.update_one({"id": content_id}, {"$set": {"is_flagged": False}})
+        elif content_type == "media":
+            await db.media_uploads.update_one(
+                {"id": content_id},
+                {"$set": {"status": "approved", "flagged": False, "reviewed_by": admin["id"],
+                          "reviewed_at": datetime.now(timezone.utc).isoformat()}}
+            )
 
     return {"message": f"Item {action}d"}
 
@@ -685,6 +720,144 @@ async def admin_delete_job(
             return {"message": "Job removed. User has been banned (3 strikes).", "strikes": strike_count, "banned": True}
 
     return {"message": "Job removed and poster notified.", "strikes": strike_count if recruiter_id else 0, "banned": False}
+
+
+# ==================== MEDIA MODERATION ====================
+
+@router.get("/admin/media")
+async def list_media_uploads(
+    admin: dict = Depends(get_current_admin),
+    status: Optional[str] = None,
+    media_type: Optional[str] = None,
+    category: Optional[str] = None,
+    user_id: Optional[str] = None,
+    page: int = 1,
+    limit: int = 30,
+):
+    """Browse all uploaded media (images and videos) in the system."""
+    query = {}
+    if status:
+        query["status"] = status
+    if media_type:
+        query["media_type"] = media_type
+    if category:
+        query["category"] = category
+    if user_id:
+        query["user_id"] = user_id
+
+    total = await db.media_uploads.count_documents(query)
+    skip = (page - 1) * limit
+    items = await db.media_uploads.find(
+        query, {"_id": 0}
+    ).sort("created_at", -1).skip(skip).limit(limit).to_list(limit)
+
+    return {
+        "items": items,
+        "total": total,
+        "page": page,
+        "pages": max(1, (total + limit - 1) // limit),
+    }
+
+
+@router.get("/admin/media/stats")
+async def media_stats(admin: dict = Depends(get_current_admin)):
+    """Get media upload statistics."""
+    total = await db.media_uploads.count_documents({})
+    flagged = await db.media_uploads.count_documents({"status": "flagged"})
+    approved = await db.media_uploads.count_documents({"status": "approved"})
+    removed = await db.media_uploads.count_documents({"status": "removed"})
+    images = await db.media_uploads.count_documents({"media_type": "image"})
+    videos = await db.media_uploads.count_documents({"media_type": "video"})
+
+    return {
+        "total": total,
+        "flagged": flagged,
+        "approved": approved,
+        "removed": removed,
+        "images": images,
+        "videos": videos,
+    }
+
+
+@router.put("/admin/media/{media_id}/remove")
+async def remove_media(media_id: str, body: dict = {}, admin: dict = Depends(get_current_admin)):
+    """Remove an uploaded media item (set status to removed, clear from user profile)."""
+    media = await db.media_uploads.find_one({"id": media_id})
+    if not media:
+        raise HTTPException(status_code=404, detail="Media not found")
+
+    reason = body.get("reason", "Removed by admin")
+
+    # Mark as removed in media_uploads
+    await db.media_uploads.update_one(
+        {"id": media_id},
+        {"$set": {
+            "status": "removed",
+            "reviewed_by": admin["id"],
+            "reviewed_at": datetime.now(timezone.utc).isoformat(),
+            "removal_reason": reason,
+        }}
+    )
+
+    # Clear the URL from the user's profile
+    user_id = media.get("user_id")
+    category = media.get("category")
+    url = media.get("url")
+
+    if category == "profile_photo":
+        # Only clear if this is still the current photo
+        user = await db.users.find_one({"id": user_id})
+        if user and user.get("photo_url") == url:
+            await db.users.update_one({"id": user_id}, {"$set": {"photo_url": None}})
+    elif category == "video_intro":
+        user = await db.users.find_one({"id": user_id})
+        if user and user.get("video_url") == url:
+            await db.users.update_one({"id": user_id}, {"$set": {"video_url": None}})
+
+    # Notify the user
+    await create_notification(
+        user_id=user_id,
+        notif_type="moderation",
+        title="Content Removed",
+        message=f"Your uploaded {media.get('media_type', 'content')} was removed for: {reason}",
+        data={"media_id": media_id}
+    )
+
+    # Issue a strike
+    await db.users.update_one(
+        {"id": user_id},
+        {"$inc": {"strikes": 1}}
+    )
+
+    logger.info(f"Admin {admin['id']} removed media {media_id} from user {user_id}: {reason}")
+    return {"message": "Media removed", "media_id": media_id}
+
+
+@router.put("/admin/media/{media_id}/approve")
+async def approve_media(media_id: str, admin: dict = Depends(get_current_admin)):
+    """Approve a flagged media item."""
+    result = await db.media_uploads.update_one(
+        {"id": media_id},
+        {"$set": {
+            "status": "approved",
+            "flagged": False,
+            "reviewed_by": admin["id"],
+            "reviewed_at": datetime.now(timezone.utc).isoformat(),
+        }}
+    )
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Media not found")
+
+    # Also approve any related moderation queue items
+    media = await db.media_uploads.find_one({"id": media_id}, {"_id": 0})
+    if media:
+        await db.moderation_queue.update_many(
+            {"content_id": media_id, "content_type": "media"},
+            {"$set": {"status": "approved", "reviewed_by": admin["id"],
+                      "reviewed_at": datetime.now(timezone.utc).isoformat()}}
+        )
+
+    return {"message": "Media approved"}
 
 
 # ==================== IMPERSONATION ====================

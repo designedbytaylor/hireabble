@@ -112,6 +112,21 @@ export default function AdminModeration() {
                   User ID: <span className="text-gray-300 font-mono">{item.user_id}</span>
                 </p>
 
+                {/* Media preview for image moderation items */}
+                {item.content_type === 'media' && item.metadata?.media_url && (
+                  <div className="mb-3 max-w-xs">
+                    <img
+                      src={item.metadata.media_url.startsWith('/uploads/')
+                        ? `${process.env.REACT_APP_BACKEND_URL}${item.metadata.media_url}`
+                        : item.metadata.media_url}
+                      alt="Flagged media"
+                      className="rounded-xl border border-gray-700 max-h-48 object-contain"
+                      onError={(e) => { e.target.style.display = 'none'; }}
+                    />
+                    <p className="text-xs text-gray-500 mt-1">{item.metadata.media_category} · {item.metadata.filename}</p>
+                  </div>
+                )}
+
                 {item.violations && item.violations.length > 0 && (
                   <div className="space-y-2">
                     <p className="text-sm font-medium text-gray-300">Violations:</p>

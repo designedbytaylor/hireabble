@@ -37,6 +37,7 @@ const AdminModeration = React.lazy(() => import("./pages/admin/AdminModeration")
 const AdminReports = React.lazy(() => import("./pages/admin/AdminReports"));
 const AdminSettings = React.lazy(() => import("./pages/admin/AdminSettings"));
 const AdminTesting = React.lazy(() => import("./pages/admin/AdminTesting"));
+const AdminMedia = React.lazy(() => import("./pages/admin/AdminMedia"));
 
 const PageSpinner = () => (
   <div className="min-h-screen bg-background flex items-center justify-center">
@@ -264,6 +265,7 @@ function AppRoutes() {
         <Route path="dashboard" element={<AdminOverview />} />
         <Route path="users" element={<AdminUsers />} />
         <Route path="jobs" element={<AdminJobs />} />
+        <Route path="media" element={<AdminMedia />} />
         <Route path="moderation" element={<AdminModeration />} />
         <Route path="reports" element={<AdminReports />} />
         <Route path="testing" element={<AdminTesting />} />
