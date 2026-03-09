@@ -31,6 +31,20 @@ const TermsOfService = React.lazy(() => import("./pages/TermsOfService"));
 const PrivacyPolicy = React.lazy(() => import("./pages/PrivacyPolicy"));
 const CookiePolicy = React.lazy(() => import("./pages/CookiePolicy"));
 
+// Prefetch likely-next page chunks after initial load so navigation feels instant
+const prefetchChunks = () => {
+  // Warm the chunk cache — import() returns cached promises if already loaded
+  import("./pages/AppliedJobs");
+  import("./pages/Matches");
+  import("./pages/Messages");
+  import("./pages/Profile");
+  import("./pages/InterviewScheduler");
+};
+// Start prefetching after main page renders (2s delay to avoid competing with critical resources)
+if (typeof window !== 'undefined') {
+  window.addEventListener('load', () => setTimeout(prefetchChunks, 2000), { once: true });
+}
+
 // Admin pages — completely separate chunk (never loaded for regular users)
 const AdminLogin = React.lazy(() => import("./pages/admin/AdminLogin"));
 const AdminLayout = React.lazy(() => import("./pages/admin/AdminLayout"));
