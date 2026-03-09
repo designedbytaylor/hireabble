@@ -811,6 +811,14 @@ function SwipeCard({ job, onSwipe, expanded, setExpanded }) {
   const y = useMotionValue(0);
   const rotate = useTransform(x, [-200, 200], [-25, 25]);
 
+  // Block downward drag — clamp y to never go positive
+  useEffect(() => {
+    const unsubscribe = y.on('change', (latest) => {
+      if (latest > 0) y.set(0);
+    });
+    return unsubscribe;
+  }, [y]);
+
   // Indicator opacities
   const likeOpacity = useTransform(x, [0, 60], [0, 1]);
   const passOpacity = useTransform(x, [-60, 0], [1, 0]);
@@ -821,7 +829,8 @@ function SwipeCard({ job, onSwipe, expanded, setExpanded }) {
     const velocityThreshold = 300;
     const pos = { x: x.get(), y: y.get() };
 
-    if (info.offset.y < -swipeThreshold || info.velocity.y < -velocityThreshold) {
+    // Up = superlike, right = like, left = pass. Down is blocked entirely.
+    if ((info.offset.y < -swipeThreshold || info.velocity.y < -velocityThreshold) && info.offset.y < 0) {
       onSwipe('superlike', { x: 0, y: -1500 }, pos);
     } else if (info.offset.x > swipeThreshold || info.velocity.x > velocityThreshold) {
       onSwipe('like', { x: 1500, y: 0 }, pos);
