@@ -77,31 +77,39 @@ export default function RecruiterSwipe() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode]);
 
-  const fetchData = async () => {
+  const fetchData = async (retry = 0) => {
     try {
+      const opts = { headers: { Authorization: `Bearer ${token}` }, timeout: 15000 };
       const [appsRes, statsRes] = await Promise.all([
-        axios.get(`${API}/applications`, { headers: { Authorization: `Bearer ${token}` } }),
-        axios.get(`${API}/stats/recruiter`, { headers: { Authorization: `Bearer ${token}` } })
+        axios.get(`${API}/applications`, opts),
+        axios.get(`${API}/stats/recruiter`, opts)
       ]);
       const pending = appsRes.data.filter(a => !a.recruiter_action);
       setApplications(pending);
       setStats(statsRes.data);
     } catch (error) {
+      if (retry < 1 && (!error.response || error.code === 'ECONNABORTED')) {
+        return fetchData(retry + 1);
+      }
       console.error('Failed to fetch data:', error);
     } finally {
       setLoading(false);
     }
   };
 
-  const fetchCandidates = async () => {
+  const fetchCandidates = async (retry = 0) => {
     try {
+      const opts = { headers: { Authorization: `Bearer ${token}` }, timeout: 15000 };
       const [candidatesRes, swipesRes] = await Promise.all([
-        axios.get(`${API}/candidates`, { headers: { Authorization: `Bearer ${token}` } }),
-        axios.get(`${API}/candidates/superswipes/remaining`, { headers: { Authorization: `Bearer ${token}` } }),
+        axios.get(`${API}/candidates`, opts),
+        axios.get(`${API}/candidates/superswipes/remaining`, opts),
       ]);
       setCandidates(candidatesRes.data);
       setSuperSwipesRemaining(swipesRes.data);
     } catch (error) {
+      if (retry < 1 && (!error.response || error.code === 'ECONNABORTED')) {
+        return fetchCandidates(retry + 1);
+      }
       console.error('Failed to fetch candidates:', error);
     }
   };

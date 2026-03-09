@@ -64,11 +64,12 @@ export default function SeekerDashboard() {
   const [detectingLocation, setDetectingLocation] = useState(false);
 
   // Batched dashboard: single API call replaces 6+ separate requests
-  const fetchDashboard = async () => {
+  const fetchDashboard = async (retry = 0) => {
     setLoading(true);
     try {
       const response = await axios.get(`${API}/dashboard`, {
-        headers: { Authorization: `Bearer ${token}` }
+        headers: { Authorization: `Bearer ${token}` },
+        timeout: 15000
       });
       const data = response.data;
       setJobs(data.jobs);
@@ -77,13 +78,18 @@ export default function SeekerDashboard() {
       setProfileComplete(data.completeness.is_complete);
       setSuperLikesRemaining(data.superlikes.remaining);
     } catch (error) {
+      // Auto-retry once on timeout/network errors before falling back
+      if (retry < 1 && (!error.response || error.code === 'ECONNABORTED')) {
+        return fetchDashboard(retry + 1);
+      }
       console.error('Failed to fetch dashboard:', error);
       // Fallback: try fetching stats and jobs separately so UI isn't stuck at zeros
       try {
+        const opts = { headers: { Authorization: `Bearer ${token}` }, timeout: 10000 };
         const [jobsRes, statsRes, slRes] = await Promise.all([
-          axios.get(`${API}/jobs`, { headers: { Authorization: `Bearer ${token}` } }),
-          axios.get(`${API}/stats`, { headers: { Authorization: `Bearer ${token}` } }),
-          axios.get(`${API}/superlikes/remaining`, { headers: { Authorization: `Bearer ${token}` } }),
+          axios.get(`${API}/jobs`, opts),
+          axios.get(`${API}/stats`, opts),
+          axios.get(`${API}/superlikes/remaining`, opts),
         ]);
         setJobs(jobsRes.data);
         setCurrentIndex(0);
@@ -268,7 +274,7 @@ export default function SeekerDashboard() {
     // Fire-and-forget API call — don't block the UI
     const sendSwipe = (retryCount = 0) => axios.post(`${API}/swipe`,
       { job_id: job.id, action },
-      { headers: { Authorization: `Bearer ${token}` } }
+      { headers: { Authorization: `Bearer ${token}` }, timeout: 15000 }
     ).then(response => {
       if (action === 'superlike' && response.data.remaining_superlikes != null) {
         setSuperLikesRemaining(response.data.remaining_superlikes);
@@ -277,6 +283,7 @@ export default function SeekerDashboard() {
     }).catch(error => {
       const status = error.response?.status;
       const detail = error.response?.data?.detail || '';
+      const isTimeout = error.code === 'ECONNABORTED' || error.message?.includes('timeout');
 
       // "Already swiped" is fine — stale-data edge case, not a user mistake
       if (status === 400 && detail.toLowerCase().includes('already swiped')) {
@@ -284,11 +291,16 @@ export default function SeekerDashboard() {
       }
 
       // Retry once on server/network errors (500, timeout, network failure)
-      if (retryCount < 1 && (!status || status >= 500)) {
-        return new Promise(resolve => setTimeout(resolve, 1000)).then(() => sendSwipe(retryCount + 1));
+      if (retryCount < 1 && (!status || status >= 500 || isTimeout)) {
+        return new Promise(resolve => setTimeout(resolve, 1500)).then(() => sendSwipe(retryCount + 1));
       }
 
-      // Revert optimistic stat update on permanent failure
+      // Timeouts after retry: swipe likely saved (DB write happens early), don't alarm the user
+      if (isTimeout) {
+        return;
+      }
+
+      // Revert optimistic stat update on permanent failure (4xx errors)
       if (action === 'like') {
         setStats(prev => ({ ...prev, applications_sent: Math.max(0, prev.applications_sent - 1) }));
       } else if (action === 'superlike') {
@@ -296,7 +308,7 @@ export default function SeekerDashboard() {
         setSuperLikesRemaining(prev => prev + 1);
       }
 
-      const msg = detail || error.message || 'Failed to save swipe';
+      const msg = detail || 'Failed to save swipe';
       toast.error(msg);
     });
 

@@ -5,8 +5,8 @@ const AuthContext = createContext(null);
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
-// Global timeout so no request hangs indefinitely on slow mobile networks
-axios.defaults.timeout = 10000;
+// Global timeout — generous enough for mobile 3G/slow networks
+axios.defaults.timeout = 20000;
 
 export const AuthProvider = ({ children }) => {
   // Hydrate cached user immediately so pages render without waiting for network

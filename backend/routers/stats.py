@@ -50,33 +50,34 @@ async def get_seeker_dashboard(current_user: dict = Depends(get_current_user)):
         raise HTTPException(status_code=403, detail="Seeker only")
 
     uid = current_user["id"]
-    today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
-    today_end = today_start + timedelta(days=1)
+    today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0).isoformat()
     now = datetime.now(timezone.utc).isoformat()
 
-    # --- Run ALL queries in parallel (server-side, near-zero latency to DB) ---
+    # --- 5 parallel queries instead of 8: derive counts from the applications list ---
     (
-        swiped_jobs_cursor,
-        applications_count, superlikes_count, matches_count,
-        superlikes_today,
+        swiped_apps,
+        matches_count,
         user_data,
         unread_messages,
         unread_notifications,
     ) = await asyncio.gather(
-        db.applications.find({"seeker_id": uid}, {"job_id": 1}).to_list(1000),
-        db.applications.count_documents({"seeker_id": uid, "action": {"$in": ["like", "superlike"]}}),
-        db.applications.count_documents({"seeker_id": uid, "action": "superlike"}),
+        db.applications.find(
+            {"seeker_id": uid}, {"job_id": 1, "action": 1, "created_at": 1}
+        ).to_list(1000),
         db.matches.count_documents({"seeker_id": uid}),
-        db.applications.count_documents({
-            "seeker_id": uid, "action": "superlike",
-            "created_at": {"$gte": today_start.isoformat(), "$lt": today_end.isoformat()}
-        }),
         db.users.find_one({"id": uid}, {"_id": 0, "seeker_purchased_superlikes": 1, "subscription": 1}),
         db.messages.count_documents({"receiver_id": uid, "is_read": False}),
         db.notifications.count_documents({"user_id": uid, "is_read": False}),
     )
 
-    swiped_job_ids = [s["job_id"] for s in swiped_jobs_cursor]
+    # Derive all application counts locally (saves 3 DB round trips)
+    swiped_job_ids = [s["job_id"] for s in swiped_apps]
+    applications_count = sum(1 for s in swiped_apps if s.get("action") in ("like", "superlike"))
+    superlikes_count = sum(1 for s in swiped_apps if s.get("action") == "superlike")
+    superlikes_today = sum(
+        1 for s in swiped_apps
+        if s.get("action") == "superlike" and s.get("created_at", "") >= today_start
+    )
 
     # Fetch available jobs (excluding already-swiped)
     job_query = {"id": {"$nin": swiped_job_ids}, "is_active": True}

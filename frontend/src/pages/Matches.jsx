@@ -29,13 +29,18 @@ export default function Matches() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const fetchMatches = async () => {
+  const fetchMatches = async (retry = 0) => {
     try {
       const response = await axios.get(`${API}/matches`, {
-        headers: { Authorization: `Bearer ${token}` }
+        headers: { Authorization: `Bearer ${token}` },
+        timeout: 15000
       });
       setMatches(response.data);
     } catch (error) {
+      // Auto-retry once on timeout/network errors
+      if (retry < 1 && (!error.response || error.code === 'ECONNABORTED')) {
+        return fetchMatches(retry + 1);
+      }
       console.error('Failed to fetch matches:', error);
     } finally {
       setLoading(false);
