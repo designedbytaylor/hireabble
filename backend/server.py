@@ -296,6 +296,11 @@ async def startup():
     await ensure_index(db.interviews, [("created_by", 1), ("status", 1)])
     await ensure_index(db.interviews, [("other_party_id", 1), ("status", 1)])
 
+    # Recruiter swipes indexes (critical for match detection speed)
+    await ensure_index(db.recruiter_swipes, [("recruiter_id", 1), ("seeker_id", 1)], unique=True)
+    await ensure_index(db.recruiter_swipes, "recruiter_id")
+    await ensure_index(db.recruiter_swipes, [("recruiter_id", 1), ("action", 1), ("created_at", -1)])
+
     # Performance indexes
     await ensure_index(db.jobs, [("recruiter_id", 1), ("is_active", 1)])
     await ensure_index(db.jobs, "is_active")

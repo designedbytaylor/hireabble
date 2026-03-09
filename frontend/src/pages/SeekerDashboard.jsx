@@ -112,6 +112,29 @@ export default function SeekerDashboard() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // WebSocket listener for async match notifications (matches are detected in background)
+  useEffect(() => {
+    if (!token) return;
+    const WS_URL = process.env.REACT_APP_BACKEND_URL?.replace('https://', 'wss://').replace('http://', 'ws://');
+    if (!WS_URL) return;
+    let ws;
+    try {
+      ws = new WebSocket(`${WS_URL}/ws/${token}`);
+      ws.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          if (data.type === 'new_match' && data.match) {
+            setStats(prev => ({ ...prev, matches: prev.matches + 1 }));
+            setMatchData(data.match);
+            setShowMatch(true);
+          }
+        } catch { /* ignore parse errors */ }
+      };
+      ws.onerror = () => {};
+    } catch { /* ignore connection errors */ }
+    return () => { if (ws) ws.close(); };
+  }, [token]);
+
   // Warn user before closing the tab/window if swipes are still saving
   useEffect(() => {
     const handleBeforeUnload = (e) => {
@@ -250,16 +273,7 @@ export default function SeekerDashboard() {
       if (action === 'superlike' && response.data.remaining_superlikes != null) {
         setSuperLikesRemaining(response.data.remaining_superlikes);
       }
-      // Sync applied count with server truth
-      if (response.data.applications_sent != null) {
-        setStats(prev => ({ ...prev, applications_sent: response.data.applications_sent }));
-      }
-      // Check for match
-      if (response.data.match) {
-        setStats(prev => ({ ...prev, matches: prev.matches + 1 }));
-        setMatchData(response.data.match);
-        setShowMatch(true);
-      }
+      // Match is delivered async via WebSocket — no need to check response.match
     }).catch(error => {
       const status = error.response?.status;
       const detail = error.response?.data?.detail || '';
