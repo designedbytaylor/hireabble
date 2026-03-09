@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect } from 'react';
+import { createContext, useContext, useState, useEffect, useMemo, useCallback } from 'react';
 import axios from 'axios';
 
 const AuthContext = createContext(null);
@@ -73,7 +73,7 @@ export const AuthProvider = ({ children }) => {
     return () => axios.interceptors.response.eject(interceptor);
   }, []);
 
-  const login = async (email, password) => {
+  const login = useCallback(async (email, password) => {
     const response = await axios.post(`${API}/auth/login`, { email, password });
     const { token: newToken, user: userData } = response.data;
     localStorage.setItem('token', newToken);
@@ -81,9 +81,9 @@ export const AuthProvider = ({ children }) => {
     setToken(newToken);
     setUser(userData);
     return userData;
-  };
+  }, []);
 
-  const register = async (userData) => {
+  const register = useCallback(async (userData) => {
     const response = await axios.post(`${API}/auth/register`, userData);
     const { token: newToken, user: newUser } = response.data;
     localStorage.setItem('token', newToken);
@@ -91,9 +91,9 @@ export const AuthProvider = ({ children }) => {
     setToken(newToken);
     setUser(newUser);
     return newUser;
-  };
+  }, []);
 
-  const loginWithToken = async (impersonateToken) => {
+  const loginWithToken = useCallback(async (impersonateToken) => {
     localStorage.setItem('token', impersonateToken);
     setToken(impersonateToken);
     try {
@@ -109,26 +109,30 @@ export const AuthProvider = ({ children }) => {
       setToken(null);
       return null;
     }
-  };
+  }, []);
 
-  const logout = () => {
+  const logout = useCallback(() => {
     localStorage.removeItem('token');
     localStorage.removeItem('cached_user');
     setToken(null);
     setUser(null);
-  };
+  }, []);
 
-  const updateProfile = async (updates) => {
+  const updateProfile = useCallback(async (updates) => {
     const response = await axios.put(`${API}/auth/profile`, updates, {
       headers: { Authorization: `Bearer ${token}` }
     });
     setUser(response.data);
     localStorage.setItem('cached_user', JSON.stringify(response.data));
     return response.data;
-  };
+  }, [token]);
+
+  const value = useMemo(() => ({
+    user, token, loading, login, loginWithToken, register, logout, updateProfile
+  }), [user, token, loading, login, loginWithToken, register, logout, updateProfile]);
 
   return (
-    <AuthContext.Provider value={{ user, token, loading, login, loginWithToken, register, logout, updateProfile }}>
+    <AuthContext.Provider value={value}>
       {children}
     </AuthContext.Provider>
   );

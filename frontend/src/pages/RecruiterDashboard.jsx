@@ -293,10 +293,11 @@ export default function RecruiterDashboard() {
                   onClick={() => setSelectedCandidate(app)}
                 >
                   <div className="flex items-center gap-3 mb-3">
-                    <img 
+                    <img
                       src={getPhotoUrl(app.seeker_photo || app.seeker_avatar, app.seeker_id)}
                       alt={app.seeker_name}
                       className="w-14 h-14 rounded-full border-2 border-primary/50 object-cover"
+                      loading="lazy"
                     />
                     {app.action === 'superlike' && (
                       <div className="absolute top-3 right-3">
@@ -367,10 +368,11 @@ export default function RecruiterDashboard() {
                       className="flex items-start gap-4 flex-1 cursor-pointer"
                       onClick={() => handleViewApplications(job)}
                     >
-                      <img 
+                      <img
                         src={job.company_logo}
                         alt={job.company}
                         className="w-14 h-14 rounded-xl object-cover"
+                        loading="lazy"
                       />
                       <div>
                         <h3 className="font-bold font-['Outfit'] text-lg">{job.title}</h3>
