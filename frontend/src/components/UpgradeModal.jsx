@@ -167,7 +167,7 @@ export default function UpgradeModal({ open, onClose, onSubscribed, trigger, hig
             animate={{ y: 0, opacity: 1 }}
             exit={{ y: '100%', opacity: 0 }}
             transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-            className="relative w-full max-w-md max-h-[85vh] overflow-y-auto bg-background rounded-3xl"
+            className="relative w-full max-w-md max-h-[80vh] overflow-y-auto bg-background rounded-3xl mb-20 sm:mb-0"
           >
             {/* Close button */}
             <button

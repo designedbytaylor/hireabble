@@ -333,7 +333,7 @@ function App() {
         <AuthProvider>
           <AdminAuthProvider>
             <AppRoutes />
-            <Toaster position="top-center" richColors />
+            <Toaster position="bottom-center" richColors style={{ bottom: '80px' }} />
           </AdminAuthProvider>
         </AuthProvider>
       </BrowserRouter>
