@@ -65,6 +65,12 @@ export default function SeekerDashboard() {
 
   // Batched dashboard: single API call replaces 6+ separate requests
   const fetchDashboard = async (retry = 0) => {
+    // Wait for any in-flight swipes to finish so DB counts are accurate
+    if (globalPendingSwipes.length > 0) {
+      await Promise.allSettled(globalPendingSwipes);
+      globalPendingSwipes = [];
+      pendingSwipesRef.current = globalPendingSwipes;
+    }
     setLoading(true);
     try {
       const response = await axios.get(`${API}/dashboard`, {
@@ -77,6 +83,11 @@ export default function SeekerDashboard() {
       setStats(data.stats);
       setProfileComplete(data.completeness.is_complete);
       setSuperLikesRemaining(data.superlikes.remaining);
+      // Seed swipedIdsRef with all jobs the user has already swiped on (from DB)
+      // so they can't be double-swiped if they reappear from prefetch/cache
+      if (data.swiped_job_ids) {
+        swipedIdsRef.current = new Set(data.swiped_job_ids);
+      }
     } catch (error) {
       // Auto-retry once on timeout/network errors before falling back
       if (retry < 1 && (!error.response || error.code === 'ECONNABORTED')) {
@@ -103,18 +114,9 @@ export default function SeekerDashboard() {
     }
   };
 
-  // On mount: wait for any in-flight swipes from a previous navigation to
-  // finish before fetching the dashboard, so the server returns accurate counts.
+  // On mount: fetch dashboard (pending swipes are awaited inside fetchDashboard)
   useEffect(() => {
-    const init = async () => {
-      if (globalPendingSwipes.length > 0) {
-        await Promise.allSettled(globalPendingSwipes);
-        globalPendingSwipes = [];
-        pendingSwipesRef.current = globalPendingSwipes;
-      }
-      fetchDashboard();
-    };
-    init();
+    fetchDashboard();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
