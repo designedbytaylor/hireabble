@@ -624,7 +624,7 @@ function MessageContent({ content }) {
   if (!content) return null;
 
   // Video message: [Video: URL]
-  const videoMatch = content.match(/\[Video: (https?:\/\/[^\]]+)\]/);
+  const videoMatch = content.match(/\[Video: (https?:\/\/[^\]]+|\/uploads\/[^\]]+)\]/);
   if (videoMatch) {
     const videoUrl = videoMatch[1];
     const rest = content.replace(/\[Video: https?:\/\/[^\]]+\]\s*/, '').trim();

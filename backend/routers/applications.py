@@ -3,6 +3,7 @@ Applications/Swipe routes for Hireabble API
 """
 from fastapi import APIRouter, HTTPException, Depends
 from typing import List
+import os
 from datetime import datetime, timezone, timedelta
 import uuid
 import asyncio
@@ -17,6 +18,18 @@ from cache import invalidate_user
 router = APIRouter(tags=["Applications"])
 
 DAILY_SUPERLIKE_LIMIT = 3
+
+def _get_seeker_daily_superlike_limit(user: dict) -> int:
+    """Return the daily super like limit based on seeker subscription tier."""
+    sub = user.get("subscription", {})
+    now = datetime.now(timezone.utc).isoformat()
+    if sub.get("status") == "active" and sub.get("period_end", "") >= now:
+        tier = sub.get("tier_id", "")
+        if tier == "seeker_premium":
+            return 999  # effectively unlimited
+        elif tier == "seeker_plus":
+            return 10
+    return DAILY_SUPERLIKE_LIMIT
 
 # ==================== EMAIL TEMPLATES ====================
 
@@ -41,7 +54,7 @@ def get_match_email_html(job_title: str, company: str, other_name: str, is_seeke
         </div>
         <div style="padding: 30px 20px; text-align: center;">
             <p style="color: #333; font-size: 16px; margin-bottom: 25px;">{message}</p>
-            <a href="#" style="display: inline-block; background: #6366f1; color: white; padding: 14px 40px; border-radius: 25px; text-decoration: none; font-weight: bold;">{cta_text}</a>
+            <a href="{os.environ.get('FRONTEND_URL', 'https://hireabble.com')}/matches" style="display: inline-block; background: #6366f1; color: white; padding: 14px 40px; border-radius: 25px; text-decoration: none; font-weight: bold;">{cta_text}</a>
         </div>
         <div style="border-top: 1px solid #eee; padding-top: 20px; text-align: center; color: #999; font-size: 12px;">
             <p>Hireabble - Your career starts with a swipe</p>
@@ -71,11 +84,12 @@ async def get_remaining_superlikes(current_user: dict = Depends(get_current_user
         }
     })
 
-    # Get purchased super likes balance
-    user = await db.users.find_one({"id": current_user["id"]}, {"_id": 0, "seeker_purchased_superlikes": 1})
+    # Get purchased super likes balance and subscription
+    user = await db.users.find_one({"id": current_user["id"]}, {"_id": 0, "seeker_purchased_superlikes": 1, "subscription": 1})
     purchased = (user or {}).get("seeker_purchased_superlikes", 0)
+    daily_limit = _get_seeker_daily_superlike_limit(user or {})
 
-    free_remaining = max(0, DAILY_SUPERLIKE_LIMIT - superlikes_today)
+    free_remaining = max(0, daily_limit - superlikes_today)
 
     return {
         "remaining": free_remaining + purchased,
@@ -243,8 +257,8 @@ async def recruiter_swipe_candidate(
             "action": "superlike",
             "created_at": {"$gte": today_start.isoformat(), "$lt": today_end.isoformat()}
         })
-        user_data = await db.users.find_one({"id": current_user["id"]}, {"_id": 0, "recruiter_purchased_superswipes": 1, "subscription": 1})
-        purchased = (user_data or {}).get("recruiter_purchased_superswipes", 0)
+        user_data = await db.users.find_one({"id": current_user["id"]}, {"_id": 0, "recruiter_super_swipes": 1, "subscription": 1})
+        purchased = (user_data or {}).get("recruiter_super_swipes", 0)
 
         sub = (user_data or {}).get("subscription", {})
         now = datetime.now(timezone.utc).isoformat()
@@ -262,7 +276,7 @@ async def recruiter_swipe_candidate(
         if free_remaining <= 0 and purchased > 0:
             await db.users.update_one(
                 {"id": current_user["id"]},
-                {"$inc": {"recruiter_purchased_superswipes": -1}}
+                {"$inc": {"recruiter_super_swipes": -1}}
             )
 
     seeker = await db.users.find_one({"id": seeker_id}, {"_id": 0, "password": 0})
@@ -363,9 +377,10 @@ async def swipe(action: SwipeAction, current_user: dict = Depends(get_current_us
             }
         })
 
-        user_data = await db.users.find_one({"id": current_user["id"]}, {"_id": 0, "seeker_purchased_superlikes": 1})
+        user_data = await db.users.find_one({"id": current_user["id"]}, {"_id": 0, "seeker_purchased_superlikes": 1, "subscription": 1})
         purchased = (user_data or {}).get("seeker_purchased_superlikes", 0)
-        free_remaining = max(0, DAILY_SUPERLIKE_LIMIT - superlikes_today)
+        daily_limit = _get_seeker_daily_superlike_limit(user_data or {})
+        free_remaining = max(0, daily_limit - superlikes_today)
 
         if free_remaining <= 0 and purchased <= 0:
             raise HTTPException(
@@ -594,7 +609,11 @@ async def respond_to_application(response: RecruiterAction, current_user: dict =
     
     if not application:
         raise HTTPException(status_code=404, detail="Application not found")
-    
+
+    # Idempotency: don't process if already responded
+    if application.get("recruiter_action") is not None:
+        return {"message": f"Application already {application['recruiter_action']}ed", "is_matched": application.get("is_matched", False)}
+
     is_matched = response.action == "accept"
     
     await db.applications.update_one(

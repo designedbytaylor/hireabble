@@ -131,6 +131,11 @@ export default function SeekerDashboard() {
       if (filterParams.location) params.append('location', filterParams.location);
       if (filterParams.category) params.append('category', filterParams.category);
       if (filterParams.employment_type) params.append('employment_type', filterParams.employment_type);
+      // When appending, skip jobs we already have (backend excludes swiped, so skip loaded-but-unswiped)
+      if (append) {
+        const unswipedCount = jobs.length - currentIndex;
+        if (unswipedCount > 0) params.append('skip', String(unswipedCount));
+      }
 
       const url = `${API}/jobs${params.toString() ? `?${params.toString()}` : ''}`;
       const response = await axios.get(url, {
