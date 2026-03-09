@@ -46,6 +46,7 @@ export default function SeekerDashboard() {
   const [exitingCards, setExitingCards] = useState([]); // cards animating off-screen
   const fetchingMoreRef = useRef(false);
   const swipedIdsRef = useRef(new Set());
+  const pendingSwipesRef = useRef([]); // track in-flight swipe API calls
   const [filters, setFilters] = useState({
     job_type: '',
     experience_level: '',
@@ -211,7 +212,7 @@ export default function SeekerDashboard() {
     }
 
     // Fire-and-forget API call — don't block the UI, no toasts
-    axios.post(`${API}/swipe`,
+    const swipePromise = axios.post(`${API}/swipe`,
       { job_id: job.id, action },
       { headers: { Authorization: `Bearer ${token}` } }
     ).then(response => {
@@ -232,7 +233,10 @@ export default function SeekerDashboard() {
           toast.error(detail);
         }
       }
+    }).finally(() => {
+      pendingSwipesRef.current = pendingSwipesRef.current.filter(p => p !== swipePromise);
     });
+    pendingSwipesRef.current.push(swipePromise);
 
     // Auto-fetch more jobs when running low (5 cards buffer) - endless Tinder-style
     if (nextIndex >= jobs.length - 5) {
@@ -509,7 +513,11 @@ export default function SeekerDashboard() {
                   </Button>
                 )}
                 <Button
-                  onClick={() => {
+                  onClick={async () => {
+                    // Wait for any in-flight swipes to persist before refreshing
+                    if (pendingSwipesRef.current.length > 0) {
+                      await Promise.allSettled(pendingSwipesRef.current);
+                    }
                     swipedIdsRef.current.clear();
                     fetchDashboard();
                   }}
