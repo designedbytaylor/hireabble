@@ -990,18 +990,21 @@ async def seed_test_data(body: dict = {}, admin: dict = Depends(get_current_admi
     ).to_list(1000)
     old_ids = [u["id"] for u in old_test_users]
     if old_ids:
-        await db.users.delete_many({"id": {"$in": old_ids}})
-        await db.applications.delete_many({"$or": [{"seeker_id": {"$in": old_ids}}, {"recruiter_id": {"$in": old_ids}}]})
-        await db.jobs.delete_many({"recruiter_id": {"$in": old_ids}})
-        await db.matches.delete_many({"$or": [{"seeker_id": {"$in": old_ids}}, {"recruiter_id": {"$in": old_ids}}]})
-        await db.messages.delete_many({"$or": [{"sender_id": {"$in": old_ids}}, {"receiver_id": {"$in": old_ids}}]})
-        await db.notifications.delete_many({"user_id": {"$in": old_ids}})
-        await db.recruiter_swipes.delete_many({"$or": [{"recruiter_id": {"$in": old_ids}}, {"seeker_id": {"$in": old_ids}}]})
-        await db.interviews.delete_many({"$or": [{"seeker_id": {"$in": old_ids}}, {"recruiter_id": {"$in": old_ids}}]})
+        await asyncio.gather(
+            db.users.delete_many({"id": {"$in": old_ids}}),
+            db.applications.delete_many({"$or": [{"seeker_id": {"$in": old_ids}}, {"recruiter_id": {"$in": old_ids}}]}),
+            db.jobs.delete_many({"recruiter_id": {"$in": old_ids}}),
+            db.matches.delete_many({"$or": [{"seeker_id": {"$in": old_ids}}, {"recruiter_id": {"$in": old_ids}}]}),
+            db.messages.delete_many({"$or": [{"sender_id": {"$in": old_ids}}, {"receiver_id": {"$in": old_ids}}]}),
+            db.notifications.delete_many({"user_id": {"$in": old_ids}}),
+            db.recruiter_swipes.delete_many({"$or": [{"recruiter_id": {"$in": old_ids}}, {"seeker_id": {"$in": old_ids}}]}),
+            db.interviews.delete_many({"$or": [{"seeker_id": {"$in": old_ids}}, {"recruiter_id": {"$in": old_ids}}]}),
+        )
         for uid in old_ids:
             invalidate_user(uid)
 
-    # Create seekers with random unique names
+    # Build all documents in memory first, then batch-insert for speed
+    seeker_docs = []
     for i in range(num_seekers):
         profile = _SEEKER_PROFILES[i % len(_SEEKER_PROFILES)]
         name = _generate_unique_name(used_names)
@@ -1024,10 +1027,9 @@ async def seed_test_data(body: dict = {}, admin: dict = Depends(get_current_admi
             "onboarding_complete": True, "push_subscription": None,
             "created_at": (datetime.now(timezone.utc) - timedelta(days=random.randint(1, 60))).isoformat(),
         }
-        await db.users.insert_one(user_doc)
-        created_seekers.append(user_doc)
+        seeker_docs.append(user_doc)
 
-    # Create recruiters with random unique company names
+    recruiter_docs = []
     for i in range(num_recruiters):
         company = _generate_unique_company(used_companies)
         recruiter_name = _generate_unique_name(used_names)
@@ -1049,10 +1051,17 @@ async def seed_test_data(body: dict = {}, admin: dict = Depends(get_current_admi
             "push_subscription": None,
             "created_at": (datetime.now(timezone.utc) - timedelta(days=random.randint(1, 90))).isoformat(),
         }
-        await db.users.insert_one(user_doc)
-        created_recruiters.append(user_doc)
+        recruiter_docs.append(user_doc)
 
-    # Create jobs
+    # Batch-insert seekers and recruiters in parallel
+    all_user_docs = seeker_docs + recruiter_docs
+    if all_user_docs:
+        await db.users.insert_many(all_user_docs)
+    created_seekers = seeker_docs
+    created_recruiters = recruiter_docs
+
+    # Build job documents and batch-insert
+    job_docs = []
     for recruiter in created_recruiters:
         available_jobs = list(SAMPLE_JOBS)
         random.shuffle(available_jobs)
@@ -1072,11 +1081,14 @@ async def seed_test_data(body: dict = {}, admin: dict = Depends(get_current_admi
                 "is_active": True,
                 "created_at": (datetime.now(timezone.utc) - timedelta(days=random.randint(0, 30))).isoformat(),
             }
-            await db.jobs.insert_one(job_doc)
-            created_jobs.append(job_doc)
+            job_docs.append(job_doc)
+    if job_docs:
+        await db.jobs.insert_many(job_docs)
+    created_jobs = job_docs
 
     # Only create applications/matches if explicitly requested (default: fresh accounts at 0)
     if apps_per_seeker > 0 and body.get("create_applications", False):
+        app_docs = []
         for seeker in created_seekers:
             available_jobs = list(created_jobs)
             random.shuffle(available_jobs)
@@ -1084,7 +1096,7 @@ async def seed_test_data(body: dict = {}, admin: dict = Depends(get_current_admi
                 job = available_jobs[j]
                 app_id = str(uuid.uuid4())
                 action = random.choices(["like", "superlike"], weights=[0.7, 0.3])[0]
-                app_doc = {
+                app_docs.append({
                     "id": app_id,
                     "job_id": job["id"],
                     "recruiter_id": job["recruiter_id"],
@@ -1104,28 +1116,26 @@ async def seed_test_data(body: dict = {}, admin: dict = Depends(get_current_admi
                     "is_matched": False,
                     "recruiter_action": None,
                     "created_at": (datetime.now(timezone.utc) - timedelta(days=random.randint(0, 14))).isoformat(),
-                }
-                await db.applications.insert_one(app_doc)
-                created_applications.append(app_doc)
+                })
+        if app_docs:
+            await db.applications.insert_many(app_docs)
+        created_applications = app_docs
 
-        # Create some matches (randomly accept some applications)
+        # Create some matches — use in-memory job lookup instead of per-app DB queries
+        jobs_by_id = {j["id"]: j for j in created_jobs}
         apps_to_match = random.sample(
             created_applications,
             min(len(created_applications) // 3, len(created_applications))
         )
+        match_docs = []
+        match_app_ids = []
         for app in apps_to_match:
-            job = await db.jobs.find_one({"id": app["job_id"]}, {"_id": 0})
+            job = jobs_by_id.get(app["job_id"])
             if not job:
                 continue
-
-            await db.applications.update_one(
-                {"id": app["id"]},
-                {"$set": {"is_matched": True, "recruiter_action": "accept"}}
-            )
-
-            match_id = str(uuid.uuid4())
-            match_doc = {
-                "id": match_id,
+            match_app_ids.append(app["id"])
+            match_docs.append({
+                "id": str(uuid.uuid4()),
                 "job_id": app["job_id"],
                 "job_title": job.get("title", ""),
                 "company": job.get("company", ""),
@@ -1135,9 +1145,16 @@ async def seed_test_data(body: dict = {}, admin: dict = Depends(get_current_admi
                 "recruiter_id": job["recruiter_id"],
                 "recruiter_name": job.get("recruiter_name", ""),
                 "created_at": datetime.now(timezone.utc).isoformat(),
-            }
-            await db.matches.insert_one(match_doc)
-            created_matches.append(match_doc)
+            })
+        if match_app_ids:
+            await asyncio.gather(
+                db.applications.update_many(
+                    {"id": {"$in": match_app_ids}},
+                    {"$set": {"is_matched": True, "recruiter_action": "accept"}}
+                ),
+                db.matches.insert_many(match_docs) if match_docs else asyncio.sleep(0),
+            )
+        created_matches = match_docs
 
     # Invalidate caches for all seeded users so dashboard returns fresh data
     for u in created_seekers + created_recruiters:
@@ -1173,30 +1190,33 @@ async def clear_test_data(admin: dict = Depends(get_current_admin)):
     if not test_user_ids:
         return {"message": "No test data found", "deleted": {}}
 
-    # Delete related data
-    apps_del = await db.applications.delete_many({"$or": [
-        {"seeker_id": {"$in": test_user_ids}},
-        {"recruiter_id": {"$in": test_user_ids}},
-    ]})
-    matches_del = await db.matches.delete_many({"$or": [
-        {"seeker_id": {"$in": test_user_ids}},
-        {"recruiter_id": {"$in": test_user_ids}},
-    ]})
-    jobs_del = await db.jobs.delete_many({"recruiter_id": {"$in": test_user_ids}})
-    interviews_del = await db.interviews.delete_many({"$or": [
-        {"seeker_id": {"$in": test_user_ids}},
-        {"recruiter_id": {"$in": test_user_ids}},
-    ]})
-    messages_del = await db.messages.delete_many({"$or": [
-        {"sender_id": {"$in": test_user_ids}},
-        {"receiver_id": {"$in": test_user_ids}},
-    ]})
-    notif_del = await db.notifications.delete_many({"user_id": {"$in": test_user_ids}})
-    swipes_del = await db.recruiter_swipes.delete_many({"$or": [
-        {"recruiter_id": {"$in": test_user_ids}},
-        {"seeker_id": {"$in": test_user_ids}},
-    ]})
-    users_del = await db.users.delete_many({"id": {"$in": test_user_ids}})
+    # Delete all related data in parallel (independent collections)
+    (apps_del, matches_del, jobs_del, interviews_del, messages_del,
+     notif_del, swipes_del, users_del) = await asyncio.gather(
+        db.applications.delete_many({"$or": [
+            {"seeker_id": {"$in": test_user_ids}},
+            {"recruiter_id": {"$in": test_user_ids}},
+        ]}),
+        db.matches.delete_many({"$or": [
+            {"seeker_id": {"$in": test_user_ids}},
+            {"recruiter_id": {"$in": test_user_ids}},
+        ]}),
+        db.jobs.delete_many({"recruiter_id": {"$in": test_user_ids}}),
+        db.interviews.delete_many({"$or": [
+            {"seeker_id": {"$in": test_user_ids}},
+            {"recruiter_id": {"$in": test_user_ids}},
+        ]}),
+        db.messages.delete_many({"$or": [
+            {"sender_id": {"$in": test_user_ids}},
+            {"receiver_id": {"$in": test_user_ids}},
+        ]}),
+        db.notifications.delete_many({"user_id": {"$in": test_user_ids}}),
+        db.recruiter_swipes.delete_many({"$or": [
+            {"recruiter_id": {"$in": test_user_ids}},
+            {"seeker_id": {"$in": test_user_ids}},
+        ]}),
+        db.users.delete_many({"id": {"$in": test_user_ids}}),
+    )
 
     # Invalidate caches for all deleted users
     for uid in test_user_ids:

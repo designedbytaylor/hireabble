@@ -290,6 +290,13 @@ export default function SeekerDashboard() {
         return;
       }
 
+      // "Job not found" means the job was deleted (e.g. after a reseed) while
+      // the card was still loaded — silently skip and refresh the feed
+      if (status === 404 && detail.toLowerCase().includes('job not found')) {
+        fetchDashboard();
+        return;
+      }
+
       // Retry once on server/network errors (500, timeout, network failure)
       if (retryCount < 1 && (!status || status >= 500 || isTimeout)) {
         return new Promise(resolve => setTimeout(resolve, 1500)).then(() => sendSwipe(retryCount + 1));
