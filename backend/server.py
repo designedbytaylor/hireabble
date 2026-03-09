@@ -8,6 +8,9 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Request, Response
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.cors import CORSMiddleware
 from starlette.middleware.gzip import GZipMiddleware
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
 from pathlib import Path
 from datetime import datetime, timezone
 import json
@@ -20,12 +23,17 @@ from database import db, manager, UPLOADS_DIR, logger, JWT_SECRET, JWT_ALGORITHM
 # Import routers
 from routers import auth, jobs, applications, matches, notifications, uploads, stats, admin, interviews, payments
 
+# Rate limiter — uses remote IP address by default
+limiter = Limiter(key_func=get_remote_address, default_limits=["120/minute"])
+
 # Create the main app
 app = FastAPI(
     title="Hireabble API",
     description="A Tinder-style job matching platform API",
     version="2.0.0"
 )
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 # Mount static files for uploads
 app.mount("/uploads", StaticFiles(directory=str(UPLOADS_DIR)), name="uploads")

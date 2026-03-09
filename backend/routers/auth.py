@@ -1,7 +1,7 @@
 """
 Authentication routes for Hireabble API
 """
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, Request
 from datetime import datetime, timezone, timedelta
 import uuid
 import asyncio
@@ -24,12 +24,18 @@ GOOGLE_CLIENT_SECRET = os.environ.get('GOOGLE_CLIENT_SECRET', '')
 GITHUB_CLIENT_ID = os.environ.get('GITHUB_CLIENT_ID', '')
 GITHUB_CLIENT_SECRET = os.environ.get('GITHUB_CLIENT_SECRET', '')
 
+from slowapi import Limiter
+from slowapi.util import get_remote_address
+
+limiter = Limiter(key_func=get_remote_address)
+
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
 # ==================== REGISTRATION & LOGIN ====================
 
 @router.post("/register")
-async def register(user: UserCreate):
+@limiter.limit("10/minute")
+async def register(user: UserCreate, request: Request):
     try:
         logger.info(f"Registration attempt for email: {user.email}")
 
@@ -88,7 +94,8 @@ async def register(user: UserCreate):
         raise HTTPException(status_code=500, detail=f"Registration error: {str(e)}")
 
 @router.post("/login")
-async def login(credentials: UserLogin):
+@limiter.limit("15/minute")
+async def login(credentials: UserLogin, request: Request):
     user = await db.users.find_one({"email": credentials.email})
     if not user:
         raise HTTPException(status_code=401, detail="Invalid credentials")

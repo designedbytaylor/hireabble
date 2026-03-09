@@ -24,9 +24,16 @@ load_dotenv(ROOT_DIR / '.env')
 UPLOADS_DIR = ROOT_DIR / "uploads"
 UPLOADS_DIR.mkdir(exist_ok=True)
 
-# MongoDB connection
+# MongoDB connection with connection pool tuning
 mongo_url = os.environ['MONGO_URL']
-client = AsyncIOMotorClient(mongo_url)
+client = AsyncIOMotorClient(
+    mongo_url,
+    maxPoolSize=200,          # max connections per worker (default 100)
+    minPoolSize=10,           # keep 10 warm connections
+    maxIdleTimeMS=45000,      # close idle connections after 45s
+    connectTimeoutMS=5000,    # 5s connect timeout
+    serverSelectionTimeoutMS=5000,
+)
 db = client[os.environ['DB_NAME']]
 
 # JWT Configuration
@@ -95,16 +102,21 @@ def create_token(user_id: str, role: str) -> str:
     return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
 
 async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    from cache import get_cached_user, set_cached_user
     try:
         token = credentials.credentials
         payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
         user_id = payload.get("user_id")
         if not user_id:
             raise HTTPException(status_code=401, detail="Invalid token")
-        
-        user = await db.users.find_one({"id": user_id}, {"_id": 0, "password": 0})
+
+        # Check cache first to avoid DB hit on every request
+        user = get_cached_user(user_id)
         if not user:
-            raise HTTPException(status_code=401, detail="User not found")
+            user = await db.users.find_one({"id": user_id}, {"_id": 0, "password": 0})
+            if not user:
+                raise HTTPException(status_code=401, detail="User not found")
+            set_cached_user(user_id, user)
 
         # Block banned/suspended users from making API calls
         if user.get("status") == "banned":
