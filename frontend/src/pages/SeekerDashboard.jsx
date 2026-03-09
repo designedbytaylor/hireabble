@@ -29,6 +29,61 @@ import UpgradeModal from '../components/UpgradeModal';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
+// ─── Persistent swipe storage (survives page reloads) ─────────────────────
+// Tinder-style: all swipe state lives in localStorage so a page refresh never
+// loses data.  The API is the source of truth; localStorage is the fast cache.
+
+const STORAGE_KEYS = {
+  SWIPED_IDS: 'hireabble_swiped_ids',
+  STATS: 'hireabble_swipe_stats',
+  SWIPE_QUEUE: 'hireabble_swipe_queue',   // failed swipes waiting to retry
+  SUPER_LIKES: 'hireabble_superlikes_remaining',
+};
+
+function loadSwipedIds() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEYS.SWIPED_IDS);
+    return raw ? new Set(JSON.parse(raw)) : new Set();
+  } catch { return new Set(); }
+}
+
+function saveSwipedIds(ids) {
+  try { localStorage.setItem(STORAGE_KEYS.SWIPED_IDS, JSON.stringify([...ids])); } catch { /* quota */ }
+}
+
+function loadCachedStats() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEYS.STATS);
+    return raw ? JSON.parse(raw) : null;
+  } catch { return null; }
+}
+
+function saveCachedStats(stats) {
+  try { localStorage.setItem(STORAGE_KEYS.STATS, JSON.stringify(stats)); } catch { /* quota */ }
+}
+
+function loadSwipeQueue() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEYS.SWIPE_QUEUE);
+    return raw ? JSON.parse(raw) : [];
+  } catch { return []; }
+}
+
+function saveSwipeQueue(queue) {
+  try { localStorage.setItem(STORAGE_KEYS.SWIPE_QUEUE, JSON.stringify(queue)); } catch { /* quota */ }
+}
+
+function loadCachedSuperLikes() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEYS.SUPER_LIKES);
+    return raw != null ? parseInt(raw, 10) : 0;
+  } catch { return 0; }
+}
+
+function saveCachedSuperLikes(n) {
+  try { localStorage.setItem(STORAGE_KEYS.SUPER_LIKES, String(n)); } catch { /* quota */ }
+}
+
 // Module-level: persists across component mounts so in-flight swipes
 // from a previous navigation are not lost when the component remounts.
 let globalPendingSwipes = [];
@@ -39,18 +94,22 @@ export default function SeekerDashboard() {
   const [jobs, setJobs] = useState([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [stats, setStats] = useState({ applications_sent: 0, super_likes_used: 0, matches: 0 });
+  // Initialize stats from localStorage — prevents "flash of zeros"
+  const [stats, setStats] = useState(() => loadCachedStats() || { applications_sent: 0, super_likes_used: 0, matches: 0 });
   const [showMatch, setShowMatch] = useState(false);
   const [matchData, setMatchData] = useState(null);
   const [expandedCard, setExpandedCard] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
   const [profileComplete, setProfileComplete] = useState(false);
-  const [superLikesRemaining, setSuperLikesRemaining] = useState(0);
+  const [superLikesRemaining, setSuperLikesRemaining] = useState(() => loadCachedSuperLikes());
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [exitingCards, setExitingCards] = useState([]); // cards animating off-screen
   const fetchingMoreRef = useRef(false);
-  const swipedIdsRef = useRef(new Set());
+  // Seed from localStorage so swiped jobs stay excluded even after F5
+  const swipedIdsRef = useRef(loadSwipedIds());
   const pendingSwipesRef = useRef(globalPendingSwipes); // track in-flight swipe API calls
+  const tokenRef = useRef(token); // stable ref for sendBeacon / beforeunload
+  tokenRef.current = token;
   const [filters, setFilters] = useState({
     job_type: '',
     experience_level: '',
@@ -63,8 +122,31 @@ export default function SeekerDashboard() {
   const [activeFiltersCount, setActiveFiltersCount] = useState(0);
   const [detectingLocation, setDetectingLocation] = useState(false);
 
-  // Batched dashboard: single API call replaces 6+ separate requests
-  const fetchDashboard = async (retry = 0) => {
+  // ─── Retry queue: flush any swipes that failed on a previous page load ───
+  const flushSwipeQueue = useCallback(async () => {
+    const queue = loadSwipeQueue();
+    if (queue.length === 0) return;
+
+    const remaining = [];
+    for (const item of queue) {
+      try {
+        await axios.post(`${API}/swipe`, { job_id: item.job_id, action: item.action }, {
+          headers: { Authorization: `Bearer ${tokenRef.current}` }, timeout: 10000,
+        });
+      } catch (err) {
+        const status = err.response?.status;
+        const detail = (err.response?.data?.detail || '').toLowerCase();
+        // 400 "already swiped" or 404 "job not found" = discard, not retriable
+        if (status === 400 && detail.includes('already swiped')) continue;
+        if (status === 404) continue;
+        remaining.push(item); // keep for next attempt
+      }
+    }
+    saveSwipeQueue(remaining);
+  }, []);
+
+  // ─── Batched dashboard: single API call replaces 6+ separate requests ───
+  const fetchDashboard = useCallback(async (retry = 0) => {
     // Wait for any in-flight swipes to finish so DB counts are accurate
     if (globalPendingSwipes.length > 0) {
       await Promise.allSettled(globalPendingSwipes);
@@ -74,20 +156,31 @@ export default function SeekerDashboard() {
     setLoading(true);
     try {
       const response = await axios.get(`${API}/dashboard`, {
-        headers: { Authorization: `Bearer ${token}` },
-        timeout: 15000
+        headers: { Authorization: `Bearer ${tokenRef.current}` },
+        timeout: 15000,
       });
       const data = response.data;
-      setJobs(data.jobs);
+
+      // Merge server swiped IDs with any we already have locally (in case
+      // the server write for a recent swipe hasn't propagated yet)
+      if (data.swiped_job_ids) {
+        const merged = new Set([...swipedIdsRef.current, ...data.swiped_job_ids]);
+        swipedIdsRef.current = merged;
+        saveSwipedIds(merged);
+      }
+
+      // Filter out any jobs the client already knows are swiped (handles the
+      // race where localStorage has an ID the server query hasn't seen yet)
+      const safeJobs = data.jobs.filter(j => !swipedIdsRef.current.has(j.id));
+      setJobs(safeJobs);
       setCurrentIndex(0);
+
+      // Stats: use server values (source of truth) and cache locally
       setStats(data.stats);
+      saveCachedStats(data.stats);
       setProfileComplete(data.completeness.is_complete);
       setSuperLikesRemaining(data.superlikes.remaining);
-      // Seed swipedIdsRef with all jobs the user has already swiped on (from DB)
-      // so they can't be double-swiped if they reappear from prefetch/cache
-      if (data.swiped_job_ids) {
-        swipedIdsRef.current = new Set(data.swiped_job_ids);
-      }
+      saveCachedSuperLikes(data.superlikes.remaining);
     } catch (error) {
       // Auto-retry once on timeout/network errors before falling back
       if (retry < 1 && (!error.response || error.code === 'ECONNABORTED')) {
@@ -96,27 +189,31 @@ export default function SeekerDashboard() {
       console.error('Failed to fetch dashboard:', error);
       // Fallback: try fetching stats and jobs separately so UI isn't stuck at zeros
       try {
-        const opts = { headers: { Authorization: `Bearer ${token}` }, timeout: 10000 };
+        const opts = { headers: { Authorization: `Bearer ${tokenRef.current}` }, timeout: 10000 };
         const [jobsRes, statsRes, slRes] = await Promise.all([
           axios.get(`${API}/jobs`, opts),
           axios.get(`${API}/stats`, opts),
           axios.get(`${API}/superlikes/remaining`, opts),
         ]);
-        setJobs(jobsRes.data);
+        // Exclude locally-known swiped jobs
+        const safeJobs = jobsRes.data.filter(j => !swipedIdsRef.current.has(j.id));
+        setJobs(safeJobs);
         setCurrentIndex(0);
         setStats(statsRes.data);
+        saveCachedStats(statsRes.data);
         setSuperLikesRemaining(slRes.data.remaining);
+        saveCachedSuperLikes(slRes.data.remaining);
       } catch (fallbackErr) {
         console.error('Fallback fetch also failed:', fallbackErr);
       }
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  // On mount: fetch dashboard (pending swipes are awaited inside fetchDashboard)
+  // On mount: flush retry queue then fetch dashboard
   useEffect(() => {
-    fetchDashboard();
+    flushSwipeQueue().then(() => fetchDashboard());
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -132,7 +229,11 @@ export default function SeekerDashboard() {
         try {
           const data = JSON.parse(event.data);
           if (data.type === 'new_match' && data.match) {
-            setStats(prev => ({ ...prev, matches: prev.matches + 1 }));
+            setStats(prev => {
+              const next = { ...prev, matches: prev.matches + 1 };
+              saveCachedStats(next);
+              return next;
+            });
             setMatchData(data.match);
             setShowMatch(true);
           }
@@ -143,9 +244,24 @@ export default function SeekerDashboard() {
     return () => { if (ws) ws.close(); };
   }, [token]);
 
-  // Warn user before closing the tab/window if swipes are still saving
+  // sendBeacon fallback: if the user closes the tab, fire any queued swipes
+  // via sendBeacon (reliable even during page unload)
   useEffect(() => {
     const handleBeforeUnload = (e) => {
+      // Use sendBeacon for any pending swipes in the retry queue
+      const queue = loadSwipeQueue();
+      if (queue.length > 0 && navigator.sendBeacon) {
+        for (const item of queue) {
+          try {
+            const payload = JSON.stringify({ job_id: item.job_id, action: item.action });
+            navigator.sendBeacon(
+              `${API}/swipe/beacon?token=${encodeURIComponent(tokenRef.current)}`,
+              new Blob([payload], { type: 'application/json' })
+            );
+          } catch { /* best effort */ }
+        }
+      }
+      // Warn if there are still in-flight swipes
       if (pendingSwipesRef.current.length > 0) {
         e.preventDefault();
         e.returnValue = '';
@@ -162,17 +278,6 @@ export default function SeekerDashboard() {
     ).length;
     setActiveFiltersCount(count);
   }, [filters]);
-
-  const fetchSuperLikesRemaining = async () => {
-    try {
-      const response = await axios.get(`${API}/superlikes/remaining`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      setSuperLikesRemaining(response.data.remaining);
-    } catch (error) {
-      console.error('Failed to fetch super likes:', error);
-    }
-  };
 
   const fetchJobs = async (filterParams = filters, append = false) => {
     if (!append) setLoading(true);
@@ -201,11 +306,14 @@ export default function SeekerDashboard() {
       if (append) {
         setJobs(prev => {
           const existingIds = new Set(prev.map(j => j.id));
-          const newJobs = response.data.filter(j => !existingIds.has(j.id));
+          // Also exclude any jobs the client already swiped on
+          const newJobs = response.data.filter(j => !existingIds.has(j.id) && !swipedIdsRef.current.has(j.id));
           return [...prev, ...newJobs];
         });
       } else {
-        setJobs(response.data);
+        // Exclude locally-known swiped jobs (handles race with server)
+        const safeJobs = response.data.filter(j => !swipedIdsRef.current.has(j.id));
+        setJobs(safeJobs);
         setCurrentIndex(0);
       }
     } catch (error) {
@@ -251,6 +359,8 @@ export default function SeekerDashboard() {
     // Prevent double-swiping the same job
     if (swipedIdsRef.current.has(job.id)) return;
     swipedIdsRef.current.add(job.id);
+    // Persist to localStorage immediately — survives F5
+    saveSwipedIds(swipedIdsRef.current);
 
     // Advance index IMMEDIATELY — next card is already visible in the stack
     const nextIndex = currentIndex + 1;
@@ -267,10 +377,22 @@ export default function SeekerDashboard() {
 
     // Optimistically update stats immediately so UI feels instant
     if (action === 'like') {
-      setStats(prev => ({ ...prev, applications_sent: prev.applications_sent + 1 }));
+      setStats(prev => {
+        const next = { ...prev, applications_sent: prev.applications_sent + 1 };
+        saveCachedStats(next);
+        return next;
+      });
     } else if (action === 'superlike') {
-      setStats(prev => ({ ...prev, super_likes_used: prev.super_likes_used + 1 }));
-      setSuperLikesRemaining(prev => Math.max(0, prev - 1));
+      setStats(prev => {
+        const next = { ...prev, super_likes_used: prev.super_likes_used + 1 };
+        saveCachedStats(next);
+        return next;
+      });
+      setSuperLikesRemaining(prev => {
+        const next = Math.max(0, prev - 1);
+        saveCachedSuperLikes(next);
+        return next;
+      });
     }
 
     // Fire-and-forget API call — don't block the UI
@@ -280,8 +402,11 @@ export default function SeekerDashboard() {
     ).then(response => {
       if (action === 'superlike' && response.data.remaining_superlikes != null) {
         setSuperLikesRemaining(response.data.remaining_superlikes);
+        saveCachedSuperLikes(response.data.remaining_superlikes);
       }
-      // Match is delivered async via WebSocket — no need to check response.match
+      // Swipe saved successfully — remove from retry queue if present
+      const queue = loadSwipeQueue().filter(q => q.job_id !== job.id);
+      saveSwipeQueue(queue);
     }).catch(error => {
       const status = error.response?.status;
       const detail = error.response?.data?.detail || '';
@@ -292,16 +417,15 @@ export default function SeekerDashboard() {
         return;
       }
 
-      // "Job not found" means the job was deleted (e.g. after a reseed) while
-      // the card was still loaded — silently skip and refresh the feed
+      // "Job not found" means the job was deleted while the card was loaded
       if (status === 404 && detail.toLowerCase().includes('job not found')) {
-        fetchDashboard();
         return;
       }
 
-      // Retry once on server/network errors (500, timeout, network failure)
-      if (retryCount < 1 && (!status || status >= 500 || isTimeout)) {
-        return new Promise(resolve => setTimeout(resolve, 1500)).then(() => sendSwipe(retryCount + 1));
+      // Retry twice on server/network errors (500, timeout, network failure)
+      if (retryCount < 2 && (!status || status >= 500 || isTimeout)) {
+        const delay = 1500 * Math.pow(2, retryCount); // 1.5s, 3s
+        return new Promise(resolve => setTimeout(resolve, delay)).then(() => sendSwipe(retryCount + 1));
       }
 
       // Timeouts after retry: swipe likely saved (DB write happens early), don't alarm the user
@@ -309,13 +433,40 @@ export default function SeekerDashboard() {
         return;
       }
 
+      // All retries exhausted — persist to retry queue so it can be retried
+      // on next page load (Tinder-style offline queue)
+      if (!status || status >= 500) {
+        const queue = loadSwipeQueue();
+        if (!queue.some(q => q.job_id === job.id)) {
+          queue.push({ job_id: job.id, action, ts: Date.now() });
+          saveSwipeQueue(queue);
+        }
+        return; // don't revert stats — the swipe will be retried
+      }
+
       // Revert optimistic stat update on permanent failure (4xx errors)
       if (action === 'like') {
-        setStats(prev => ({ ...prev, applications_sent: Math.max(0, prev.applications_sent - 1) }));
+        setStats(prev => {
+          const next = { ...prev, applications_sent: Math.max(0, prev.applications_sent - 1) };
+          saveCachedStats(next);
+          return next;
+        });
       } else if (action === 'superlike') {
-        setStats(prev => ({ ...prev, super_likes_used: Math.max(0, prev.super_likes_used - 1) }));
-        setSuperLikesRemaining(prev => prev + 1);
+        setStats(prev => {
+          const next = { ...prev, super_likes_used: Math.max(0, prev.super_likes_used - 1) };
+          saveCachedStats(next);
+          return next;
+        });
+        setSuperLikesRemaining(prev => {
+          const next = prev + 1;
+          saveCachedSuperLikes(next);
+          return next;
+        });
       }
+
+      // Also remove from swiped IDs so the job can be re-swiped
+      swipedIdsRef.current.delete(job.id);
+      saveSwipedIds(swipedIdsRef.current);
 
       const msg = detail || 'Failed to save swipe';
       toast.error(msg);
@@ -611,13 +762,15 @@ export default function SeekerDashboard() {
                       globalPendingSwipes = [];
                       pendingSwipesRef.current = [];
                     }
-                    swipedIdsRef.current.clear();
+                    // Also flush retry queue before fetching new jobs
+                    await flushSwipeQueue();
+                    // DO NOT clear swipedIdsRef — swiped jobs must never reappear
                     fetchDashboard();
                   }}
                   className="rounded-full bg-gradient-to-r from-primary to-secondary"
                   data-testid="refresh-jobs-btn"
                 >
-                  Refresh Jobs
+                  Check for New Jobs
                 </Button>
               </div>
             </div>

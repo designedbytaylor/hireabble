@@ -1,9 +1,11 @@
 """
 Applications/Swipe routes for Hireabble API
 """
-from fastapi import APIRouter, HTTPException, Depends
-from typing import List
+from fastapi import APIRouter, HTTPException, Depends, Request, Query
+from typing import List, Optional
 import os
+import json
+import logging
 from datetime import datetime, timezone, timedelta
 import uuid
 import asyncio
@@ -13,7 +15,7 @@ from database import (
     send_system_message,
     SwipeAction, ApplicationResponse, RecruiterAction, MatchResponse
 )
-from cache import invalidate_user
+from cache import invalidate_user, invalidate, stats_cache, cache_key
 
 router = APIRouter(tags=["Applications"])
 
@@ -523,7 +525,23 @@ async def swipe(action: SwipeAction, current_user: dict = Depends(get_current_us
         # Compute remaining from data we already have (no second query!)
         remaining_superlikes = max(0, free_remaining - 1) + purchased
 
-    # ── Phase 2: Insert immediately ───────────────────────────────────
+    # ── Phase 2: Upsert (idempotent — safe for retries) ──────────────
+    # Check if this job was already swiped on (handles retry queue, sendBeacon, etc.)
+    existing = await db.applications.find_one(
+        {"seeker_id": uid, "job_id": action.job_id},
+        {"_id": 0, "id": 1}
+    )
+    if existing:
+        # Already swiped — return success (idempotent), don't create a duplicate
+        # Invalidate caches so dashboard reflects the latest state
+        invalidate(stats_cache, cache_key("stats", uid))
+        return {
+            "message": f"Swiped {action.action}",
+            "application_id": existing["id"],
+            "remaining_superlikes": remaining_superlikes,
+            "match": None,
+        }
+
     application_id = str(uuid.uuid4())
     now = datetime.now(timezone.utc).isoformat()
     application_doc = {
@@ -554,8 +572,18 @@ async def swipe(action: SwipeAction, current_user: dict = Depends(get_current_us
         await db.applications.insert_one(application_doc)
     except Exception as e:
         if "duplicate key" in str(e).lower() or "E11000" in str(e):
-            raise HTTPException(status_code=400, detail="Already swiped on this job")
+            # Race condition: another request beat us — return success (idempotent)
+            invalidate(stats_cache, cache_key("stats", uid))
+            return {
+                "message": f"Swiped {action.action}",
+                "application_id": application_id,
+                "remaining_superlikes": remaining_superlikes,
+                "match": None,
+            }
         raise
+
+    # Invalidate stats cache immediately so the next dashboard fetch gets fresh counts
+    invalidate(stats_cache, cache_key("stats", uid))
 
     # ── Phase 3: Return immediately, process the rest in background ───
     # Match checking + notifications happen async — user sees instant response.
@@ -569,6 +597,89 @@ async def swipe(action: SwipeAction, current_user: dict = Depends(get_current_us
         "remaining_superlikes": remaining_superlikes,
         "match": None,  # match is detected async; delivered via WebSocket
     }
+
+
+# ==================== BEACON SWIPE (page unload) ====================
+
+@router.post("/swipe/beacon")
+async def swipe_beacon(request: Request, token: Optional[str] = Query(None)):
+    """sendBeacon-compatible swipe endpoint.
+
+    sendBeacon cannot set Authorization headers, so the JWT is passed as a
+    query parameter.  This endpoint does a best-effort fire-and-forget save
+    (no response body needed — the page is already closing)."""
+    import jwt as _jwt
+    from database import JWT_SECRET, JWT_ALGORITHM
+
+    if not token:
+        raise HTTPException(status_code=401, detail="Token required")
+
+    try:
+        payload = _jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+        user_id = payload.get("user_id")
+        if not user_id:
+            raise HTTPException(status_code=401, detail="Invalid token")
+    except Exception:
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+    try:
+        body = await request.json()
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid body")
+
+    job_id = body.get("job_id")
+    action_str = body.get("action", "like")
+    if not job_id or action_str not in ("like", "pass", "superlike"):
+        raise HTTPException(status_code=400, detail="Invalid swipe data")
+
+    # Check if already swiped (idempotent)
+    existing = await db.applications.find_one(
+        {"seeker_id": user_id, "job_id": job_id}, {"_id": 1}
+    )
+    if existing:
+        return {"ok": True}
+
+    # Minimal save — no match checking (page is already gone)
+    job = await db.jobs.find_one({"id": job_id}, {"_id": 0, "title": 1, "recruiter_id": 1})
+    if not job:
+        return {"ok": True}  # job deleted, nothing to do
+
+    user = await db.users.find_one({"id": user_id}, {"_id": 0, "password": 0})
+    if not user:
+        return {"ok": True}
+
+    application_doc = {
+        "id": str(uuid.uuid4()),
+        "job_id": job_id,
+        "seeker_id": user_id,
+        "seeker_name": user.get("name", ""),
+        "seeker_title": user.get("title"),
+        "seeker_skills": user.get("skills", []),
+        "seeker_avatar": user.get("avatar"),
+        "seeker_photo": user.get("photo_url"),
+        "seeker_video": user.get("video_url"),
+        "seeker_experience": user.get("experience_years"),
+        "seeker_school": user.get("school"),
+        "seeker_degree": user.get("degree"),
+        "seeker_location": user.get("location"),
+        "seeker_current_employer": user.get("current_employer"),
+        "seeker_bio": user.get("bio"),
+        "job_title": job.get("title", ""),
+        "recruiter_id": job.get("recruiter_id", ""),
+        "action": action_str,
+        "is_matched": False,
+        "recruiter_action": None,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+
+    try:
+        await db.applications.insert_one(application_doc)
+        invalidate(stats_cache, cache_key("stats", user_id))
+    except Exception:
+        pass  # best-effort
+
+    return {"ok": True}
+
 
 # ==================== RECRUITER APPLICATIONS ====================
 
