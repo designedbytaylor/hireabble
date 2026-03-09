@@ -47,7 +47,7 @@ export default function AdminTesting() {
         seekers: 10,
         recruiters: 5,
         jobs_per_recruiter: 2,
-      }, { headers: { Authorization: `Bearer ${token}` } });
+      }, { headers: { Authorization: `Bearer ${token}` }, timeout: 30000 });
       setSeedResult(res.data);
       toast.success('Test data seeded!');
       fetchUsers();
@@ -64,6 +64,7 @@ export default function AdminTesting() {
     try {
       const res = await axios.delete(`${API}/admin/clear-test-data`, {
         headers: { Authorization: `Bearer ${token}` },
+        timeout: 30000,
       });
       toast.success(res.data.message);
       setSeedResult(null);
