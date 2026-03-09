@@ -270,6 +270,23 @@ async def get_jobs(
 
     return jobs
 
+@router.get("/company/{recruiter_id}")
+async def get_company_jobs(recruiter_id: str, current_user: dict = Depends(get_current_user)):
+    """Get active jobs posted by a specific recruiter/company — for seeker browsing"""
+    recruiter = await db.users.find_one(
+        {"id": recruiter_id, "role": "recruiter"},
+        {"_id": 0, "id": 1, "name": 1, "company": 1, "photo_url": 1, "avatar": 1, "location": 1, "bio": 1}
+    )
+    if not recruiter:
+        raise HTTPException(status_code=404, detail="Company not found")
+
+    jobs = await db.jobs.find(
+        {"recruiter_id": recruiter_id, "is_active": True},
+        {"_id": 0}
+    ).sort("created_at", -1).to_list(50)
+
+    return {"company": recruiter, "jobs": jobs}
+
 @router.get("/{job_id}", response_model=JobResponse)
 async def get_job(job_id: str, current_user: dict = Depends(get_current_user)):
     """Get a specific job by ID"""

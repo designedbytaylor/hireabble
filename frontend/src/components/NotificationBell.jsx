@@ -113,6 +113,10 @@ export default function NotificationBell() {
       navigate('/interviews');
     } else if (notification.type === 'reference_request') {
       navigate('/profile');
+    } else if (notification.type === 'recruiter_interest' && notification.data?.recruiter_id) {
+      navigate(`/company/${notification.data.recruiter_id}`);
+    } else if (notification.type === 'application') {
+      navigate('/recruiter/applications');
     }
   };
 
@@ -153,7 +157,7 @@ export default function NotificationBell() {
       </button>
 
       {isOpen && (
-        <div className="absolute right-0 mt-2 w-80 max-h-96 overflow-hidden rounded-2xl bg-card border border-border shadow-xl z-50">
+        <div className="absolute right-0 mt-2 w-80 max-h-96 overflow-hidden rounded-2xl bg-card border border-border shadow-xl z-[60]">
           {/* Header */}
           <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-accent/30">
             <h3 className="font-semibold text-sm">Notifications</h3>

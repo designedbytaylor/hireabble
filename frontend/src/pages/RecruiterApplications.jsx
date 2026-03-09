@@ -2,9 +2,17 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Users, Briefcase, Star, Check, X, Clock, ArrowLeft,
-  MapPin, GraduationCap, Building2, Heart
+  MapPin, GraduationCap, Building2, Heart, MessageSquare,
+  Calendar, FileText, ChevronRight, Award, Mail, Phone
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '../components/ui/dialog';
+import { toast } from 'sonner';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import Navigation from '../components/Navigation';
@@ -17,7 +25,10 @@ export default function RecruiterApplications() {
   const { token } = useAuth();
   const [applications, setApplications] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState('all'); // 'all', 'pending', 'accepted', 'rejected', 'matched'
+  const [filter, setFilter] = useState('all');
+  const [selectedApp, setSelectedApp] = useState(null);
+  const [resume, setResume] = useState(null);
+  const [loadingResume, setLoadingResume] = useState(false);
 
   useEffect(() => {
     fetchApplications();
@@ -35,6 +46,35 @@ export default function RecruiterApplications() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleOpenApplicant = async (app) => {
+    setSelectedApp(app);
+    setResume(null);
+    setLoadingResume(true);
+    try {
+      const response = await axios.get(`${API}/applicant/${app.seeker_id}/resume`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setResume(response.data);
+    } catch (error) {
+      console.error('Failed to fetch resume:', error);
+    } finally {
+      setLoadingResume(false);
+    }
+  };
+
+  const handleMessage = (app) => {
+    // Find the match for this application to navigate to chat
+    if (app.match_id) {
+      navigate(`/chat/${app.match_id}`);
+    } else {
+      navigate('/matches');
+    }
+  };
+
+  const handleScheduleInterview = (app) => {
+    navigate('/interviews', { state: { seekerId: app.seeker_id, seekerName: app.seeker_name } });
   };
 
   const getStatus = (app) => {
@@ -139,9 +179,10 @@ export default function RecruiterApplications() {
             filtered.map((app) => {
               const status = getStatus(app);
               return (
-                <div
+                <button
                   key={app.id}
-                  className="glass-card rounded-2xl p-4 flex items-center gap-4 hover:border-primary/20 transition-colors"
+                  onClick={() => handleOpenApplicant(app)}
+                  className="w-full glass-card rounded-2xl p-4 flex items-center gap-4 hover:border-primary/20 transition-colors cursor-pointer text-left"
                 >
                   {/* Avatar */}
                   <img
@@ -176,16 +217,191 @@ export default function RecruiterApplications() {
                     </div>
                   </div>
 
-                  {/* Status Badge */}
-                  <div className="flex-shrink-0">
+                  {/* Status Badge + Arrow */}
+                  <div className="flex items-center gap-2 flex-shrink-0">
                     {getStatusBadge(status)}
+                    <ChevronRight className="w-4 h-4 text-muted-foreground" />
                   </div>
-                </div>
+                </button>
               );
             })
           )}
         </div>
       </main>
+
+      {/* Applicant Detail Modal */}
+      <Dialog open={!!selectedApp} onOpenChange={(open) => { if (!open) setSelectedApp(null); }}>
+        <DialogContent className="max-w-lg bg-card border-border max-h-[85vh] overflow-y-auto">
+          {selectedApp && (
+            <>
+              <DialogHeader>
+                <DialogTitle className="font-['Outfit'] sr-only">Applicant Details</DialogTitle>
+              </DialogHeader>
+
+              {/* Profile Header */}
+              <div className="flex items-center gap-4 mb-4">
+                <img
+                  src={getPhotoUrl(selectedApp.seeker_photo || selectedApp.seeker_avatar, selectedApp.seeker_id)}
+                  alt={selectedApp.seeker_name}
+                  className="w-16 h-16 rounded-full border-2 border-primary object-cover"
+                />
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-lg font-bold font-['Outfit']">{selectedApp.seeker_name}</h2>
+                    {selectedApp.action === 'superlike' && (
+                      <Star className="w-4 h-4 text-secondary fill-secondary" />
+                    )}
+                  </div>
+                  <p className="text-sm text-primary">{selectedApp.seeker_title || 'Job Seeker'}</p>
+                  <div className="flex items-center gap-3 text-xs text-muted-foreground mt-1">
+                    {selectedApp.seeker_location && (
+                      <span className="flex items-center gap-1">
+                        <MapPin className="w-3 h-3" /> {selectedApp.seeker_location}
+                      </span>
+                    )}
+                    {selectedApp.seeker_experience && (
+                      <span>{selectedApp.seeker_experience}+ yrs experience</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Applied to */}
+              {selectedApp.job_title && (
+                <div className="p-3 rounded-xl bg-accent/50 mb-4">
+                  <p className="text-xs text-muted-foreground">Applied to</p>
+                  <p className="text-sm font-medium flex items-center gap-1">
+                    <Briefcase className="w-3.5 h-3.5" /> {selectedApp.job_title}
+                  </p>
+                </div>
+              )}
+
+              {/* Action Buttons */}
+              <div className="flex gap-2 mb-5">
+                {getStatus(selectedApp) === 'matched' && (
+                  <Button
+                    onClick={() => { setSelectedApp(null); handleMessage(selectedApp); }}
+                    className="flex-1 h-10 rounded-xl bg-gradient-to-r from-primary to-secondary text-sm"
+                  >
+                    <MessageSquare className="w-4 h-4 mr-1.5" /> Message
+                  </Button>
+                )}
+                <Button
+                  variant="outline"
+                  onClick={() => { setSelectedApp(null); handleScheduleInterview(selectedApp); }}
+                  className="flex-1 h-10 rounded-xl text-sm"
+                >
+                  <Calendar className="w-4 h-4 mr-1.5" /> Schedule Interview
+                </Button>
+              </div>
+
+              {/* Resume Content */}
+              {loadingResume ? (
+                <div className="flex items-center justify-center py-8">
+                  <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                </div>
+              ) : resume ? (
+                <div className="space-y-4">
+                  {/* Bio */}
+                  {resume.bio && (
+                    <div>
+                      <h4 className="text-xs font-semibold text-muted-foreground uppercase mb-1">About</h4>
+                      <p className="text-sm">{resume.bio}</p>
+                    </div>
+                  )}
+
+                  {/* Skills */}
+                  {resume.skills?.length > 0 && (
+                    <div>
+                      <h4 className="text-xs font-semibold text-muted-foreground uppercase mb-2">Skills</h4>
+                      <div className="flex flex-wrap gap-1.5">
+                        {resume.skills.map((skill, i) => (
+                          <span key={i} className="px-2.5 py-1 rounded-full bg-primary/10 text-primary text-xs">
+                            {skill}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Work History */}
+                  {resume.work_history?.length > 0 && (
+                    <div>
+                      <h4 className="text-xs font-semibold text-muted-foreground uppercase mb-2">
+                        <Building2 className="w-3.5 h-3.5 inline mr-1" /> Work Experience
+                      </h4>
+                      <div className="space-y-3">
+                        {resume.work_history.map((job, i) => (
+                          <div key={i} className="p-3 rounded-xl bg-background/50 border border-border">
+                            <p className="font-medium text-sm">{job.position}</p>
+                            <p className="text-xs text-primary">{job.company}</p>
+                            {(job.start_date || job.end_date) && (
+                              <p className="text-xs text-muted-foreground mt-0.5">
+                                {job.start_date} {job.start_date && '–'} {job.end_date || 'Present'}
+                              </p>
+                            )}
+                            {job.description && (
+                              <p className="text-xs text-muted-foreground mt-1">{job.description}</p>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Education */}
+                  {resume.education?.length > 0 && (
+                    <div>
+                      <h4 className="text-xs font-semibold text-muted-foreground uppercase mb-2">
+                        <GraduationCap className="w-3.5 h-3.5 inline mr-1" /> Education
+                      </h4>
+                      <div className="space-y-2">
+                        {resume.education.map((edu, i) => (
+                          <div key={i} className="p-3 rounded-xl bg-background/50 border border-border">
+                            <p className="font-medium text-sm">{edu.school}</p>
+                            {edu.degree && <p className="text-xs text-primary">{edu.degree}{edu.field ? ` in ${edu.field}` : ''}</p>}
+                            {edu.year && <p className="text-xs text-muted-foreground">{edu.year}</p>}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Certifications */}
+                  {resume.certifications?.length > 0 && (
+                    <div>
+                      <h4 className="text-xs font-semibold text-muted-foreground uppercase mb-2">
+                        <Award className="w-3.5 h-3.5 inline mr-1" /> Certifications
+                      </h4>
+                      <div className="flex flex-wrap gap-1.5">
+                        {resume.certifications.map((cert, i) => (
+                          <span key={i} className="px-2.5 py-1 rounded-full bg-secondary/10 text-secondary text-xs">
+                            {cert}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Contact / References */}
+                  {resume.references_available && (
+                    <div className="p-3 rounded-xl bg-accent/50">
+                      <p className="text-xs text-muted-foreground">
+                        {resume.references_approved ? 'References available' : 'References available upon request'}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="text-center py-6 text-muted-foreground text-sm">
+                  <FileText className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                  <p>Resume details not available</p>
+                </div>
+              )}
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
 
       <Navigation />
     </div>

@@ -134,16 +134,30 @@ async def get_profile_completeness(current_user: dict = Depends(get_current_user
         "degree": 5,
         "current_employer": 5
     }
-    
+
+    # Friendly display names for missing fields
+    field_labels = {
+        "name": "name",
+        "title": "job title",
+        "bio": "bio",
+        "skills": "skills",
+        "experience_years": "experience",
+        "location": "location",
+        "photo_url": "photo",
+        "school": "education",
+        "degree": "degree",
+        "current_employer": "employer"
+    }
+
     total = 0
     missing = []
-    
+
     for field, weight in fields_to_check.items():
         value = current_user.get(field)
         if value and (not isinstance(value, list) or len(value) > 0):
             total += weight
         else:
-            missing.append(field)
+            missing.append(field_labels.get(field, field))
     
     return {
         "percentage": total,
