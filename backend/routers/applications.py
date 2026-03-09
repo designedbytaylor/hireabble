@@ -198,8 +198,8 @@ async def get_remaining_superswipes(current_user: dict = Depends(get_current_use
         "created_at": {"$gte": today_start.isoformat(), "$lt": today_end.isoformat()}
     })
 
-    user_data = await db.users.find_one({"id": current_user["id"]}, {"_id": 0, "recruiter_purchased_superswipes": 1, "subscription": 1})
-    purchased = (user_data or {}).get("recruiter_purchased_superswipes", 0)
+    user_data = await db.users.find_one({"id": current_user["id"]}, {"_id": 0, "recruiter_super_swipes": 1, "subscription": 1})
+    purchased = (user_data or {}).get("recruiter_super_swipes", 0)
 
     # Check subscription for higher limit
     sub = (user_data or {}).get("subscription", {})
