@@ -47,7 +47,6 @@ export default function AdminTesting() {
         seekers: 10,
         recruiters: 5,
         jobs_per_recruiter: 2,
-        applications_per_seeker: 3,
       }, { headers: { Authorization: `Bearer ${token}` } });
       setSeedResult(res.data);
       toast.success('Test data seeded!');
