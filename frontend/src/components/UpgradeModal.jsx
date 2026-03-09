@@ -173,9 +173,11 @@ export default function UpgradeModal({ open, onClose, onSubscribed, trigger, hig
             {/* Close button */}
             <button
               onClick={onClose}
-              className="absolute top-4 right-4 z-10 p-2 rounded-full bg-white/10 hover:bg-white/20 transition-colors"
+              className="absolute top-4 right-4 z-30 p-3 rounded-full bg-black/30 hover:bg-black/50 transition-colors"
+              aria-label="Close"
+              style={{ touchAction: 'manipulation' }}
             >
-              <X className="w-5 h-5" />
+              <X className="w-6 h-6" />
             </button>
 
             {/* Hero gradient header */}

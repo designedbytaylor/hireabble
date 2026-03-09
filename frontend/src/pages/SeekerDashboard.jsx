@@ -41,7 +41,7 @@ export default function SeekerDashboard() {
   const [expandedCard, setExpandedCard] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
   const [profileComplete, setProfileComplete] = useState(false);
-  const [superLikesRemaining, setSuperLikesRemaining] = useState(3);
+  const [superLikesRemaining, setSuperLikesRemaining] = useState(0);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [exitingCards, setExitingCards] = useState([]); // cards animating off-screen
   const fetchingMoreRef = useRef(false);
@@ -73,6 +73,20 @@ export default function SeekerDashboard() {
       setSuperLikesRemaining(data.superlikes.remaining);
     } catch (error) {
       console.error('Failed to fetch dashboard:', error);
+      // Fallback: try fetching stats and jobs separately so UI isn't stuck at zeros
+      try {
+        const [jobsRes, statsRes, slRes] = await Promise.all([
+          axios.get(`${API}/jobs`, { headers: { Authorization: `Bearer ${token}` } }),
+          axios.get(`${API}/stats`, { headers: { Authorization: `Bearer ${token}` } }),
+          axios.get(`${API}/superlikes/remaining`, { headers: { Authorization: `Bearer ${token}` } }),
+        ]);
+        setJobs(jobsRes.data);
+        setCurrentIndex(0);
+        setStats(statsRes.data);
+        setSuperLikesRemaining(slRes.data.remaining);
+      } catch (fallbackErr) {
+        console.error('Fallback fetch also failed:', fallbackErr);
+      }
     } finally {
       setLoading(false);
     }
@@ -211,9 +225,12 @@ export default function SeekerDashboard() {
         setShowMatch(true);
       }
     }).catch(error => {
-      // Only surface errors that actually block the user (e.g. no superlikes left)
       if (error.response?.status === 400) {
-        toast.error(error.response?.data?.detail || 'Failed to submit');
+        const detail = error.response?.data?.detail || 'Failed to submit';
+        // Don't show "already swiped" as an error — it's a stale-data edge case, not a user mistake
+        if (!detail.toLowerCase().includes('already swiped')) {
+          toast.error(detail);
+        }
       }
     });
 
@@ -491,10 +508,10 @@ export default function SeekerDashboard() {
                     Clear Filters
                   </Button>
                 )}
-                <Button 
+                <Button
                   onClick={() => {
-                    setCurrentIndex(0);
-                    fetchJobs();
+                    swipedIdsRef.current.clear();
+                    fetchDashboard();
                   }}
                   className="rounded-full bg-gradient-to-r from-primary to-secondary"
                   data-testid="refresh-jobs-btn"
@@ -840,10 +857,19 @@ function SwipeCard({ job, onSwipe, expanded, setExpanded }) {
   const handleDragEnd = (_, info) => {
     const swipeThreshold = 60;
     const velocityThreshold = 300;
+    const superlikeThreshold = 80; // Higher threshold for superlike to prevent accidental triggers
     const pos = { x: x.get(), y: y.get() };
 
-    // Up = superlike, right = like, left = pass. Down is blocked entirely.
-    if ((info.offset.y < -swipeThreshold || info.velocity.y < -velocityThreshold) && info.offset.y < 0) {
+    const absX = Math.abs(info.offset.x);
+    const absY = Math.abs(info.offset.y);
+
+    // Up = superlike (only if upward movement is dominant over horizontal)
+    // Right = like, Left = pass. Down is blocked entirely.
+    if (
+      info.offset.y < 0 &&
+      absY > absX &&
+      (info.offset.y < -superlikeThreshold || info.velocity.y < -velocityThreshold)
+    ) {
       onSwipe('superlike', { x: 0, y: -1500 }, pos);
     } else if (info.offset.x > swipeThreshold || info.velocity.x > velocityThreshold) {
       onSwipe('like', { x: 1500, y: 0 }, pos);
