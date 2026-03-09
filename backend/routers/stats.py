@@ -18,6 +18,10 @@ from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
 from database import (
     db, get_current_user
 )
+from cache import (
+    stats_cache, completeness_cache, superlikes_cache,
+    cache_key, get_cached, set_cached
+)
 
 router = APIRouter(tags=["Stats & Utilities"])
 
@@ -27,13 +31,18 @@ router = APIRouter(tags=["Stats & Utilities"])
 async def get_stats(current_user: dict = Depends(get_current_user)):
     """Get user statistics"""
     uid = current_user["id"]
+    key = cache_key("stats", uid)
+    cached = get_cached(stats_cache, key)
+    if cached:
+        return cached
+
     if current_user["role"] == "seeker":
         applications, superlikes, matches = await asyncio.gather(
             db.applications.count_documents({"seeker_id": uid, "action": {"$in": ["like", "superlike"]}}),
             db.applications.count_documents({"seeker_id": uid, "action": "superlike"}),
             db.matches.count_documents({"seeker_id": uid}),
         )
-        return {
+        result = {
             "applications_sent": applications,
             "super_likes_used": superlikes,
             "matches": matches
@@ -44,11 +53,14 @@ async def get_stats(current_user: dict = Depends(get_current_user)):
             db.applications.count_documents({"recruiter_id": uid}),
             db.matches.count_documents({"recruiter_id": uid}),
         )
-        return {
+        result = {
             "jobs_posted": jobs,
             "applications_received": applications,
             "matches": matches
         }
+
+    set_cached(stats_cache, key, result)
+    return result
 
 @router.get("/stats/recruiter")
 async def get_recruiter_stats(current_user: dict = Depends(get_current_user)):
@@ -57,6 +69,11 @@ async def get_recruiter_stats(current_user: dict = Depends(get_current_user)):
         raise HTTPException(status_code=403, detail="Only recruiters can access this")
 
     uid = current_user["id"]
+    key = cache_key("rstats", uid)
+    cached = get_cached(stats_cache, key)
+    if cached:
+        return cached
+
     week_ago = (datetime.now(timezone.utc) - timedelta(days=7)).isoformat()
 
     # Run all count queries in parallel
@@ -81,26 +98,36 @@ async def get_recruiter_stats(current_user: dict = Depends(get_current_user)):
     response_rate = round((responded / total_applications * 100) if total_applications > 0 else 0)
     match_rate = round((matches / total_applications * 100) if total_applications > 0 else 0)
 
-    # Get per-job stats in parallel (not one-by-one)
+    # Get per-job stats with aggregation pipelines (2 queries instead of N*2)
     if jobs_list:
-        job_stats = await asyncio.gather(*[
-            asyncio.gather(
-                db.applications.count_documents({"job_id": job["id"]}),
-                db.matches.count_documents({"job_id": job["id"]}),
-            )
-            for job in jobs_list
-        ])
+        job_ids = [job["id"] for job in jobs_list]
+        job_title_map = {job["id"]: job["title"] for job in jobs_list}
+
+        app_counts, match_counts = await asyncio.gather(
+            db.applications.aggregate([
+                {"$match": {"job_id": {"$in": job_ids}}},
+                {"$group": {"_id": "$job_id", "count": {"$sum": 1}}}
+            ]).to_list(100),
+            db.matches.aggregate([
+                {"$match": {"job_id": {"$in": job_ids}}},
+                {"$group": {"_id": "$job_id", "count": {"$sum": 1}}}
+            ]).to_list(100),
+        )
+
+        app_map = {doc["_id"]: doc["count"] for doc in app_counts}
+        match_map = {doc["_id"]: doc["count"] for doc in match_counts}
+
         top_jobs = [{
-            "job_id": jobs_list[i]["id"],
-            "title": jobs_list[i]["title"],
-            "applications": job_stats[i][0],
-            "matches": job_stats[i][1],
-        } for i in range(len(jobs_list))]
+            "job_id": jid,
+            "title": job_title_map[jid],
+            "applications": app_map.get(jid, 0),
+            "matches": match_map.get(jid, 0),
+        } for jid in job_ids]
         top_jobs.sort(key=lambda j: j["applications"], reverse=True)
     else:
         top_jobs = []
 
-    return {
+    result = {
         "active_jobs": active_jobs,
         "total_jobs": total_jobs,
         "total_applications": total_applications,
@@ -114,6 +141,8 @@ async def get_recruiter_stats(current_user: dict = Depends(get_current_user)):
         "weekly_applications": weekly_apps,
         "top_jobs": top_jobs[:10],
     }
+    set_cached(stats_cache, key, result)
+    return result
 
 
 @router.get("/profile/completeness")
@@ -121,7 +150,12 @@ async def get_profile_completeness(current_user: dict = Depends(get_current_user
     """Get profile completeness percentage"""
     if current_user["role"] != "seeker":
         return {"percentage": 100, "missing_fields": [], "is_complete": True}
-    
+
+    key = cache_key("completeness", current_user["id"])
+    cached = get_cached(completeness_cache, key)
+    if cached:
+        return cached
+
     fields_to_check = {
         "name": 10,
         "title": 15,
@@ -159,11 +193,13 @@ async def get_profile_completeness(current_user: dict = Depends(get_current_user
         else:
             missing.append(field_labels.get(field, field))
     
-    return {
+    result = {
         "percentage": total,
         "missing_fields": missing,
         "is_complete": total >= 80
     }
+    set_cached(completeness_cache, key, result)
+    return result
 
 # ==================== RESUME PDF ====================
 

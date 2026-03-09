@@ -1,6 +1,6 @@
 const CACHE_NAME = 'hireabble-v3';
 const IMG_CACHE = 'hireabble-images-v1';
-const API_CACHE = 'hireabble-api-v3';
+const API_CACHE = 'hireabble-api-v4';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
@@ -89,11 +89,15 @@ function isImageRequest(url) {
 
 // Helper: is this a cacheable GET API request?
 function isCacheableApi(url) {
-  // Only cache non-user-specific endpoints (stale-while-revalidate)
-  // Do NOT cache user-specific data like /api/jobs, /api/matches, /api/applications
-  // because it varies by user and becomes stale after re-seeding test data
+  // Stale-while-revalidate: show cached data instantly, update in background.
+  // These endpoints are per-user (auth header varies the response) but benefit
+  // from showing stale data for a few seconds while the fresh response loads.
   return url.includes('/api/stats') ||
-    url.includes('/api/profile/completeness') || url.includes('/api/superlikes/remaining');
+    url.includes('/api/profile/completeness') ||
+    url.includes('/api/superlikes/remaining') ||
+    url.includes('/api/auth/me') ||
+    url.includes('/api/notifications') ||
+    url.includes('/api/oauth/config');
 }
 
 // Fetch strategy
