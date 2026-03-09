@@ -29,6 +29,10 @@ import UpgradeModal from '../components/UpgradeModal';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
+// Module-level: persists across component mounts so in-flight swipes
+// from a previous navigation are not lost when the component remounts.
+let globalPendingSwipes = [];
+
 export default function SeekerDashboard() {
   const navigate = useNavigate();
   const { user, token } = useAuth();
@@ -46,7 +50,7 @@ export default function SeekerDashboard() {
   const [exitingCards, setExitingCards] = useState([]); // cards animating off-screen
   const fetchingMoreRef = useRef(false);
   const swipedIdsRef = useRef(new Set());
-  const pendingSwipesRef = useRef([]); // track in-flight swipe API calls
+  const pendingSwipesRef = useRef(globalPendingSwipes); // track in-flight swipe API calls
   const [filters, setFilters] = useState({
     job_type: '',
     experience_level: '',
@@ -93,9 +97,31 @@ export default function SeekerDashboard() {
     }
   };
 
+  // On mount: wait for any in-flight swipes from a previous navigation to
+  // finish before fetching the dashboard, so the server returns accurate counts.
   useEffect(() => {
-    fetchDashboard();
+    const init = async () => {
+      if (globalPendingSwipes.length > 0) {
+        await Promise.allSettled(globalPendingSwipes);
+        globalPendingSwipes = [];
+        pendingSwipesRef.current = globalPendingSwipes;
+      }
+      fetchDashboard();
+    };
+    init();
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Warn user before closing the tab/window if swipes are still saving
+  useEffect(() => {
+    const handleBeforeUnload = (e) => {
+      if (pendingSwipesRef.current.length > 0) {
+        e.preventDefault();
+        e.returnValue = '';
+      }
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, []);
 
   useEffect(() => {
@@ -240,8 +266,10 @@ export default function SeekerDashboard() {
       }
     }).finally(() => {
       pendingSwipesRef.current = pendingSwipesRef.current.filter(p => p !== swipePromise);
+      globalPendingSwipes = globalPendingSwipes.filter(p => p !== swipePromise);
     });
     pendingSwipesRef.current.push(swipePromise);
+    globalPendingSwipes.push(swipePromise);
 
     // Auto-fetch more jobs when running low (5 cards buffer) - endless Tinder-style
     if (nextIndex >= jobs.length - 5) {
@@ -520,8 +548,11 @@ export default function SeekerDashboard() {
                 <Button
                   onClick={async () => {
                     // Wait for any in-flight swipes to persist before refreshing
-                    if (pendingSwipesRef.current.length > 0) {
-                      await Promise.allSettled(pendingSwipesRef.current);
+                    const allPending = [...new Set([...pendingSwipesRef.current, ...globalPendingSwipes])];
+                    if (allPending.length > 0) {
+                      await Promise.allSettled(allPending);
+                      globalPendingSwipes = [];
+                      pendingSwipesRef.current = [];
                     }
                     swipedIdsRef.current.clear();
                     fetchDashboard();
