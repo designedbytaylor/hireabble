@@ -252,49 +252,60 @@ async def root():
 async def startup():
     """Initialize database indexes"""
     logger.info("Starting Hireabble API...")
-    
+
+    async def ensure_index(collection, keys, **kwargs):
+        """Create an index, ignoring conflicts with existing indexes."""
+        try:
+            await collection.create_index(keys, **kwargs)
+        except Exception as e:
+            if "IndexKeySpecificationConflict" in str(e) or "IndexOptionsConflict" in str(e) or "86" in str(getattr(e, 'code', '')):
+                # Index already exists with compatible keys — safe to ignore
+                logger.warning(f"Index conflict on {collection.name}, skipping: {e}")
+            else:
+                raise
+
     # Create indexes for better query performance
-    await db.users.create_index("email", unique=True)
-    await db.users.create_index("id", unique=True)
-    await db.jobs.create_index("id", unique=True)
-    await db.jobs.create_index("recruiter_id")
-    await db.applications.create_index("id", unique=True)
-    await db.applications.create_index([("job_id", 1), ("seeker_id", 1)], unique=True)
-    await db.applications.create_index("seeker_id")
-    await db.applications.create_index("recruiter_id")
-    await db.applications.create_index([("seeker_id", 1), ("created_at", -1)])
-    await db.matches.create_index("id", unique=True)
-    await db.matches.create_index([("seeker_id", 1), ("recruiter_id", 1)])
-    await db.matches.create_index("last_message_at")
-    await db.messages.create_index("match_id")
-    await db.messages.create_index([("receiver_id", 1), ("is_read", 1)])
-    await db.notifications.create_index([("user_id", 1), ("is_read", 1)])
-    await db.password_reset_tokens.create_index("token", unique=True)
-    await db.password_reset_tokens.create_index("expires_at", expireAfterSeconds=0)
+    await ensure_index(db.users, "email", unique=True)
+    await ensure_index(db.users, "id", unique=True)
+    await ensure_index(db.jobs, "id", unique=True)
+    await ensure_index(db.jobs, "recruiter_id")
+    await ensure_index(db.applications, "id", unique=True)
+    await ensure_index(db.applications, [("job_id", 1), ("seeker_id", 1)], unique=True)
+    await ensure_index(db.applications, "seeker_id")
+    await ensure_index(db.applications, "recruiter_id")
+    await ensure_index(db.applications, [("seeker_id", 1), ("created_at", -1)])
+    await ensure_index(db.matches, "id", unique=True)
+    await ensure_index(db.matches, [("seeker_id", 1), ("recruiter_id", 1)])
+    await ensure_index(db.matches, "last_message_at")
+    await ensure_index(db.messages, "match_id")
+    await ensure_index(db.messages, [("receiver_id", 1), ("is_read", 1)])
+    await ensure_index(db.notifications, [("user_id", 1), ("is_read", 1)])
+    await ensure_index(db.password_reset_tokens, "token", unique=True)
+    await ensure_index(db.password_reset_tokens, "expires_at", expireAfterSeconds=0)
 
     # Admin & moderation indexes
-    await db.admin_users.create_index("id", unique=True)
-    await db.admin_users.create_index("email", unique=True)
-    await db.reports.create_index("id", unique=True)
-    await db.reports.create_index([("status", 1), ("created_at", -1)])
-    await db.moderation_queue.create_index("id", unique=True)
-    await db.moderation_queue.create_index([("status", 1), ("created_at", -1)])
+    await ensure_index(db.admin_users, "id", unique=True)
+    await ensure_index(db.admin_users, "email", unique=True)
+    await ensure_index(db.reports, "id", unique=True)
+    await ensure_index(db.reports, [("status", 1), ("created_at", -1)])
+    await ensure_index(db.moderation_queue, "id", unique=True)
+    await ensure_index(db.moderation_queue, [("status", 1), ("created_at", -1)])
 
     # Interview indexes
-    await db.interviews.create_index("id", unique=True)
-    await db.interviews.create_index([("created_by", 1), ("status", 1)])
-    await db.interviews.create_index([("other_party_id", 1), ("status", 1)])
+    await ensure_index(db.interviews, "id", unique=True)
+    await ensure_index(db.interviews, [("created_by", 1), ("status", 1)])
+    await ensure_index(db.interviews, [("other_party_id", 1), ("status", 1)])
 
     # Performance indexes
-    await db.jobs.create_index([("recruiter_id", 1), ("is_active", 1)])
-    await db.jobs.create_index("is_active")
-    await db.applications.create_index([("recruiter_id", 1), ("action", 1), ("created_at", -1)])
-    await db.applications.create_index("job_id")
-    await db.messages.create_index([("match_id", 1), ("is_read", 1)])
-    await db.messages.create_index([("match_id", 1), ("created_at", -1)])
-    await db.matches.create_index("seeker_id")
-    await db.matches.create_index("recruiter_id")
-    await db.matches.create_index("job_id")
+    await ensure_index(db.jobs, [("recruiter_id", 1), ("is_active", 1)])
+    await ensure_index(db.jobs, "is_active")
+    await ensure_index(db.applications, [("recruiter_id", 1), ("action", 1), ("created_at", -1)])
+    await ensure_index(db.applications, "job_id")
+    await ensure_index(db.messages, [("match_id", 1), ("is_read", 1)])
+    await ensure_index(db.messages, [("match_id", 1), ("created_at", -1)])
+    await ensure_index(db.matches, "seeker_id")
+    await ensure_index(db.matches, "recruiter_id")
+    await ensure_index(db.matches, "job_id")
 
     logger.info("Database indexes created")
     logger.info("Hireabble API started successfully!")
