@@ -8,6 +8,7 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Request, Response
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.cors import CORSMiddleware
 from starlette.middleware.gzip import GZipMiddleware
+from brotli_asgi import BrotliMiddleware
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
@@ -38,7 +39,8 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 # Mount static files for uploads
 app.mount("/uploads", StaticFiles(directory=str(UPLOADS_DIR)), name="uploads")
 
-# GZip compression — compress responses > 500 bytes (huge win on mobile)
+# Brotli compression first (15-20% smaller than gzip), GZip as fallback
+app.add_middleware(BrotliMiddleware, minimum_size=500)
 app.add_middleware(GZipMiddleware, minimum_size=500)
 
 # CORS middleware
@@ -51,7 +53,7 @@ app.add_middleware(
 )
 
 
-# Cache headers for uploads (images/videos) — browsers will cache for 1 hour
+# Cache headers — tell browsers what they can cache to avoid redundant requests
 @app.middleware("http")
 async def add_cache_headers(request: Request, call_next):
     response = await call_next(request)
@@ -59,9 +61,24 @@ async def add_cache_headers(request: Request, call_next):
     # Long cache for uploaded media (images, videos)
     if path.startswith("/uploads/"):
         response.headers["Cache-Control"] = "public, max-age=3600, immutable"
-    # Cache API responses that don't change often
+    # Static/health endpoints
     elif path in ("/api/health", "/"):
         response.headers["Cache-Control"] = "public, max-age=60"
+    # Read-only API data that changes infrequently — browser can reuse for 30s
+    elif path in ("/api/oauth/config",):
+        response.headers["Cache-Control"] = "public, max-age=30"
+    # User-specific data — private cache, short TTL to reduce refetches on back-nav
+    elif path.startswith("/api/stats") or path.startswith("/api/profile/completeness") or path.startswith("/api/superlikes/remaining"):
+        response.headers["Cache-Control"] = "private, max-age=15, stale-while-revalidate=30"
+    # Auth check — very short cache to avoid re-calling on every navigation
+    elif path == "/api/auth/me":
+        response.headers["Cache-Control"] = "private, max-age=10, stale-while-revalidate=20"
+    # Notifications — short cache
+    elif path.startswith("/api/notifications"):
+        response.headers["Cache-Control"] = "private, max-age=5, stale-while-revalidate=15"
+    # Jobs/matches listing — stale-while-revalidate for snappy back-nav
+    elif request.method == "GET" and (path.startswith("/api/jobs") or path.startswith("/api/matches")):
+        response.headers["Cache-Control"] = "private, max-age=10, stale-while-revalidate=30"
     return response
 
 # Include all routers with /api prefix

@@ -463,7 +463,7 @@ export default function AdminUsers() {
                 <td className="px-6 py-4">
                   <div className="flex items-center gap-3">
                     {(u.photo_url || u.avatar) ? (
-                      <img src={u.photo_url || u.avatar} alt="" className="w-9 h-9 rounded-full bg-gray-700 object-cover" />
+                      <img src={u.photo_url || u.avatar} alt="" className="w-9 h-9 rounded-full bg-gray-700 object-cover" loading="lazy" />
                     ) : (
                       <div className="w-9 h-9 rounded-full bg-gray-700 flex items-center justify-center text-white text-sm font-bold">
                         {u.name?.charAt(0) || '?'}
