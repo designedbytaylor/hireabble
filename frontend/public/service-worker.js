@@ -1,4 +1,4 @@
-const CACHE_NAME = 'hireabble-v3';
+const CACHE_NAME = 'hireabble-v4';
 const IMG_CACHE = 'hireabble-images-v1';
 const API_CACHE = 'hireabble-api-v4';
 const STATIC_ASSETS = [
@@ -121,7 +121,7 @@ self.addEventListener('fetch', (event) => {
               cache.put(request, response.clone());
             }
             return response;
-          }).catch(() => cached);
+          }).catch(() => cached || new Response('', { status: 503 }));
         })
       )
     );
@@ -156,9 +156,17 @@ self.addEventListener('fetch', (event) => {
           caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
         }
         return response;
-      }).catch(() => cached);
+      }).catch(() => cached || null);
 
       return cached || fetched;
+    }).then((response) => {
+      // Ensure respondWith never receives null/undefined
+      if (response) return response;
+      // For navigation requests, redirect to index.html (SPA fallback)
+      if (request.mode === 'navigate') {
+        return caches.match('/index.html') || fetch('/index.html');
+      }
+      return new Response('Offline', { status: 503, statusText: 'Service Unavailable' });
     })
   );
 });
