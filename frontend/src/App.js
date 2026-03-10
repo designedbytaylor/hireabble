@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { Toaster } from "./components/ui/sonner";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import { AdminAuthProvider, useAdminAuth } from "./context/AdminAuthContext";
+import { ThemeProvider } from "./context/ThemeContext";
 
 // Eager load only the landing/auth pages (first paint)
 import Landing from "./pages/Landing";
@@ -58,6 +59,7 @@ const AdminReports = React.lazy(() => import("./pages/admin/AdminReports"));
 const AdminSettings = React.lazy(() => import("./pages/admin/AdminSettings"));
 const AdminTesting = React.lazy(() => import("./pages/admin/AdminTesting"));
 const AdminMedia = React.lazy(() => import("./pages/admin/AdminMedia"));
+const AdminThemes = React.lazy(() => import("./pages/admin/AdminThemes"));
 
 const PageSpinner = () => (
   <div className="min-h-screen bg-background flex items-center justify-center">
@@ -304,6 +306,7 @@ function AppRoutes() {
         <Route path="moderation" element={<AdminModeration />} />
         <Route path="reports" element={<AdminReports />} />
         <Route path="testing" element={<AdminTesting />} />
+        <Route path="themes" element={<AdminThemes />} />
         <Route path="settings" element={<AdminSettings />} />
       </Route>
     </Routes>
@@ -349,12 +352,14 @@ function App() {
   return (
     <ErrorBoundary>
       <BrowserRouter>
-        <AuthProvider>
-          <AdminAuthProvider>
-            <AppRoutes />
-            <Toaster position="bottom-center" richColors style={{ bottom: '80px' }} />
-          </AdminAuthProvider>
-        </AuthProvider>
+        <ThemeProvider>
+          <AuthProvider>
+            <AdminAuthProvider>
+              <AppRoutes />
+              <Toaster position="bottom-center" richColors style={{ bottom: '80px' }} />
+            </AdminAuthProvider>
+          </AuthProvider>
+        </ThemeProvider>
       </BrowserRouter>
     </ErrorBoundary>
   );

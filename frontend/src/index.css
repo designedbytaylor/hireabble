@@ -29,6 +29,32 @@
     --ring: 239 84% 67%;
     --radius: 0.75rem;
   }
+
+  /* Professional theme — clean, business-appropriate dark palette */
+  [data-theme="professional"] {
+    --background: 222 47% 6%;
+    --foreground: 210 40% 96%;
+    --card: 217 33% 10%;
+    --card-foreground: 210 40% 96%;
+    --popover: 217 33% 10%;
+    --popover-foreground: 210 40% 96%;
+    --primary: 173 58% 39%;
+    --primary-foreground: 210 40% 98%;
+    --secondary: 215 25% 34%;
+    --secondary-foreground: 210 40% 96%;
+    --muted: 217 19% 17%;
+    --muted-foreground: 215 20% 55%;
+    --accent: 217 19% 17%;
+    --accent-foreground: 210 40% 96%;
+    --destructive: 0 63% 51%;
+    --destructive-foreground: 210 40% 98%;
+    --success: 160 60% 40%;
+    --success-foreground: 222 47% 6%;
+    --border: 217 19% 18%;
+    --input: 217 19% 18%;
+    --ring: 173 58% 39%;
+    --radius: 0.5rem;
+  }
 }
 
 @layer base {
@@ -88,6 +114,13 @@
   background-clip: text;
 }
 
+[data-theme="professional"] .gradient-text {
+  background: linear-gradient(135deg, #2dd4bf 0%, #3b82f6 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
 /* Neon glow effects */
 .neon-glow {
   box-shadow: 0 0 20px rgba(99, 102, 241, 0.4), 0 0 40px rgba(99, 102, 241, 0.2);
@@ -103,6 +136,23 @@
 
 .neon-glow-red {
   box-shadow: 0 0 20px rgba(244, 63, 94, 0.4), 0 0 40px rgba(244, 63, 94, 0.2);
+}
+
+/* Professional theme — subtler, more refined shadows */
+[data-theme="professional"] .neon-glow {
+  box-shadow: 0 0 12px rgba(45, 212, 191, 0.25), 0 0 24px rgba(45, 212, 191, 0.1);
+}
+
+[data-theme="professional"] .neon-glow-pink {
+  box-shadow: 0 0 12px rgba(59, 130, 246, 0.25), 0 0 24px rgba(59, 130, 246, 0.1);
+}
+
+[data-theme="professional"] .neon-glow-green {
+  box-shadow: 0 0 12px rgba(16, 185, 129, 0.25), 0 0 24px rgba(16, 185, 129, 0.1);
+}
+
+[data-theme="professional"] .neon-glow-red {
+  box-shadow: 0 0 12px rgba(220, 38, 38, 0.25), 0 0 24px rgba(220, 38, 38, 0.1);
 }
 
 /* Swipe card animations */
@@ -176,6 +226,10 @@
   pointer-events: none;
 }
 
+[data-theme="professional"] .gradient-border::before {
+  background: linear-gradient(135deg, #2dd4bf, #3b82f6);
+}
+
 /* Button hover effects */
 .btn-hover-glow {
   transition: all 0.3s ease;
@@ -186,15 +240,30 @@
   box-shadow: 0 10px 40px rgba(99, 102, 241, 0.4);
 }
 
+[data-theme="professional"] .btn-hover-glow:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 30px rgba(45, 212, 191, 0.2);
+}
+
 /* Input focus styles */
 input:focus, textarea:focus {
   outline: none;
   box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.4);
 }
 
+[data-theme="professional"] input:focus,
+[data-theme="professional"] textarea:focus {
+  box-shadow: 0 0 0 2px rgba(45, 212, 191, 0.3);
+}
+
 /* Selection styling */
 ::selection {
   background: rgba(99, 102, 241, 0.4);
+  color: white;
+}
+
+[data-theme="professional"] ::selection {
+  background: rgba(45, 212, 191, 0.3);
   color: white;
 }
 

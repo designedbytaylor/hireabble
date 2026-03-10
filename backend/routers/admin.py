@@ -1236,3 +1236,68 @@ async def clear_test_data(admin: dict = Depends(get_current_admin)):
             "recruiter_swipes": swipes_del.deleted_count,
         }
     }
+
+
+# ==================== THEME MANAGEMENT ====================
+
+AVAILABLE_THEMES = {
+    "default": {
+        "id": "default",
+        "name": "Neon Noir",
+        "description": "Electric, vibrant dark theme with neon glows and bold gradients. Fun, youthful energy.",
+        "preview": {
+            "background": "#09090b",
+            "primary": "#6366f1",
+            "secondary": "#d946ef",
+            "accent": "#27272a",
+            "text": "#fafafa",
+        },
+    },
+    "professional": {
+        "id": "professional",
+        "name": "Executive",
+        "description": "Clean, business-appropriate dark theme with refined teal accents. Modern and trustworthy.",
+        "preview": {
+            "background": "#0d1520",
+            "primary": "#2ba893",
+            "secondary": "#3f5973",
+            "accent": "#1a2636",
+            "text": "#e8edf2",
+        },
+    },
+}
+
+
+@router.get("/theme")
+async def get_active_theme():
+    """Public endpoint — returns the currently active theme."""
+    settings = await db.site_settings.find_one({"key": "active_theme"})
+    theme_id = settings["value"] if settings else "default"
+    return {"theme": theme_id, "themes": AVAILABLE_THEMES}
+
+
+@router.get("/admin/themes")
+async def list_themes(admin=Depends(get_current_admin)):
+    """List all available themes with the currently active one."""
+    settings = await db.site_settings.find_one({"key": "active_theme"})
+    active = settings["value"] if settings else "default"
+    return {"active": active, "themes": AVAILABLE_THEMES}
+
+
+@router.post("/admin/themes")
+async def set_active_theme(
+    body: dict = Body(...),
+    admin=Depends(get_current_admin),
+):
+    """Set the active theme for the entire platform."""
+    theme_id = body.get("theme")
+    if theme_id not in AVAILABLE_THEMES:
+        raise HTTPException(status_code=400, detail=f"Unknown theme: {theme_id}")
+
+    await db.site_settings.update_one(
+        {"key": "active_theme"},
+        {"$set": {"key": "active_theme", "value": theme_id, "updated_at": datetime.now(timezone.utc)}},
+        upsert=True,
+    )
+
+    return {"message": f"Theme set to {AVAILABLE_THEMES[theme_id]['name']}", "theme": theme_id}
