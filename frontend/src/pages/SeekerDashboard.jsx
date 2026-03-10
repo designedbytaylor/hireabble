@@ -254,6 +254,25 @@ export default function SeekerDashboard() {
     return () => { if (ws) ws.close(); };
   }, [token]);
 
+  // Refresh stats when user returns to this page (e.g. after applying from
+  // a company page or switching tabs).  Only refreshes counts — doesn't
+  // reload the job deck, so the swipe position is preserved.
+  useEffect(() => {
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        axios.get(`${API}/stats`, {
+          headers: { Authorization: `Bearer ${tokenRef.current}` },
+          timeout: 5000,
+        }).then(res => {
+          setStats(res.data);
+          saveCachedStats(res.data, uidRef.current);
+        }).catch(() => { /* ignore - stats will catch up on next full fetch */ });
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => document.removeEventListener('visibilitychange', handleVisibility);
+  }, []);
+
   // sendBeacon fallback: if the user closes the tab, fire any queued swipes
   // via sendBeacon (reliable even during page unload)
   useEffect(() => {
