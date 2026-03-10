@@ -33,55 +33,62 @@ const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 // Tinder-style: all swipe state lives in localStorage so a page refresh never
 // loses data.  The API is the source of truth; localStorage is the fast cache.
 
-const STORAGE_KEYS = {
-  SWIPED_IDS: 'hireabble_swiped_ids',
-  STATS: 'hireabble_swipe_stats',
-  SWIPE_QUEUE: 'hireabble_swipe_queue',   // failed swipes waiting to retry
-  SUPER_LIKES: 'hireabble_superlikes_remaining',
-};
+// Storage keys are scoped by user ID so impersonating different users
+// doesn't bleed cached swipe data between accounts.
+function storageKey(userId, suffix) {
+  return userId ? `hireabble_${suffix}_${userId}` : `hireabble_${suffix}`;
+}
 
-function loadSwipedIds() {
+// Resolve current user ID from cached_user in localStorage (available before React mounts)
+function getCachedUserId() {
   try {
-    const raw = localStorage.getItem(STORAGE_KEYS.SWIPED_IDS);
+    const cached = localStorage.getItem('cached_user');
+    return cached ? JSON.parse(cached).id : null;
+  } catch { return null; }
+}
+
+function loadSwipedIds(userId) {
+  try {
+    const raw = localStorage.getItem(storageKey(userId, 'swiped_ids'));
     return raw ? new Set(JSON.parse(raw)) : new Set();
   } catch { return new Set(); }
 }
 
-function saveSwipedIds(ids) {
-  try { localStorage.setItem(STORAGE_KEYS.SWIPED_IDS, JSON.stringify([...ids])); } catch { /* quota */ }
+function saveSwipedIds(ids, userId) {
+  try { localStorage.setItem(storageKey(userId, 'swiped_ids'), JSON.stringify([...ids])); } catch { /* quota */ }
 }
 
-function loadCachedStats() {
+function loadCachedStats(userId) {
   try {
-    const raw = localStorage.getItem(STORAGE_KEYS.STATS);
+    const raw = localStorage.getItem(storageKey(userId, 'swipe_stats'));
     return raw ? JSON.parse(raw) : null;
   } catch { return null; }
 }
 
-function saveCachedStats(stats) {
-  try { localStorage.setItem(STORAGE_KEYS.STATS, JSON.stringify(stats)); } catch { /* quota */ }
+function saveCachedStats(stats, userId) {
+  try { localStorage.setItem(storageKey(userId, 'swipe_stats'), JSON.stringify(stats)); } catch { /* quota */ }
 }
 
-function loadSwipeQueue() {
+function loadSwipeQueue(userId) {
   try {
-    const raw = localStorage.getItem(STORAGE_KEYS.SWIPE_QUEUE);
+    const raw = localStorage.getItem(storageKey(userId, 'swipe_queue'));
     return raw ? JSON.parse(raw) : [];
   } catch { return []; }
 }
 
-function saveSwipeQueue(queue) {
-  try { localStorage.setItem(STORAGE_KEYS.SWIPE_QUEUE, JSON.stringify(queue)); } catch { /* quota */ }
+function saveSwipeQueue(queue, userId) {
+  try { localStorage.setItem(storageKey(userId, 'swipe_queue'), JSON.stringify(queue)); } catch { /* quota */ }
 }
 
-function loadCachedSuperLikes() {
+function loadCachedSuperLikes(userId) {
   try {
-    const raw = localStorage.getItem(STORAGE_KEYS.SUPER_LIKES);
+    const raw = localStorage.getItem(storageKey(userId, 'superlikes_remaining'));
     return raw != null ? parseInt(raw, 10) : 0;
   } catch { return 0; }
 }
 
-function saveCachedSuperLikes(n) {
-  try { localStorage.setItem(STORAGE_KEYS.SUPER_LIKES, String(n)); } catch { /* quota */ }
+function saveCachedSuperLikes(n, userId) {
+  try { localStorage.setItem(storageKey(userId, 'superlikes_remaining'), String(n)); } catch { /* quota */ }
 }
 
 // Module-level: persists across component mounts so in-flight swipes
@@ -91,25 +98,28 @@ let globalPendingSwipes = [];
 export default function SeekerDashboard() {
   const navigate = useNavigate();
   const { user, token } = useAuth();
+  const uid = user?.id || getCachedUserId();
   const [jobs, setJobs] = useState([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [loading, setLoading] = useState(true);
   // Initialize stats from localStorage — prevents "flash of zeros"
-  const [stats, setStats] = useState(() => loadCachedStats() || { applications_sent: 0, super_likes_used: 0, matches: 0 });
+  const [stats, setStats] = useState(() => loadCachedStats(uid) || { applications_sent: 0, super_likes_used: 0, matches: 0 });
   const [showMatch, setShowMatch] = useState(false);
   const [matchData, setMatchData] = useState(null);
   const [expandedCard, setExpandedCard] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
   const [profileComplete, setProfileComplete] = useState(false);
-  const [superLikesRemaining, setSuperLikesRemaining] = useState(() => loadCachedSuperLikes());
+  const [superLikesRemaining, setSuperLikesRemaining] = useState(() => loadCachedSuperLikes(uid));
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [exitingCards, setExitingCards] = useState([]); // cards animating off-screen
   const fetchingMoreRef = useRef(false);
   // Seed from localStorage so swiped jobs stay excluded even after F5
-  const swipedIdsRef = useRef(loadSwipedIds());
+  const swipedIdsRef = useRef(loadSwipedIds(uid));
   const pendingSwipesRef = useRef(globalPendingSwipes); // track in-flight swipe API calls
   const tokenRef = useRef(token); // stable ref for sendBeacon / beforeunload
   tokenRef.current = token;
+  const uidRef = useRef(uid);
+  uidRef.current = uid;
   const [filters, setFilters] = useState({
     job_type: '',
     experience_level: '',
@@ -124,7 +134,7 @@ export default function SeekerDashboard() {
 
   // ─── Retry queue: flush any swipes that failed on a previous page load ───
   const flushSwipeQueue = useCallback(async () => {
-    const queue = loadSwipeQueue();
+    const queue = loadSwipeQueue(uidRef.current);
     if (queue.length === 0) return;
 
     const remaining = [];
@@ -142,7 +152,7 @@ export default function SeekerDashboard() {
         remaining.push(item); // keep for next attempt
       }
     }
-    saveSwipeQueue(remaining);
+    saveSwipeQueue(remaining, uidRef.current);
   }, []);
 
   // ─── Batched dashboard: single API call replaces 6+ separate requests ───
@@ -166,7 +176,7 @@ export default function SeekerDashboard() {
       if (data.swiped_job_ids) {
         const merged = new Set([...swipedIdsRef.current, ...data.swiped_job_ids]);
         swipedIdsRef.current = merged;
-        saveSwipedIds(merged);
+        saveSwipedIds(merged, uidRef.current);
       }
 
       // Filter out any jobs the client already knows are swiped (handles the
@@ -177,10 +187,10 @@ export default function SeekerDashboard() {
 
       // Stats: use server values (source of truth) and cache locally
       setStats(data.stats);
-      saveCachedStats(data.stats);
+      saveCachedStats(data.stats, uidRef.current);
       setProfileComplete(data.completeness.is_complete);
       setSuperLikesRemaining(data.superlikes.remaining);
-      saveCachedSuperLikes(data.superlikes.remaining);
+      saveCachedSuperLikes(data.superlikes.remaining, uidRef.current);
     } catch (error) {
       // Auto-retry once on timeout/network errors before falling back
       if (retry < 1 && (!error.response || error.code === 'ECONNABORTED')) {
@@ -200,9 +210,9 @@ export default function SeekerDashboard() {
         setJobs(safeJobs);
         setCurrentIndex(0);
         setStats(statsRes.data);
-        saveCachedStats(statsRes.data);
+        saveCachedStats(statsRes.data, uidRef.current);
         setSuperLikesRemaining(slRes.data.remaining);
-        saveCachedSuperLikes(slRes.data.remaining);
+        saveCachedSuperLikes(slRes.data.remaining, uidRef.current);
       } catch (fallbackErr) {
         console.error('Fallback fetch also failed:', fallbackErr);
       }
@@ -231,7 +241,7 @@ export default function SeekerDashboard() {
           if (data.type === 'new_match' && data.match) {
             setStats(prev => {
               const next = { ...prev, matches: prev.matches + 1 };
-              saveCachedStats(next);
+              saveCachedStats(next, uidRef.current);
               return next;
             });
             setMatchData(data.match);
@@ -249,7 +259,7 @@ export default function SeekerDashboard() {
   useEffect(() => {
     const handleBeforeUnload = (e) => {
       // Use sendBeacon for any pending swipes in the retry queue
-      const queue = loadSwipeQueue();
+      const queue = loadSwipeQueue(uidRef.current);
       if (queue.length > 0 && navigator.sendBeacon) {
         for (const item of queue) {
           try {
@@ -360,7 +370,7 @@ export default function SeekerDashboard() {
     if (swipedIdsRef.current.has(job.id)) return;
     swipedIdsRef.current.add(job.id);
     // Persist to localStorage immediately — survives F5
-    saveSwipedIds(swipedIdsRef.current);
+    saveSwipedIds(swipedIdsRef.current, uidRef.current);
 
     // Advance index IMMEDIATELY — next card is already visible in the stack
     const nextIndex = currentIndex + 1;
@@ -379,18 +389,18 @@ export default function SeekerDashboard() {
     if (action === 'like') {
       setStats(prev => {
         const next = { ...prev, applications_sent: prev.applications_sent + 1 };
-        saveCachedStats(next);
+        saveCachedStats(next, uidRef.current);
         return next;
       });
     } else if (action === 'superlike') {
       setStats(prev => {
         const next = { ...prev, super_likes_used: prev.super_likes_used + 1 };
-        saveCachedStats(next);
+        saveCachedStats(next, uidRef.current);
         return next;
       });
       setSuperLikesRemaining(prev => {
         const next = Math.max(0, prev - 1);
-        saveCachedSuperLikes(next);
+        saveCachedSuperLikes(next, uidRef.current);
         return next;
       });
     }
@@ -402,11 +412,11 @@ export default function SeekerDashboard() {
     ).then(response => {
       if (action === 'superlike' && response.data.remaining_superlikes != null) {
         setSuperLikesRemaining(response.data.remaining_superlikes);
-        saveCachedSuperLikes(response.data.remaining_superlikes);
+        saveCachedSuperLikes(response.data.remaining_superlikes, uidRef.current);
       }
       // Swipe saved successfully — remove from retry queue if present
-      const queue = loadSwipeQueue().filter(q => q.job_id !== job.id);
-      saveSwipeQueue(queue);
+      const queue = loadSwipeQueue(uidRef.current).filter(q => q.job_id !== job.id);
+      saveSwipeQueue(queue, uidRef.current);
     }).catch(error => {
       const status = error.response?.status;
       const detail = error.response?.data?.detail || '';
@@ -436,10 +446,10 @@ export default function SeekerDashboard() {
       // All retries exhausted — persist to retry queue so it can be retried
       // on next page load (Tinder-style offline queue)
       if (!status || status >= 500) {
-        const queue = loadSwipeQueue();
+        const queue = loadSwipeQueue(uidRef.current);
         if (!queue.some(q => q.job_id === job.id)) {
           queue.push({ job_id: job.id, action, ts: Date.now() });
-          saveSwipeQueue(queue);
+          saveSwipeQueue(queue, uidRef.current);
         }
         return; // don't revert stats — the swipe will be retried
       }
@@ -448,25 +458,25 @@ export default function SeekerDashboard() {
       if (action === 'like') {
         setStats(prev => {
           const next = { ...prev, applications_sent: Math.max(0, prev.applications_sent - 1) };
-          saveCachedStats(next);
+          saveCachedStats(next, uidRef.current);
           return next;
         });
       } else if (action === 'superlike') {
         setStats(prev => {
           const next = { ...prev, super_likes_used: Math.max(0, prev.super_likes_used - 1) };
-          saveCachedStats(next);
+          saveCachedStats(next, uidRef.current);
           return next;
         });
         setSuperLikesRemaining(prev => {
           const next = prev + 1;
-          saveCachedSuperLikes(next);
+          saveCachedSuperLikes(next, uidRef.current);
           return next;
         });
       }
 
       // Also remove from swiped IDs so the job can be re-swiped
       swipedIdsRef.current.delete(job.id);
-      saveSwipedIds(swipedIdsRef.current);
+      saveSwipedIds(swipedIdsRef.current, uidRef.current);
 
       const msg = detail || 'Failed to save swipe';
       toast.error(msg);

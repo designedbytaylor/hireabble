@@ -118,6 +118,13 @@ export const AuthProvider = ({ children }) => {
     }
     // Clear stale cached user to prevent flash of wrong identity
     localStorage.removeItem('cached_user');
+    // Clear all user-scoped swipe/stats caches so the new user starts fresh
+    const keysToRemove = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith('hireabble_')) keysToRemove.push(key);
+    }
+    keysToRemove.forEach(k => localStorage.removeItem(k));
     setUser(null);
     localStorage.setItem('token', impersonateToken);
     setToken(impersonateToken);
