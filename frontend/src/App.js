@@ -9,6 +9,8 @@ import Landing from "./pages/Landing";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 
+const ImpersonationBanner = React.lazy(() => import("./components/ImpersonationBanner"));
+
 // Lazy load everything else — each becomes its own JS chunk
 const ForgotPassword = React.lazy(() => import("./pages/ForgotPassword"));
 const ResetPassword = React.lazy(() => import("./pages/ResetPassword"));
@@ -160,6 +162,7 @@ const AdminRoute = ({ children }) => {
 
 function AppRoutes() {
   return (
+    <Suspense fallback={null}><ImpersonationBanner /></Suspense>
     <Suspense fallback={<PageSpinner />}>
     <Routes>
       <Route path="/" element={<PublicRoute><Landing /></PublicRoute>} />
