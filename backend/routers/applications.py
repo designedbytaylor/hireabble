@@ -651,7 +651,7 @@ async def undo_last_swipe(current_user: dict = Depends(get_current_user)):
     uid = current_user["id"]
 
     # Check subscription allows undo
-    sub = current_user.get("subscription", {})
+    sub = current_user.get("subscription") or {}
     now = datetime.now(timezone.utc).isoformat()
     can_undo = (
         sub.get("status") == "active"

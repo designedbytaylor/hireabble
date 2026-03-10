@@ -151,7 +151,7 @@ async def get_seeker_dashboard(current_user: dict = Depends(get_current_user)):
     free_remaining = max(0, daily_limit - superlikes_today)
 
     # Check if user's subscription allows undo
-    sub = current_user.get("subscription", {})
+    sub = current_user.get("subscription") or {}
     can_undo = (
         sub.get("status") == "active"
         and sub.get("period_end", "") >= now
