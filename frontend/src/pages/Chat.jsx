@@ -620,14 +620,20 @@ export default function Chat() {
   );
 }
 
+function resolveMediaUrl(url) {
+  if (!url) return url;
+  if (url.startsWith('/')) return `${process.env.REACT_APP_BACKEND_URL}${url}`;
+  return url;
+}
+
 function MessageContent({ content }) {
   if (!content) return null;
 
   // Video message: [Video: URL]
   const videoMatch = content.match(/\[Video: (https?:\/\/[^\]]+|\/uploads\/[^\]]+)\]/);
   if (videoMatch) {
-    const videoUrl = videoMatch[1];
-    const rest = content.replace(/\[Video: https?:\/\/[^\]]+\]\s*/, '').trim();
+    const videoUrl = resolveMediaUrl(videoMatch[1]);
+    const rest = content.replace(/\[Video: [^\]]+\]\s*/, '').trim();
     return (
       <>
         <video
@@ -645,17 +651,23 @@ function MessageContent({ content }) {
   // Image message: [Image: URL]
   const imageMatch = content.match(/\[Image: (https?:\/\/[^\]]+|\/uploads\/[^\]]+)\]/);
   if (imageMatch) {
-    const imageUrl = imageMatch[1];
+    const imageUrl = resolveMediaUrl(imageMatch[1]);
     const rest = content.replace(/\[Image: [^\]]+\]\s*/, '').trim();
-    const fullUrl = imageUrl.startsWith('/') ? `${process.env.REACT_APP_BACKEND_URL}${imageUrl}` : imageUrl;
     return (
       <>
         <img
-          src={fullUrl}
+          src={imageUrl}
           alt="Shared image"
           className="rounded-lg max-w-full cursor-pointer mb-1"
           style={{ maxHeight: '250px' }}
-          onClick={() => window.open(fullUrl, '_blank')}
+          onClick={() => window.open(imageUrl, '_blank')}
+          onError={(e) => {
+            e.target.onerror = null;
+            e.target.style.display = 'none';
+            e.target.insertAdjacentHTML('afterend',
+              '<div class="rounded-lg bg-accent/50 border border-border p-4 text-xs text-muted-foreground flex items-center gap-2 mb-1">Image could not be loaded</div>'
+            );
+          }}
         />
         {rest && <p className="text-sm">{rest}</p>}
       </>

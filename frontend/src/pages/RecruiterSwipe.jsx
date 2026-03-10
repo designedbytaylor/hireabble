@@ -12,7 +12,7 @@ import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import Navigation from '../components/Navigation';
 import NotificationBell from '../components/NotificationBell';
-import { getPhotoUrl } from '../utils/helpers';
+import { getPhotoUrl, handleImgError } from '../utils/helpers';
 import UpgradeModal from '../components/UpgradeModal';
 import MatchModal from '../components/MatchModal';
 
@@ -210,6 +210,7 @@ export default function RecruiterSwipe() {
               alt="Avatar"
               onClick={() => navigate('/profile')}
               className="w-10 h-10 rounded-full border-2 border-primary object-cover cursor-pointer hover:opacity-80 transition-opacity"
+              onError={handleImgError(user?.id)}
             />
           </div>
         </div>
@@ -499,6 +500,7 @@ function ApplicantCard({ app, onSwipe, expanded, setExpanded }) {
               src={getPhotoUrl(app.seeker_photo || app.seeker_avatar, app.seeker_id)}
               alt={app.seeker_name}
               className="w-full h-full object-cover"
+              onError={handleImgError(app.seeker_id)}
             />
             <div className="absolute inset-0 bg-gradient-to-t from-card via-transparent to-transparent" />
           </div>
@@ -523,6 +525,12 @@ function ApplicantCard({ app, onSwipe, expanded, setExpanded }) {
         {app.action === 'superlike' && (
           <div className="absolute top-4 right-4 z-20 px-3 py-1 rounded-full bg-gradient-to-r from-secondary to-pink-500 text-white text-xs font-bold flex items-center gap-1 shadow-lg">
             <Star className="w-3 h-3 fill-white" /> Super Like
+          </div>
+        )}
+        {/* Priority Badge for upgraded seekers */}
+        {app.is_premium_seeker && app.action !== 'superlike' && (
+          <div className="absolute top-4 right-4 z-20 px-3 py-1 rounded-full bg-gradient-to-r from-amber-500 to-orange-500 text-white text-xs font-bold flex items-center gap-1 shadow-lg">
+            <Zap className="w-3 h-3 fill-white" /> Priority
           </div>
         )}
 
@@ -661,6 +669,7 @@ function CandidateCard({ candidate, onSwipe, expanded, setExpanded }) {
               src={getPhotoUrl(candidate.photo_url || candidate.avatar, candidate.id)}
               alt={candidate.name}
               className="w-full h-full object-cover"
+              onError={handleImgError(candidate.id)}
             />
             <div className="absolute inset-0 bg-gradient-to-t from-card via-transparent to-transparent" />
           </div>
@@ -844,6 +853,11 @@ function StaticApplicantCard({ app }) {
       {app.action === 'superlike' && (
         <div className="absolute top-4 right-4 z-20 px-3 py-1 rounded-full bg-gradient-to-r from-secondary to-pink-500 text-white text-xs font-bold flex items-center gap-1 shadow-lg">
           <Star className="w-3 h-3 fill-white" /> Super Like
+        </div>
+      )}
+      {app.is_premium_seeker && app.action !== 'superlike' && (
+        <div className="absolute top-4 right-4 z-20 px-3 py-1 rounded-full bg-gradient-to-r from-amber-500 to-orange-500 text-white text-xs font-bold flex items-center gap-1 shadow-lg">
+          <Zap className="w-3 h-3 fill-white" /> Priority
         </div>
       )}
       <div className="absolute inset-0 top-[35%] flex flex-col p-6 z-10">

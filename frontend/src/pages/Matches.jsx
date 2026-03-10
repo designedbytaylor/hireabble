@@ -9,7 +9,7 @@ import { Button } from '../components/ui/button';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import Navigation from '../components/Navigation';
-import { getPhotoUrl } from '../utils/helpers';
+import { getPhotoUrl, handleImgError } from '../utils/helpers';
 import { toast } from 'sonner';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
@@ -140,6 +140,7 @@ export default function Matches() {
                     src={getPhotoUrl(p.photo_url, p.id) || p.avatar}
                     alt={p.name}
                     className="w-24 h-24 rounded-full border-4 border-primary mx-auto object-cover mb-4"
+                    onError={handleImgError(p.id)}
                   />
                 ) : (
                   <div className="w-24 h-24 rounded-full bg-primary/20 flex items-center justify-center mx-auto mb-4">
@@ -442,6 +443,7 @@ export default function Matches() {
                           src={getPhotoUrl(match.seeker_avatar, match.seeker_id)}
                           alt={match.seeker_name}
                           className="w-14 h-14 rounded-xl object-cover border-2 border-primary/50"
+                          onError={handleImgError(match.seeker_id)}
                         />
                       )}
                       <div className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-success flex items-center justify-center">

@@ -4,7 +4,7 @@ import { MessageCircle, ArrowLeft, Building2, User } from 'lucide-react';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import Navigation from '../components/Navigation';
-import { getPhotoUrl } from '../utils/helpers';
+import { getPhotoUrl, handleImgError } from '../utils/helpers';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -98,6 +98,7 @@ export default function Messages() {
                               src={getPhotoUrl(match.seeker_avatar, match.seeker_id)}
                               alt={match.seeker_name}
                               className="w-12 h-12 rounded-xl object-cover border-2 border-primary/50 shrink-0"
+                              onError={handleImgError(match.seeker_id)}
                             />
                           )}
 
