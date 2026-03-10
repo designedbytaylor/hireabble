@@ -162,6 +162,7 @@ const AdminRoute = ({ children }) => {
 
 function AppRoutes() {
   return (
+    <>
     <Suspense fallback={null}><ImpersonationBanner /></Suspense>
     <Suspense fallback={<PageSpinner />}>
     <Routes>
@@ -307,6 +308,7 @@ function AppRoutes() {
       </Route>
     </Routes>
     </Suspense>
+    </>
   );
 }
 
