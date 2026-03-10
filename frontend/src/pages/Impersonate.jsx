@@ -9,7 +9,7 @@ import { useAuth } from '../context/AuthContext';
  * Clears any stale token first to avoid conflicts.
  */
 export default function Impersonate() {
-  const { loginWithToken } = useAuth();
+  const { loginWithToken, logout } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const handled = useRef(false);
@@ -27,22 +27,12 @@ export default function Impersonate() {
       return;
     }
 
-    // Clear any stale auth data and swipe caches before impersonating
-    localStorage.removeItem('token');
-    localStorage.removeItem('cached_user');
-    // Remove all user-scoped swipe/stats caches so new identity starts fresh
-    const keysToRemove = [];
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i);
-      if (key && key.startsWith('hireabble_')) keysToRemove.push(key);
-    }
-    keysToRemove.forEach(k => localStorage.removeItem(k));
+    // Sign out the previous user completely before loading the new one.
+    // This resets React auth state, clears localStorage, and purges caches
+    // so no stale data from a prior impersonation bleeds through.
+    logout();
 
-    // Purge service-worker API cache — it caches /api/dashboard etc. by URL
-    // only (ignoring Auth header), so a previous user's data leaks through.
-    const cacheClear = caches.delete('hireabble-api-v7').catch(() => {});
-
-    cacheClear.then(() => loginWithToken(token)).then(user => {
+    loginWithToken(token).then(user => {
       if (user) {
         toast.success(`Logged in as ${user.name}`);
         navigate(redirect, { replace: true });
