@@ -125,6 +125,11 @@ export const AuthProvider = ({ children }) => {
       if (key && key.startsWith('hireabble_')) keysToRemove.push(key);
     }
     keysToRemove.forEach(k => localStorage.removeItem(k));
+
+    // Purge service-worker API cache — it caches by URL only (ignores Auth
+    // header), so switching users without clearing returns stale data.
+    try { await caches.delete('hireabble-api-v7'); } catch (_) { /* ok */ }
+
     setUser(null);
     localStorage.setItem('token', impersonateToken);
     setToken(impersonateToken);
@@ -148,6 +153,8 @@ export const AuthProvider = ({ children }) => {
     localStorage.removeItem('cached_user');
     setToken(null);
     setUser(null);
+    // Purge SW API cache so next login doesn't see stale user data
+    try { caches.delete('hireabble-api-v7'); } catch (_) { /* ok */ }
   }, []);
 
   const updateProfile = useCallback(async (updates) => {

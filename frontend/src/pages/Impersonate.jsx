@@ -38,7 +38,11 @@ export default function Impersonate() {
     }
     keysToRemove.forEach(k => localStorage.removeItem(k));
 
-    loginWithToken(token).then(user => {
+    // Purge service-worker API cache — it caches /api/dashboard etc. by URL
+    // only (ignoring Auth header), so a previous user's data leaks through.
+    const cacheClear = caches.delete('hireabble-api-v7').catch(() => {});
+
+    cacheClear.then(() => loginWithToken(token)).then(user => {
       if (user) {
         toast.success(`Logged in as ${user.name}`);
         navigate(redirect, { replace: true });
