@@ -69,6 +69,20 @@ function saveCachedStats(stats, userId) {
   try { localStorage.setItem(storageKey(userId, 'swipe_stats'), JSON.stringify(stats)); } catch { /* quota */ }
 }
 
+// Merge server stats with cached optimistic stats — never let counts regress.
+// The user may have swiped faster than the backend can persist, so the local
+// optimistic count can be ahead of the server.  Taking the max of each field
+// prevents the jarring "count drops to zero" effect when navigating back.
+function mergeStatsWithCache(serverStats, userId) {
+  const cached = loadCachedStats(userId);
+  if (!cached) return serverStats;
+  return {
+    applications_sent: Math.max(serverStats.applications_sent || 0, cached.applications_sent || 0),
+    super_likes_used: Math.max(serverStats.super_likes_used || 0, cached.super_likes_used || 0),
+    matches: Math.max(serverStats.matches || 0, cached.matches || 0),
+  };
+}
+
 function loadSwipeQueue(userId) {
   try {
     const raw = localStorage.getItem(storageKey(userId, 'swipe_queue'));
@@ -185,9 +199,11 @@ export default function SeekerDashboard() {
       setJobs(safeJobs);
       setCurrentIndex(0);
 
-      // Stats: use server values (source of truth) and cache locally
-      setStats(data.stats);
-      saveCachedStats(data.stats, uidRef.current);
+      // Stats: merge server values with cached optimistic counts so fast
+      // swiping never causes counts to regress while the backend catches up
+      const merged = mergeStatsWithCache(data.stats, uidRef.current);
+      setStats(merged);
+      saveCachedStats(merged, uidRef.current);
       setProfileComplete(data.completeness.is_complete);
       setSuperLikesRemaining(data.superlikes.remaining);
       saveCachedSuperLikes(data.superlikes.remaining, uidRef.current);
@@ -209,8 +225,9 @@ export default function SeekerDashboard() {
         const safeJobs = jobsRes.data.filter(j => !swipedIdsRef.current.has(j.id));
         setJobs(safeJobs);
         setCurrentIndex(0);
-        setStats(statsRes.data);
-        saveCachedStats(statsRes.data, uidRef.current);
+        const mergedFallback = mergeStatsWithCache(statsRes.data, uidRef.current);
+        setStats(mergedFallback);
+        saveCachedStats(mergedFallback, uidRef.current);
         setSuperLikesRemaining(slRes.data.remaining);
         saveCachedSuperLikes(slRes.data.remaining, uidRef.current);
       } catch (fallbackErr) {
@@ -264,8 +281,9 @@ export default function SeekerDashboard() {
           headers: { Authorization: `Bearer ${tokenRef.current}` },
           timeout: 5000,
         }).then(res => {
-          setStats(res.data);
-          saveCachedStats(res.data, uidRef.current);
+          const mergedVis = mergeStatsWithCache(res.data, uidRef.current);
+          setStats(mergedVis);
+          saveCachedStats(mergedVis, uidRef.current);
         }).catch(() => { /* ignore - stats will catch up on next full fetch */ });
       }
     };
