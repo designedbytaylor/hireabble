@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, useMemo, useCallback } from 'react';
+import { createContext, useContext, useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import axios from 'axios';
 
 const AuthContext = createContext(null);
@@ -8,23 +8,32 @@ const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 // Global timeout — generous enough for mobile 3G/slow networks
 axios.defaults.timeout = 20000;
 
+// Don't hydrate stale cached user on impersonation route — it will be replaced immediately
+const isImpersonateRoute = window.location.pathname === '/impersonate';
+
 export const AuthProvider = ({ children }) => {
   // Hydrate cached user immediately so pages render without waiting for network
   const [user, setUser] = useState(() => {
+    if (isImpersonateRoute) return null;
     try {
       const cached = localStorage.getItem('cached_user');
       return cached ? JSON.parse(cached) : null;
     } catch { return null; }
   });
-  const [token, setToken] = useState(localStorage.getItem('token'));
+  const [token, setToken] = useState(() => isImpersonateRoute ? null : localStorage.getItem('token'));
   const [loading, setLoading] = useState(() => {
+    if (isImpersonateRoute) return false;
     // If we have cached user data, skip loading state entirely
     const hasCached = !!localStorage.getItem('cached_user');
     return !hasCached && !!localStorage.getItem('token');
   });
 
+  // Ref to the current auth-init AbortController so loginWithToken can cancel it
+  const authInitController = useRef(null);
+
   useEffect(() => {
     const controller = new AbortController();
+    authInitController.current = controller;
     const initAuth = async () => {
       if (token) {
         try {
@@ -102,6 +111,11 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   const loginWithToken = useCallback(async (impersonateToken) => {
+    // Abort any in-flight auth initialization to prevent it from overwriting
+    // the impersonated user with a stale cached identity (race condition)
+    if (authInitController.current) {
+      authInitController.current.abort();
+    }
     // Clear stale cached user to prevent flash of wrong identity
     localStorage.removeItem('cached_user');
     setUser(null);
