@@ -23,7 +23,7 @@ DAILY_SUPERLIKE_LIMIT = 3
 
 def _get_seeker_daily_superlike_limit(user: dict) -> int:
     """Return the daily super like limit based on seeker subscription tier."""
-    sub = user.get("subscription", {})
+    sub = user.get("subscription") or {}
     now = datetime.now(timezone.utc).isoformat()
     if sub.get("status") == "active" and sub.get("period_end", "") >= now:
         tier = sub.get("tier_id", "")
@@ -204,7 +204,7 @@ async def get_remaining_superswipes(current_user: dict = Depends(get_current_use
     purchased = (user_data or {}).get("recruiter_super_swipes", 0)
 
     # Check subscription for higher limit
-    sub = (user_data or {}).get("subscription", {})
+    sub = (user_data or {}).get("subscription") or {}
     now = datetime.now(timezone.utc).isoformat()
     daily_limit = DAILY_RECRUITER_SUPERSWIPE_LIMIT
     if sub.get("status") == "active" and sub.get("period_end", "") >= now:
@@ -364,7 +364,7 @@ async def recruiter_swipe_candidate(
         user_data = results[1]
         purchased = (user_data or {}).get("recruiter_super_swipes", 0)
 
-        sub = (user_data or {}).get("subscription", {})
+        sub = (user_data or {}).get("subscription") or {}
         now = datetime.now(timezone.utc).isoformat()
         daily_limit = DAILY_RECRUITER_SUPERSWIPE_LIMIT
         if sub.get("status") == "active" and sub.get("period_end", "") >= now:
@@ -651,7 +651,7 @@ async def undo_last_swipe(current_user: dict = Depends(get_current_user)):
     uid = current_user["id"]
 
     # Check subscription allows undo
-    sub = current_user.get("subscription", {})
+    sub = current_user.get("subscription") or {}
     now = datetime.now(timezone.utc).isoformat()
     can_undo = (
         sub.get("status") == "active"
@@ -802,7 +802,7 @@ async def get_applications(
             {"_id": 0, "id": 1, "subscription": 1}
         ).to_list(len(seeker_ids))
         for s in seekers:
-            sub = s.get("subscription", {})
+            sub = s.get("subscription") or {}
             if sub.get("status") == "active" and sub.get("period_end", "") >= now:
                 premium_seekers.add(s["id"])
 
