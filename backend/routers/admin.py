@@ -972,8 +972,8 @@ async def seed_test_data(body: dict = {}, admin: dict = Depends(get_current_admi
     Optional body: { "seekers": 10, "recruiters": 5, "jobs_per_recruiter": 2 }
     Pass "create_applications": true to also generate sample applications (default: fresh accounts with 0 applied).
     """
-    num_seekers = body.get("seekers", 10)
-    num_recruiters = body.get("recruiters", 5)
+    num_seekers = body.get("seekers", 25)
+    num_recruiters = body.get("recruiters", 25)
     jobs_per_recruiter = body.get("jobs_per_recruiter", 2)
     apps_per_seeker = body.get("applications_per_seeker", 0)
 

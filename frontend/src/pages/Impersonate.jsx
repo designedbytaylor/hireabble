@@ -6,10 +6,10 @@ import { useAuth } from '../context/AuthContext';
 /**
  * Dedicated impersonation route used by admin panel.
  * NOT wrapped in PublicRoute so it works regardless of existing auth state.
- * Clears any stale token first to avoid conflicts.
+ * loginWithToken handles all cleanup (abort in-flight auth, clear caches, etc.)
  */
 export default function Impersonate() {
-  const { loginWithToken, logout } = useAuth();
+  const { loginWithToken } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const handled = useRef(false);
@@ -18,21 +18,24 @@ export default function Impersonate() {
     if (handled.current) return;
     handled.current = true;
 
-    const token = searchParams.get('token');
+    const impersonateToken = searchParams.get('token');
     const redirect = searchParams.get('redirect') || '/dashboard';
 
-    if (!token) {
+    if (!impersonateToken) {
       toast.error('Invalid impersonation link');
       navigate('/login', { replace: true });
       return;
     }
 
-    // Sign out the previous user completely before loading the new one.
-    // This resets React auth state, clears localStorage, and purges caches
-    // so no stale data from a prior impersonation bleeds through.
-    logout();
-
-    loginWithToken(token).then(user => {
+    // loginWithToken already:
+    // 1. Aborts any in-flight auth init
+    // 2. Clears cached_user and all hireabble_ localStorage keys
+    // 3. Purges SW cache
+    // 4. Sets the new token and fetches /auth/me
+    // No need to call logout() first — that causes a race condition
+    // where setToken(null) triggers authInit useEffect which competes
+    // with the loginWithToken call.
+    loginWithToken(impersonateToken).then(user => {
       if (user) {
         toast.success(`Logged in as ${user.name}`);
         navigate(redirect, { replace: true });

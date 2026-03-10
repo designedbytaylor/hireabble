@@ -4,6 +4,7 @@ Jobs routes for Hireabble API
 from fastapi import APIRouter, HTTPException, Depends
 from typing import List, Optional
 from datetime import datetime, timezone
+import asyncio
 import uuid
 
 from database import (
@@ -276,17 +277,32 @@ async def get_jobs(
 @router.get("/company/{recruiter_id}")
 async def get_company_jobs(recruiter_id: str, current_user: dict = Depends(get_current_user)):
     """Get active jobs posted by a specific recruiter/company — for seeker browsing"""
-    recruiter = await db.users.find_one(
-        {"id": recruiter_id, "role": "recruiter"},
-        {"_id": 0, "id": 1, "name": 1, "company": 1, "photo_url": 1, "avatar": 1, "location": 1, "bio": 1}
+    recruiter, jobs = await asyncio.gather(
+        db.users.find_one(
+            {"id": recruiter_id, "role": "recruiter"},
+            {"_id": 0, "id": 1, "name": 1, "company": 1, "photo_url": 1, "avatar": 1, "location": 1, "bio": 1}
+        ),
+        db.jobs.find(
+            {"recruiter_id": recruiter_id, "is_active": True},
+            {"_id": 0}
+        ).sort("created_at", -1).to_list(50),
     )
     if not recruiter:
         raise HTTPException(status_code=404, detail="Company not found")
 
-    jobs = await db.jobs.find(
-        {"recruiter_id": recruiter_id, "is_active": True},
-        {"_id": 0}
-    ).sort("created_at", -1).to_list(50)
+    # If the viewer is a seeker, mark which jobs they've already applied to
+    applied_set = set()
+    if current_user.get("role") == "seeker":
+        job_ids = [j["id"] for j in jobs]
+        if job_ids:
+            applied_apps = await db.applications.find(
+                {"seeker_id": current_user["id"], "job_id": {"$in": job_ids}},
+                {"job_id": 1}
+            ).to_list(len(job_ids))
+            applied_set = {a["job_id"] for a in applied_apps}
+
+    for job in jobs:
+        job["applied"] = job["id"] in applied_set
 
     return {"company": recruiter, "jobs": jobs}
 

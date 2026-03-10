@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Heart, MessageCircle, Briefcase, Building2, Calendar, ChevronRight,
@@ -23,13 +23,10 @@ export default function Matches() {
   // Profile view state
   const [viewingProfile, setViewingProfile] = useState(null);
   const [profileLoading, setProfileLoading] = useState(false);
+  const tokenRef = useRef(token);
+  tokenRef.current = token;
 
-  useEffect(() => {
-    fetchMatches();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  const fetchMatches = async (retry = 0) => {
+  const fetchMatches = useCallback(async (retry = 0) => {
     try {
       const response = await axios.get(`${API}/matches`, {
         headers: { Authorization: `Bearer ${token}` },
@@ -45,7 +42,44 @@ export default function Matches() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [token]);
+
+  useEffect(() => {
+    fetchMatches();
+  }, [fetchMatches]);
+
+  // Refetch when page becomes visible (e.g. tab switch, coming back from chat)
+  useEffect(() => {
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') fetchMatches();
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => document.removeEventListener('visibilitychange', handleVisibility);
+  }, [fetchMatches]);
+
+  // Listen for real-time new matches via WebSocket
+  useEffect(() => {
+    if (!token) return;
+    const WS_URL = process.env.REACT_APP_BACKEND_URL?.replace('https://', 'wss://').replace('http://', 'ws://');
+    if (!WS_URL) return;
+    let ws;
+    try {
+      ws = new WebSocket(`${WS_URL}/ws/${token}`);
+      ws.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          if (data.type === 'new_match' && data.match) {
+            // Prepend new match immediately so the user sees it without refresh
+            setMatches(prev => {
+              if (prev.some(m => m.id === data.match.id)) return prev;
+              return [data.match, ...prev];
+            });
+          }
+        } catch { /* ignore */ }
+      };
+    } catch { /* ignore */ }
+    return () => { if (ws) ws.close(); };
+  }, [token]);
 
   const handleOpenChat = (matchId) => {
     navigate(`/chat/${matchId}`);

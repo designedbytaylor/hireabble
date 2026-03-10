@@ -69,18 +69,47 @@ function saveCachedStats(stats, userId) {
   try { localStorage.setItem(storageKey(userId, 'swipe_stats'), JSON.stringify(stats)); } catch { /* quota */ }
 }
 
-// Merge server stats with cached optimistic stats — never let counts regress.
-// The user may have swiped faster than the backend can persist, so the local
-// optimistic count can be ahead of the server.  Taking the max of each field
-// prevents the jarring "count drops to zero" effect when navigating back.
+// Merge server stats with cached optimistic increments.
+// The cache stores the number of optimistic bumps made since the last server sync.
+// When the server responds, we add any pending increments on top of the server
+// baseline, then reset the pending count.  This prevents the inflated-count bug
+// where MAX(server, local) would permanently latch to a stale high value.
 function mergeStatsWithCache(serverStats, userId) {
   const cached = loadCachedStats(userId);
-  if (!cached) return serverStats;
-  return {
-    applications_sent: Math.max(serverStats.applications_sent || 0, cached.applications_sent || 0),
-    super_likes_used: Math.max(serverStats.super_likes_used || 0, cached.super_likes_used || 0),
-    matches: Math.max(serverStats.matches || 0, cached.matches || 0),
+  if (!cached || !cached._pending) {
+    // No pending optimistic increments — trust the server completely
+    // Store server values as baseline with zero pending
+    const merged = {
+      applications_sent: serverStats.applications_sent || 0,
+      super_likes_used: serverStats.super_likes_used || 0,
+      matches: serverStats.matches || 0,
+      _pending: { applications_sent: 0, super_likes_used: 0, matches: 0 },
+      _serverBaseline: { ...serverStats },
+    };
+    saveCachedStats(merged, userId);
+    return merged;
+  }
+  // We have pending optimistic bumps — add them to the server baseline.
+  // If the server already caught up (server >= baseline + pending), reset pending.
+  const pending = cached._pending;
+  const baseline = cached._serverBaseline || {};
+  const result = {
+    applications_sent: serverStats.applications_sent || 0,
+    super_likes_used: serverStats.super_likes_used || 0,
+    matches: serverStats.matches || 0,
+    _pending: { applications_sent: 0, super_likes_used: 0, matches: 0 },
+    _serverBaseline: { ...serverStats },
   };
+  // Only add pending if server hasn't caught up yet
+  for (const key of ['applications_sent', 'super_likes_used', 'matches']) {
+    const serverCaughtUp = (serverStats[key] || 0) >= ((baseline[key] || 0) + (pending[key] || 0));
+    if (!serverCaughtUp) {
+      const gap = ((baseline[key] || 0) + (pending[key] || 0)) - (serverStats[key] || 0);
+      result[key] += Math.max(0, gap);
+      result._pending[key] = Math.max(0, gap);
+    }
+  }
+  return result;
 }
 
 function loadSwipeQueue(userId) {
@@ -256,13 +285,17 @@ export default function SeekerDashboard() {
         try {
           const data = JSON.parse(event.data);
           if (data.type === 'new_match' && data.match) {
-            setStats(prev => {
-              const next = { ...prev, matches: prev.matches + 1 };
-              saveCachedStats(next, uidRef.current);
-              return next;
+            // Only show modal if not already showing one (API response may have already triggered it)
+            setShowMatch(prev => {
+              if (prev) return prev; // already showing a match modal
+              setStats(s => {
+                const next = { ...s, matches: s.matches + 1 };
+                saveCachedStats(next, uidRef.current);
+                return next;
+              });
+              setMatchData(data.match);
+              return true;
             });
-            setMatchData(data.match);
-            setShowMatch(true);
           }
         } catch { /* ignore parse errors */ }
       };
@@ -425,13 +458,23 @@ export default function SeekerDashboard() {
     // Optimistically update stats immediately so UI feels instant
     if (action === 'like') {
       setStats(prev => {
-        const next = { ...prev, applications_sent: prev.applications_sent + 1 };
+        const pending = prev._pending || { applications_sent: 0, super_likes_used: 0, matches: 0 };
+        const next = {
+          ...prev,
+          applications_sent: prev.applications_sent + 1,
+          _pending: { ...pending, applications_sent: (pending.applications_sent || 0) + 1 },
+        };
         saveCachedStats(next, uidRef.current);
         return next;
       });
     } else if (action === 'superlike') {
       setStats(prev => {
-        const next = { ...prev, super_likes_used: prev.super_likes_used + 1 };
+        const pending = prev._pending || { applications_sent: 0, super_likes_used: 0, matches: 0 };
+        const next = {
+          ...prev,
+          super_likes_used: prev.super_likes_used + 1,
+          _pending: { ...pending, super_likes_used: (pending.super_likes_used || 0) + 1 },
+        };
         saveCachedStats(next, uidRef.current);
         return next;
       });
@@ -450,6 +493,16 @@ export default function SeekerDashboard() {
       if (action === 'superlike' && response.data.remaining_superlikes != null) {
         setSuperLikesRemaining(response.data.remaining_superlikes);
         saveCachedSuperLikes(response.data.remaining_superlikes, uidRef.current);
+      }
+      // Show "It's a Match!" modal if the API returned match data
+      if (response.data.match) {
+        setStats(prev => {
+          const next = { ...prev, matches: prev.matches + 1 };
+          saveCachedStats(next, uidRef.current);
+          return next;
+        });
+        setMatchData(response.data.match);
+        setShowMatch(true);
       }
       // Swipe saved successfully — remove from retry queue if present
       const queue = loadSwipeQueue(uidRef.current).filter(q => q.job_id !== job.id);
@@ -494,13 +547,19 @@ export default function SeekerDashboard() {
       // Revert optimistic stat update on permanent failure (4xx errors)
       if (action === 'like') {
         setStats(prev => {
-          const next = { ...prev, applications_sent: Math.max(0, prev.applications_sent - 1) };
+          const pending = prev._pending || {};
+          const next = {
+            ...prev,
+            applications_sent: Math.max(0, prev.applications_sent - 1),
+            _pending: { ...pending, applications_sent: Math.max(0, (pending.applications_sent || 0) - 1) },
+          };
           saveCachedStats(next, uidRef.current);
           return next;
         });
       } else if (action === 'superlike') {
         setStats(prev => {
-          const next = { ...prev, super_likes_used: Math.max(0, prev.super_likes_used - 1) };
+          const pending = prev._pending || {};
+          const next = { ...prev, super_likes_used: Math.max(0, prev.super_likes_used - 1), _pending: { ...pending, super_likes_used: Math.max(0, (pending.super_likes_used || 0) - 1) } };
           saveCachedStats(next, uidRef.current);
           return next;
         });
@@ -1032,7 +1091,7 @@ export default function SeekerDashboard() {
         <MatchModal
           match={matchData}
           onClose={() => setShowMatch(false)}
-          onMessage={() => { setShowMatch(false); navigate('/matches'); }}
+          onMessage={() => { setShowMatch(false); navigate(matchData?.id ? `/chat/${matchData.id}` : '/matches'); }}
         />
       )}
 
