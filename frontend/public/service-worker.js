@@ -1,6 +1,6 @@
 const CACHE_NAME = 'hireabble-v4';
 const IMG_CACHE = 'hireabble-images-v1';
-const API_CACHE = 'hireabble-api-v6';
+const API_CACHE = 'hireabble-api-v7';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
@@ -79,6 +79,13 @@ self.addEventListener('notificationclick', (event) => {
       return self.clients.openWindow(url);
     })
   );
+});
+
+// Allow the app to purge user-specific caches (e.g. on impersonation / logout)
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'CLEAR_API_CACHE') {
+    caches.delete(API_CACHE);
+  }
 });
 
 // Helper: is this an image request?

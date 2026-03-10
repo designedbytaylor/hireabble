@@ -112,6 +112,14 @@ export default function AdminTesting() {
       localStorage.removeItem('token');
       localStorage.removeItem('cached_user');
 
+      // Purge service-worker API cache so the new user doesn't see
+      // stale dashboard/stats data from a previously impersonated user.
+      // The SW caches by URL only (ignores Authorization header), so
+      // switching identities without clearing returns the old user's data.
+      try {
+        await caches.delete('hireabble-api-v7');
+      } catch (_) { /* SW cache API not available */ }
+
       const baseUrl = window.location.origin;
       const impersonateUrl = `${baseUrl}/impersonate?token=${encodeURIComponent(impersonateToken)}&redirect=${encodeURIComponent(targetPath)}`;
 
