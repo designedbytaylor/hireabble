@@ -247,6 +247,14 @@ async def _recruiter_swipe_post_process(
         })
 
         if seeker_app:
+            # Guard: check if a match already exists (race with seeker swipe)
+            existing_match = await db.matches.find_one({
+                "seeker_id": seeker_id,
+                "job_id": seeker_app["job_id"],
+            })
+            if existing_match:
+                return  # match already created by seeker swipe path
+
             # Mutual interest → auto-match
             seeker, job = await asyncio.gather(
                 db.users.find_one({"id": seeker_id}, {"_id": 0, "name": 1, "avatar": 1}),
@@ -268,13 +276,18 @@ async def _recruiter_swipe_post_process(
                 "created_at": now,
             }
 
-            await asyncio.gather(
-                db.matches.insert_one(match_doc),
-                db.applications.update_one(
-                    {"id": seeker_app["id"]},
-                    {"$set": {"recruiter_action": "accept", "is_matched": True}}
-                ),
-            )
+            try:
+                await asyncio.gather(
+                    db.matches.insert_one(match_doc),
+                    db.applications.update_one(
+                        {"id": seeker_app["id"]},
+                        {"$set": {"recruiter_action": "accept", "is_matched": True}}
+                    ),
+                )
+            except Exception as insert_err:
+                if "duplicate key" in str(insert_err).lower() or "E11000" in str(insert_err):
+                    return  # match created by concurrent seeker swipe
+                raise
 
             match_payload = {k: v for k, v in match_doc.items() if k != "_id"}
             await asyncio.gather(
@@ -396,49 +409,53 @@ async def recruiter_swipe_candidate(
 
 # ==================== SWIPE ====================
 
-async def _swipe_post_process(
+async def _check_match_on_swipe(
     application_id: str,
     job: dict,
     current_user_snapshot: dict,
     action_str: str,
     job_id: str,
 ):
-    """Background task: match checking, notifications, cache invalidation.
-    Runs AFTER the swipe has already been persisted so the user isn't blocked."""
+    """Inline match check — returns match data if mutual interest exists.
+    Called synchronously so the HTTP response includes the match for the modal."""
+    uid = current_user_snapshot["id"]
+    invalidate_user(uid)
+
+    if action_str not in ("like", "superlike"):
+        return None
+
+    # Check if recruiter already swiped on this seeker → auto-match
+    recruiter_swipe = await db.recruiter_swipes.find_one({
+        "recruiter_id": job["recruiter_id"],
+        "seeker_id": uid,
+        "action": {"$in": ["like", "superlike"]},
+    })
+    if not recruiter_swipe:
+        return None
+
+    # Guard against duplicate matches (race with recruiter swipe creating one too)
+    existing_match = await db.matches.find_one({"seeker_id": uid, "job_id": job_id})
+    if existing_match:
+        return {k: v for k, v in existing_match.items() if k != "_id"}
+
+    # Mutual interest — create match
+    match_id = str(uuid.uuid4())
+    now = datetime.now(timezone.utc).isoformat()
+    match_doc = {
+        "id": match_id,
+        "application_id": application_id,
+        "job_id": job_id,
+        "job_title": job.get("title", "Unknown"),
+        "company": job.get("company", "Unknown"),
+        "seeker_id": uid,
+        "seeker_name": current_user_snapshot["name"],
+        "seeker_avatar": current_user_snapshot.get("avatar"),
+        "recruiter_id": job["recruiter_id"],
+        "recruiter_name": job.get("recruiter_name", ""),
+        "created_at": now,
+    }
+
     try:
-        uid = current_user_snapshot["id"]
-        invalidate_user(uid)
-
-        if action_str not in ("like", "superlike"):
-            return
-
-        # Check if recruiter already swiped on this seeker → auto-match
-        recruiter_swipe = await db.recruiter_swipes.find_one({
-            "recruiter_id": job["recruiter_id"],
-            "seeker_id": uid,
-            "action": {"$in": ["like", "superlike"]},
-        })
-        if not recruiter_swipe:
-            return
-
-        # Mutual interest — create match
-        match_id = str(uuid.uuid4())
-        now = datetime.now(timezone.utc).isoformat()
-        match_doc = {
-            "id": match_id,
-            "application_id": application_id,
-            "job_id": job_id,
-            "job_title": job.get("title", "Unknown"),
-            "company": job.get("company", "Unknown"),
-            "seeker_id": uid,
-            "seeker_name": current_user_snapshot["name"],
-            "seeker_avatar": current_user_snapshot.get("avatar"),
-            "recruiter_id": job["recruiter_id"],
-            "recruiter_name": job.get("recruiter_name", ""),
-            "created_at": now,
-        }
-
-        # Insert match + update application in parallel
         await asyncio.gather(
             db.matches.insert_one(match_doc),
             db.applications.update_one(
@@ -446,25 +463,39 @@ async def _swipe_post_process(
                 {"$set": {"recruiter_action": "accept", "is_matched": True}}
             ),
         )
+    except Exception as e:
+        if "duplicate key" in str(e).lower() or "E11000" in str(e):
+            existing = await db.matches.find_one({"seeker_id": uid, "job_id": job_id})
+            return {k: v for k, v in existing.items() if k != "_id"} if existing else None
+        raise
 
-        # Notify recruiter (non-blocking)
-        await create_notification(
-            user_id=job["recruiter_id"],
-            notif_type="match",
-            title="It's a Match!",
-            message=f"{current_user_snapshot['name']} applied to {job.get('title', 'your position')} - mutual interest!",
-            data={"match_id": match_id, "job_id": job_id}
+    match_payload = {k: v for k, v in match_doc.items() if k != "_id"}
+
+    # Notifications + WebSocket in background (don't block the response)
+    asyncio.create_task(_swipe_match_notify(
+        match_id, match_payload, job, current_user_snapshot, uid, job_id
+    ))
+
+    return match_payload
+
+
+async def _swipe_match_notify(match_id, match_payload, job, current_user_snapshot, uid, job_id):
+    """Background: send match notifications + WebSocket after match is created."""
+    try:
+        await asyncio.gather(
+            create_notification(
+                user_id=job["recruiter_id"],
+                notif_type="match",
+                title="It's a Match!",
+                message=f"{current_user_snapshot['name']} applied to {job.get('title', 'your position')} - mutual interest!",
+                data={"match_id": match_id, "job_id": job_id}
+            ),
+            manager.send_to_user(uid, {"type": "new_match", "match": match_payload}),
+            manager.send_to_user(job["recruiter_id"], {"type": "new_match", "match": match_payload}),
         )
-
-        # Push match to seeker via WebSocket so they see it immediately
-        await manager.send_to_user(uid, {
-            "type": "new_match",
-            "match": {k: v for k, v in match_doc.items() if k != "_id"}
-        })
-
     except Exception as e:
         import logging
-        logging.getLogger(__name__).error(f"Swipe post-process error: {e}")
+        logging.getLogger(__name__).error(f"Swipe match notify error: {e}")
 
 
 @router.post("/swipe")
@@ -585,17 +616,22 @@ async def swipe(action: SwipeAction, current_user: dict = Depends(get_current_us
     # Invalidate stats cache immediately so the next dashboard fetch gets fresh counts
     invalidate(stats_cache, cache_key("stats", uid))
 
-    # ── Phase 3: Return immediately, process the rest in background ───
-    # Match checking + notifications happen async — user sees instant response.
-    asyncio.create_task(
-        _swipe_post_process(application_id, job, dict(current_user), action.action, action.job_id)
-    )
+    # ── Phase 3: Check for match inline so the response includes match data ───
+    # This enables the frontend to show the "It's a Match!" modal immediately.
+    match_data = None
+    try:
+        match_data = await _check_match_on_swipe(
+            application_id, job, dict(current_user), action.action, action.job_id
+        )
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).error(f"Match check error (non-fatal): {e}")
 
     return {
         "message": f"Swiped {action.action}",
         "application_id": application_id,
         "remaining_superlikes": remaining_superlikes,
-        "match": None,  # match is detected async; delivered via WebSocket
+        "match": match_data,
     }
 
 

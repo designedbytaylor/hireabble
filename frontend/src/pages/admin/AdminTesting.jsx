@@ -44,8 +44,8 @@ export default function AdminTesting() {
     setLoading(prev => ({ ...prev, seed: true }));
     try {
       const res = await axios.post(`${API}/admin/seed-test-data`, {
-        seekers: 10,
-        recruiters: 5,
+        seekers: 25,
+        recruiters: 25,
         jobs_per_recruiter: 2,
       }, { headers: { Authorization: `Bearer ${token}` }, timeout: 120000 });
       setSeedResult(res.data);
@@ -152,7 +152,7 @@ export default function AdminTesting() {
             </div>
             <div className="min-w-0">
               <h2 className="text-base sm:text-lg font-semibold text-white">Seed Test Data</h2>
-              <p className="text-xs text-gray-400">10 seekers, 5 recruiters, jobs & matches</p>
+              <p className="text-xs text-gray-400">25 seekers, 25 recruiters, jobs & matches</p>
             </div>
           </div>
           <p className="text-xs text-gray-500 mb-3">
