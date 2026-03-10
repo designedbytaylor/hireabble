@@ -295,11 +295,14 @@ async def startup():
     await ensure_index(db.interviews, "id", unique=True)
     await ensure_index(db.interviews, [("created_by", 1), ("status", 1)])
     await ensure_index(db.interviews, [("other_party_id", 1), ("status", 1)])
+    await ensure_index(db.interviews, "seeker_id")
+    await ensure_index(db.interviews, "recruiter_id")
 
     # Recruiter swipes indexes (critical for match detection speed)
     await ensure_index(db.recruiter_swipes, [("recruiter_id", 1), ("seeker_id", 1)], unique=True)
     await ensure_index(db.recruiter_swipes, "recruiter_id")
     await ensure_index(db.recruiter_swipes, [("recruiter_id", 1), ("action", 1), ("created_at", -1)])
+    await ensure_index(db.recruiter_swipes, "seeker_id")
 
     # Performance indexes
     await ensure_index(db.jobs, [("recruiter_id", 1), ("is_active", 1)])
@@ -308,9 +311,11 @@ async def startup():
     await ensure_index(db.applications, "job_id")
     await ensure_index(db.messages, [("match_id", 1), ("is_read", 1)])
     await ensure_index(db.messages, [("match_id", 1), ("created_at", -1)])
+    await ensure_index(db.messages, "sender_id")
     await ensure_index(db.matches, "seeker_id")
     await ensure_index(db.matches, "recruiter_id")
     await ensure_index(db.matches, "job_id")
+    await ensure_index(db.notifications, "user_id")
 
     logger.info("Database indexes created")
     logger.info("Hireabble API started successfully!")

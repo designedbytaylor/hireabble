@@ -17,7 +17,7 @@ from database import (
     AdminLogin, AdminCreate, ReportCreate, get_current_user, JobCreate,
 )
 from content_filter import check_text, BANNED_WORDS
-from cache import invalidate_user
+from cache import invalidate_user, invalidate_users_batch
 
 router = APIRouter(tags=["Admin"])
 
@@ -982,7 +982,8 @@ async def seed_test_data(body: dict = {}, admin: dict = Depends(get_current_admi
     created_jobs = []
     created_applications = []
     created_matches = []
-    password = hash_password("testpass123")
+    # Run bcrypt off the event loop to avoid blocking
+    password = await asyncio.to_thread(hash_password, "testpass123")
     used_names = set()
     used_companies = set()
 
@@ -1003,8 +1004,7 @@ async def seed_test_data(body: dict = {}, admin: dict = Depends(get_current_admi
             db.recruiter_swipes.delete_many({"$or": [{"recruiter_id": {"$in": old_ids}}, {"seeker_id": {"$in": old_ids}}]}),
             db.interviews.delete_many({"$or": [{"seeker_id": {"$in": old_ids}}, {"recruiter_id": {"$in": old_ids}}]}),
         )
-        for uid in old_ids:
-            invalidate_user(uid)
+        invalidate_users_batch(old_ids)
 
     # Build all documents in memory first, then batch-insert for speed
     seeker_docs = []
@@ -1160,8 +1160,7 @@ async def seed_test_data(body: dict = {}, admin: dict = Depends(get_current_admi
         created_matches = match_docs
 
     # Invalidate caches for all seeded users so dashboard returns fresh data
-    for u in created_seekers + created_recruiters:
-        invalidate_user(u["id"])
+    invalidate_users_batch([u["id"] for u in created_seekers + created_recruiters])
 
     return {
         "message": "Test data seeded successfully!",
@@ -1221,9 +1220,8 @@ async def clear_test_data(admin: dict = Depends(get_current_admin)):
         db.users.delete_many({"id": {"$in": test_user_ids}}),
     )
 
-    # Invalidate caches for all deleted users
-    for uid in test_user_ids:
-        invalidate_user(uid)
+    # Invalidate caches for all deleted users in one batch
+    invalidate_users_batch(test_user_ids)
 
     return {
         "message": "Test data cleared",
