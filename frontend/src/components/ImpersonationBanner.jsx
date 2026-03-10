@@ -24,7 +24,7 @@ export default function ImpersonationBanner() {
 
   if (!visible) return null;
 
-  const handleBackToAdmin = () => {
+  const handleBackToAdmin = async () => {
     // Clear the impersonated user session
     localStorage.removeItem('token');
     localStorage.removeItem('cached_user');
@@ -35,8 +35,13 @@ export default function ImpersonationBanner() {
       if (key && key.startsWith('hireabble_')) keysToRemove.push(key);
     }
     keysToRemove.forEach(k => localStorage.removeItem(k));
-    // Purge SW cache (fire-and-forget — don't block navigation)
-    try { caches.delete('hireabble-api-v7'); } catch (_) { /* ok */ }
+    // Purge SW cache — await it so stale responses don't interfere with reload
+    try { await caches.delete('hireabble-api-v7'); } catch (_) { /* ok */ }
+    // Unregister service workers to prevent stale responses on reload
+    try {
+      const regs = await navigator.serviceWorker?.getRegistrations();
+      if (regs) await Promise.all(regs.map(r => r.unregister()));
+    } catch (_) { /* ok */ }
     // Navigate back to admin testing page (full reload to reset React state)
     window.location.href = '/admin/testing';
   };
