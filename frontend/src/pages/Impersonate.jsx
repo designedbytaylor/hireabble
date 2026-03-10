@@ -9,7 +9,7 @@ import { useAuth } from '../context/AuthContext';
  * loginWithToken handles all cleanup (abort in-flight auth, clear caches, etc.)
  */
 export default function Impersonate() {
-  const { loginWithToken, logout } = useAuth();
+  const { loginWithToken } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const handled = useRef(false);
@@ -27,14 +27,13 @@ export default function Impersonate() {
       return;
     }
 
-    // Sign out the previous user completely before loading the new one.
-    // This resets React auth state, clears localStorage, and purges caches
-    // so no stale data from a prior impersonation bleeds through.
-    // (loginWithToken also does cleanup, but logout() ensures React state
-    // is fully torn down first — the race condition is handled by
-    // skipNextAuthInit ref in AuthContext.)
-    logout();
-
+    // loginWithToken handles all cleanup internally:
+    // 1. Aborts any in-flight auth init
+    // 2. Clears cached_user and all hireabble_ localStorage keys
+    // 3. Purges ALL SW caches (api + static + images)
+    // 4. Sets the new token and fetches /auth/me
+    // Do NOT call logout() — it causes a race condition where
+    // setToken(null) triggers authInit useEffect competing with loginWithToken.
     loginWithToken(impersonateToken).then(user => {
       if (user) {
         toast.success(`Logged in as ${user.name}`);
