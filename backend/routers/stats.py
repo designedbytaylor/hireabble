@@ -31,7 +31,7 @@ DAILY_SUPERLIKE_LIMIT = 3
 
 def _get_seeker_daily_superlike_limit(user: dict) -> int:
     """Return the daily super like limit based on seeker subscription tier."""
-    sub = user.get("subscription", {})
+    sub = user.get("subscription") or {}
     now = datetime.now(timezone.utc).isoformat()
     if sub.get("status") == "active" and sub.get("period_end", "") >= now:
         tier = sub.get("tier_id", "")
@@ -101,7 +101,7 @@ async def get_seeker_dashboard(current_user: dict = Depends(get_current_user)):
             {"_id": 0, "id": 1, "subscription": 1}
         ).to_list(len(recruiter_ids))
         for r in recruiters:
-            sub = r.get("subscription", {})
+            sub = r.get("subscription") or {}
             if sub.get("status") == "active" and sub.get("period_end", "") >= now:
                 recruiter_subs[r["id"]] = sub.get("tier_id", "")
 
@@ -151,7 +151,7 @@ async def get_seeker_dashboard(current_user: dict = Depends(get_current_user)):
     free_remaining = max(0, daily_limit - superlikes_today)
 
     # Check if user's subscription allows undo
-    sub = current_user.get("subscription", {})
+    sub = current_user.get("subscription") or {}
     can_undo = (
         sub.get("status") == "active"
         and sub.get("period_end", "") >= now
@@ -258,7 +258,7 @@ async def get_recruiter_dashboard_data(current_user: dict = Depends(get_current_
             {"id": {"$in": seeker_ids}}, {"_id": 0, "id": 1, "subscription": 1}
         ).to_list(len(seeker_ids))
         for s in seekers:
-            sub = s.get("subscription", {})
+            sub = s.get("subscription") or {}
             if sub.get("status") == "active" and sub.get("period_end", "") >= now_iso:
                 premium_seekers.add(s["id"])
     for app in raw_applications:
@@ -270,7 +270,7 @@ async def get_recruiter_dashboard_data(current_user: dict = Depends(get_current_
     applications = sl + pr + rg
 
     # Subscription status
-    sub = (user_sub_data or {}).get("subscription", {})
+    sub = (user_sub_data or {}).get("subscription") or {}
     from routers.payments import SUBSCRIPTION_TIERS
     tier_id = sub.get("tier_id")
     tier = SUBSCRIPTION_TIERS.get(tier_id)
