@@ -35,8 +35,12 @@ export default function ImpersonationBanner() {
       if (key && key.startsWith('hireabble_')) keysToRemove.push(key);
     }
     keysToRemove.forEach(k => localStorage.removeItem(k));
-    // Purge SW cache — await it so stale responses don't interfere with reload
-    try { await caches.delete('hireabble-api-v7'); } catch (_) { /* ok */ }
+    // Purge ALL SW caches — not just hireabble-api-v7, the static asset cache
+    // can also hold stale API responses that cause wrong-user impersonation.
+    try {
+      const cacheNames = await caches.keys();
+      await Promise.all(cacheNames.map(name => caches.delete(name)));
+    } catch (_) { /* ok */ }
     // Unregister service workers to prevent stale responses on reload
     try {
       const regs = await navigator.serviceWorker?.getRegistrations();

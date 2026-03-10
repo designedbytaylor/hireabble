@@ -112,12 +112,12 @@ export default function AdminTesting() {
       localStorage.removeItem('token');
       localStorage.removeItem('cached_user');
 
-      // Purge service-worker API cache so the new user doesn't see
-      // stale dashboard/stats data from a previously impersonated user.
-      // The SW caches by URL only (ignores Authorization header), so
-      // switching identities without clearing returns the old user's data.
+      // Purge ALL service-worker caches so the new user doesn't see
+      // stale data from a previously impersonated user. Both hireabble-api-v7
+      // and hireabble-v4 (static) can hold stale API responses.
       try {
-        await caches.delete('hireabble-api-v7');
+        const cacheNames = await caches.keys();
+        await Promise.all(cacheNames.map(name => caches.delete(name)));
       } catch (_) { /* SW cache API not available */ }
 
       const baseUrl = window.location.origin;

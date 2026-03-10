@@ -152,6 +152,12 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
+  // Never cache API requests in the static asset cache — they contain
+  // user-specific data keyed by Auth header that the SW ignores.
+  if (url.includes('/api/')) {
+    return;
+  }
+
   // Static assets: cache-first with network fallback
   event.respondWith(
     caches.match(request).then((cached) => {

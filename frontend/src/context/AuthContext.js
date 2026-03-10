@@ -124,10 +124,8 @@ export const AuthProvider = ({ children }) => {
       authInitController.current.abort();
     }
 
-    // Fully tear down the previous user's session first.
-    // Clear React state so components don't render stale data.
+    // Clear stale cached user to prevent flash of wrong identity
     setUser(null);
-    setToken(null);
 
     // Clear ALL user data from localStorage
     localStorage.removeItem('token');
@@ -139,9 +137,12 @@ export const AuthProvider = ({ children }) => {
     }
     keysToRemove.forEach(k => localStorage.removeItem(k));
 
-    // Purge service-worker API cache — it caches by URL only (ignores Auth
-    // header), so switching users without clearing returns stale data.
-    try { await caches.delete('hireabble-api-v7'); } catch (_) { /* ok */ }
+    // Purge ALL service-worker caches — the static asset cache (hireabble-v4)
+    // can also hold stale API responses if same-origin, not just hireabble-api-v7.
+    try {
+      const cacheNames = await caches.keys();
+      await Promise.all(cacheNames.map(name => caches.delete(name)));
+    } catch (_) { /* ok */ }
 
     // Skip the useEffect auth init that setToken will trigger —
     // we handle the /auth/me fetch directly below.
@@ -168,8 +169,8 @@ export const AuthProvider = ({ children }) => {
     localStorage.removeItem('cached_user');
     setToken(null);
     setUser(null);
-    // Purge SW API cache so next login doesn't see stale user data
-    try { caches.delete('hireabble-api-v7'); } catch (_) { /* ok */ }
+    // Purge all SW caches so next login doesn't see stale user data
+    try { caches.keys().then(names => names.forEach(n => caches.delete(n))); } catch (_) { /* ok */ }
   }, []);
 
   const updateProfile = useCallback(async (updates) => {
