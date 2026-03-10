@@ -47,9 +47,10 @@ export default function AdminTesting() {
         seekers: 10,
         recruiters: 5,
         jobs_per_recruiter: 2,
-      }, { headers: { Authorization: `Bearer ${token}` }, timeout: 60000 });
+      }, { headers: { Authorization: `Bearer ${token}` }, timeout: 120000 });
       setSeedResult(res.data);
       toast.success('Test data seeded!');
+      fetchUsers();
     } catch (e) {
       const detail = e.response?.data?.detail;
       const isTimeout = e.code === 'ECONNABORTED' || e.message?.includes('timeout');
@@ -58,10 +59,10 @@ export default function AdminTesting() {
       } else {
         toast.error(detail || 'Failed to seed data');
       }
+      // Refresh regardless — backend may have succeeded before the error
+      fetchUsers();
     } finally {
       setLoading(prev => ({ ...prev, seed: false }));
-      // Always refresh the user list — backend may have succeeded even if the request timed out
-      fetchUsers();
     }
   };
 
@@ -71,13 +72,20 @@ export default function AdminTesting() {
     try {
       const res = await axios.delete(`${API}/admin/clear-test-data`, {
         headers: { Authorization: `Bearer ${token}` },
-        timeout: 30000,
+        timeout: 120000,
       });
       toast.success(res.data.message);
       setSeedResult(null);
       fetchUsers();
     } catch (e) {
-      toast.error('Failed to clear data');
+      const isTimeout = e.code === 'ECONNABORTED' || e.message?.includes('timeout');
+      if (isTimeout) {
+        toast.warning('Clear request timed out — data may still be processing. Refreshing...');
+      } else {
+        toast.error(e.response?.data?.detail || 'Failed to clear data');
+      }
+      // Refresh regardless — backend may have succeeded
+      fetchUsers();
     } finally {
       setLoading(prev => ({ ...prev, clear: false }));
     }

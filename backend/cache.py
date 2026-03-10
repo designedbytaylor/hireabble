@@ -114,17 +114,66 @@ def invalidate(cache: TTLCache, key: str):
 
 def invalidate_user(user_id: str):
     """Invalidate all caches for a user (call after writes)."""
+    # Each cache has ONE correct prefix — no cross-product needed
+    _CACHE_PREFIXES = [
+        (stats_cache, "stats"),
+        (stats_cache, "rstats"),
+        (completeness_cache, "completeness"),
+        (plan_cache, "plan"),
+        (superlikes_cache, "superlikes"),
+        (user_auth_cache, "auth"),
+    ]
     r = _get_redis()
-    for cache in (stats_cache, completeness_cache, plan_cache, superlikes_cache, user_auth_cache):
-        for prefix in ("stats", "rstats", "completeness", "plan", "superlikes", "auth"):
-            k = cache_key(prefix, user_id)
+    pipe = None
+    if r is not None:
+        try:
+            pipe = r.pipeline(transaction=False)
+        except Exception:
+            pipe = None
+    for cache, prefix in _CACHE_PREFIXES:
+        k = cache_key(prefix, user_id)
+        cache.pop(k, None)
+        if pipe is not None:
+            rprefix, _ = _CACHE_META.get(id(cache), ("c:misc", 30))
+            pipe.delete(f"{rprefix}:{k}")
+    if pipe is not None:
+        try:
+            pipe.execute()
+        except Exception:
+            pass
+
+
+def invalidate_users_batch(user_ids: list):
+    """Invalidate all caches for multiple users in one Redis round-trip."""
+    if not user_ids:
+        return
+    _CACHE_PREFIXES = [
+        (stats_cache, "stats"),
+        (stats_cache, "rstats"),
+        (completeness_cache, "completeness"),
+        (plan_cache, "plan"),
+        (superlikes_cache, "superlikes"),
+        (user_auth_cache, "auth"),
+    ]
+    r = _get_redis()
+    pipe = None
+    if r is not None:
+        try:
+            pipe = r.pipeline(transaction=False)
+        except Exception:
+            pipe = None
+    for uid in user_ids:
+        for cache, prefix in _CACHE_PREFIXES:
+            k = cache_key(prefix, uid)
             cache.pop(k, None)
-            if r is not None:
+            if pipe is not None:
                 rprefix, _ = _CACHE_META.get(id(cache), ("c:misc", 30))
-                try:
-                    r.delete(f"{rprefix}:{k}")
-                except Exception:
-                    pass
+                pipe.delete(f"{rprefix}:{k}")
+    if pipe is not None:
+        try:
+            pipe.execute()
+        except Exception:
+            pass
 
 
 # ==================== USER AUTH CACHE HELPERS ====================
