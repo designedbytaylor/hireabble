@@ -27,8 +27,9 @@ export default function Impersonate() {
       return;
     }
 
-    // Clear any stale token before impersonating
+    // Clear any stale auth data before impersonating
     localStorage.removeItem('token');
+    localStorage.removeItem('cached_user');
 
     loginWithToken(token).then(user => {
       if (user) {
