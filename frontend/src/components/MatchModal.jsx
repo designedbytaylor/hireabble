@@ -19,36 +19,52 @@ export default function MatchModal({ match, onClose, onMessage }) {
           onClick={onClose}
         />
 
-        {/* Confetti particles */}
+        {/* Confetti particles — multi-burst celebration */}
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          {[...Array(50)].map((_, i) => (
-            <motion.div
-              key={i}
-              className="confetti-piece rounded-sm"
-              initial={{
-                x: Math.random() * (typeof window !== 'undefined' ? window.innerWidth : 400),
-                y: -20,
-                rotate: 0,
-                opacity: 1
-              }}
-              animate={{
-                y: (typeof window !== 'undefined' ? window.innerHeight : 800) + 20,
-                rotate: Math.random() * 720,
-                opacity: 0
-              }}
-              transition={{
-                duration: 2 + Math.random() * 2,
-                delay: Math.random() * 0.5,
-                ease: 'easeOut'
-              }}
-              style={{
-                position: 'absolute',
-                backgroundColor: ['#6366f1', '#d946ef', '#10b981', '#f43f5e', '#fbbf24'][Math.floor(Math.random() * 5)],
-                width: 8 + Math.random() * 8,
-                height: 8 + Math.random() * 8,
-              }}
-            />
-          ))}
+          {[...Array(80)].map((_, i) => {
+            const centerX = typeof window !== 'undefined' ? window.innerWidth / 2 : 200;
+            const centerY = typeof window !== 'undefined' ? window.innerHeight * 0.35 : 280;
+            const angle = (Math.random() * Math.PI * 2);
+            const velocity = 200 + Math.random() * 600;
+            const colors = ['#6366f1', '#d946ef', '#10b981', '#f43f5e', '#fbbf24', '#06b6d4', '#f97316', '#a855f7'];
+            const shapes = ['rounded-sm', 'rounded-full', 'rounded-none'];
+            const w = 6 + Math.random() * 10;
+            const h = Math.random() > 0.5 ? w : w * (0.3 + Math.random() * 0.5);
+            const burst = i < 50 ? 0 : 1; // two bursts
+            const burstDelay = burst * 0.3;
+
+            return (
+              <motion.div
+                key={i}
+                className={`${shapes[Math.floor(Math.random() * shapes.length)]}`}
+                initial={{
+                  x: centerX + (Math.random() - 0.5) * 40,
+                  y: centerY + (Math.random() - 0.5) * 40,
+                  rotate: 0,
+                  scale: 0,
+                  opacity: 1,
+                }}
+                animate={{
+                  x: centerX + Math.cos(angle) * velocity,
+                  y: centerY + Math.sin(angle) * velocity + 300,
+                  rotate: Math.random() * 1080 - 540,
+                  scale: [0, 1.2, 1, 0.8],
+                  opacity: [0, 1, 1, 0],
+                }}
+                transition={{
+                  duration: 1.5 + Math.random() * 1.5,
+                  delay: burstDelay + Math.random() * 0.4,
+                  ease: [0.25, 0.46, 0.45, 0.94],
+                }}
+                style={{
+                  position: 'absolute',
+                  backgroundColor: colors[Math.floor(Math.random() * colors.length)],
+                  width: w,
+                  height: h,
+                }}
+              />
+            );
+          })}
         </div>
 
         {/* Modal Content */}

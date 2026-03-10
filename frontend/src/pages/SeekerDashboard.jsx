@@ -472,8 +472,13 @@ export default function SeekerDashboard() {
         const pending = prev._pending || { applications_sent: 0, super_likes_used: 0, matches: 0 };
         const next = {
           ...prev,
+          applications_sent: prev.applications_sent + 1,
           super_likes_used: prev.super_likes_used + 1,
-          _pending: { ...pending, super_likes_used: (pending.super_likes_used || 0) + 1 },
+          _pending: {
+            ...pending,
+            applications_sent: (pending.applications_sent || 0) + 1,
+            super_likes_used: (pending.super_likes_used || 0) + 1,
+          },
         };
         saveCachedStats(next, uidRef.current);
         return next;
@@ -559,7 +564,16 @@ export default function SeekerDashboard() {
       } else if (action === 'superlike') {
         setStats(prev => {
           const pending = prev._pending || {};
-          const next = { ...prev, super_likes_used: Math.max(0, prev.super_likes_used - 1), _pending: { ...pending, super_likes_used: Math.max(0, (pending.super_likes_used || 0) - 1) } };
+          const next = {
+            ...prev,
+            applications_sent: Math.max(0, prev.applications_sent - 1),
+            super_likes_used: Math.max(0, prev.super_likes_used - 1),
+            _pending: {
+              ...pending,
+              applications_sent: Math.max(0, (pending.applications_sent || 0) - 1),
+              super_likes_used: Math.max(0, (pending.super_likes_used || 0) - 1),
+            },
+          };
           saveCachedStats(next, uidRef.current);
           return next;
         });

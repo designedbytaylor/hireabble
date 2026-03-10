@@ -181,7 +181,7 @@ export default function RecruiterSwipe() {
   }
 
   return (
-    <div className="min-h-screen bg-background pb-24">
+    <div className="min-h-screen bg-background pb-24 overflow-x-hidden">
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
         <div className="absolute top-0 left-1/4 w-96 h-96 bg-primary/10 rounded-full blur-3xl" />
         <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-secondary/10 rounded-full blur-3xl" />
@@ -483,7 +483,7 @@ function ApplicantCard({ app, onSwipe, expanded, setExpanded }) {
 
   return (
     <motion.div
-      className="absolute inset-0 cursor-grab active:cursor-grabbing z-[5]"
+      className="absolute inset-0 cursor-grab active:cursor-grabbing z-[5] touch-pan-y"
       style={{ x, rotate }}
       drag="x"
       dragConstraints={false}
@@ -527,7 +527,7 @@ function ApplicantCard({ app, onSwipe, expanded, setExpanded }) {
         )}
 
         {/* Content */}
-        <div className="absolute inset-0 top-[35%] flex flex-col p-6 z-10 overflow-y-auto">
+        <div className={`absolute inset-0 top-[35%] flex flex-col p-6 z-10 ${expanded ? 'overflow-y-auto' : 'overflow-hidden'}`}>
           <h2 className="text-2xl font-bold font-['Outfit']">{app.seeker_name}</h2>
           <p className="text-primary text-sm mt-1">{app.seeker_title || 'Job Seeker'}</p>
           <p className="text-muted-foreground text-xs mt-1">Applied for: {app.job_title}</p>
@@ -645,7 +645,7 @@ function CandidateCard({ candidate, onSwipe, expanded, setExpanded }) {
 
   return (
     <motion.div
-      className="absolute inset-0 cursor-grab active:cursor-grabbing z-[5]"
+      className="absolute inset-0 cursor-grab active:cursor-grabbing z-[5] touch-pan-y"
       style={{ x, rotate }}
       drag="x"
       dragConstraints={false}
@@ -690,7 +690,7 @@ function CandidateCard({ candidate, onSwipe, expanded, setExpanded }) {
         )}
 
         {/* Content */}
-        <div className="absolute inset-0 top-[35%] flex flex-col p-6 z-10 overflow-y-auto">
+        <div className={`absolute inset-0 top-[35%] flex flex-col p-6 z-10 ${expanded ? 'overflow-y-auto' : 'overflow-hidden'}`}>
           <h2 className="text-2xl font-bold font-['Outfit']">{candidate.name}</h2>
           <p className="text-primary text-sm mt-1">{candidate.title || 'Job Seeker'}</p>
           {candidate.best_match_job && (
