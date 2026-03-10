@@ -30,8 +30,15 @@ export const AuthProvider = ({ children }) => {
 
   // Ref to the current auth-init AbortController so loginWithToken can cancel it
   const authInitController = useRef(null);
+  // When loginWithToken sets the token, skip the useEffect auth init —
+  // loginWithToken already fetches /auth/me directly and handles everything.
+  const skipNextAuthInit = useRef(false);
 
   useEffect(() => {
+    if (skipNextAuthInit.current) {
+      skipNextAuthInit.current = false;
+      return;
+    }
     const controller = new AbortController();
     authInitController.current = controller;
     const initAuth = async () => {
@@ -116,9 +123,15 @@ export const AuthProvider = ({ children }) => {
     if (authInitController.current) {
       authInitController.current.abort();
     }
-    // Clear stale cached user to prevent flash of wrong identity
+
+    // Fully tear down the previous user's session first.
+    // Clear React state so components don't render stale data.
+    setUser(null);
+    setToken(null);
+
+    // Clear ALL user data from localStorage
+    localStorage.removeItem('token');
     localStorage.removeItem('cached_user');
-    // Clear all user-scoped swipe/stats caches so the new user starts fresh
     const keysToRemove = [];
     for (let i = 0; i < localStorage.length; i++) {
       const key = localStorage.key(i);
@@ -130,7 +143,9 @@ export const AuthProvider = ({ children }) => {
     // header), so switching users without clearing returns stale data.
     try { await caches.delete('hireabble-api-v7'); } catch (_) { /* ok */ }
 
-    setUser(null);
+    // Skip the useEffect auth init that setToken will trigger —
+    // we handle the /auth/me fetch directly below.
+    skipNextAuthInit.current = true;
     localStorage.setItem('token', impersonateToken);
     setToken(impersonateToken);
     try {
