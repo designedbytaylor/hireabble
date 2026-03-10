@@ -1,6 +1,6 @@
 const CACHE_NAME = 'hireabble-v4';
 const IMG_CACHE = 'hireabble-images-v1';
-const API_CACHE = 'hireabble-api-v5';
+const API_CACHE = 'hireabble-api-v6';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
@@ -92,12 +92,15 @@ function isCacheableApi(url) {
   // Stale-while-revalidate: show cached data instantly, update in background.
   // These endpoints are per-user (auth header varies the response) but benefit
   // from showing stale data for a few seconds while the fresh response loads.
+  //
+  // NOTE: /api/auth/me is intentionally EXCLUDED — the cache matches by URL only
+  // (ignoring the Authorization header), so switching users (e.g. admin impersonation)
+  // would return the previously-cached user's data, logging you in as the wrong person.
   return url.includes('/api/dashboard') ||
     url.includes('/api/recruiter/dashboard-data') ||
     url.includes('/api/stats') ||
     url.includes('/api/profile/completeness') ||
     url.includes('/api/superlikes/remaining') ||
-    url.includes('/api/auth/me') ||
     url.includes('/api/notifications') ||
     url.includes('/api/oauth/config');
 }
