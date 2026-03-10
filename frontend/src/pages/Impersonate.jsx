@@ -27,9 +27,16 @@ export default function Impersonate() {
       return;
     }
 
-    // Clear any stale auth data before impersonating
+    // Clear any stale auth data and swipe caches before impersonating
     localStorage.removeItem('token');
     localStorage.removeItem('cached_user');
+    // Remove all user-scoped swipe/stats caches so new identity starts fresh
+    const keysToRemove = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith('hireabble_')) keysToRemove.push(key);
+    }
+    keysToRemove.forEach(k => localStorage.removeItem(k));
 
     loginWithToken(token).then(user => {
       if (user) {

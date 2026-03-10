@@ -94,10 +94,6 @@ export default function AdminTesting() {
   const handleImpersonate = async (user) => {
     setLoading(prev => ({ ...prev, impersonate: user.id }));
 
-    // Open window immediately during user gesture (before async call)
-    // Safari blocks popups/navigation that happen after async operations
-    const newWindow = window.open('about:blank', '_blank');
-
     try {
       const res = await axios.post(`${API}/admin/impersonate/${user.id}`, {}, {
         headers: { Authorization: `Bearer ${token}` },
@@ -105,21 +101,25 @@ export default function AdminTesting() {
       const impersonateToken = res.data.token;
       const targetPath = user.role === 'seeker' ? '/dashboard' : '/recruiter';
 
+      // Clear any stale swipe/user localStorage from a previous impersonation
+      // so the new user starts with a clean slate
+      const keysToRemove = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && key.startsWith('hireabble_')) keysToRemove.push(key);
+      }
+      keysToRemove.forEach(k => localStorage.removeItem(k));
+      localStorage.removeItem('token');
+      localStorage.removeItem('cached_user');
+
       const baseUrl = window.location.origin;
       const impersonateUrl = `${baseUrl}/impersonate?token=${encodeURIComponent(impersonateToken)}&redirect=${encodeURIComponent(targetPath)}`;
 
-      if (newWindow) {
-        // Navigate the already-opened window to the impersonation URL
-        newWindow.location.href = impersonateUrl;
-      } else {
-        // Fallback: navigate in same tab if popup was still blocked
-        window.location.href = impersonateUrl;
-      }
-
-      toast.success(`Opening as ${user.name}...`);
+      // Always navigate in the same window — popups are unreliable in
+      // iframe/preview environments and cause localStorage conflicts
+      // when multiple tabs share the same token key.
+      window.location.href = impersonateUrl;
     } catch (e) {
-      // Close the blank window on error
-      if (newWindow) newWindow.close();
       toast.error('Failed to impersonate user');
     } finally {
       setLoading(prev => ({ ...prev, impersonate: null }));
