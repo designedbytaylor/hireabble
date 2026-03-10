@@ -24,25 +24,33 @@ export const AuthProvider = ({ children }) => {
   });
 
   useEffect(() => {
+    const controller = new AbortController();
     const initAuth = async () => {
       if (token) {
         try {
           const response = await axios.get(`${API}/auth/me`, {
             headers: { Authorization: `Bearer ${token}` },
-            timeout: 3000
+            timeout: 3000,
+            signal: controller.signal
           });
-          setUser(response.data);
-          localStorage.setItem('cached_user', JSON.stringify(response.data));
+          if (!controller.signal.aborted) {
+            setUser(response.data);
+            localStorage.setItem('cached_user', JSON.stringify(response.data));
+          }
         } catch (error) {
+          if (controller.signal.aborted) return;
           console.error('Auth initialization failed:', error);
           localStorage.removeItem('token');
           localStorage.removeItem('cached_user');
           setToken(null);
         }
       }
-      setLoading(false);
+      if (!controller.signal.aborted) {
+        setLoading(false);
+      }
     };
     initAuth();
+    return () => controller.abort();
   }, [token]);
 
   // Global axios interceptor: auto-logout on invalid/expired token or banned users
@@ -94,6 +102,9 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   const loginWithToken = useCallback(async (impersonateToken) => {
+    // Clear stale cached user to prevent flash of wrong identity
+    localStorage.removeItem('cached_user');
+    setUser(null);
     localStorage.setItem('token', impersonateToken);
     setToken(impersonateToken);
     try {
