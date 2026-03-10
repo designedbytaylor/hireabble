@@ -21,7 +21,7 @@ const formatSalary = (min, max) => {
 export default function CompanyJobs() {
   const { recruiterId } = useParams();
   const navigate = useNavigate();
-  const { token } = useAuth();
+  const { token, user } = useAuth();
   const [company, setCompany] = useState(null);
   const [jobs, setJobs] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -54,6 +54,12 @@ export default function CompanyJobs() {
       });
       toast.success('Application sent!');
       setJobs(prev => prev.map(j => j.id === jobId ? { ...j, applied: true } : j));
+      // Invalidate cached dashboard stats so the "Applied" count updates
+      // immediately when the user navigates back to the dashboard.
+      try {
+        const uid = user?.id;
+        if (uid) localStorage.removeItem(`hireabble_swipe_stats_${uid}`);
+      } catch { /* ignore */ }
     } catch (error) {
       if (error.response?.status === 400) {
         toast.info('Already applied to this job');

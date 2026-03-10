@@ -96,20 +96,13 @@ function isImageRequest(url) {
 
 // Helper: is this a cacheable GET API request?
 function isCacheableApi(url) {
-  // Stale-while-revalidate: show cached data instantly, update in background.
-  // These endpoints are per-user (auth header varies the response) but benefit
-  // from showing stale data for a few seconds while the fresh response loads.
-  //
-  // NOTE: /api/auth/me is intentionally EXCLUDED — the cache matches by URL only
-  // (ignoring the Authorization header), so switching users (e.g. admin impersonation)
-  // would return the previously-cached user's data, logging you in as the wrong person.
-  return url.includes('/api/dashboard') ||
-    url.includes('/api/recruiter/dashboard-data') ||
-    url.includes('/api/stats') ||
-    url.includes('/api/profile/completeness') ||
-    url.includes('/api/superlikes/remaining') ||
-    url.includes('/api/notifications') ||
-    url.includes('/api/oauth/config');
+  // Only cache non-user-specific API responses.  Per-user endpoints like
+  // /api/dashboard, /api/stats, /api/notifications, etc. are NOT cached
+  // because the service worker matches by URL only (ignores Auth header).
+  // Stale-while-revalidate on per-user data causes visible bugs: stats show
+  // old counts ("0 Applied" when it should be 8), dashboard flickers between
+  // stale and fresh values, and switching users returns the wrong data.
+  return url.includes('/api/oauth/config');
 }
 
 // Fetch strategy
