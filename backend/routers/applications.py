@@ -635,6 +635,61 @@ async def swipe(action: SwipeAction, current_user: dict = Depends(get_current_us
     }
 
 
+# ==================== UNDO LAST SWIPE ====================
+
+@router.post("/swipe/undo")
+async def undo_last_swipe(current_user: dict = Depends(get_current_user)):
+    """Undo the seeker's most recent swipe.
+
+    Requires an active subscription with can_undo enabled (seeker_plus or seeker_premium).
+    Deletes the application record and removes the job from swiped history so
+    the card reappears in the deck.
+    """
+    if current_user["role"] != "seeker":
+        raise HTTPException(status_code=403, detail="Only seekers can undo swipes")
+
+    uid = current_user["id"]
+
+    # Check subscription allows undo
+    sub = current_user.get("subscription", {})
+    now = datetime.now(timezone.utc).isoformat()
+    can_undo = (
+        sub.get("status") == "active"
+        and sub.get("period_end", "") >= now
+        and sub.get("tier_id", "") in ("seeker_plus", "seeker_premium")
+    )
+    if not can_undo:
+        raise HTTPException(status_code=403, detail="Upgrade to Plus or Premium to undo swipes")
+
+    # Find the most recent application (like or superlike, not pass)
+    last_app = await db.applications.find_one(
+        {"seeker_id": uid, "action": {"$in": ["like", "superlike"]}},
+        sort=[("created_at", -1)],
+        projection={"_id": 0},
+    )
+    if not last_app:
+        raise HTTPException(status_code=404, detail="No recent swipe to undo")
+
+    # Don't allow undo if already matched or recruiter already acted
+    if last_app.get("is_matched") or last_app.get("recruiter_action"):
+        raise HTTPException(status_code=400, detail="Cannot undo — recruiter has already responded or you matched")
+
+    # Delete the application
+    await db.applications.delete_one({"id": last_app["id"]})
+
+    # If it was a superlike, refund the daily count (by not doing anything — the count
+    # is derived from DB at query time, so deleting the record is sufficient)
+
+    # Invalidate stats cache
+    invalidate(stats_cache, cache_key("stats", uid))
+
+    return {
+        "message": "Swipe undone",
+        "undone_job_id": last_app["job_id"],
+        "undone_action": last_app["action"],
+    }
+
+
 # ==================== BEACON SWIPE (page unload) ====================
 
 @router.post("/swipe/beacon")

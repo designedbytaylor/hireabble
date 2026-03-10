@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback, memo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence, useMotionValue, useTransform } from 'framer-motion';
-import { X, Heart, Star, Briefcase, MapPin, DollarSign, Building2, Clock, ChevronDown, Filter, SlidersHorizontal, Zap, CheckCircle, Globe, Wifi, Navigation2, Info, Calendar } from 'lucide-react';
+import { X, Heart, Star, Briefcase, MapPin, DollarSign, Building2, Clock, ChevronDown, Filter, SlidersHorizontal, Zap, CheckCircle, Globe, Wifi, Navigation2, Info, Calendar, Undo2 } from 'lucide-react';
 import { toast } from 'sonner';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
@@ -24,7 +24,7 @@ import {
 } from '../components/ui/select';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
-import { getPhotoUrl } from '../utils/helpers';
+import { getPhotoUrl, handleImgError } from '../utils/helpers';
 import UpgradeModal from '../components/UpgradeModal';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
@@ -155,6 +155,8 @@ export default function SeekerDashboard() {
   const [superLikesRemaining, setSuperLikesRemaining] = useState(() => loadCachedSuperLikes(uid));
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [exitingCards, setExitingCards] = useState([]); // cards animating off-screen
+  const [canUndo, setCanUndo] = useState(false); // subscription allows undo
+  const [undoing, setUndoing] = useState(false);
   const fetchingMoreRef = useRef(false);
   // Seed from localStorage so swiped jobs stay excluded even after F5
   const swipedIdsRef = useRef(loadSwipedIds(uid));
@@ -236,6 +238,7 @@ export default function SeekerDashboard() {
       setProfileComplete(data.completeness.is_complete);
       setSuperLikesRemaining(data.superlikes.remaining);
       saveCachedSuperLikes(data.superlikes.remaining, uidRef.current);
+      if (data.can_undo != null) setCanUndo(data.can_undo);
     } catch (error) {
       // Auto-retry once on timeout/network errors before falling back
       if (retry < 1 && (!error.response || error.code === 'ECONNABORTED')) {
@@ -605,6 +608,53 @@ export default function SeekerDashboard() {
     }
   };
 
+  const handleUndo = async () => {
+    if (undoing) return;
+    if (!canUndo) {
+      setShowUpgradeModal(true);
+      return;
+    }
+    setUndoing(true);
+    try {
+      const res = await axios.post(`${API}/swipe/undo`, {}, {
+        headers: { Authorization: `Bearer ${token}` }, timeout: 10000,
+      });
+      const { undone_job_id, undone_action } = res.data;
+      // Remove from swiped IDs so the card reappears
+      swipedIdsRef.current.delete(undone_job_id);
+      saveSwipedIds(swipedIdsRef.current, uidRef.current);
+      // Decrement stats
+      setStats(prev => {
+        const next = {
+          ...prev,
+          applications_sent: Math.max(0, prev.applications_sent - 1),
+          super_likes_used: undone_action === 'superlike' ? Math.max(0, prev.super_likes_used - 1) : prev.super_likes_used,
+        };
+        saveCachedStats(next, uidRef.current);
+        return next;
+      });
+      if (undone_action === 'superlike') {
+        setSuperLikesRemaining(prev => {
+          const next = prev + 1;
+          saveCachedSuperLikes(next, uidRef.current);
+          return next;
+        });
+      }
+      toast.success('Swipe undone!');
+      // Refetch to get the job back in the deck
+      fetchDashboard();
+    } catch (err) {
+      const detail = err.response?.data?.detail || 'Could not undo swipe';
+      if (err.response?.status === 403 && detail.includes('Upgrade')) {
+        setShowUpgradeModal(true);
+      } else {
+        toast.error(detail);
+      }
+    } finally {
+      setUndoing(false);
+    }
+  };
+
   const handleApplyFilters = () => {
     fetchJobs(filters);
     setShowFilters(false);
@@ -699,6 +749,7 @@ export default function SeekerDashboard() {
               alt="Avatar"
               onClick={() => navigate('/profile')}
               className="w-10 h-10 rounded-full border-2 border-primary object-cover cursor-pointer hover:opacity-80 transition-opacity"
+              onError={handleImgError(user?.id)}
             />
           </div>
         </div>
@@ -814,6 +865,19 @@ export default function SeekerDashboard() {
 
               {/* Action Buttons */}
               <div className="flex justify-center items-center gap-5 mt-8">
+                <button
+                  onClick={handleUndo}
+                  disabled={undoing}
+                  className={`w-12 h-12 rounded-full flex items-center justify-center transition-all duration-300 ${
+                    canUndo
+                      ? 'bg-amber-500/10 border border-amber-500/30 hover:scale-110 text-amber-500'
+                      : 'bg-muted/10 border border-muted/20 text-muted-foreground opacity-50'
+                  }`}
+                  title={canUndo ? 'Undo last swipe' : 'Upgrade to undo'}
+                  data-testid="undo-btn"
+                >
+                  <Undo2 className="w-5 h-5" />
+                </button>
                 <button
                   onClick={() => handleSwipe('pass', { x: -1500, y: 0 })}
                   className="w-16 h-16 rounded-full bg-destructive/10 border border-destructive/30 flex items-center justify-center hover:scale-110 hover:neon-glow-red transition-all duration-300"

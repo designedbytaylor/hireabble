@@ -150,9 +150,18 @@ async def get_seeker_dashboard(current_user: dict = Depends(get_current_user)):
     daily_limit = _get_seeker_daily_superlike_limit(user_data or {})
     free_remaining = max(0, daily_limit - superlikes_today)
 
+    # Check if user's subscription allows undo
+    sub = current_user.get("subscription", {})
+    can_undo = (
+        sub.get("status") == "active"
+        and sub.get("period_end", "") >= now
+        and sub.get("tier_id", "") in ("seeker_plus", "seeker_premium")
+    )
+
     return {
         "jobs": result_jobs,
         "swiped_job_ids": swiped_job_ids,
+        "can_undo": can_undo,
         "stats": {
             "applications_sent": applications_count,
             "super_likes_used": superlikes_count,

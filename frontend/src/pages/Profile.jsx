@@ -10,7 +10,7 @@ import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import Navigation from '../components/Navigation';
 import VideoUpload from '../components/VideoUpload';
-import { getPhotoUrl } from '../utils/helpers';
+import { getPhotoUrl, handleImgError } from '../utils/helpers';
 import { isPushSupported, getPermissionStatus, subscribeToPush, unsubscribeFromPush } from '../utils/pushNotifications';
 import { UpgradePrompt } from '../components/UpgradeModal';
 
@@ -411,10 +411,11 @@ export default function Profile() {
           {/* Avatar Section */}
           <div className="glass-card rounded-3xl p-8 mb-6 text-center">
             <div className="relative inline-block mb-4">
-              <img 
+              <img
                 src={getPhotoUrl(user?.photo_url, user?.id) || user?.avatar}
                 alt="Avatar"
                 className="w-24 h-24 rounded-full border-4 border-primary mx-auto object-cover"
+                onError={handleImgError(user?.id)}
               />
               <button
                 onClick={() => fileInputRef.current?.click()}
