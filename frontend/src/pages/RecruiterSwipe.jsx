@@ -36,11 +36,23 @@ export default function RecruiterSwipe() {
   const [showMatch, setShowMatch] = useState(false);
   const [matchData, setMatchData] = useState(null);
   const swipedIdsRef = useRef(new Set());
+  const readReceiptsSent = useRef(new Set());
 
   useEffect(() => {
     fetchData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Fire read receipt when recruiter views an application card
+  useEffect(() => {
+    if (mode !== 'applicants' || !applications.length || currentIndex >= applications.length) return;
+    const app = applications[currentIndex];
+    if (!app?.id || readReceiptsSent.current.has(app.id)) return;
+    readReceiptsSent.current.add(app.id);
+    axios.post(`${API}/applications/${app.id}/read`, {}, {
+      headers: { Authorization: `Bearer ${token}` },
+    }).catch(() => {}); // fire-and-forget
+  }, [currentIndex, mode, applications, token]);
 
   // WebSocket listener for async match notifications
   useEffect(() => {
@@ -779,6 +791,12 @@ function CandidateCard({ candidate, onSwipe, expanded, setExpanded }) {
           <div className="absolute top-4 right-4 z-20 px-3 py-1 rounded-full bg-card/90 backdrop-blur-sm border border-border text-xs font-bold flex items-center gap-1 shadow-lg">
             <Sparkles className={`w-3 h-3 ${scoreColor}`} />
             <span className={scoreColor}>{matchScore}%</span> match
+          </div>
+        )}
+        {/* Featured Badge for Premium seekers */}
+        {candidate.is_featured && (
+          <div className="absolute top-4 left-4 z-20 px-3 py-1 rounded-full bg-gradient-to-r from-amber-500 to-orange-500 text-white text-xs font-bold flex items-center gap-1 shadow-lg">
+            <Star className="w-3 h-3 fill-white" /> Featured
           </div>
         )}
 

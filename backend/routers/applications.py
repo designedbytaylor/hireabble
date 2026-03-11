@@ -167,6 +167,7 @@ async def browse_candidates(
 
     # Calculate best match score across all recruiter jobs
     from routers.jobs import calculate_job_match_score
+    now = datetime.now(timezone.utc).isoformat()
     for seeker in seekers:
         best_score = 0
         best_job = None
@@ -179,8 +180,15 @@ async def browse_candidates(
         seeker["best_match_job"] = best_job.get("title") if best_job else None
         seeker["best_match_job_id"] = best_job.get("id") if best_job else None
 
-    # Sort by match score descending
-    seekers.sort(key=lambda s: s.get("match_score", 0), reverse=True)
+        # Featured profile boost for premium seekers
+        sub = seeker.get("subscription") or {}
+        if (sub.get("status") == "active" and sub.get("period_end", "") >= now
+                and sub.get("tier_id") == "seeker_premium"):
+            seeker["is_featured"] = True
+            seeker["match_score"] = min(100, best_score + 15)
+
+    # Sort: featured profiles first (at same score), then by match score
+    seekers.sort(key=lambda s: (1 if s.get("is_featured") else 0, s.get("match_score", 0)), reverse=True)
 
     return seekers
 
@@ -398,6 +406,9 @@ async def recruiter_swipe_candidate(
         if "duplicate key" in str(e).lower() or "E11000" in str(e):
             raise HTTPException(status_code=400, detail="Already swiped on this candidate")
         raise
+
+    # Track profile view
+    asyncio.create_task(_record_profile_view(rid, seeker_id))
 
     # ── Phase 3: Return immediately, process the rest in background ───
     asyncio.create_task(
@@ -828,6 +839,15 @@ async def get_my_applications(current_user: dict = Depends(get_current_user)):
     if current_user["role"] != "seeker":
         raise HTTPException(status_code=403, detail="Only seekers can view their applications")
 
+    # Check if seeker has premium read receipts
+    sub = current_user.get("subscription") or {}
+    now_iso = datetime.now(timezone.utc).isoformat()
+    has_read_receipts = (
+        sub.get("status") == "active"
+        and sub.get("period_end", "") >= now_iso
+        and sub.get("tier_id") == "seeker_premium"
+    )
+
     applications = await db.applications.find(
         {"seeker_id": current_user["id"], "action": {"$in": ["like", "superlike"]}},
         {"_id": 0}
@@ -847,7 +867,7 @@ async def get_my_applications(current_user: dict = Depends(get_current_user)):
         app_id = app.get("id") or str(app.get("_id", ""))
         if not app_id or not app.get("job_id"):
             continue  # Skip malformed application docs
-        result.append({
+        app_entry = {
             "id": app_id,
             "job_id": app.get("job_id"),
             "action": app.get("action", "like"),
@@ -865,7 +885,11 @@ async def get_my_applications(current_user: dict = Depends(get_current_user)):
                 "company_logo": job.get("company_logo") if job else None,
                 "employment_type": job.get("employment_type", "full-time") if job else "",
             },
-        })
+        }
+        # Include read receipt for premium seekers
+        if has_read_receipts and app.get("read_at"):
+            app_entry["read_at"] = app["read_at"]
+        result.append(app_entry)
 
     return result
 
@@ -1066,6 +1090,9 @@ async def get_applicant_resume(seeker_id: str, current_user: dict = Depends(get_
     if not seeker:
         raise HTTPException(status_code=404, detail="Seeker not found")
 
+    # Track profile view (fire-and-forget)
+    asyncio.create_task(_record_profile_view(current_user["id"], seeker_id))
+
     # Check if references are shared
     ref_request = await db.reference_requests.find_one({
         "seeker_id": seeker_id,
@@ -1098,3 +1125,95 @@ async def get_applicant_resume(seeker_id: str, current_user: dict = Depends(get_
         "references_available": bool(seeker.get("references")) and seeker.get("references_hidden", True) and not ref_request,
         "references_approved": bool(ref_request),
     }
+
+
+# ==================== PROFILE VIEW TRACKING ====================
+
+async def _record_profile_view(viewer_id: str, seeker_id: str):
+    """Record a profile view (deduped: one entry per viewer per seeker per day)."""
+    try:
+        today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        await db.profile_views.update_one(
+            {"viewer_id": viewer_id, "seeker_id": seeker_id, "date": today},
+            {"$set": {
+                "viewer_id": viewer_id,
+                "seeker_id": seeker_id,
+                "date": today,
+                "viewed_at": datetime.now(timezone.utc).isoformat(),
+            }},
+            upsert=True,
+        )
+    except Exception as e:
+        logging.getLogger(__name__).error(f"Profile view tracking error: {e}")
+
+
+@router.get("/profile/viewers")
+async def get_profile_viewers(current_user: dict = Depends(get_current_user)):
+    """Get list of recruiters who viewed the seeker's profile (Plus/Premium only)."""
+    if current_user["role"] != "seeker":
+        raise HTTPException(status_code=403, detail="Only seekers can view this")
+
+    # Check subscription
+    sub = current_user.get("subscription") or {}
+    now = datetime.now(timezone.utc).isoformat()
+    has_access = (
+        sub.get("status") == "active"
+        and sub.get("period_end", "") >= now
+        and sub.get("tier_id", "") in ("seeker_plus", "seeker_premium")
+    )
+
+    # Always return the count (tease for free users), but only return details for subscribers
+    views = await db.profile_views.find(
+        {"seeker_id": current_user["id"]},
+        {"_id": 0}
+    ).sort("viewed_at", -1).to_list(50)
+
+    total_views = len(views)
+
+    if not has_access:
+        return {"total_views": total_views, "viewers": [], "locked": True}
+
+    # Fetch viewer details
+    viewer_ids = list(set(v["viewer_id"] for v in views))
+    viewers_data = {}
+    if viewer_ids:
+        recruiters = await db.users.find(
+            {"id": {"$in": viewer_ids}},
+            {"_id": 0, "id": 1, "name": 1, "company": 1, "photo_url": 1, "avatar": 1}
+        ).to_list(len(viewer_ids))
+        viewers_data = {r["id"]: r for r in recruiters}
+
+    result = []
+    seen_viewers = set()
+    for v in views:
+        vid = v["viewer_id"]
+        if vid in seen_viewers:
+            continue
+        seen_viewers.add(vid)
+        recruiter = viewers_data.get(vid, {})
+        result.append({
+            "viewer_id": vid,
+            "name": recruiter.get("name", "Recruiter"),
+            "company": recruiter.get("company", ""),
+            "photo_url": recruiter.get("photo_url") or recruiter.get("avatar"),
+            "viewed_at": v.get("viewed_at", ""),
+        })
+
+    return {"total_views": total_views, "viewers": result, "locked": False}
+
+
+# ==================== APPLICATION READ RECEIPTS ====================
+
+@router.post("/applications/{application_id}/read")
+async def mark_application_read(application_id: str, current_user: dict = Depends(get_current_user)):
+    """Mark an application as read by the recruiter. Fires when recruiter views the applicant card."""
+    if current_user["role"] != "recruiter":
+        raise HTTPException(status_code=403, detail="Only recruiters can mark applications as read")
+
+    now = datetime.now(timezone.utc).isoformat()
+    result = await db.applications.update_one(
+        {"id": application_id, "recruiter_id": current_user["id"], "read_at": {"$exists": False}},
+        {"$set": {"read_at": now, "read_by": current_user["id"]}}
+    )
+
+    return {"marked": result.modified_count > 0}

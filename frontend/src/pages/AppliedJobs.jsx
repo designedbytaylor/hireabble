@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, Briefcase, MapPin, DollarSign, Clock,
-  CheckCircle, XCircle, Star, Zap, Building2
+  CheckCircle, XCircle, Star, Zap, Building2, Eye
 } from 'lucide-react';
 import { toast } from 'sonner';
 import axios from 'axios';
@@ -196,10 +196,17 @@ export default function AppliedJobs() {
                     </div>
 
                     <div className="flex items-center justify-between mt-2">
-                      <span className="text-xs text-muted-foreground flex items-center gap-1">
-                        {app.action === 'superlike' && <Star className="w-3 h-3 text-secondary fill-secondary" />}
-                        {app.action === 'superlike' ? 'Super Liked' : 'Applied'} {new Date(app.created_at).toLocaleDateString()}
-                      </span>
+                      <div className="flex items-center gap-3">
+                        <span className="text-xs text-muted-foreground flex items-center gap-1">
+                          {app.action === 'superlike' && <Star className="w-3 h-3 text-secondary fill-secondary" />}
+                          {app.action === 'superlike' ? 'Super Liked' : 'Applied'} {new Date(app.created_at).toLocaleDateString()}
+                        </span>
+                        {app.read_at && (
+                          <span className="text-xs text-primary flex items-center gap-1">
+                            <Eye className="w-3 h-3" /> Viewed
+                          </span>
+                        )}
+                      </div>
                       {app.status === 'matched' && (
                         <button
                           onClick={() => navigate('/matches')}

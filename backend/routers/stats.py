@@ -60,6 +60,7 @@ async def get_seeker_dashboard(current_user: dict = Depends(get_current_user)):
         user_data,
         unread_messages,
         unread_notifications,
+        profile_views_count,
     ) = await asyncio.gather(
         db.applications.find(
             {"seeker_id": uid}, {"job_id": 1, "action": 1, "created_at": 1}
@@ -68,6 +69,7 @@ async def get_seeker_dashboard(current_user: dict = Depends(get_current_user)):
         db.users.find_one({"id": uid}, {"_id": 0, "seeker_purchased_superlikes": 1, "subscription": 1}),
         db.messages.count_documents({"receiver_id": uid, "is_read": False}),
         db.notifications.count_documents({"user_id": uid, "is_read": False}),
+        db.profile_views.count_documents({"seeker_id": uid}),
     )
 
     # Derive all application counts locally (saves 3 DB round trips)
@@ -158,6 +160,14 @@ async def get_seeker_dashboard(current_user: dict = Depends(get_current_user)):
         and sub.get("tier_id", "") in ("seeker_plus", "seeker_premium")
     )
 
+    # Check subscription for premium features
+    sub_data = current_user.get("subscription") or {}
+    can_see_viewers = (
+        sub_data.get("status") == "active"
+        and sub_data.get("period_end", "") >= now
+        and sub_data.get("tier_id", "") in ("seeker_plus", "seeker_premium")
+    )
+
     return {
         "jobs": result_jobs,
         "swiped_job_ids": swiped_job_ids,
@@ -166,7 +176,9 @@ async def get_seeker_dashboard(current_user: dict = Depends(get_current_user)):
             "applications_sent": applications_count,
             "super_likes_used": superlikes_count,
             "matches": matches_count,
+            "profile_views": profile_views_count,
         },
+        "can_see_viewers": can_see_viewers,
         "completeness": {
             "percentage": completeness_total,
             "missing_fields": missing,
