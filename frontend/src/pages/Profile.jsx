@@ -218,6 +218,7 @@ export default function Profile() {
       });
 
       const parsed = response.data.parsed;
+      console.log('Resume parsed response:', JSON.stringify(parsed, null, 2));
 
       // Build the updated form data from parsed resume
       const updatedFormData = {
