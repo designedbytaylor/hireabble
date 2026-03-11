@@ -45,8 +45,8 @@ export default function Register() {
     setLoading(true);
     try {
       const user = await register(formData);
-      toast.success('Welcome to Hireabble!');
-      navigate(user.role === 'seeker' ? '/dashboard' : '/recruiter');
+      toast.success('Welcome to Hireabble! Please verify your email.');
+      navigate('/verify-email');
     } catch (error) {
       console.error('Registration error:', error);
       console.error('Response status:', error.response?.status);

@@ -26,10 +26,22 @@ const AppleIcon = () => (
   </svg>
 );
 
+const LinkedInIcon = () => (
+  <svg className="w-5 h-5" viewBox="0 0 24 24" fill="#0A66C2">
+    <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/>
+  </svg>
+);
+
+const FacebookIcon = () => (
+  <svg className="w-5 h-5" viewBox="0 0 24 24" fill="#1877F2">
+    <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
+  </svg>
+);
+
 export default function OAuthButtons({ role = 'seeker' }) {
   const navigate = useNavigate();
   const [oauthConfig, setOauthConfig] = useState(null);
-  const [loading, setLoading] = useState({ google: false, github: false, apple: false });
+  const [loading, setLoading] = useState({ google: false, github: false, apple: false, linkedin: false, facebook: false });
 
   useEffect(() => {
     axios.get(`${API}/auth/oauth/config`).then(res => {
@@ -84,9 +96,39 @@ export default function OAuthButtons({ role = 'seeker' }) {
     window.location.href = `https://appleid.apple.com/auth/authorize?${params}`;
   }, [oauthConfig, role]);
 
+  const handleLinkedInLogin = useCallback(() => {
+    if (!oauthConfig?.linkedin?.enabled) return;
+
+    const redirectUri = `${window.location.origin}/login`;
+    const params = new URLSearchParams({
+      response_type: 'code',
+      client_id: oauthConfig.linkedin.client_id,
+      redirect_uri: redirectUri,
+      scope: 'openid profile email',
+      state: JSON.stringify({ role, provider: 'linkedin' }),
+    });
+
+    window.location.href = `https://www.linkedin.com/oauth/v2/authorization?${params}`;
+  }, [oauthConfig, role]);
+
+  const handleFacebookLogin = useCallback(() => {
+    if (!oauthConfig?.facebook?.enabled) return;
+
+    const redirectUri = `${window.location.origin}/login`;
+    const params = new URLSearchParams({
+      client_id: oauthConfig.facebook.client_id,
+      redirect_uri: redirectUri,
+      scope: 'email,public_profile',
+      response_type: 'code',
+      state: JSON.stringify({ role, provider: 'facebook' }),
+    });
+
+    window.location.href = `https://www.facebook.com/v19.0/dialog/oauth?${params}`;
+  }, [oauthConfig, role]);
+
   // Handle OAuth callback
   useEffect(() => {
-    // Check URL search params (Google/GitHub) and hash fragment (Apple)
+    // Check URL search params (Google/GitHub/LinkedIn/Facebook) and hash fragment (Apple)
     const urlParams = new URLSearchParams(window.location.search);
     const hashParams = new URLSearchParams(window.location.hash.replace('#', ''));
 
@@ -111,6 +153,10 @@ export default function OAuthButtons({ role = 'seeker' }) {
     let provider;
     if (parsedProvider === 'apple' || idToken) {
       provider = 'apple';
+    } else if (parsedProvider === 'linkedin') {
+      provider = 'linkedin';
+    } else if (parsedProvider === 'facebook') {
+      provider = 'facebook';
     } else if (!urlParams.get('scope')) {
       provider = 'github'; // Google has scope in callback, GitHub doesn't
     } else {
@@ -122,7 +168,7 @@ export default function OAuthButtons({ role = 'seeker' }) {
 
       try {
         const payload = { code, role: parsedRole };
-        if (provider === 'google') {
+        if (provider === 'google' || provider === 'linkedin' || provider === 'facebook') {
           payload.redirect_uri = `${window.location.origin}/login`;
         }
         if (provider === 'apple') {
@@ -149,7 +195,11 @@ export default function OAuthButtons({ role = 'seeker' }) {
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Don't render if no OAuth providers are configured
-  if (!oauthConfig || (!oauthConfig.google?.enabled && !oauthConfig.github?.enabled && !oauthConfig.apple?.enabled)) {
+  const hasAnyProvider = oauthConfig && (
+    oauthConfig.google?.enabled || oauthConfig.github?.enabled || oauthConfig.apple?.enabled ||
+    oauthConfig.linkedin?.enabled || oauthConfig.facebook?.enabled
+  );
+  if (!hasAnyProvider) {
     return null;
   }
 
@@ -216,6 +266,46 @@ export default function OAuthButtons({ role = 'seeker' }) {
           </button>
         )}
       </div>
+
+      {(oauthConfig.linkedin?.enabled || oauthConfig.facebook?.enabled) && (
+        <div className="flex gap-3">
+          {oauthConfig.linkedin?.enabled && (
+            <button
+              type="button"
+              onClick={handleLinkedInLogin}
+              disabled={loading.linkedin}
+              className="flex-1 h-12 rounded-xl border border-border bg-background hover:bg-accent flex items-center justify-center gap-2 transition-colors disabled:opacity-50"
+            >
+              {loading.linkedin ? (
+                <div className="w-5 h-5 border-2 border-muted-foreground border-t-transparent rounded-full animate-spin" />
+              ) : (
+                <>
+                  <LinkedInIcon />
+                  <span className="text-sm font-medium">LinkedIn</span>
+                </>
+              )}
+            </button>
+          )}
+
+          {oauthConfig.facebook?.enabled && (
+            <button
+              type="button"
+              onClick={handleFacebookLogin}
+              disabled={loading.facebook}
+              className="flex-1 h-12 rounded-xl border border-border bg-background hover:bg-accent flex items-center justify-center gap-2 transition-colors disabled:opacity-50"
+            >
+              {loading.facebook ? (
+                <div className="w-5 h-5 border-2 border-muted-foreground border-t-transparent rounded-full animate-spin" />
+              ) : (
+                <>
+                  <FacebookIcon />
+                  <span className="text-sm font-medium">Facebook</span>
+                </>
+              )}
+            </button>
+          )}
+        </div>
+      )}
     </div>
   );
 }

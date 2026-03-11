@@ -354,6 +354,7 @@ class UserResponse(BaseModel):
     desired_salary: Optional[int] = None
     available_immediately: bool = True
     onboarding_complete: bool = False
+    email_verified: bool = False
     push_subscription: Optional[dict] = None
     created_at: str
 

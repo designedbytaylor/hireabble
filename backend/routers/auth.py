@@ -10,9 +10,9 @@ import os
 import httpx
 
 from database import (
-    db, security, logger, RESEND_API_KEY,
+    db, security, logger, RESEND_API_KEY, FRONTEND_URL,
     hash_password, verify_password, create_token, get_current_user,
-    send_email_notification, manager,
+    send_email_notification, get_email_template, manager,
     UserCreate, UserLogin, UserResponse, ForgotPasswordRequest,
     ResetPasswordRequest, ChangePasswordRequest
 )
@@ -24,6 +24,10 @@ GOOGLE_CLIENT_ID = os.environ.get('GOOGLE_CLIENT_ID', '')
 GOOGLE_CLIENT_SECRET = os.environ.get('GOOGLE_CLIENT_SECRET', '')
 GITHUB_CLIENT_ID = os.environ.get('GITHUB_CLIENT_ID', '')
 GITHUB_CLIENT_SECRET = os.environ.get('GITHUB_CLIENT_SECRET', '')
+LINKEDIN_CLIENT_ID = os.environ.get('LINKEDIN_CLIENT_ID', '')
+LINKEDIN_CLIENT_SECRET = os.environ.get('LINKEDIN_CLIENT_SECRET', '')
+FACEBOOK_APP_ID = os.environ.get('FACEBOOK_APP_ID', '')
+FACEBOOK_APP_SECRET = os.environ.get('FACEBOOK_APP_SECRET', '')
 
 from slowapi import Limiter
 from slowapi.util import get_remote_address
@@ -77,12 +81,16 @@ async def register(user: UserCreate, request: Request):
             "desired_salary": None,
             "available_immediately": True,
             "onboarding_complete": False,
+            "email_verified": False,
             "push_subscription": None,
             "created_at": datetime.now(timezone.utc).isoformat()
         }
 
         await db.users.insert_one(user_doc)
         logger.info(f"User created successfully: {user_id}")
+
+        # Send verification email
+        asyncio.create_task(_send_verification_email(user_id, user.email, user.name))
 
         token = create_token(user_id, user.role)
         user_response = {k: v for k, v in user_doc.items() if k not in ['_id', 'password']}
@@ -93,6 +101,69 @@ async def register(user: UserCreate, request: Request):
     except Exception as e:
         logger.error(f"Registration failed: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Registration error: {str(e)}")
+
+async def _send_verification_email(user_id: str, email: str, name: str):
+    """Send email verification link"""
+    verification_token = str(uuid.uuid4())
+    expires_at = datetime.now(timezone.utc) + timedelta(hours=24)
+
+    await db.email_verification_tokens.delete_many({"user_id": user_id})
+    await db.email_verification_tokens.insert_one({
+        "token": verification_token,
+        "user_id": user_id,
+        "email": email,
+        "expires_at": expires_at.isoformat(),
+        "created_at": datetime.now(timezone.utc).isoformat()
+    })
+
+    verify_link = f"{FRONTEND_URL}/verify-email?token={verification_token}"
+    html = get_email_template(
+        title="Verify Your Email",
+        body_html=f"<p>Hi {name},</p><p>Welcome to Hireabble! Please verify your email address to get full access to all features.</p>",
+        cta_text="Verify Email",
+        cta_url=verify_link,
+    )
+    await send_email_notification(email, "Verify your Hireabble email", html)
+
+
+@router.post("/verify-email")
+async def verify_email(body: dict):
+    """Verify email using token from email link"""
+    token_str = body.get("token")
+    if not token_str:
+        raise HTTPException(status_code=400, detail="Missing verification token")
+
+    token_doc = await db.email_verification_tokens.find_one({"token": token_str})
+    if not token_doc:
+        raise HTTPException(status_code=400, detail="Invalid or expired verification token")
+
+    expires_at = datetime.fromisoformat(token_doc["expires_at"].replace('Z', '+00:00'))
+    if datetime.now(timezone.utc) > expires_at:
+        await db.email_verification_tokens.delete_one({"token": token_str})
+        raise HTTPException(status_code=400, detail="Verification token has expired")
+
+    await db.users.update_one(
+        {"id": token_doc["user_id"]},
+        {"$set": {"email_verified": True}}
+    )
+    await db.email_verification_tokens.delete_many({"user_id": token_doc["user_id"]})
+    invalidate_user(token_doc["user_id"])
+
+    return {"message": "Email verified successfully"}
+
+
+@router.post("/resend-verification")
+@limiter.limit("3/minute")
+async def resend_verification(request: Request, current_user: dict = Depends(get_current_user)):
+    """Resend verification email for the current user"""
+    if current_user.get("email_verified"):
+        return {"message": "Email already verified"}
+
+    asyncio.create_task(_send_verification_email(
+        current_user["id"], current_user["email"], current_user["name"]
+    ))
+    return {"message": "Verification email sent"}
+
 
 @router.post("/login")
 @limiter.limit("15/minute")
@@ -329,6 +400,7 @@ async def _find_or_create_oauth_user(email: str, name: str, provider: str, role:
         "desired_salary": None,
         "available_immediately": True,
         "onboarding_complete": False,
+        "email_verified": True,  # OAuth emails are pre-verified by the provider
         "push_subscription": None,
         "oauth_providers": [provider],
         "created_at": datetime.now(timezone.utc).isoformat()
@@ -462,8 +534,122 @@ async def get_oauth_config():
         "apple": {
             "enabled": bool(APPLE_CLIENT_ID),
             "client_id": APPLE_CLIENT_ID if APPLE_CLIENT_ID else None,
+        },
+        "linkedin": {
+            "enabled": bool(LINKEDIN_CLIENT_ID),
+            "client_id": LINKEDIN_CLIENT_ID if LINKEDIN_CLIENT_ID else None,
+        },
+        "facebook": {
+            "enabled": bool(FACEBOOK_APP_ID),
+            "client_id": FACEBOOK_APP_ID if FACEBOOK_APP_ID else None,
         }
     }
+
+
+# ==================== LINKEDIN OAUTH ====================
+
+@router.post("/oauth/linkedin")
+async def linkedin_oauth(body: dict):
+    """Authenticate with LinkedIn OAuth. Expects {code, redirect_uri, role?}"""
+    code = body.get("code")
+    redirect_uri = body.get("redirect_uri")
+    role = body.get("role", "seeker")
+
+    if not code or not redirect_uri:
+        raise HTTPException(status_code=400, detail="Missing code or redirect_uri")
+
+    if not LINKEDIN_CLIENT_ID or not LINKEDIN_CLIENT_SECRET:
+        raise HTTPException(status_code=501, detail="LinkedIn OAuth not configured")
+
+    try:
+        async with httpx.AsyncClient(timeout=10) as client:
+            # Exchange code for access token
+            token_resp = await client.post("https://www.linkedin.com/oauth/v2/accessToken", data={
+                "grant_type": "authorization_code",
+                "code": code,
+                "client_id": LINKEDIN_CLIENT_ID,
+                "client_secret": LINKEDIN_CLIENT_SECRET,
+                "redirect_uri": redirect_uri,
+            }, headers={"Content-Type": "application/x-www-form-urlencoded"})
+            token_data = token_resp.json()
+
+            if "error" in token_data:
+                raise HTTPException(status_code=400, detail=token_data.get("error_description", "LinkedIn auth failed"))
+
+            access_token = token_data.get("access_token")
+
+            # Get user info from LinkedIn userinfo endpoint (OpenID Connect)
+            userinfo_resp = await client.get("https://api.linkedin.com/v2/userinfo", headers={
+                "Authorization": f"Bearer {access_token}"
+            })
+            userinfo = userinfo_resp.json()
+
+        email = userinfo.get("email")
+        name = userinfo.get("name") or f"{userinfo.get('given_name', '')} {userinfo.get('family_name', '')}".strip()
+
+        if not email:
+            raise HTTPException(status_code=400, detail="Could not retrieve email from LinkedIn")
+
+        return await _find_or_create_oauth_user(email, name or email.split("@")[0], "linkedin", role)
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"LinkedIn OAuth error: {str(e)}")
+        raise HTTPException(status_code=500, detail="LinkedIn authentication failed")
+
+
+# ==================== FACEBOOK OAUTH ====================
+
+@router.post("/oauth/facebook")
+async def facebook_oauth(body: dict):
+    """Authenticate with Facebook OAuth. Expects {code, redirect_uri, role?}"""
+    code = body.get("code")
+    redirect_uri = body.get("redirect_uri")
+    role = body.get("role", "seeker")
+
+    if not code or not redirect_uri:
+        raise HTTPException(status_code=400, detail="Missing code or redirect_uri")
+
+    if not FACEBOOK_APP_ID or not FACEBOOK_APP_SECRET:
+        raise HTTPException(status_code=501, detail="Facebook OAuth not configured")
+
+    try:
+        async with httpx.AsyncClient(timeout=10) as client:
+            # Exchange code for access token
+            token_resp = await client.get("https://graph.facebook.com/v19.0/oauth/access_token", params={
+                "client_id": FACEBOOK_APP_ID,
+                "client_secret": FACEBOOK_APP_SECRET,
+                "redirect_uri": redirect_uri,
+                "code": code,
+            })
+            token_data = token_resp.json()
+
+            if "error" in token_data:
+                raise HTTPException(status_code=400, detail=token_data.get("error", {}).get("message", "Facebook auth failed"))
+
+            access_token = token_data.get("access_token")
+
+            # Get user info
+            userinfo_resp = await client.get("https://graph.facebook.com/me", params={
+                "fields": "id,name,email",
+                "access_token": access_token,
+            })
+            userinfo = userinfo_resp.json()
+
+        email = userinfo.get("email")
+        name = userinfo.get("name")
+
+        if not email:
+            raise HTTPException(status_code=400, detail="Could not retrieve email from Facebook. Make sure email permission is granted.")
+
+        return await _find_or_create_oauth_user(email, name or email.split("@")[0], "facebook", role)
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Facebook OAuth error: {str(e)}")
+        raise HTTPException(status_code=500, detail="Facebook authentication failed")
 
 
 # ==================== SIGN IN WITH APPLE ====================
