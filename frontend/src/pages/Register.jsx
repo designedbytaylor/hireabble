@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { Briefcase, Mail, Lock, User, Building2, ArrowRight, Eye, EyeOff, MapPin } from 'lucide-react';
+import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Briefcase, Mail, Lock, User, Building2, ArrowRight, Eye, EyeOff, MapPin, Search, Users, Zap, Target, Shield, BarChart3 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
@@ -8,15 +8,49 @@ import { toast } from 'sonner';
 import { useAuth } from '../context/AuthContext';
 import OAuthButtons from '../components/OAuthButtons';
 
+const ROLE_CONFIG = {
+  seeker: {
+    heading: 'Find Your Dream Job',
+    subheading: 'Create your profile and start matching with opportunities',
+    brandHeading: 'Your Next Career Move',
+    brandSubheading: 'Swipe through curated job opportunities, get matched with top companies, and land your dream role — all from your phone.',
+    features: [
+      { icon: Search, text: 'Discover jobs tailored to your skills' },
+      { icon: Zap, text: 'Instant match when companies like you back' },
+      { icon: Shield, text: 'Your profile, your control' },
+    ],
+    switchText: 'Looking to hire?',
+    switchLink: '/register/recruiter',
+    switchLabel: 'Sign up as a Recruiter',
+    accentColor: 'primary',
+  },
+  recruiter: {
+    heading: 'Hire Top Talent',
+    subheading: 'Create your account and start finding the perfect candidates',
+    brandHeading: 'Build Your Dream Team',
+    brandSubheading: 'Browse pre-qualified candidates, swipe to connect, and fill roles faster than ever — powered by smart matching.',
+    features: [
+      { icon: Target, text: 'Candidates matched to your requirements' },
+      { icon: Users, text: 'Access a growing pool of verified talent' },
+      { icon: BarChart3, text: 'Track your hiring pipeline in real-time' },
+    ],
+    switchText: 'Looking for a job?',
+    switchLink: '/register/seeker',
+    switchLabel: 'Sign up as a Job Seeker',
+    accentColor: 'secondary',
+  },
+};
+
 export default function Register() {
-  const [searchParams] = useSearchParams();
-  const defaultRole = searchParams.get('role') === 'recruiter' ? 'recruiter' : 'seeker';
-  
+  const { role: urlRole } = useParams();
+  const role = urlRole === 'recruiter' ? 'recruiter' : 'seeker';
+  const config = ROLE_CONFIG[role];
+
   const [formData, setFormData] = useState({
     name: '',
     email: '',
     password: '',
-    role: defaultRole,
+    role,
     company: '',
     title: '',
     location: ''
@@ -25,6 +59,11 @@ export default function Register() {
   const [loading, setLoading] = useState(false);
   const { register } = useAuth();
   const navigate = useNavigate();
+
+  // Keep formData.role in sync with URL
+  if (formData.role !== role) {
+    setFormData(prev => ({ ...prev, role }));
+  }
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -49,9 +88,6 @@ export default function Register() {
       navigate('/verify-email');
     } catch (error) {
       console.error('Registration error:', error);
-      console.error('Response status:', error.response?.status);
-      console.error('Response data:', error.response?.data);
-      console.error('Request URL:', error.config?.url);
       const message = error.response?.data?.detail || error.message || 'Registration failed';
       toast.error(`Registration failed: ${message}`);
     } finally {
@@ -67,7 +103,7 @@ export default function Register() {
         <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-secondary/20 rounded-full blur-3xl" />
       </div>
 
-      {/* Left Panel - Branding */}
+      {/* Left Panel - Role-specific Branding */}
       <div className="hidden lg:flex lg:w-1/2 relative items-center justify-center p-12">
         <div className="max-w-lg">
           <Link to="/" className="flex items-center gap-2 mb-12">
@@ -76,15 +112,25 @@ export default function Register() {
             </div>
             <span className="text-2xl font-bold font-['Outfit']">Hireabble</span>
           </Link>
-          
-          <h1 className="text-4xl font-bold font-['Outfit'] mb-6">
-            Join{' '}
-            <span className="gradient-text">Hireabble</span>
+
+          <h1 className="text-4xl font-bold font-['Outfit'] mb-4">
+            <span className="gradient-text">{config.brandHeading}</span>
           </h1>
-          
-          <p className="text-lg text-muted-foreground">
-            Create your account and start matching with opportunities that align with your goals.
+
+          <p className="text-lg text-muted-foreground mb-10">
+            {config.brandSubheading}
           </p>
+
+          <div className="space-y-5">
+            {config.features.map((feature, i) => (
+              <div key={i} className="flex items-center gap-4">
+                <div className={`w-10 h-10 rounded-xl bg-${config.accentColor}/10 flex items-center justify-center flex-shrink-0`}>
+                  <feature.icon className={`w-5 h-5 text-${config.accentColor}`} />
+                </div>
+                <span className="text-muted-foreground">{feature.text}</span>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
 
@@ -101,38 +147,8 @@ export default function Register() {
 
           <div className="glass-card rounded-3xl p-8 md:p-10">
             <div className="mb-8">
-              <h2 className="text-2xl font-bold font-['Outfit'] mb-2">Create Account</h2>
-              <p className="text-muted-foreground">Start your journey today</p>
-            </div>
-
-            {/* Role Selection */}
-            <div className="flex gap-3 mb-8">
-              <button
-                type="button"
-                onClick={() => setFormData({ ...formData, role: 'seeker' })}
-                className={`flex-1 py-4 px-4 rounded-xl border transition-all ${
-                  formData.role === 'seeker'
-                    ? 'border-primary bg-primary/10 text-primary'
-                    : 'border-border bg-background text-muted-foreground hover:border-primary/50'
-                }`}
-                data-testid="role-seeker-btn"
-              >
-                <User className="w-5 h-5 mx-auto mb-2" />
-                <div className="text-sm font-medium">Job Seeker</div>
-              </button>
-              <button
-                type="button"
-                onClick={() => setFormData({ ...formData, role: 'recruiter' })}
-                className={`flex-1 py-4 px-4 rounded-xl border transition-all ${
-                  formData.role === 'recruiter'
-                    ? 'border-secondary bg-secondary/10 text-secondary'
-                    : 'border-border bg-background text-muted-foreground hover:border-secondary/50'
-                }`}
-                data-testid="role-recruiter-btn"
-              >
-                <Building2 className="w-5 h-5 mx-auto mb-2" />
-                <div className="text-sm font-medium">Recruiter</div>
-              </button>
+              <h2 className="text-2xl font-bold font-['Outfit'] mb-2">{config.heading}</h2>
+              <p className="text-muted-foreground">{config.subheading}</p>
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-5">
@@ -194,7 +210,7 @@ export default function Register() {
                 </div>
               </div>
 
-              {formData.role === 'recruiter' && (
+              {role === 'recruiter' && (
                 <div className="space-y-2">
                   <Label htmlFor="company">Company Name</Label>
                   <div className="relative">
@@ -213,7 +229,7 @@ export default function Register() {
                 </div>
               )}
 
-              {formData.role === 'seeker' && (
+              {role === 'seeker' && (
                 <>
                   <div className="space-y-2">
                     <Label htmlFor="title">Job Title</Label>
@@ -267,9 +283,17 @@ export default function Register() {
               </Button>
             </form>
 
-            <OAuthButtons role={formData.role} />
+            <OAuthButtons role={role} />
 
-            <p className="mt-8 text-center text-muted-foreground">
+            {/* Switch role link */}
+            <p className="mt-6 text-center text-muted-foreground text-sm">
+              {config.switchText}{' '}
+              <Link to={config.switchLink} className={`text-${config.accentColor === 'primary' ? 'secondary' : 'primary'} hover:underline font-medium`}>
+                {config.switchLabel}
+              </Link>
+            </p>
+
+            <p className="mt-4 text-center text-muted-foreground">
               Already have an account?{' '}
               <Link to="/login" className="text-primary hover:underline font-medium" data-testid="login-link">
                 Sign in
