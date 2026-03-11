@@ -4,7 +4,7 @@ import { motion, AnimatePresence, useMotionValue, useTransform } from 'framer-mo
 import {
   X, Heart, Star, MapPin, Briefcase, GraduationCap, Clock,
   ChevronDown, BarChart3, Users, FileText, Building2, SlidersHorizontal,
-  Search, Sparkles, Zap
+  Search, Sparkles, Zap, MessageSquare
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { toast } from 'sonner';
@@ -606,6 +606,15 @@ function ApplicantCard({ app, onSwipe, expanded, setExpanded }) {
           <h2 className="text-2xl font-bold font-['Outfit']">{app.seeker_name}</h2>
           <p className="text-primary text-sm mt-1">{app.seeker_title || 'Job Seeker'}</p>
           <p className="text-muted-foreground text-xs mt-1">Applied for: {app.job_title}</p>
+
+          {app.superlike_note && (
+            <div className="mt-2 px-3 py-2 rounded-xl bg-secondary/10 border border-secondary/20">
+              <p className="text-xs text-secondary flex items-center gap-1 mb-0.5 font-medium">
+                <MessageSquare className="w-3 h-3" /> Note from applicant
+              </p>
+              <p className="text-sm text-foreground/90 italic">"{app.superlike_note}"</p>
+            </div>
+          )}
 
           <div className="flex flex-wrap gap-2 mt-4">
             {app.seeker_experience && (

@@ -349,6 +349,7 @@ class JobResponse(BaseModel):
 class SwipeAction(BaseModel):
     job_id: str
     action: str  # 'like', 'pass', 'superlike'
+    note: Optional[str] = None  # Premium: attach a note to Super Likes (max 140 chars)
 
 class ApplicationResponse(BaseModel):
     model_config = ConfigDict(extra="ignore")

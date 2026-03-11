@@ -161,12 +161,26 @@ async def get_seeker_dashboard(current_user: dict = Depends(get_current_user)):
     )
 
     # Check subscription for premium features
-    sub_data = current_user.get("subscription") or {}
-    can_see_viewers = (
-        sub_data.get("status") == "active"
-        and sub_data.get("period_end", "") >= now
-        and sub_data.get("tier_id", "") in ("seeker_plus", "seeker_premium")
+    is_plus_or_premium = (
+        sub.get("status") == "active"
+        and sub.get("period_end", "") >= now
+        and sub.get("tier_id", "") in ("seeker_plus", "seeker_premium")
     )
+    is_premium = (
+        sub.get("status") == "active"
+        and sub.get("period_end", "") >= now
+        and sub.get("tier_id") == "seeker_premium"
+    )
+
+    # Premium feature flags
+    premium_features = {
+        "can_see_viewers": is_plus_or_premium,
+        "advanced_filters": is_plus_or_premium,
+        "superlike_notes": is_premium,
+        "application_insights": is_premium,
+        "incognito_mode": is_premium,
+        "top_picks": is_premium,
+    }
 
     return {
         "jobs": result_jobs,
@@ -178,7 +192,9 @@ async def get_seeker_dashboard(current_user: dict = Depends(get_current_user)):
             "matches": matches_count,
             "profile_views": profile_views_count,
         },
-        "can_see_viewers": can_see_viewers,
+        "premium_features": premium_features,
+        "incognito_active": bool(current_user.get("incognito_mode")),
+        "boost_active_until": current_user.get("profile_boost_until") if current_user.get("profile_boost_until", "") >= now else None,
         "completeness": {
             "percentage": completeness_total,
             "missing_fields": missing,

@@ -136,6 +136,8 @@ async def browse_candidates(
         "role": "seeker",
         "id": {"$nin": exclude_ids},
         "onboarding_complete": True,
+        # Exclude incognito mode users
+        "incognito_mode": {"$ne": True},
     }
 
     # Apply filters
@@ -187,8 +189,17 @@ async def browse_candidates(
             seeker["is_featured"] = True
             seeker["match_score"] = min(100, best_score + 15)
 
-    # Sort: featured profiles first (at same score), then by match score
-    seekers.sort(key=lambda s: (1 if s.get("is_featured") else 0, s.get("match_score", 0)), reverse=True)
+        # Profile boost (active 30-min boost from subscription perk)
+        boost_until = seeker.get("profile_boost_until", "")
+        if boost_until and boost_until >= now:
+            seeker["is_boosted"] = True
+            seeker["match_score"] = min(100, seeker["match_score"] + 20)
+
+    # Sort: boosted first, then featured, then by match score
+    seekers.sort(key=lambda s: (
+        2 if s.get("is_boosted") else (1 if s.get("is_featured") else 0),
+        s.get("match_score", 0)
+    ), reverse=True)
 
     return seekers
 
@@ -610,6 +621,13 @@ async def swipe(action: SwipeAction, current_user: dict = Depends(get_current_us
         "created_at": now,
     }
 
+    # Attach note to Super Like (Premium seekers only, max 140 chars)
+    if is_superlike and action.note:
+        sub = current_user.get("subscription") or {}
+        if (sub.get("status") == "active" and sub.get("period_end", "") >= now
+                and sub.get("tier_id") == "seeker_premium"):
+            application_doc["superlike_note"] = action.note[:140]
+
     try:
         await db.applications.insert_one(application_doc)
     except Exception as e:
@@ -889,6 +907,9 @@ async def get_my_applications(current_user: dict = Depends(get_current_user)):
         # Include read receipt for premium seekers
         if has_read_receipts and app.get("read_at"):
             app_entry["read_at"] = app["read_at"]
+        # Flag for application insights availability (premium only)
+        if has_read_receipts:
+            app_entry["has_insights"] = True
         result.append(app_entry)
 
     return result
@@ -1217,3 +1238,195 @@ async def mark_application_read(application_id: str, current_user: dict = Depend
     )
 
     return {"marked": result.modified_count > 0}
+
+
+# ==================== APPLICATION INSIGHTS (Premium) ====================
+
+@router.get("/applications/{application_id}/insights")
+async def get_application_insights(application_id: str, current_user: dict = Depends(get_current_user)):
+    """Get insights about how the seeker ranks against other applicants for a job.
+    Premium seekers only."""
+    if current_user["role"] != "seeker":
+        raise HTTPException(status_code=403, detail="Only seekers can view application insights")
+
+    sub = current_user.get("subscription") or {}
+    now = datetime.now(timezone.utc).isoformat()
+    if not (sub.get("status") == "active" and sub.get("period_end", "") >= now
+            and sub.get("tier_id") == "seeker_premium"):
+        raise HTTPException(status_code=403, detail="Premium subscription required for application insights")
+
+    app = await db.applications.find_one({"id": application_id, "seeker_id": current_user["id"]})
+    if not app:
+        raise HTTPException(status_code=404, detail="Application not found")
+
+    job_id = app["job_id"]
+
+    # Count total applicants and where this seeker stands
+    all_apps = await db.applications.find(
+        {"job_id": job_id, "action": {"$in": ["like", "superlike"]}},
+        {"_id": 0, "seeker_id": 1, "action": 1, "created_at": 1}
+    ).to_list(500)
+
+    total_applicants = len(all_apps)
+    superlike_count = sum(1 for a in all_apps if a.get("action") == "superlike")
+
+    # Determine rough rank based on match score
+    # Fetch the job to calculate this seeker's match score
+    from routers.jobs import calculate_job_match_score
+    job = await db.jobs.find_one({"id": job_id}, {"_id": 0})
+    my_score = calculate_job_match_score(current_user, job) if job else 50
+
+    # Get experience distribution of applicants
+    applicant_ids = [a["seeker_id"] for a in all_apps if a["seeker_id"] != current_user["id"]]
+    experience_data = []
+    if applicant_ids:
+        applicants = await db.users.find(
+            {"id": {"$in": applicant_ids}},
+            {"_id": 0, "experience_years": 1}
+        ).to_list(len(applicant_ids))
+        experience_data = [a.get("experience_years", 0) for a in applicants if a.get("experience_years")]
+
+    my_exp = current_user.get("experience_years", 0)
+    more_experienced = sum(1 for e in experience_data if e > my_exp)
+    percentile = max(1, round((1 - more_experienced / max(total_applicants, 1)) * 100))
+
+    # Applied timing rank (earlier = better)
+    my_created = app.get("created_at", "")
+    earlier_apps = sum(1 for a in all_apps if a.get("created_at", "") < my_created)
+    applied_rank = earlier_apps + 1
+
+    return {
+        "total_applicants": total_applicants,
+        "superlike_count": superlike_count,
+        "my_action": app.get("action", "like"),
+        "match_score": my_score,
+        "experience_percentile": percentile,
+        "applied_rank": applied_rank,
+        "applied_early": applied_rank <= max(1, total_applicants // 4),
+    }
+
+
+# ==================== INCOGNITO MODE (Premium) ====================
+
+@router.post("/profile/incognito")
+async def toggle_incognito(body: dict, current_user: dict = Depends(get_current_user)):
+    """Toggle incognito mode — hide profile from recruiter discovery.
+    Premium seekers only."""
+    if current_user["role"] != "seeker":
+        raise HTTPException(status_code=403, detail="Only seekers can use incognito mode")
+
+    sub = current_user.get("subscription") or {}
+    now = datetime.now(timezone.utc).isoformat()
+    if not (sub.get("status") == "active" and sub.get("period_end", "") >= now
+            and sub.get("tier_id") == "seeker_premium"):
+        raise HTTPException(status_code=403, detail="Premium subscription required for incognito mode")
+
+    enabled = bool(body.get("enabled", False))
+    await db.users.update_one(
+        {"id": current_user["id"]},
+        {"$set": {"incognito_mode": enabled}}
+    )
+
+    return {"incognito_mode": enabled}
+
+
+# ==================== WEEKLY PROFILE BOOST (Plus+) ====================
+
+@router.post("/profile/boost")
+async def activate_profile_boost(current_user: dict = Depends(get_current_user)):
+    """Activate a weekly profile boost for Plus+ seekers.
+    Boosts the seeker's profile in recruiter discovery for 30 minutes."""
+    if current_user["role"] != "seeker":
+        raise HTTPException(status_code=403, detail="Only seekers can boost their profile")
+
+    sub = current_user.get("subscription") or {}
+    now = datetime.now(timezone.utc)
+    now_iso = now.isoformat()
+    if not (sub.get("status") == "active" and sub.get("period_end", "") >= now_iso
+            and sub.get("tier_id", "") in ("seeker_plus", "seeker_premium")):
+        raise HTTPException(status_code=403, detail="Plus or Premium subscription required")
+
+    # Check weekly boost limit
+    week_start = (now - timedelta(days=now.weekday())).replace(hour=0, minute=0, second=0, microsecond=0).isoformat()
+    boosts_this_week = await db.profile_boosts.count_documents({
+        "seeker_id": current_user["id"],
+        "activated_at": {"$gte": week_start},
+    })
+
+    if boosts_this_week >= 1:
+        raise HTTPException(status_code=400, detail="Weekly boost already used. Resets every Monday.")
+
+    # Check if already actively boosted
+    existing_boost = current_user.get("profile_boost_until", "")
+    if existing_boost and existing_boost >= now_iso:
+        raise HTTPException(status_code=400, detail="Profile is already boosted")
+
+    boost_until = (now + timedelta(minutes=30)).isoformat()
+    await asyncio.gather(
+        db.users.update_one(
+            {"id": current_user["id"]},
+            {"$set": {"profile_boost_until": boost_until}}
+        ),
+        db.profile_boosts.insert_one({
+            "id": str(uuid.uuid4()),
+            "seeker_id": current_user["id"],
+            "activated_at": now_iso,
+            "boost_until": boost_until,
+        }),
+    )
+
+    return {"message": "Profile boosted for 30 minutes!", "boost_until": boost_until}
+
+
+# ==================== TOP PICKS (Premium) ====================
+
+@router.get("/top-picks")
+async def get_top_picks(current_user: dict = Depends(get_current_user)):
+    """Get 3 curated daily top picks for premium seekers.
+    Returns highest-matching unswiped jobs for today."""
+    if current_user["role"] != "seeker":
+        raise HTTPException(status_code=403, detail="Only seekers can view top picks")
+
+    sub = current_user.get("subscription") or {}
+    now = datetime.now(timezone.utc).isoformat()
+    if not (sub.get("status") == "active" and sub.get("period_end", "") >= now
+            and sub.get("tier_id") == "seeker_premium"):
+        raise HTTPException(status_code=403, detail="Premium subscription required for Top Picks")
+
+    uid = current_user["id"]
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+
+    # Check if picks already generated today (cached)
+    cached_picks = await db.top_picks.find_one({"seeker_id": uid, "date": today})
+    if cached_picks:
+        job_ids = cached_picks.get("job_ids", [])
+        jobs = await db.jobs.find({"id": {"$in": job_ids}, "is_active": True}, {"_id": 0}).to_list(3)
+        # Add match scores
+        from routers.jobs import calculate_job_match_score
+        for job in jobs:
+            job["match_score"] = calculate_job_match_score(current_user, job)
+        return {"picks": jobs, "date": today}
+
+    # Generate new picks: get top 3 matching unswiped jobs
+    swiped = await db.applications.find({"seeker_id": uid}, {"job_id": 1}).to_list(1000)
+    swiped_ids = [s["job_id"] for s in swiped]
+
+    job_query = {"id": {"$nin": swiped_ids}, "is_active": True}
+    candidates = await db.jobs.find(job_query, {"_id": 0}).to_list(100)
+
+    from routers.jobs import calculate_job_match_score
+    for job in candidates:
+        job["match_score"] = calculate_job_match_score(current_user, job)
+
+    candidates.sort(key=lambda j: j["match_score"], reverse=True)
+    top_3 = candidates[:3]
+
+    # Cache the picks for today
+    if top_3:
+        await db.top_picks.update_one(
+            {"seeker_id": uid, "date": today},
+            {"$set": {"seeker_id": uid, "date": today, "job_ids": [j["id"] for j in top_3]}},
+            upsert=True,
+        )
+
+    return {"picks": top_3, "date": today}
