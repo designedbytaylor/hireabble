@@ -8,6 +8,8 @@ import { toast } from 'sonner';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import Navigation from '../components/Navigation';
+import { SkeletonPageBackground, SkeletonListItem, SkeletonFilterTabs } from '../components/skeletons';
+import { Skeleton } from '../components/ui/skeleton';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -55,8 +57,25 @@ export default function AppliedJobs() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="w-10 h-10 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+      <div className="min-h-screen bg-background pb-24">
+        <SkeletonPageBackground />
+        <header className="relative z-10 p-6 md:p-8">
+          <div className="flex items-center gap-3 mb-6">
+            <Skeleton className="w-9 h-9 rounded-xl" />
+            <div className="space-y-2">
+              <Skeleton className="h-7 w-32 rounded" />
+              <Skeleton className="h-3.5 w-24 rounded" />
+            </div>
+          </div>
+          <SkeletonFilterTabs count={4} />
+        </header>
+        <main className="relative z-10 px-6 md:px-8 space-y-3">
+          <SkeletonListItem avatarSize="w-12 h-12" avatarShape="rounded-xl" lines={3} badge />
+          <SkeletonListItem avatarSize="w-12 h-12" avatarShape="rounded-xl" lines={3} badge />
+          <SkeletonListItem avatarSize="w-12 h-12" avatarShape="rounded-xl" lines={3} badge />
+          <SkeletonListItem avatarSize="w-12 h-12" avatarShape="rounded-xl" lines={3} badge />
+        </main>
+        <Navigation />
       </div>
     );
   }

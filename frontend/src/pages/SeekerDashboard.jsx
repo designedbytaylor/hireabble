@@ -26,6 +26,8 @@ import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { getPhotoUrl, handleImgError } from '../utils/helpers';
 import UpgradeModal from '../components/UpgradeModal';
+import { SkeletonPageBackground, SkeletonStatCard, SkeletonSwipeCard, SkeletonActionButtons } from '../components/skeletons';
+import { Skeleton } from '../components/ui/skeleton';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -733,8 +735,31 @@ export default function SeekerDashboard() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="w-10 h-10 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+      <div className="min-h-screen bg-background pb-24 overflow-x-hidden">
+        <SkeletonPageBackground />
+        <header className="relative z-20 p-6 md:p-8">
+          <div className="flex items-center justify-between mb-8">
+            <div className="space-y-2">
+              <Skeleton className="h-7 w-40 rounded" />
+              <Skeleton className="h-4 w-32 rounded" />
+            </div>
+            <div className="flex items-center gap-3">
+              <Skeleton className="w-10 h-10 rounded-full" />
+            </div>
+          </div>
+          <div className="flex gap-4 overflow-x-auto pb-2">
+            <SkeletonStatCard />
+            <SkeletonStatCard />
+            <SkeletonStatCard />
+          </div>
+        </header>
+        <main className="relative z-10 px-6 md:px-8">
+          <div className="max-w-md mx-auto">
+            <SkeletonSwipeCard />
+            <SkeletonActionButtons />
+          </div>
+        </main>
+        <Navigation />
       </div>
     );
   }

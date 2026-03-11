@@ -5,6 +5,8 @@ import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import Navigation from '../components/Navigation';
 import { getPhotoUrl, handleImgError } from '../utils/helpers';
+import { SkeletonPageBackground, SkeletonListItem } from '../components/skeletons';
+import { Skeleton } from '../components/ui/skeleton';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -49,8 +51,21 @@ export default function Messages() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="w-10 h-10 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+      <div className="min-h-screen bg-background pb-24">
+        <SkeletonPageBackground />
+        <header className="relative z-10 p-6 md:p-8">
+          <Skeleton className="h-7 w-28 rounded mb-2" />
+          <Skeleton className="h-4 w-40 rounded" />
+        </header>
+        <main className="relative z-10 px-6 md:px-8">
+          <div className="max-w-lg mx-auto space-y-2">
+            <SkeletonListItem avatarSize="w-12 h-12" avatarShape="rounded-xl" lines={3} />
+            <SkeletonListItem avatarSize="w-12 h-12" avatarShape="rounded-xl" lines={3} />
+            <SkeletonListItem avatarSize="w-12 h-12" avatarShape="rounded-xl" lines={3} />
+            <SkeletonListItem avatarSize="w-12 h-12" avatarShape="rounded-xl" lines={3} />
+          </div>
+        </main>
+        <Navigation />
       </div>
     );
   }
