@@ -169,7 +169,7 @@ export default function Login() {
 
             <p className="mt-8 text-center text-muted-foreground">
               Don't have an account?{' '}
-              <Link to="/register" className="text-primary hover:underline font-medium" data-testid="register-link">
+              <Link to="/register/seeker" className="text-primary hover:underline font-medium" data-testid="register-link">
                 Create one
               </Link>
             </p>

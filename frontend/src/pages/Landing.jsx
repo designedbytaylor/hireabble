@@ -35,21 +35,29 @@ export default function Landing() {
         </div>
 
         {/* Bottom: Auth buttons + Legal links */}
-        <div className="w-full max-w-sm space-y-4">
-          <Link to="/register" className="block">
+        <div className="w-full max-w-sm space-y-3">
+          <Link to="/register/seeker" className="block">
             <button
               className="w-full py-4 rounded-full bg-white text-primary font-bold text-lg hover:bg-white/95 active:scale-[0.98] transition-all shadow-lg"
               data-testid="hero-get-started-btn"
             >
-              Create account
+              Find a Job
+            </button>
+          </Link>
+          <Link to="/register/recruiter" className="block">
+            <button
+              className="w-full py-4 rounded-full bg-white/20 backdrop-blur-sm text-white font-bold text-lg border border-white/30 hover:bg-white/30 active:scale-[0.98] transition-all"
+              data-testid="hero-recruiter-btn"
+            >
+              I'm Hiring
             </button>
           </Link>
           <Link to="/login" className="block">
             <button
-              className="w-full py-4 rounded-full bg-white/15 backdrop-blur-sm text-white font-bold text-lg border border-white/30 hover:bg-white/25 active:scale-[0.98] transition-all"
+              className="w-full py-3 rounded-full text-white/80 font-medium text-base hover:text-white active:scale-[0.98] transition-all"
               data-testid="login-nav-btn"
             >
-              Log in
+              Already have an account? Log in
             </button>
           </Link>
 
