@@ -13,6 +13,7 @@ import os
 import json
 
 from database import db, get_current_user, create_notification, logger
+from cache import invalidate_user
 
 router = APIRouter(prefix="/payments", tags=["Payments & Boosts"])
 
@@ -311,6 +312,9 @@ async def subscribe(data: SubscriptionCheckout, current_user: dict = Depends(get
         {"id": current_user["id"]},
         {"$set": {"subscription": subscription}}
     )
+
+    # Invalidate all caches so dashboard/stats reflect new subscription limits
+    invalidate_user(current_user["id"])
 
     # Record transaction
     await db.transactions.insert_one({

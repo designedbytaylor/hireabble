@@ -451,23 +451,45 @@ export default function RecruiterSwipe() {
 
 function ApplicantCard({ app, onSwipe, expanded, setExpanded }) {
   const x = useMotionValue(0);
+  const y = useMotionValue(0);
   const rotate = useTransform(x, [-200, 200], [-25, 25]);
+
+  // Block downward drag — clamp y to never go positive
+  useEffect(() => {
+    const unsubscribe = y.on('change', (latest) => {
+      if (latest > 0) y.set(0);
+    });
+    return unsubscribe;
+  }, [y]);
 
   const acceptOpacity = useTransform(x, [0, 60], [0, 1]);
   const rejectOpacity = useTransform(x, [-60, 0], [1, 0]);
+  const superlikeOpacity = useTransform(y, [-60, 0], [1, 0]);
 
   const handleDragEnd = (_, info) => {
     const threshold = 60;
     const velThreshold = 300;
+    const superlikeThreshold = 80;
 
-    const pos = { x: x.get(), y: 0 };
-    if (info.offset.x > threshold || info.velocity.x > velThreshold) {
+    const pos = { x: x.get(), y: y.get() };
+    const absX = Math.abs(info.offset.x);
+    const absY = Math.abs(info.offset.y);
+
+    // Up = superlike (only if upward movement dominates horizontal)
+    if (
+      info.offset.y < 0 &&
+      absY > absX &&
+      (info.offset.y < -superlikeThreshold || info.velocity.y < -velThreshold)
+    ) {
+      onSwipe('superlike', { x: 0, y: -1500 }, pos);
+    } else if (info.offset.x > threshold || info.velocity.x > velThreshold) {
       onSwipe('accept', { x: 1500, y: 0 }, pos);
     } else if (info.offset.x < -threshold || info.velocity.x < -velThreshold) {
       onSwipe('reject', { x: -1500, y: 0 }, pos);
     } else {
       // Spring back
       const startX = x.get();
+      const startY = y.get();
       const startTime = Date.now();
       const duration = 200;
 
@@ -476,6 +498,7 @@ function ApplicantCard({ app, onSwipe, expanded, setExpanded }) {
         const progress = Math.min(elapsed / duration, 1);
         const ease = 1 - Math.pow(1 - progress, 4);
         x.set(startX * (1 - ease));
+        y.set(startY * (1 - ease));
         if (progress < 1) requestAnimationFrame(animate);
       };
       requestAnimationFrame(animate);
@@ -484,11 +507,11 @@ function ApplicantCard({ app, onSwipe, expanded, setExpanded }) {
 
   return (
     <motion.div
-      className="absolute inset-0 cursor-grab active:cursor-grabbing z-[5] touch-pan-y"
-      style={{ x, rotate }}
-      drag="x"
-      dragConstraints={false}
-      dragElastic={0.9}
+      className="absolute inset-0 cursor-grab active:cursor-grabbing z-[5]"
+      style={{ x, y, rotate, touchAction: 'none' }}
+      drag
+      dragConstraints={{ left: 0, right: 0, top: 0, bottom: 0 }}
+      dragElastic={1}
       onDragEnd={handleDragEnd}
       data-testid="applicant-card"
     >
@@ -519,6 +542,12 @@ function ApplicantCard({ app, onSwipe, expanded, setExpanded }) {
           style={{ opacity: rejectOpacity }}
         >
           PASS
+        </motion.div>
+        <motion.div
+          className="absolute top-8 left-1/2 -translate-x-1/2 px-6 py-2 rounded-full bg-secondary border-2 border-secondary font-bold text-white z-20"
+          style={{ opacity: superlikeOpacity }}
+        >
+          SUPER LIKE
         </motion.div>
 
         {/* Super Like Badge */}
@@ -617,23 +646,45 @@ function ApplicantCard({ app, onSwipe, expanded, setExpanded }) {
 
 function CandidateCard({ candidate, onSwipe, expanded, setExpanded }) {
   const x = useMotionValue(0);
+  const y = useMotionValue(0);
   const rotate = useTransform(x, [-200, 200], [-25, 25]);
+
+  // Block downward drag — clamp y to never go positive
+  useEffect(() => {
+    const unsubscribe = y.on('change', (latest) => {
+      if (latest > 0) y.set(0);
+    });
+    return unsubscribe;
+  }, [y]);
 
   const acceptOpacity = useTransform(x, [0, 60], [0, 1]);
   const rejectOpacity = useTransform(x, [-60, 0], [1, 0]);
+  const superlikeOpacity = useTransform(y, [-60, 0], [1, 0]);
 
   const handleDragEnd = (_, info) => {
     const threshold = 60;
     const velThreshold = 300;
+    const superlikeThreshold = 80;
 
-    const pos = { x: x.get(), y: 0 };
-    if (info.offset.x > threshold || info.velocity.x > velThreshold) {
+    const pos = { x: x.get(), y: y.get() };
+    const absX = Math.abs(info.offset.x);
+    const absY = Math.abs(info.offset.y);
+
+    // Up = superlike (only if upward movement dominates horizontal)
+    if (
+      info.offset.y < 0 &&
+      absY > absX &&
+      (info.offset.y < -superlikeThreshold || info.velocity.y < -velThreshold)
+    ) {
+      onSwipe('superlike', { x: 0, y: -1500 }, pos);
+    } else if (info.offset.x > threshold || info.velocity.x > velThreshold) {
       onSwipe('accept', { x: 1500, y: 0 }, pos);
     } else if (info.offset.x < -threshold || info.velocity.x < -velThreshold) {
       onSwipe('reject', { x: -1500, y: 0 }, pos);
     } else {
       // Spring back
       const startX = x.get();
+      const startY = y.get();
       const startTime = Date.now();
       const duration = 200;
 
@@ -642,6 +693,7 @@ function CandidateCard({ candidate, onSwipe, expanded, setExpanded }) {
         const progress = Math.min(elapsed / duration, 1);
         const ease = 1 - Math.pow(1 - progress, 4);
         x.set(startX * (1 - ease));
+        y.set(startY * (1 - ease));
         if (progress < 1) requestAnimationFrame(animate);
       };
       requestAnimationFrame(animate);
@@ -653,11 +705,11 @@ function CandidateCard({ candidate, onSwipe, expanded, setExpanded }) {
 
   return (
     <motion.div
-      className="absolute inset-0 cursor-grab active:cursor-grabbing z-[5] touch-pan-y"
-      style={{ x, rotate }}
-      drag="x"
-      dragConstraints={false}
-      dragElastic={0.9}
+      className="absolute inset-0 cursor-grab active:cursor-grabbing z-[5]"
+      style={{ x, y, rotate, touchAction: 'none' }}
+      drag
+      dragConstraints={{ left: 0, right: 0, top: 0, bottom: 0 }}
+      dragElastic={1}
       onDragEnd={handleDragEnd}
       data-testid="candidate-card"
     >
@@ -688,6 +740,12 @@ function CandidateCard({ candidate, onSwipe, expanded, setExpanded }) {
           style={{ opacity: rejectOpacity }}
         >
           PASS
+        </motion.div>
+        <motion.div
+          className="absolute top-8 left-1/2 -translate-x-1/2 px-6 py-2 rounded-full bg-secondary border-2 border-secondary font-bold text-white z-20"
+          style={{ opacity: superlikeOpacity }}
+        >
+          SUPER LIKE
         </motion.div>
 
         {/* Match Score Badge */}
