@@ -1,11 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import { useAdminAuth } from '../../context/AdminAuthContext';
-import { Button } from '../../components/ui/button';
-import { Badge } from '../../components/ui/badge';
-import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
-} from '../../components/ui/dialog';
 import { Headphones, ChevronLeft, ChevronRight, Send, Search, ArrowLeft, User, Clock } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -57,9 +52,7 @@ export default function AdminSupport() {
   const [selectedTicket, setSelectedTicket] = useState(null);
   const [replyMessage, setReplyMessage] = useState('');
   const [sending, setSending] = useState(false);
-  const [updateDialog, setUpdateDialog] = useState(null);
-
-  const headers = { Authorization: `Bearer ${token}` };
+  const authHeaders = () => ({ Authorization: `Bearer ${token}` });
 
   const fetchTickets = useCallback(async () => {
     setLoading(true);
@@ -68,7 +61,7 @@ export default function AdminSupport() {
       if (statusFilter) params.append('status', statusFilter);
       if (priorityFilter) params.append('priority', priorityFilter);
       if (search) params.append('search', search);
-      const res = await axios.get(`${API}/admin/support/tickets?${params}`, { headers });
+      const res = await axios.get(`${API}/admin/support/tickets?${params}`, { headers: { Authorization: `Bearer ${token}` } });
       setTickets(res.data.tickets);
       setTotal(res.data.total);
       setPages(res.data.pages);
@@ -81,7 +74,7 @@ export default function AdminSupport() {
 
   const fetchStats = useCallback(async () => {
     try {
-      const res = await axios.get(`${API}/admin/support/stats`, { headers });
+      const res = await axios.get(`${API}/admin/support/stats`, { headers: { Authorization: `Bearer ${token}` } });
       setStats(res.data);
     } catch { /* silent */ }
   }, [token]);
@@ -91,7 +84,7 @@ export default function AdminSupport() {
 
   const openTicket = async (ticketId) => {
     try {
-      const res = await axios.get(`${API}/admin/support/tickets/${ticketId}`, { headers });
+      const res = await axios.get(`${API}/admin/support/tickets/${ticketId}`, { headers: authHeaders() });
       setSelectedTicket(res.data.ticket);
     } catch {
       toast.error('Failed to load ticket');
@@ -102,11 +95,11 @@ export default function AdminSupport() {
     if (!replyMessage.trim() || !selectedTicket) return;
     setSending(true);
     try {
-      await axios.post(`${API}/admin/support/tickets/${selectedTicket.id}/reply`, { message: replyMessage }, { headers });
+      await axios.post(`${API}/admin/support/tickets/${selectedTicket.id}/reply`, { message: replyMessage }, { headers: authHeaders() });
       setReplyMessage('');
       toast.success('Reply sent');
       // Refresh ticket
-      const res = await axios.get(`${API}/admin/support/tickets/${selectedTicket.id}`, { headers });
+      const res = await axios.get(`${API}/admin/support/tickets/${selectedTicket.id}`, { headers: authHeaders() });
       setSelectedTicket(res.data.ticket);
       fetchTickets();
       fetchStats();
@@ -119,13 +112,12 @@ export default function AdminSupport() {
 
   const handleUpdateTicket = async (ticketId, changes) => {
     try {
-      await axios.put(`${API}/admin/support/tickets/${ticketId}`, changes, { headers });
+      await axios.put(`${API}/admin/support/tickets/${ticketId}`, changes, { headers: authHeaders() });
       toast.success('Ticket updated');
-      setUpdateDialog(null);
       fetchTickets();
       fetchStats();
       if (selectedTicket?.id === ticketId) {
-        const res = await axios.get(`${API}/admin/support/tickets/${ticketId}`, { headers });
+        const res = await axios.get(`${API}/admin/support/tickets/${ticketId}`, { headers: authHeaders() });
         setSelectedTicket(res.data.ticket);
       }
     } catch (err) {

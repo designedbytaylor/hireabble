@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { HelpCircle, Send, ArrowLeft, Plus, Clock, CheckCircle, AlertCircle, MessageSquare, ChevronRight } from 'lucide-react';
+import { HelpCircle, Send, ArrowLeft, Plus, ChevronRight } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
@@ -39,12 +39,12 @@ export default function Support() {
   const [form, setForm] = useState({ category: '', subject: '', message: '' });
   const [replyMessage, setReplyMessage] = useState('');
 
-  const headers = { Authorization: `Bearer ${token}` };
+  const authHeaders = () => ({ Authorization: `Bearer ${token}` });
 
   const fetchTickets = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await axios.get(`${API}/support/tickets`, { headers });
+      const res = await axios.get(`${API}/support/tickets`, { headers: { Authorization: `Bearer ${token}` } });
       setTickets(res.data.tickets);
       setTotal(res.data.total);
     } catch {
@@ -64,7 +64,7 @@ export default function Support() {
     }
     setSubmitting(true);
     try {
-      await axios.post(`${API}/support/tickets`, form, { headers });
+      await axios.post(`${API}/support/tickets`, form, { headers: authHeaders() });
       toast.success('Ticket submitted! We\'ll get back to you soon.');
       setForm({ category: '', subject: '', message: '' });
       setView('list');
@@ -78,7 +78,7 @@ export default function Support() {
 
   const openTicket = async (ticketId) => {
     try {
-      const res = await axios.get(`${API}/support/tickets/${ticketId}`, { headers });
+      const res = await axios.get(`${API}/support/tickets/${ticketId}`, { headers: authHeaders() });
       setSelectedTicket(res.data.ticket);
       setView('detail');
     } catch {
@@ -89,10 +89,10 @@ export default function Support() {
   const handleReply = async () => {
     if (!replyMessage.trim()) return;
     try {
-      await axios.post(`${API}/support/tickets/${selectedTicket.id}/reply`, { message: replyMessage }, { headers });
+      await axios.post(`${API}/support/tickets/${selectedTicket.id}/reply`, { message: replyMessage }, { headers: authHeaders() });
       setReplyMessage('');
       // Refresh ticket
-      const res = await axios.get(`${API}/support/tickets/${selectedTicket.id}`, { headers });
+      const res = await axios.get(`${API}/support/tickets/${selectedTicket.id}`, { headers: authHeaders() });
       setSelectedTicket(res.data.ticket);
       toast.success('Reply sent');
     } catch (err) {
