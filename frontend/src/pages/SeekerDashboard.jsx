@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback, memo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence, useMotionValue, useTransform } from 'framer-motion';
-import { X, Heart, Star, Briefcase, MapPin, DollarSign, Building2, Clock, ChevronDown, Filter, SlidersHorizontal, Zap, CheckCircle, Globe, Wifi, Navigation2, Info, Calendar, Undo2 } from 'lucide-react';
+import { X, Heart, Star, Briefcase, MapPin, DollarSign, Building2, Clock, ChevronDown, Filter, SlidersHorizontal, Zap, CheckCircle, Globe, Wifi, Navigation2, Info, Calendar, Undo2, Eye } from 'lucide-react';
 import { toast } from 'sonner';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
@@ -148,7 +148,8 @@ export default function SeekerDashboard() {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [loading, setLoading] = useState(true);
   // Initialize stats from localStorage — prevents "flash of zeros"
-  const [stats, setStats] = useState(() => loadCachedStats(uid) || { applications_sent: 0, super_likes_used: 0, matches: 0 });
+  const [stats, setStats] = useState(() => loadCachedStats(uid) || { applications_sent: 0, super_likes_used: 0, matches: 0, profile_views: 0 });
+  const [canSeeViewers, setCanSeeViewers] = useState(false);
   const [showMatch, setShowMatch] = useState(false);
   const [matchData, setMatchData] = useState(null);
   const [expandedCard, setExpandedCard] = useState(false);
@@ -244,6 +245,7 @@ export default function SeekerDashboard() {
       setSuperLikesRemaining(data.superlikes.remaining);
       saveCachedSuperLikes(data.superlikes.remaining, uidRef.current);
       if (data.can_undo != null) setCanUndo(data.can_undo);
+      if (data.can_see_viewers != null) setCanSeeViewers(data.can_see_viewers);
     } catch (error) {
       // Auto-retry once on timeout/network errors before falling back
       if (retry < 1 && (!error.response || error.code === 'ECONNABORTED')) {
@@ -847,6 +849,22 @@ export default function SeekerDashboard() {
               <div className="text-xs text-muted-foreground">Matches</div>
             </div>
           </div>
+          {stats.profile_views > 0 && (
+            <button
+              onClick={() => canSeeViewers ? navigate('/profile-viewers') : setShowUpgradeModal(true)}
+              className="glass-card rounded-2xl px-5 py-3 flex items-center gap-3 whitespace-nowrap hover:border-primary/30 transition-colors text-left"
+            >
+              <div className="w-10 h-10 rounded-xl bg-amber-500/20 flex items-center justify-center">
+                <Eye className="w-5 h-5 text-amber-500" />
+              </div>
+              <div>
+                <div className="text-xl font-bold">{stats.profile_views}</div>
+                <div className="text-xs text-muted-foreground">
+                  {canSeeViewers ? 'Profile Views' : '🔒 Views'}
+                </div>
+              </div>
+            </button>
+          )}
           {/* Quick Apply Badge */}
           {profileComplete && (
             <div className="glass-card rounded-2xl px-5 py-3 flex items-center gap-3 whitespace-nowrap border-success/30 bg-success/5">
