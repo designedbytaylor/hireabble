@@ -49,6 +49,12 @@ export default function Onboarding() {
   const [resumeUploaded, setResumeUploaded] = useState(false);
   const resumeInputRef = useRef(null);
 
+  // Structured data from resume parsing (saved directly to profile)
+  const [resumeWorkHistory, setResumeWorkHistory] = useState([]);
+  const [resumeEducation, setResumeEducation] = useState([]);
+  const [resumeCertifications, setResumeCertifications] = useState([]);
+  const [resumeBio, setResumeBio] = useState('');
+
   const [formData, setFormData] = useState({
     photo_url: '',
     title: '',
@@ -143,7 +149,7 @@ export default function Onboarding() {
 
       const parsed = response.data.parsed;
 
-      // Autofill form data from parsed resume
+      // Autofill flat form fields from parsed resume
       setFormData(prev => ({
         ...prev,
         title: parsed.title || prev.title,
@@ -152,11 +158,40 @@ export default function Onboarding() {
         current_employer: parsed.work_history?.[0]?.company || prev.current_employer,
         previous_employers: parsed.work_history?.slice(1).map(w => w.company).filter(Boolean).join(', ') || prev.previous_employers,
         school: parsed.education?.[0]?.school || prev.school,
-        degree: prev.degree, // Keep dropdown selection
+        degree: prev.degree, // Keep dropdown selection — mapped below
         location: parsed.location || prev.location,
+        experience_years: parsed.experience_years ? String(parsed.experience_years) : prev.experience_years,
       }));
 
-      // Try to map degree
+      // Store structured arrays for saving to profile
+      if (parsed.work_history?.length > 0) {
+        setResumeWorkHistory(parsed.work_history);
+      }
+      if (parsed.education?.length > 0) {
+        setResumeEducation(parsed.education);
+      }
+      if (parsed.certifications?.length > 0) {
+        setResumeCertifications(parsed.certifications);
+      }
+      if (parsed.bio) {
+        setResumeBio(parsed.bio);
+      }
+
+      // Map experience_years to nearest select option
+      if (parsed.experience_years) {
+        const years = parseInt(parsed.experience_years);
+        let mappedYears;
+        if (years <= 0) mappedYears = '0';
+        else if (years <= 1) mappedYears = '1';
+        else if (years <= 2) mappedYears = '2';
+        else if (years <= 3) mappedYears = '3';
+        else if (years <= 7) mappedYears = '5';
+        else if (years <= 12) mappedYears = '10';
+        else mappedYears = '15';
+        setFormData(prev => ({ ...prev, experience_years: mappedYears }));
+      }
+
+      // Try to map degree to dropdown value
       if (parsed.education?.[0]?.degree) {
         const degreeText = parsed.education[0].degree.toLowerCase();
         const degreeMap = {
@@ -242,19 +277,25 @@ export default function Onboarding() {
       const updates = {
         photo_url: formData.photo_url || null,
         title: formData.title || null,
+        bio: resumeBio || null,
         experience_years: formData.experience_years ? parseInt(formData.experience_years) : null,
         current_employer: formData.current_employer || null,
         previous_employers: formData.previous_employers ? formData.previous_employers.split(',').map(e => e.trim()).filter(Boolean) : [],
         school: formData.school || null,
         degree: formData.degree || null,
         skills: formData.skills ? formData.skills.split(',').map(s => s.trim()).filter(Boolean) : [],
-        certifications: formData.certifications ? formData.certifications.split(',').map(c => c.trim()).filter(Boolean) : [],
+        certifications: resumeCertifications.length > 0
+          ? resumeCertifications
+          : formData.certifications ? formData.certifications.split(',').map(c => c.trim()).filter(Boolean) : [],
         location: formData.location || null,
         work_preference: formData.work_preference,
         desired_salary: formData.desired_salary ? parseInt(formData.desired_salary) : null,
         available_immediately: formData.available_immediately,
         job_type_preference: formData.job_type_preference || [],
         onboarding_complete: true,
+        // Structured data from resume parsing
+        work_history: resumeWorkHistory.length > 0 ? resumeWorkHistory : [],
+        education: resumeEducation.length > 0 ? resumeEducation : [],
       };
       
       await updateProfile(updates);
