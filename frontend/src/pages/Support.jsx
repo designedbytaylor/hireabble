@@ -278,22 +278,30 @@ export default function Support() {
             {/* Messages */}
             <div className="space-y-3">
               {selectedTicket.messages?.map((msg) => (
-                <div
-                  key={msg.id}
-                  className={`rounded-2xl p-4 ${
-                    msg.sender_type === 'admin'
-                      ? 'bg-primary/10 border border-primary/20 ml-4'
-                      : 'bg-card border border-border mr-4'
-                  }`}
-                >
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-sm font-medium text-foreground">
-                      {msg.sender_type === 'admin' ? `${msg.sender_name} (Support)` : 'You'}
-                    </span>
-                    <span className="text-xs text-muted-foreground">{formatDate(msg.created_at)}</span>
+                msg.sender_type === 'system' ? (
+                  <div key={msg.id} className="flex items-center gap-3 py-2 px-4">
+                    <div className="flex-1 h-px bg-border" />
+                    <span className="text-xs text-muted-foreground italic">{msg.message}</span>
+                    <div className="flex-1 h-px bg-border" />
                   </div>
-                  <p className="text-sm text-foreground/90 whitespace-pre-wrap">{msg.message}</p>
-                </div>
+                ) : (
+                  <div
+                    key={msg.id}
+                    className={`rounded-2xl p-4 ${
+                      msg.sender_type === 'admin'
+                        ? 'bg-primary/10 border border-primary/20 ml-4'
+                        : 'bg-card border border-border mr-4'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-sm font-medium text-foreground">
+                        {msg.sender_type === 'admin' ? `${msg.sender_name} (Support)` : 'You'}
+                      </span>
+                      <span className="text-xs text-muted-foreground">{formatDate(msg.created_at)}</span>
+                    </div>
+                    <p className="text-sm text-foreground/90 whitespace-pre-wrap">{msg.message}</p>
+                  </div>
+                )
               ))}
             </div>
 
