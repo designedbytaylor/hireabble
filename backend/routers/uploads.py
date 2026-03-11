@@ -465,10 +465,21 @@ async def _parse_resume_with_ai(text: str) -> dict:
     api_key = os.environ.get("ANTHROPIC_API_KEY")
     if not api_key:
         logger.warning("ANTHROPIC_API_KEY not set — falling back to basic parsing")
-        return _parse_resume_basic(text)
+        result = _parse_resume_basic(text)
+        result["_parser"] = "basic"
+        result["_parser_reason"] = "ANTHROPIC_API_KEY not set"
+        return result
 
     try:
         import anthropic
+    except ImportError:
+        logger.error("anthropic package not installed — falling back to basic parsing. Install with: pip install anthropic")
+        result = _parse_resume_basic(text)
+        result["_parser"] = "basic"
+        result["_parser_reason"] = "anthropic package not installed"
+        return result
+
+    try:
         client = anthropic.Anthropic(api_key=api_key)
 
         prompt = f"""You are a resume parser. Extract structured data from the resume text below. Return ONLY valid JSON, no extra text.
@@ -541,7 +552,7 @@ Resume text:
 {text}"""
 
         message = client.messages.create(
-            model="claude-haiku-4-5-20251001",
+            model="claude-haiku-4-5-20251001",  # Claude Haiku 4.5
             max_tokens=4000,
             messages=[{"role": "user", "content": prompt}],
         )
@@ -602,12 +613,16 @@ Resume text:
                     "year": entry.get("year", ""),
                 })
 
-        logger.info(f"AI resume parsing successful: {len(result['skills'])} skills, {len(result['work_history'])} positions")
+        logger.info(f"AI resume parsing successful: {len(result['skills'])} skills, {len(result['work_history'])} positions, {len(result['education'])} education")
+        result["_parser"] = "ai"
         return result
 
     except Exception as e:
-        logger.error(f"AI resume parsing failed: {e} — falling back to basic parsing")
-        return _parse_resume_basic(text)
+        logger.error(f"AI resume parsing failed: {type(e).__name__}: {e} — falling back to basic parsing")
+        result = _parse_resume_basic(text)
+        result["_parser"] = "basic"
+        result["_parser_reason"] = f"{type(e).__name__}: {str(e)[:200]}"
+        return result
 
 
 def _parse_resume_basic(text: str) -> dict:
@@ -642,31 +657,40 @@ def _parse_resume_basic(text: str) -> dict:
         if 10 <= len(digits) <= 15:
             result["phone"] = candidate
 
-    # Name: first non-empty line that's not email/phone
-    name_candidates = [l for l in lines[:3]
-                       if not re.search(r'@|http|www\.|[\d\s\-\(\)]{10,}', l) and len(l) < 60]
+    # Name: first non-empty line that's not email/phone/header keyword
+    header_words = {'experience', 'education', 'skills', 'summary', 'objective', 'profile', 'certifications'}
+    name_candidates = [l for l in lines[:5]
+                       if not re.search(r'@|http|www\.|[\d\s\-\(\)]{10,}', l)
+                       and len(l) < 60
+                       and l.lower().strip(':') not in header_words
+                       and not re.search(r'bachelor|master|university|college|school|degree', l, re.IGNORECASE)]
     if name_candidates:
         result["name"] = name_candidates[0]
 
-    # Location: city, state pattern
-    location_match = re.search(
-        r'(?i)([A-Z][a-z]+(?:\s[A-Z][a-z]+)*,\s*[A-Z]{2}(?:\s+\d{5})?)',
-        text[:500]
-    )
-    if location_match:
-        result["location"] = re.sub(r'\s+\d{5}$', '', location_match.group(1))
+    # Location: "City, ST" pattern — must NOT contain degree/education words
+    for loc_match in re.finditer(
+        r'([A-Z][a-z]+(?:\s[A-Z][a-z]+)*,\s*[A-Z]{2})(?:\s+\d{5})?',
+        text[:600]
+    ):
+        candidate_loc = loc_match.group(1)
+        # Skip if it's inside a degree/education phrase
+        start = max(0, loc_match.start() - 40)
+        context = text[start:loc_match.end() + 10]
+        if not re.search(r'bachelor|master|degree|science|arts|university|college|gpa', context, re.IGNORECASE):
+            result["location"] = candidate_loc
+            break
 
     # --- Section-based parsing ---
-    # Split text into sections by common resume headings
     section_headers = re.compile(
-        r'^(work\s*experience|experience|employment|professional\s*experience|'
-        r'education|academic|skills|technical\s*skills|relevant\s*skills|'
-        r'certifications?|licenses?|projects?|activities|summary|objective|'
-        r'profile|qualifications)\s*:?\s*$',
+        r'^(work\s*experience|professional\s*experience|experience|employment\s*(?:history)?|'
+        r'education|academic\s*background|skills|technical\s*skills|core\s*competencies|relevant\s*skills|'
+        r'certifications?|licenses?\s*(?:and|&)?\s*certifications?|projects?|'
+        r'activities|summary|professional\s*summary|objective|'
+        r'profile|qualifications|honors?\s*(?:and|&)?\s*awards?)\s*:?\s*$',
         re.IGNORECASE | re.MULTILINE
     )
 
-    # Build sections dict: header -> list of lines
+    # Build sections dict
     sections = {}
     current_section = "header"
     sections[current_section] = []
@@ -679,46 +703,78 @@ def _parse_resume_basic(text: str) -> dict:
             sections.setdefault(current_section, []).append(clean)
 
     # --- Parse Work Experience ---
-    # Date pattern: "Mon YYYY" or "YYYY" or "Present"
-    date_pattern = r'(?:(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\.?\s+)?\d{4}\s*[-–—]+\s*(?:(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\.?\s+)?\d{0,4}\s*(?:Present)?'
-
-    work_keys = [k for k in sections if any(w in k for w in ['work', 'experience', 'employment'])]
+    work_keys = [k for k in sections if any(w in k for w in ['work', 'experience', 'employment'])
+                 and 'education' not in k]
     for key in work_keys:
         work_lines = sections[key]
         current_job = None
-        for wline in work_lines:
+        pending_title_line = None  # Line before date that might be position/company
+
+        for idx, wline in enumerate(work_lines):
             # Detect a new job entry: line with a date range
             date_match = re.search(
-                r'((?:(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\w*\.?\s+)?\d{4})\s*[-–—]+?\s*((?:(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\w*\.?\s+)?\d{0,4}|Present)',
-                wline, re.IGNORECASE
+                r'((?:(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\s+)?\d{4})\s*[-–—]+\s*((?:(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\s+)?\d{0,4}|[Pp]resent|[Cc]urrent)',
+                wline
             )
             if date_match:
                 if current_job:
                     current_job["description"] = "\n".join(current_job.get("_bullets", []))
-                    del current_job["_bullets"]
+                    current_job.pop("_bullets", None)
                     result["work_history"].append(current_job)
 
-                # Try to extract position and company from the line (remove the date part)
-                text_part = wline[:date_match.start()].strip().rstrip(',').rstrip('–').rstrip('-').strip()
-                # Common pattern: "Position    Company" or "Position / Company" or "Position, Company"
-                parts = re.split(r'\s{2,}|\t', text_part)
-                position = parts[0].strip() if parts else ""
-                company = parts[1].strip() if len(parts) > 1 else ""
-                # Clean bullet markers
+                # Try to extract position and company from the line (text before the date)
+                text_before = wline[:date_match.start()].strip().rstrip(',').rstrip('–').rstrip('-').rstrip('|').strip()
+                text_after = wline[date_match.end():].strip().lstrip(',').lstrip('|').strip()
+
+                # Split by multiple spaces or tabs
+                parts = [p.strip() for p in re.split(r'\s{2,}|\t', text_before) if p.strip()] if text_before else []
+                position = ""
+                company = ""
+
+                if len(parts) >= 2:
+                    position = parts[0]
+                    company = parts[1]
+                elif len(parts) == 1:
+                    # Single part — check previous line for position/company
+                    position = parts[0]
+                    if pending_title_line:
+                        # Previous line might have the other half
+                        prev_parts = [p.strip() for p in re.split(r'\s{2,}|\t|[,|]', pending_title_line) if p.strip()]
+                        if prev_parts:
+                            # If current looks like a company, swap
+                            if any(w in position.lower() for w in ['inc', 'corp', 'llc', 'ltd', 'company', 'insurance', 'university']):
+                                company = position
+                                position = prev_parts[0]
+                            else:
+                                company = prev_parts[0] if len(prev_parts) == 1 else prev_parts[-1]
+                elif pending_title_line:
+                    # No text before date — position/company from previous line
+                    prev_parts = [p.strip() for p in re.split(r'\s{2,}|\t', pending_title_line) if p.strip()]
+                    if len(prev_parts) >= 2:
+                        position = prev_parts[0]
+                        company = prev_parts[1]
+                    elif prev_parts:
+                        position = prev_parts[0]
+
+                # Clean bullet markers from position
                 position = re.sub(r'^[●•·▪◦○]\s*', '', position)
 
                 current_job = {
                     "position": position,
                     "company": company,
                     "start_date": date_match.group(1).strip(),
-                    "end_date": date_match.group(2).strip() or "Present",
+                    "end_date": date_match.group(2).strip() if date_match.group(2) else "Present",
                     "_bullets": [],
                 }
+                pending_title_line = None
             elif current_job:
                 # Bullet point or continuation line
-                bullet = re.sub(r'^[●•·▪◦○o]\s*', '', wline).strip()
+                bullet = re.sub(r'^[●•·▪◦○o\-]\s*', '', wline).strip()
                 if bullet and len(bullet) > 5:
                     current_job["_bullets"].append(bullet)
+            else:
+                # Line before first date — could be position/company header
+                pending_title_line = wline
 
         if current_job:
             current_job["description"] = "\n".join(current_job.get("_bullets", []))
@@ -749,7 +805,6 @@ def _parse_resume_basic(text: str) -> dict:
     edu_keys = [k for k in sections if any(w in k for w in ['education', 'academic'])]
     for key in edu_keys:
         edu_lines = sections[key]
-        # Try to find degree lines: lines containing common degree words
         degree_pattern = re.compile(
             r'(bachelor|master|associate|ph\.?d|doctor|b\.?s\.?|b\.?a\.?|m\.?s\.?|m\.?a\.?|m\.?b\.?a)',
             re.IGNORECASE
@@ -757,57 +812,80 @@ def _parse_resume_basic(text: str) -> dict:
         i = 0
         while i < len(edu_lines):
             line = edu_lines[i]
-            # Check if line mentions a school or degree
             has_degree = degree_pattern.search(line)
-            year_match = re.search(r'(?:Expected\s+)?(?:May|June?|Aug|Dec|Jan|Spring|Fall|Summer)?\s*\d{4}', line, re.IGNORECASE)
+            has_school = any(w in line.lower() for w in ['university', 'college', 'institute', 'school', 'academy'])
 
-            if has_degree or (i == 0 and any(w in line.lower() for w in ['university', 'college', 'institute', 'school'])):
+            if has_degree or has_school:
                 edu_entry = {"school": "", "degree": "", "field": "", "year": ""}
-                # Combine this line and possibly the next few for context
+                # Gather context lines for this education entry
                 context_lines = [line]
                 j = i + 1
-                while j < len(edu_lines) and j < i + 4:
+                while j < len(edu_lines) and j < i + 5:
                     next_line = edu_lines[j]
-                    # Stop if we hit another school/degree
-                    if any(w in next_line.lower() for w in ['university', 'college', 'institute']) and j > i + 1:
+                    # Stop if another school/degree
+                    if (any(w in next_line.lower() for w in ['university', 'college', 'institute'])
+                            and degree_pattern.search(next_line) and j > i + 1):
                         break
                     context_lines.append(next_line)
                     j += 1
 
-                context = " | ".join(context_lines)
+                # Process each context line separately for better field extraction
+                for ctx_line in context_lines:
+                    # Extract school name
+                    if not edu_entry["school"]:
+                        school_match = re.search(
+                            r'((?:The\s+)?(?:University|College|Institute|School|Academy)\s+of\s+[\w\s]+?(?=\s{2}|\t|\d|,\s*[A-Z]{2}|$)|'
+                            r'[\w\s]+?(?:University|College|Institute|School|Academy|Tech))',
+                            ctx_line, re.IGNORECASE
+                        )
+                        if school_match:
+                            school_name = school_match.group(0).strip()
+                            # Clean trailing whitespace artifacts
+                            school_name = re.sub(r'\s+$', '', school_name)
+                            edu_entry["school"] = school_name
 
-                # Extract school name
-                school_match = re.search(
-                    r'((?:The\s+)?(?:University|College|Institute|School|Academy)\s+of\s+[\w\s]+|'
-                    r'[\w\s]+(?:University|College|Institute|School|Academy|Tech))',
-                    context, re.IGNORECASE
-                )
-                if school_match:
-                    edu_entry["school"] = school_match.group(0).strip()
+                    # Extract degree type
+                    if not edu_entry["degree"]:
+                        deg_match = re.search(
+                            r"((?:Bachelor|Master|Associate|Doctor(?:ate)?)\s+of\s+(?:Science|Arts|Engineering|Business|Fine Arts|Education|Applied Science))",
+                            ctx_line, re.IGNORECASE
+                        )
+                        if not deg_match:
+                            deg_match = re.search(
+                                r"(B\.?S\.?|B\.?A\.?|M\.?S\.?|M\.?A\.?|M\.?B\.?A\.?|Ph\.?D\.?|A\.?S\.?)",
+                                ctx_line
+                            )
+                        if deg_match:
+                            edu_entry["degree"] = deg_match.group(0).strip()
 
-                # Extract degree
-                deg_match = re.search(
-                    r"((?:Bachelor|Master|Associate|Doctor)\s+of\s+\w+(?:\s+\w+)?|"
-                    r"B\.?S\.?|B\.?A\.?|M\.?S\.?|M\.?A\.?|M\.?B\.?A\.?|Ph\.?D\.?)",
-                    context, re.IGNORECASE
-                )
-                if deg_match:
-                    edu_entry["degree"] = deg_match.group(0).strip()
+                    # Extract field of study — look for "in <field>" pattern
+                    if not edu_entry["field"]:
+                        field_match = re.search(
+                            r'(?:Bachelor|Master|B\.?S\.?|B\.?A\.?|M\.?S\.?|M\.?A\.?|Ph\.?D\.?)\s+(?:of\s+\w+\s+)?in\s+([\w\s&]+?)(?:\s*[\(,|]|\s{2,}|\s*$)',
+                            ctx_line, re.IGNORECASE
+                        )
+                        if field_match:
+                            edu_entry["field"] = field_match.group(1).strip()[:60]
+                        else:
+                            # Try "Major: X" or standalone field after degree
+                            major_match = re.search(r'[Mm]ajor:?\s*([\w\s&]+?)(?:\s*[,;|]|\s*$)', ctx_line)
+                            if major_match:
+                                edu_entry["field"] = major_match.group(1).strip()[:60]
 
-                # Extract field of study
-                field_match = re.search(r'(?:in|of)\s+([\w\s,]+?)(?:\s*[,|]|\s*$)', context, re.IGNORECASE)
-                if field_match:
-                    edu_entry["field"] = field_match.group(1).strip()[:60]
+                    # Extract year
+                    if not edu_entry["year"]:
+                        yr_match = re.search(r'(?:Expected\s+|Graduation:?\s*)?(?:(?:May|June?|Aug(?:ust)?|Dec(?:ember)?|Jan(?:uary)?|Spring|Fall|Summer)\s+)?(\d{4})', ctx_line, re.IGNORECASE)
+                        if yr_match:
+                            edu_entry["year"] = yr_match.group(0).strip()
 
-                # Extract year
-                yr_match = re.search(r'(?:Expected\s+)?(?:Graduation:?\s*)?(?:May|June?|Aug|Dec|Jan|Spring|Fall|Summer)?\s*(\d{4})', context, re.IGNORECASE)
-                if yr_match:
-                    edu_entry["year"] = yr_match.group(0).strip()
-
-                # Extract GPA if present
-                gpa_match = re.search(r'GPA:?\s*([\d.]+\s*/\s*[\d.]+|[\d.]+)', context, re.IGNORECASE)
+                # Extract GPA and add to field (not degree)
+                full_context = " ".join(context_lines)
+                gpa_match = re.search(r'GPA:?\s*([\d.]+(?:\s*/\s*[\d.]+)?)', full_context, re.IGNORECASE)
                 if gpa_match:
-                    edu_entry["degree"] += f" (GPA: {gpa_match.group(1)})"
+                    if edu_entry["field"]:
+                        edu_entry["field"] += f" (GPA: {gpa_match.group(1)})"
+                    elif edu_entry["degree"]:
+                        edu_entry["degree"] += f" (GPA: {gpa_match.group(1)})"
 
                 if edu_entry["school"] or edu_entry["degree"]:
                     result["education"].append(edu_entry)
@@ -816,12 +894,10 @@ def _parse_resume_basic(text: str) -> dict:
                 i += 1
 
     # --- Parse Skills ---
-    skill_keys = [k for k in sections if 'skill' in k or 'qualifications' in k]
+    skill_keys = [k for k in sections if 'skill' in k or 'qualifications' in k or 'competenc' in k]
     for key in skill_keys:
         for sline in sections[key]:
-            # Remove common prefixes like "Proficient:", "Familiar:", etc.
-            clean = re.sub(r'^(?:Proficient|Familiar|Languages|Frameworks|Tools|Technologies)\s*[:()]\s*', '', sline, flags=re.IGNORECASE)
-            # Split by comma, pipe, semicolon, or bullet
+            clean = re.sub(r'^(?:Proficient|Familiar|Languages|Frameworks|Tools|Technologies|Databases|Platforms)\s*[:()]\s*', '', sline, flags=re.IGNORECASE)
             raw_skills = re.split(r'[,;|●•·]', clean)
             for s in raw_skills:
                 s = s.strip().strip('()')
@@ -830,13 +906,21 @@ def _parse_resume_basic(text: str) -> dict:
     result["skills"] = result["skills"][:30]
 
     # --- Parse Certifications ---
-    cert_keys = [k for k in sections if 'cert' in k or 'license' in k]
+    cert_keys = [k for k in sections if 'cert' in k or 'license' in k or 'honor' in k or 'award' in k]
     for key in cert_keys:
         for cline in sections[key]:
-            clean = re.sub(r'^[●•·▪◦○]\s*', '', cline).strip()
+            clean = re.sub(r'^[●•·▪◦○\-]\s*', '', cline).strip()
             if clean and len(clean) > 3:
                 result["certifications"].append(clean)
     result["certifications"] = result["certifications"][:15]
+
+    # --- Extract bio from summary/profile section ---
+    bio_keys = [k for k in sections if any(w in k for w in ['summary', 'profile', 'objective'])]
+    for key in bio_keys:
+        bio_text = " ".join(sections[key]).strip()
+        if bio_text and len(bio_text) > 20:
+            result["bio"] = bio_text[:500]
+            break
 
     logger.info(f"Basic resume parsing: {len(result['work_history'])} positions, {len(result['education'])} education, {len(result['skills'])} skills")
     return result
