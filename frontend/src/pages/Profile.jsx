@@ -219,35 +219,46 @@ export default function Profile() {
 
       const parsed = response.data.parsed;
 
-      // Autofill form data
-      setFormData(prev => ({
-        ...prev,
-        title: parsed.title || prev.title,
-        bio: parsed.bio || prev.bio,
-        skills: parsed.skills?.length > 0 ? parsed.skills.join(', ') : prev.skills,
-        current_employer: parsed.work_history?.[0]?.company || prev.current_employer,
-        experience_years: parsed.experience_years || prev.experience_years,
-        location: parsed.location || prev.location,
-        school: parsed.education?.[0]?.school || prev.school,
-        degree: parsed.education?.[0]?.degree || prev.degree,
-      }));
+      // Build the updated form data from parsed resume
+      const updatedFormData = {
+        ...formData,
+        title: parsed.title || formData.title,
+        bio: parsed.bio || formData.bio,
+        skills: parsed.skills?.length > 0 ? parsed.skills.join(', ') : formData.skills,
+        current_employer: parsed.work_history?.[0]?.company || formData.current_employer,
+        experience_years: parsed.experience_years || formData.experience_years,
+        location: parsed.location || formData.location,
+        school: parsed.education?.[0]?.school || formData.school,
+        degree: parsed.education?.[0]?.degree || formData.degree,
+      };
+      setFormData(updatedFormData);
 
-      // Set work history
-      if (parsed.work_history?.length > 0) {
-        setWorkHistory(parsed.work_history);
+      const newWorkHistory = parsed.work_history?.length > 0 ? parsed.work_history : workHistory;
+      const newEducation = parsed.education?.length > 0 ? parsed.education : education;
+      const newCertifications = parsed.certifications?.length > 0 ? parsed.certifications : certifications;
+
+      setWorkHistory(newWorkHistory);
+      setEducation(newEducation);
+      setCertifications(newCertifications);
+
+      // Auto-save parsed resume data to profile immediately
+      try {
+        const updates = {
+          ...updatedFormData,
+          skills: updatedFormData.skills.split(',').map(s => s.trim()).filter(Boolean),
+          experience_years: updatedFormData.experience_years ? parseInt(updatedFormData.experience_years) : null,
+          work_history: newWorkHistory,
+          education: newEducation,
+          certifications: newCertifications.filter(Boolean),
+          references: references.filter(r => r.name),
+          references_hidden: referencesHidden,
+        };
+        await updateProfile(updates);
+        toast.success('Resume parsed and profile updated!');
+        fetchCompleteness();
+      } catch {
+        toast.success('Resume parsed! Review and save your profile.');
       }
-
-      // Set education
-      if (parsed.education?.length > 0) {
-        setEducation(parsed.education);
-      }
-
-      // Set certifications
-      if (parsed.certifications?.length > 0) {
-        setCertifications(parsed.certifications);
-      }
-
-      toast.success('Resume parsed! Your details have been filled in. Review and save your profile.');
     } catch (error) {
       toast.error(error.response?.data?.detail || 'Failed to parse resume');
     } finally {
