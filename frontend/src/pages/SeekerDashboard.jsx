@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback, memo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence, useMotionValue, useTransform } from 'framer-motion';
-import { X, Heart, Star, Briefcase, MapPin, DollarSign, Building2, Clock, ChevronDown, Filter, SlidersHorizontal, Zap, CheckCircle, Globe, Wifi, Navigation2, Info, Calendar, Undo2, Eye } from 'lucide-react';
+import { X, Heart, Star, Briefcase, MapPin, DollarSign, Building2, Clock, ChevronDown, Filter, SlidersHorizontal, Zap, CheckCircle, Globe, Wifi, Navigation2, Info, Calendar, Undo2, Eye, EyeOff, Rocket, Crown, Sparkles, Lock } from 'lucide-react';
 import { toast } from 'sonner';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
@@ -149,7 +149,9 @@ export default function SeekerDashboard() {
   const [loading, setLoading] = useState(true);
   // Initialize stats from localStorage — prevents "flash of zeros"
   const [stats, setStats] = useState(() => loadCachedStats(uid) || { applications_sent: 0, super_likes_used: 0, matches: 0, profile_views: 0 });
-  const [canSeeViewers, setCanSeeViewers] = useState(false);
+  const [premiumFeatures, setPremiumFeatures] = useState({});
+  const [incognitoActive, setIncognitoActive] = useState(false);
+  const [boostActiveUntil, setBoostActiveUntil] = useState(null);
   const [showMatch, setShowMatch] = useState(false);
   const [matchData, setMatchData] = useState(null);
   const [expandedCard, setExpandedCard] = useState(false);
@@ -157,9 +159,13 @@ export default function SeekerDashboard() {
   const [profileComplete, setProfileComplete] = useState(false);
   const [superLikesRemaining, setSuperLikesRemaining] = useState(() => loadCachedSuperLikes(uid));
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+  const [upgradeModalTrigger, setUpgradeModalTrigger] = useState(null);
   const [exitingCards, setExitingCards] = useState([]); // cards animating off-screen
   const [canUndo, setCanUndo] = useState(false); // subscription allows undo
   const [undoing, setUndoing] = useState(false);
+  const [topPicks, setTopPicks] = useState([]);
+  const [superlikeNote, setSuperlikeNote] = useState('');
+  const [showNoteInput, setShowNoteInput] = useState(false);
   const [enteringCard, setEnteringCard] = useState(null); // card animating back in (undo)
   const [upgradeTrigger, setUpgradeTrigger] = useState('super_likes'); // what triggered upgrade modal
   const lastSwipedRef = useRef(null); // track last swiped card for undo animation
@@ -245,7 +251,9 @@ export default function SeekerDashboard() {
       setSuperLikesRemaining(data.superlikes.remaining);
       saveCachedSuperLikes(data.superlikes.remaining, uidRef.current);
       if (data.can_undo != null) setCanUndo(data.can_undo);
-      if (data.can_see_viewers != null) setCanSeeViewers(data.can_see_viewers);
+      if (data.premium_features) setPremiumFeatures(data.premium_features);
+      if (data.incognito_active != null) setIncognitoActive(data.incognito_active);
+      if (data.boost_active_until != null) setBoostActiveUntil(data.boost_active_until);
     } catch (error) {
       // Auto-retry once on timeout/network errors before falling back
       if (retry < 1 && (!error.response || error.code === 'ECONNABORTED')) {
@@ -282,6 +290,15 @@ export default function SeekerDashboard() {
     flushSwipeQueue().then(() => fetchDashboard());
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Fetch top picks for premium subscribers
+  useEffect(() => {
+    if (premiumFeatures.top_picks) {
+      axios.get(`${API}/top-picks`, {
+        headers: { Authorization: `Bearer ${tokenRef.current}` },
+      }).then(res => setTopPicks(res.data.picks || [])).catch(() => {});
+    }
+  }, [premiumFeatures.top_picks]);
 
   // WebSocket listener for async match notifications (matches are detected in background)
   useEffect(() => {
@@ -505,8 +522,15 @@ export default function SeekerDashboard() {
     }
 
     // Fire-and-forget API call — don't block the UI
+    const swipePayload = { job_id: job.id, action };
+    // Attach note for premium super likes
+    if (action === 'superlike' && superlikeNote.trim() && premiumFeatures.superlike_notes) {
+      swipePayload.note = superlikeNote.trim().slice(0, 140);
+    }
+    if (action === 'superlike') { setSuperlikeNote(''); setShowNoteInput(false); }
+
     const sendSwipe = (retryCount = 0) => axios.post(`${API}/swipe`,
-      { job_id: job.id, action },
+      swipePayload,
       { headers: { Authorization: `Bearer ${token}` }, timeout: 15000 }
     ).then(response => {
       if (action === 'superlike' && response.data.remaining_superlikes != null) {
@@ -851,7 +875,7 @@ export default function SeekerDashboard() {
           </div>
           {stats.profile_views > 0 && (
             <button
-              onClick={() => canSeeViewers ? navigate('/profile-viewers') : setShowUpgradeModal(true)}
+              onClick={() => premiumFeatures.can_see_viewers ? navigate('/profile-viewers') : setShowUpgradeModal(true)}
               className="glass-card rounded-2xl px-5 py-3 flex items-center gap-3 whitespace-nowrap hover:border-primary/30 transition-colors text-left"
             >
               <div className="w-10 h-10 rounded-xl bg-amber-500/20 flex items-center justify-center">
@@ -860,7 +884,7 @@ export default function SeekerDashboard() {
               <div>
                 <div className="text-xl font-bold">{stats.profile_views}</div>
                 <div className="text-xs text-muted-foreground">
-                  {canSeeViewers ? 'Profile Views' : '🔒 Views'}
+                  {premiumFeatures.can_see_viewers ? 'Profile Views' : '🔒 Views'}
                 </div>
               </div>
             </button>
@@ -878,6 +902,83 @@ export default function SeekerDashboard() {
             </div>
           )}
         </div>
+
+        {/* Premium Quick Actions Bar */}
+        {(premiumFeatures.incognito_mode || premiumFeatures.can_see_viewers) && (
+          <div className="flex gap-2 mt-3">
+            {premiumFeatures.incognito_mode && (
+              <button
+                onClick={async () => {
+                  try {
+                    const res = await axios.post(`${API}/profile/incognito`, { enabled: !incognitoActive }, {
+                      headers: { Authorization: `Bearer ${token}` }
+                    });
+                    setIncognitoActive(res.data.incognito_mode);
+                    toast.success(res.data.incognito_mode ? 'Incognito mode on — you\'re hidden from discovery' : 'Incognito mode off — you\'re visible again');
+                  } catch (e) { toast.error(e.response?.data?.detail || 'Failed to toggle incognito'); }
+                }}
+                className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-medium transition-colors ${
+                  incognitoActive ? 'bg-primary/20 text-primary border border-primary/30' : 'glass-card hover:border-primary/30'
+                }`}
+              >
+                <EyeOff className="w-3.5 h-3.5" />
+                {incognitoActive ? 'Incognito On' : 'Incognito'}
+              </button>
+            )}
+            {premiumFeatures.can_see_viewers && (
+              <button
+                onClick={async () => {
+                  if (boostActiveUntil && new Date(boostActiveUntil) > new Date()) {
+                    toast.info('Profile is already boosted!');
+                    return;
+                  }
+                  try {
+                    const res = await axios.post(`${API}/profile/boost`, {}, {
+                      headers: { Authorization: `Bearer ${token}` }
+                    });
+                    setBoostActiveUntil(res.data.boost_until);
+                    toast.success('Profile boosted for 30 minutes!');
+                  } catch (e) { toast.error(e.response?.data?.detail || 'Failed to boost profile'); }
+                }}
+                className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-medium transition-colors ${
+                  boostActiveUntil && new Date(boostActiveUntil) > new Date()
+                    ? 'bg-amber-500/20 text-amber-500 border border-amber-500/30'
+                    : 'glass-card hover:border-amber-500/30'
+                }`}
+              >
+                <Rocket className="w-3.5 h-3.5" />
+                {boostActiveUntil && new Date(boostActiveUntil) > new Date() ? 'Boosted' : 'Boost'}
+              </button>
+            )}
+          </div>
+        )}
+
+        {/* Top Picks (Premium) */}
+        {topPicks.length > 0 && (
+          <div className="mt-4">
+            <div className="flex items-center gap-2 mb-3">
+              <Crown className="w-4 h-4 text-amber-500" />
+              <span className="text-sm font-bold font-['Outfit']">Today's Top Picks</span>
+              <span className="text-xs text-muted-foreground">Curated for you</span>
+            </div>
+            <div className="flex gap-3 overflow-x-auto pb-2">
+              {topPicks.map(pick => (
+                <div key={pick.id} className="glass-card rounded-2xl p-3 min-w-[200px] max-w-[200px] border-amber-500/20 hover:border-amber-500/40 transition-colors flex-shrink-0">
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="w-8 h-8 rounded-lg bg-amber-500/20 flex items-center justify-center">
+                      <Sparkles className="w-4 h-4 text-amber-500" />
+                    </div>
+                    <span className="text-xs font-bold text-amber-500">{pick.match_score}% match</span>
+                  </div>
+                  <h4 className="text-sm font-bold font-['Outfit'] truncate">{pick.title}</h4>
+                  <p className="text-xs text-muted-foreground truncate">{pick.company}</p>
+                  {pick.location && <p className="text-xs text-muted-foreground truncate mt-1">{pick.location}</p>}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Profile Completion Prompt */}
         {!profileComplete && (
           <div className="mt-4 p-4 rounded-2xl bg-gradient-to-r from-primary/10 to-secondary/10 border border-primary/20">
@@ -994,6 +1095,34 @@ export default function SeekerDashboard() {
                   <Heart className="w-7 h-7 text-success" />
                 </button>
               </div>
+              {/* Super Like Note (Premium) */}
+              {premiumFeatures.superlike_notes && superLikesRemaining > 0 && (
+                <div className="mt-3 flex justify-center">
+                  {showNoteInput ? (
+                    <div className="glass-card rounded-2xl p-3 w-full max-w-xs">
+                      <input
+                        type="text"
+                        value={superlikeNote}
+                        onChange={e => setSuperlikeNote(e.target.value.slice(0, 140))}
+                        placeholder="Attach a note to your Super Like..."
+                        className="w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+                        maxLength={140}
+                      />
+                      <div className="flex justify-between items-center mt-1">
+                        <span className="text-xs text-muted-foreground">{superlikeNote.length}/140</span>
+                        <button onClick={() => setShowNoteInput(false)} className="text-xs text-muted-foreground hover:text-foreground">Close</button>
+                      </div>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => setShowNoteInput(true)}
+                      className="text-xs text-secondary hover:text-secondary/80 flex items-center gap-1 transition-colors"
+                    >
+                      <Star className="w-3 h-3" /> Attach a note to Super Like
+                    </button>
+                  )}
+                </div>
+              )}
             </>
           ) : (
             <div className="aspect-[3/4] rounded-3xl glass-card flex flex-col items-center justify-center p-8 text-center">
@@ -1166,60 +1295,78 @@ export default function SeekerDashboard() {
               </Select>
             </div>
 
-            <div className="space-y-2">
-              <Label>Category</Label>
-              <Select
-                value={filters.category || "all"}
-                onValueChange={(v) => setFilters({ ...filters, category: v === "all" ? "" : v })}
-              >
-                <SelectTrigger className="h-11 rounded-xl bg-background">
-                  <SelectValue placeholder="All categories" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Categories</SelectItem>
-                  <SelectItem value="technology">Technology</SelectItem>
-                  <SelectItem value="design">Design</SelectItem>
-                  <SelectItem value="marketing">Marketing</SelectItem>
-                  <SelectItem value="sales">Sales</SelectItem>
-                  <SelectItem value="finance">Finance</SelectItem>
-                  <SelectItem value="healthcare">Healthcare</SelectItem>
-                  <SelectItem value="engineering">Engineering</SelectItem>
-                  <SelectItem value="education">Education</SelectItem>
-                  <SelectItem value="other">Other</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+            {premiumFeatures.advanced_filters ? (
+              <>
+                <div className="space-y-2">
+                  <Label>Category</Label>
+                  <Select
+                    value={filters.category || "all"}
+                    onValueChange={(v) => setFilters({ ...filters, category: v === "all" ? "" : v })}
+                  >
+                    <SelectTrigger className="h-11 rounded-xl bg-background">
+                      <SelectValue placeholder="All categories" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Categories</SelectItem>
+                      <SelectItem value="technology">Technology</SelectItem>
+                      <SelectItem value="design">Design</SelectItem>
+                      <SelectItem value="marketing">Marketing</SelectItem>
+                      <SelectItem value="sales">Sales</SelectItem>
+                      <SelectItem value="finance">Finance</SelectItem>
+                      <SelectItem value="healthcare">Healthcare</SelectItem>
+                      <SelectItem value="engineering">Engineering</SelectItem>
+                      <SelectItem value="education">Education</SelectItem>
+                      <SelectItem value="other">Other</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
 
-            <div className="space-y-2">
-              <Label>Employment Type</Label>
-              <Select
-                value={filters.employment_type || "all"}
-                onValueChange={(v) => setFilters({ ...filters, employment_type: v === "all" ? "" : v })}
-              >
-                <SelectTrigger className="h-11 rounded-xl bg-background">
-                  <SelectValue placeholder="All types" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Types</SelectItem>
-                  <SelectItem value="full-time">Full-time</SelectItem>
-                  <SelectItem value="part-time">Part-time</SelectItem>
-                  <SelectItem value="contract">Contract</SelectItem>
-                  <SelectItem value="internship">Internship</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+                <div className="space-y-2">
+                  <Label>Employment Type</Label>
+                  <Select
+                    value={filters.employment_type || "all"}
+                    onValueChange={(v) => setFilters({ ...filters, employment_type: v === "all" ? "" : v })}
+                  >
+                    <SelectTrigger className="h-11 rounded-xl bg-background">
+                      <SelectValue placeholder="All types" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Types</SelectItem>
+                      <SelectItem value="full-time">Full-time</SelectItem>
+                      <SelectItem value="part-time">Part-time</SelectItem>
+                      <SelectItem value="contract">Contract</SelectItem>
+                      <SelectItem value="internship">Internship</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
 
-            <div className="space-y-2">
-              <Label>Minimum Salary ($)</Label>
-              <Input
-                type="number"
-                placeholder="e.g., 50000"
-                value={filters.salary_min}
-                onChange={(e) => setFilters({ ...filters, salary_min: e.target.value })}
-                className="h-11 rounded-xl bg-background"
-                data-testid="filter-salary"
-              />
-            </div>
+                <div className="space-y-2">
+                  <Label>Minimum Salary ($)</Label>
+                  <Input
+                    type="number"
+                    placeholder="e.g., 50000"
+                    value={filters.salary_min}
+                    onChange={(e) => setFilters({ ...filters, salary_min: e.target.value })}
+                    className="h-11 rounded-xl bg-background"
+                    data-testid="filter-salary"
+                  />
+                </div>
+              </>
+            ) : (
+              <button
+                onClick={() => navigate('/upgrade')}
+                className="flex items-center gap-3 p-4 rounded-xl border border-dashed border-primary/30 bg-primary/5 hover:bg-primary/10 transition-colors w-full text-left"
+              >
+                <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0">
+                  <Lock className="w-5 h-5 text-primary" />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold">Advanced Filters</p>
+                  <p className="text-xs text-muted-foreground">Upgrade to Plus+ for salary, category &amp; employment type filters</p>
+                </div>
+                <Crown className="w-4 h-4 text-amber-500 ml-auto flex-shrink-0" />
+              </button>
+            )}
           </div>
 
           <div className="flex gap-3">

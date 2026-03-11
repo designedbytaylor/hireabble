@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, Briefcase, MapPin, DollarSign, Clock,
-  CheckCircle, XCircle, Star, Zap, Building2, Eye
+  CheckCircle, XCircle, Star, Zap, Building2, Eye,
+  BarChart3, ChevronDown, ChevronUp
 } from 'lucide-react';
 import { toast } from 'sonner';
 import axios from 'axios';
@@ -25,6 +26,8 @@ export default function AppliedJobs() {
   const [applications, setApplications] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('all'); // all, pending, matched, declined
+  const [expandedInsights, setExpandedInsights] = useState({}); // { appId: insightsData }
+  const [loadingInsights, setLoadingInsights] = useState({});
 
   useEffect(() => {
     fetchApplications();
@@ -41,6 +44,24 @@ export default function AppliedJobs() {
       toast.error('Failed to load applications');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const toggleInsights = async (appId) => {
+    if (expandedInsights[appId]) {
+      setExpandedInsights(prev => { const n = { ...prev }; delete n[appId]; return n; });
+      return;
+    }
+    setLoadingInsights(prev => ({ ...prev, [appId]: true }));
+    try {
+      const res = await axios.get(`${API}/applications/${appId}/insights`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setExpandedInsights(prev => ({ ...prev, [appId]: res.data }));
+    } catch {
+      toast.error('Could not load insights');
+    } finally {
+      setLoadingInsights(prev => ({ ...prev, [appId]: false }));
     }
   };
 
@@ -216,6 +237,43 @@ export default function AppliedJobs() {
                         </button>
                       )}
                     </div>
+
+                    {/* Application Insights (Premium) */}
+                    {app.has_insights && (
+                      <div className="mt-2">
+                        <button
+                          onClick={() => toggleInsights(app.id)}
+                          className="text-xs text-secondary font-medium flex items-center gap-1 hover:underline"
+                        >
+                          <BarChart3 className="w-3 h-3" />
+                          {expandedInsights[app.id] ? 'Hide' : 'View'} Insights
+                          {expandedInsights[app.id] ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                        </button>
+                        {loadingInsights[app.id] && (
+                          <div className="mt-2 flex gap-2">
+                            <Skeleton className="h-12 flex-1 rounded-lg" />
+                            <Skeleton className="h-12 flex-1 rounded-lg" />
+                            <Skeleton className="h-12 flex-1 rounded-lg" />
+                          </div>
+                        )}
+                        {expandedInsights[app.id] && (
+                          <div className="mt-2 grid grid-cols-3 gap-2">
+                            <div className="p-2 rounded-lg bg-primary/10 text-center">
+                              <p className="text-lg font-bold text-primary">{expandedInsights[app.id].applied_rank || '—'}</p>
+                              <p className="text-[10px] text-muted-foreground">Your Rank</p>
+                            </div>
+                            <div className="p-2 rounded-lg bg-secondary/10 text-center">
+                              <p className="text-lg font-bold text-secondary">{expandedInsights[app.id].total_applicants}</p>
+                              <p className="text-[10px] text-muted-foreground">Applicants</p>
+                            </div>
+                            <div className="p-2 rounded-lg bg-green-500/10 text-center">
+                              <p className="text-lg font-bold text-green-500">Top {expandedInsights[app.id].experience_percentile}%</p>
+                              <p className="text-[10px] text-muted-foreground">Experience</p>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
