@@ -471,6 +471,9 @@ async def get_current_admin(credentials: HTTPAuthorizationCredentials = Depends(
             raise HTTPException(status_code=401, detail="Admin not found")
         if admin.get("is_active") is False:
             raise HTTPException(status_code=403, detail="Admin account is deactivated")
+        # Ensure role field exists (default to "admin" for legacy records)
+        if "role" not in admin:
+            admin["role"] = "admin"
         return admin
     except jwt.ExpiredSignatureError:
         raise HTTPException(status_code=401, detail="Token expired")

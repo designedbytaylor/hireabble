@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
-import { User, Mail, Briefcase, MapPin, Save, LogOut, Building2, Download, Upload, CheckCircle, AlertCircle, Lock, Eye, EyeOff, ChevronDown, Plus, Trash2, GraduationCap, Award, Clock, Navigation2, Bell, BellOff, CreditCard, Crown, ExternalLink, FileText, Loader2 } from 'lucide-react';
+import { User, Mail, Briefcase, MapPin, Save, LogOut, Building2, Download, Upload, CheckCircle, AlertCircle, Lock, Eye, EyeOff, ChevronDown, Plus, Trash2, GraduationCap, Award, Clock, Navigation2, Bell, BellOff, CreditCard, Crown, ExternalLink, FileText, Loader2, HelpCircle } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
@@ -1186,11 +1187,20 @@ export default function Profile() {
             </div>
           )}
 
+          {/* Help & Support */}
+          <Link
+            to="/support"
+            className="w-full h-12 rounded-xl mt-6 border border-border bg-background hover:bg-accent flex items-center justify-center gap-2 text-sm font-medium text-foreground transition-colors"
+          >
+            <HelpCircle className="w-5 h-5" />
+            Help & Support
+          </Link>
+
           {/* Logout Button */}
           <Button
             variant="outline"
             onClick={handleLogout}
-            className="w-full h-12 rounded-xl mt-6 border-destructive/30 text-destructive hover:bg-destructive/10"
+            className="w-full h-12 rounded-xl mt-3 border-destructive/30 text-destructive hover:bg-destructive/10"
             data-testid="logout-btn"
           >
             <LogOut className="w-5 h-5 mr-2" />

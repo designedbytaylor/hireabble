@@ -2,25 +2,28 @@ import { useState } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useAdminAuth } from '../../context/AdminAuthContext';
 import {
-  LayoutDashboard, Users, ShieldAlert, Flag, Settings, LogOut, Shield, Briefcase, Beaker, Menu, X, Image, Palette,
+  LayoutDashboard, Users, ShieldAlert, Flag, Settings, LogOut, Shield, Briefcase, Beaker, Menu, X, Image, Palette, Headphones,
 } from 'lucide-react';
 
-const navItems = [
-  { icon: LayoutDashboard, label: 'Overview', path: '/admin/dashboard' },
-  { icon: Users, label: 'Users', path: '/admin/users' },
-  { icon: Briefcase, label: 'Jobs', path: '/admin/jobs' },
-  { icon: Image, label: 'Media', path: '/admin/media' },
-  { icon: ShieldAlert, label: 'Moderation', path: '/admin/moderation' },
-  { icon: Flag, label: 'Reports', path: '/admin/reports' },
-  { icon: Beaker, label: 'Testing', path: '/admin/testing' },
-  { icon: Palette, label: 'Themes', path: '/admin/themes' },
-  { icon: Settings, label: 'Settings', path: '/admin/settings' },
+const allNavItems = [
+  { icon: LayoutDashboard, label: 'Overview', path: '/admin/dashboard', roles: ['admin'] },
+  { icon: Users, label: 'Users', path: '/admin/users', roles: ['admin'] },
+  { icon: Briefcase, label: 'Jobs', path: '/admin/jobs', roles: ['admin'] },
+  { icon: Image, label: 'Media', path: '/admin/media', roles: ['admin'] },
+  { icon: ShieldAlert, label: 'Moderation', path: '/admin/moderation', roles: ['admin'] },
+  { icon: Flag, label: 'Reports', path: '/admin/reports', roles: ['admin'] },
+  { icon: Headphones, label: 'Support', path: '/admin/support', roles: ['admin', 'support'] },
+  { icon: Beaker, label: 'Testing', path: '/admin/testing', roles: ['admin'] },
+  { icon: Palette, label: 'Themes', path: '/admin/themes', roles: ['admin'] },
+  { icon: Settings, label: 'Settings', path: '/admin/settings', roles: ['admin'] },
 ];
 
 export default function AdminLayout() {
   const { admin, logout } = useAdminAuth();
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const adminRole = admin?.role || 'admin';
+  const navItems = allNavItems.filter(item => item.roles.includes(adminRole));
 
   const handleLogout = () => {
     logout();
@@ -51,7 +54,7 @@ export default function AdminLayout() {
               </div>
               <div>
                 <h1 className="font-bold text-white text-lg">Hireabble</h1>
-                <p className="text-xs text-gray-500">Admin Panel</p>
+                <p className="text-xs text-gray-500">{adminRole === 'support' ? 'Support Panel' : 'Admin Panel'}</p>
               </div>
             </div>
             <button onClick={closeSidebar} className="p-2 rounded-lg hover:bg-gray-800 text-gray-400 lg:hidden">

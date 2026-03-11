@@ -61,6 +61,8 @@ const AdminSettings = React.lazy(() => import("./pages/admin/AdminSettings"));
 const AdminTesting = React.lazy(() => import("./pages/admin/AdminTesting"));
 const AdminMedia = React.lazy(() => import("./pages/admin/AdminMedia"));
 const AdminThemes = React.lazy(() => import("./pages/admin/AdminThemes"));
+const AdminSupport = React.lazy(() => import("./pages/admin/AdminSupport"));
+const Support = React.lazy(() => import("./pages/Support"));
 
 const PageSpinner = () => (
   <div className="min-h-screen bg-background flex items-center justify-center">
@@ -161,6 +163,12 @@ const AdminRoute = ({ children }) => {
   }
 
   return children;
+};
+
+const AdminIndex = () => {
+  const { admin } = useAdminAuth();
+  const target = admin?.role === 'support' ? '/admin/support' : '/admin/dashboard';
+  return <Navigate to={target} replace />;
 };
 
 function AppRoutes() {
@@ -295,6 +303,14 @@ function AppRoutes() {
           </ProtectedRoute>
         }
       />
+      <Route
+        path="/support"
+        element={
+          <ProtectedRoute>
+            <Support />
+          </ProtectedRoute>
+        }
+      />
 
       {/* Legal pages — always accessible */}
       <Route path="/terms" element={<TermsOfService />} />
@@ -307,7 +323,7 @@ function AppRoutes() {
       {/* Admin routes — completely separate auth flow */}
       <Route path="/admin/login" element={<AdminLogin />} />
       <Route path="/admin" element={<AdminRoute><AdminLayout /></AdminRoute>}>
-        <Route index element={<Navigate to="/admin/dashboard" replace />} />
+        <Route index element={<AdminIndex />} />
         <Route path="dashboard" element={<AdminOverview />} />
         <Route path="users" element={<AdminUsers />} />
         <Route path="jobs" element={<AdminJobs />} />
@@ -316,6 +332,7 @@ function AppRoutes() {
         <Route path="reports" element={<AdminReports />} />
         <Route path="testing" element={<AdminTesting />} />
         <Route path="themes" element={<AdminThemes />} />
+        <Route path="support" element={<AdminSupport />} />
         <Route path="settings" element={<AdminSettings />} />
       </Route>
     </Routes>

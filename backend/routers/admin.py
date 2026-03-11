@@ -47,6 +47,7 @@ async def admin_setup(admin: AdminCreate):
         "email": admin.email,
         "password": hash_password(admin.password),
         "name": admin.name,
+        "role": "admin",
         "is_active": True,
         "created_at": datetime.now(timezone.utc).isoformat(),
     }
@@ -78,7 +79,7 @@ async def admin_login(credentials: AdminLogin):
             "id": admin["id"],
             "email": admin["email"],
             "name": admin["name"],
-            "role": "admin",
+            "role": admin.get("role", "admin"),
         },
     }
 
@@ -98,6 +99,81 @@ async def admin_change_password(payload: dict, admin: dict = Depends(get_current
         {"$set": {"password": hash_password(new_password)}}
     )
     return {"message": "Password updated successfully"}
+
+
+# ==================== STAFF MANAGEMENT ====================
+
+@router.get("/admin/staff")
+async def list_staff(admin: dict = Depends(get_current_admin)):
+    """List all admin/support staff (admin only)."""
+    if admin.get("role", "admin") != "admin":
+        raise HTTPException(status_code=403, detail="Only admins can manage staff")
+    staff = await db.admin_users.find({}, {"_id": 0, "password": 0}).to_list(length=100)
+    return {"staff": staff}
+
+
+@router.post("/admin/staff")
+async def create_staff(payload: dict, admin: dict = Depends(get_current_admin)):
+    """Create a new support or admin staff account (admin only)."""
+    if admin.get("role", "admin") != "admin":
+        raise HTTPException(status_code=403, detail="Only admins can create staff")
+
+    email = payload.get("email", "").strip()
+    password = payload.get("password", "")
+    name = payload.get("name", "").strip()
+    role = payload.get("role", "support")  # 'admin' or 'support'
+
+    if not email or not password or not name:
+        raise HTTPException(status_code=400, detail="Email, password, and name are required")
+    if role not in ("admin", "support"):
+        raise HTTPException(status_code=400, detail="Role must be 'admin' or 'support'")
+    if len(password) < 6:
+        raise HTTPException(status_code=400, detail="Password must be at least 6 characters")
+
+    existing = await db.admin_users.find_one({"email": email})
+    if existing:
+        raise HTTPException(status_code=400, detail="An account with this email already exists")
+
+    staff_id = str(uuid.uuid4())
+    staff_doc = {
+        "id": staff_id,
+        "email": email,
+        "password": hash_password(password),
+        "name": name,
+        "role": role,
+        "is_active": True,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+    await db.admin_users.insert_one(staff_doc)
+
+    return {
+        "message": f"{role.capitalize()} account created",
+        "staff": {"id": staff_id, "email": email, "name": name, "role": role},
+    }
+
+
+@router.put("/admin/staff/{staff_id}")
+async def update_staff(staff_id: str, payload: dict, admin: dict = Depends(get_current_admin)):
+    """Update staff role or active status (admin only)."""
+    if admin.get("role", "admin") != "admin":
+        raise HTTPException(status_code=403, detail="Only admins can manage staff")
+
+    staff = await db.admin_users.find_one({"id": staff_id})
+    if not staff:
+        raise HTTPException(status_code=404, detail="Staff not found")
+
+    changes = {}
+    if "role" in payload and payload["role"] in ("admin", "support"):
+        changes["role"] = payload["role"]
+    if "is_active" in payload and isinstance(payload["is_active"], bool):
+        changes["is_active"] = payload["is_active"]
+
+    if not changes:
+        raise HTTPException(status_code=400, detail="No valid changes provided")
+
+    await db.admin_users.update_one({"id": staff_id}, {"$set": changes})
+    return {"message": "Staff updated", "changes": changes}
+
 
 # ==================== PLATFORM ANALYTICS ====================
 
