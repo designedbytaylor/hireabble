@@ -913,15 +913,197 @@ def _parse_resume_basic(text: str) -> dict:
                 i += 1
 
     # --- Parse Skills ---
-    skill_keys = [k for k in sections if 'skill' in k or 'qualifications' in k or 'competenc' in k]
+    # Known technology/skill keywords for matching across entire resume
+    KNOWN_SKILLS = {
+        # Programming languages
+        'python', 'java', 'javascript', 'typescript', 'c++', 'c#', 'ruby', 'go', 'golang',
+        'rust', 'swift', 'kotlin', 'scala', 'php', 'perl', 'r', 'matlab', 'dart', 'lua',
+        'haskell', 'elixir', 'clojure', 'objective-c', 'shell', 'bash', 'powershell',
+        'sql', 'html', 'css', 'sass', 'less', 'graphql', 'solidity',
+        # Frontend frameworks
+        'react', 'react.js', 'reactjs', 'angular', 'angularjs', 'vue', 'vue.js', 'vuejs',
+        'svelte', 'next.js', 'nextjs', 'nuxt', 'nuxt.js', 'gatsby', 'ember', 'backbone',
+        'jquery', 'bootstrap', 'tailwind', 'tailwindcss', 'material-ui', 'mui',
+        'chakra ui', 'redux', 'mobx', 'webpack', 'vite', 'rollup', 'parcel',
+        # Backend frameworks
+        'node.js', 'nodejs', 'express', 'express.js', 'django', 'flask', 'fastapi',
+        'spring', 'spring boot', 'rails', 'ruby on rails', 'laravel', 'asp.net', '.net',
+        'dotnet', 'gin', 'fiber', 'actix', 'nest.js', 'nestjs', 'koa', 'hapi',
+        # Databases
+        'mysql', 'postgresql', 'postgres', 'mongodb', 'redis', 'elasticsearch',
+        'sqlite', 'oracle', 'sql server', 'dynamodb', 'cassandra', 'neo4j',
+        'mariadb', 'couchdb', 'firestore', 'supabase', 'prisma',
+        # Cloud & DevOps
+        'aws', 'amazon web services', 'azure', 'gcp', 'google cloud', 'heroku',
+        'digitalocean', 'vercel', 'netlify', 'docker', 'kubernetes', 'k8s',
+        'terraform', 'ansible', 'jenkins', 'circleci', 'github actions',
+        'gitlab ci', 'travis ci', 'nginx', 'apache', 'linux', 'unix',
+        # Data & ML
+        'pandas', 'numpy', 'scikit-learn', 'tensorflow', 'pytorch', 'keras',
+        'spark', 'hadoop', 'airflow', 'kafka', 'rabbitmq', 'celery',
+        'tableau', 'power bi', 'looker', 'dbt', 'snowflake', 'bigquery',
+        'machine learning', 'deep learning', 'nlp', 'computer vision',
+        'data analysis', 'data engineering', 'data science', 'etl',
+        # Mobile
+        'react native', 'flutter', 'ios', 'android', 'swiftui', 'xamarin',
+        'ionic', 'cordova', 'expo',
+        # Tools & Practices
+        'git', 'github', 'gitlab', 'bitbucket', 'jira', 'confluence',
+        'figma', 'sketch', 'adobe xd', 'postman', 'swagger',
+        'rest', 'restful', 'rest api', 'graphql', 'grpc', 'websocket',
+        'ci/cd', 'agile', 'scrum', 'kanban', 'tdd', 'bdd',
+        'microservices', 'serverless', 'oauth', 'jwt',
+        # Testing
+        'jest', 'mocha', 'chai', 'cypress', 'selenium', 'playwright',
+        'pytest', 'junit', 'rspec', 'testing library',
+        # Other
+        'api', 'seo', 'accessibility', 'a11y', 'responsive design',
+        'ux', 'ui', 'ux design', 'ui design', 'wireframing',
+        'project management', 'team leadership', 'mentoring',
+        'communication', 'problem solving', 'analytical',
+        'salesforce', 'hubspot', 'sap', 'erp', 'crm',
+    }
+
+    # Build a case-insensitive lookup (maps lowercase -> preferred casing)
+    SKILL_LOOKUP = {}
+    for sk in KNOWN_SKILLS:
+        SKILL_LOOKUP[sk.lower()] = sk
+
+    # Canonical casing for well-known skills
+    SKILL_DISPLAY = {
+        'python': 'Python', 'java': 'Java', 'javascript': 'JavaScript',
+        'typescript': 'TypeScript', 'c++': 'C++', 'c#': 'C#', 'ruby': 'Ruby',
+        'go': 'Go', 'golang': 'Go', 'rust': 'Rust', 'swift': 'Swift',
+        'kotlin': 'Kotlin', 'scala': 'Scala', 'php': 'PHP', 'perl': 'Perl',
+        'r': 'R', 'matlab': 'MATLAB', 'dart': 'Dart', 'sql': 'SQL',
+        'html': 'HTML', 'css': 'CSS', 'sass': 'Sass', 'graphql': 'GraphQL',
+        'react': 'React', 'react.js': 'React', 'reactjs': 'React',
+        'angular': 'Angular', 'angularjs': 'Angular',
+        'vue': 'Vue.js', 'vue.js': 'Vue.js', 'vuejs': 'Vue.js',
+        'svelte': 'Svelte', 'next.js': 'Next.js', 'nextjs': 'Next.js',
+        'nuxt': 'Nuxt.js', 'nuxt.js': 'Nuxt.js',
+        'gatsby': 'Gatsby', 'jquery': 'jQuery', 'bootstrap': 'Bootstrap',
+        'tailwind': 'Tailwind CSS', 'tailwindcss': 'Tailwind CSS',
+        'redux': 'Redux', 'webpack': 'Webpack', 'vite': 'Vite',
+        'node.js': 'Node.js', 'nodejs': 'Node.js',
+        'express': 'Express.js', 'express.js': 'Express.js',
+        'django': 'Django', 'flask': 'Flask', 'fastapi': 'FastAPI',
+        'spring': 'Spring', 'spring boot': 'Spring Boot',
+        'rails': 'Ruby on Rails', 'ruby on rails': 'Ruby on Rails',
+        'laravel': 'Laravel', 'asp.net': 'ASP.NET', '.net': '.NET', 'dotnet': '.NET',
+        'nest.js': 'NestJS', 'nestjs': 'NestJS',
+        'mysql': 'MySQL', 'postgresql': 'PostgreSQL', 'postgres': 'PostgreSQL',
+        'mongodb': 'MongoDB', 'redis': 'Redis', 'elasticsearch': 'Elasticsearch',
+        'sqlite': 'SQLite', 'dynamodb': 'DynamoDB', 'cassandra': 'Cassandra',
+        'neo4j': 'Neo4j', 'firestore': 'Firestore', 'supabase': 'Supabase',
+        'prisma': 'Prisma', 'snowflake': 'Snowflake', 'bigquery': 'BigQuery',
+        'aws': 'AWS', 'azure': 'Azure', 'gcp': 'GCP',
+        'heroku': 'Heroku', 'vercel': 'Vercel', 'docker': 'Docker',
+        'kubernetes': 'Kubernetes', 'k8s': 'Kubernetes',
+        'terraform': 'Terraform', 'ansible': 'Ansible', 'jenkins': 'Jenkins',
+        'nginx': 'Nginx', 'linux': 'Linux',
+        'pandas': 'Pandas', 'numpy': 'NumPy', 'tensorflow': 'TensorFlow',
+        'pytorch': 'PyTorch', 'keras': 'Keras', 'spark': 'Spark',
+        'kafka': 'Kafka', 'tableau': 'Tableau', 'dbt': 'dbt',
+        'react native': 'React Native', 'flutter': 'Flutter',
+        'ios': 'iOS', 'android': 'Android', 'swiftui': 'SwiftUI',
+        'git': 'Git', 'github': 'GitHub', 'gitlab': 'GitLab',
+        'jira': 'Jira', 'figma': 'Figma', 'postman': 'Postman',
+        'jest': 'Jest', 'cypress': 'Cypress', 'selenium': 'Selenium',
+        'playwright': 'Playwright', 'pytest': 'pytest',
+        'agile': 'Agile', 'scrum': 'Scrum',
+        'salesforce': 'Salesforce', 'sap': 'SAP',
+        'ci/cd': 'CI/CD', 'rest': 'REST', 'restful': 'REST',
+        'rest api': 'REST API', 'grpc': 'gRPC',
+        'machine learning': 'Machine Learning', 'deep learning': 'Deep Learning',
+        'nlp': 'NLP', 'computer vision': 'Computer Vision',
+        'data analysis': 'Data Analysis', 'data engineering': 'Data Engineering',
+        'data science': 'Data Science', 'etl': 'ETL',
+        'microservices': 'Microservices', 'serverless': 'Serverless',
+    }
+
+    skills_found = set()  # Track lowercase for dedup
+
+    def _add_skill(skill_text):
+        """Add a skill with deduplication and normalization."""
+        key = skill_text.lower().strip()
+        if key in SKILL_DISPLAY:
+            display = SKILL_DISPLAY[key]
+        else:
+            display = skill_text.strip()
+        dedup_key = display.lower()
+        if dedup_key not in skills_found and len(display) >= 2:
+            skills_found.add(dedup_key)
+            result["skills"].append(display)
+
+    # 1) Parse dedicated skill sections (original approach, improved header matching)
+    skill_keys = [k for k in sections if any(w in k for w in
+                  ['skill', 'qualifications', 'competenc', 'technologies', 'proficienc', 'tools', 'expertise'])]
     for key in skill_keys:
         for sline in sections[key]:
-            clean = re.sub(r'^(?:Proficient|Familiar|Languages|Frameworks|Tools|Technologies|Databases|Platforms)\s*[:()]\s*', '', sline, flags=re.IGNORECASE)
-            raw_skills = re.split(r'[,;|●•·]', clean)
+            # Remove common prefixes like "Languages:", "Frameworks:", etc.
+            clean = re.sub(
+                r'^(?:Proficient\s+(?:in|with)|Familiar\s+with|Experience\s+with|'
+                r'Languages|Frameworks|Tools|Technologies|Databases|Platforms|'
+                r'Libraries|Operating\s+Systems|Software|Hardware|'
+                r'Frontend|Backend|DevOps|Cloud|Mobile|Other)\s*[:()]\s*',
+                '', sline, flags=re.IGNORECASE
+            )
+            raw_skills = re.split(r'[,;|●•·▪◦○]', clean)
             for s in raw_skills:
                 s = s.strip().strip('()')
+                s = re.sub(r'^[●•·▪◦○\-]\s*', '', s).strip()
                 if s and 2 <= len(s) <= 40 and not re.match(r'^[\d\s]+$', s):
-                    result["skills"].append(s)
+                    _add_skill(s)
+
+    # 2) Scan work history bullets for inline "Technologies:" lines and known skill mentions
+    for job in result["work_history"]:
+        desc = job.get("description", "")
+        if not desc:
+            continue
+        for bullet_line in desc.split('\n'):
+            # Check for inline tech lists: "Technologies: X, Y, Z" or "Tech stack: ..."
+            tech_match = re.match(
+                r'(?:Technologies|Tech(?:nology)?\s*(?:Stack|Used)?|Stack|Built\s+with|'
+                r'Tools?\s+Used|Environment)\s*[:]\s*(.+)',
+                bullet_line, re.IGNORECASE
+            )
+            if tech_match:
+                for s in re.split(r'[,;|●•·]', tech_match.group(1)):
+                    s = s.strip().strip('()')
+                    if s and 2 <= len(s) <= 40:
+                        _add_skill(s)
+
+            # Scan for known skill keywords in bullet text
+            bullet_lower = bullet_line.lower()
+            for skill_key, display in SKILL_DISPLAY.items():
+                if len(skill_key) <= 2:
+                    # Short skills (R, Go, C#) need word boundaries
+                    if re.search(r'\b' + re.escape(skill_key) + r'\b', bullet_lower):
+                        _add_skill(display)
+                elif skill_key in bullet_lower:
+                    _add_skill(display)
+
+    # 3) Scan summary/bio for known skills
+    for key in [k for k in sections if any(w in k for w in ['summary', 'profile', 'objective'])]:
+        summary_text = " ".join(sections[key]).lower()
+        for skill_key, display in SKILL_DISPLAY.items():
+            if len(skill_key) <= 2:
+                if re.search(r'\b' + re.escape(skill_key) + r'\b', summary_text):
+                    _add_skill(display)
+            elif skill_key in summary_text:
+                _add_skill(display)
+
+    # 4) Scan header section (often has a tagline with skills)
+    if 'header' in sections:
+        header_text = " ".join(sections['header']).lower()
+        for skill_key, display in SKILL_DISPLAY.items():
+            if len(skill_key) <= 2:
+                if re.search(r'\b' + re.escape(skill_key) + r'\b', header_text):
+                    _add_skill(display)
+            elif skill_key in header_text:
+                _add_skill(display)
+
     result["skills"] = result["skills"][:30]
 
     # --- Parse Certifications ---
