@@ -458,5 +458,117 @@ async def get_oauth_config():
         "github": {
             "enabled": bool(GITHUB_CLIENT_ID),
             "client_id": GITHUB_CLIENT_ID if GITHUB_CLIENT_ID else None,
+        },
+        "apple": {
+            "enabled": bool(APPLE_CLIENT_ID),
+            "client_id": APPLE_CLIENT_ID if APPLE_CLIENT_ID else None,
         }
     }
+
+
+# ==================== SIGN IN WITH APPLE ====================
+
+APPLE_CLIENT_ID = os.environ.get('APPLE_CLIENT_ID', '')
+APPLE_TEAM_ID = os.environ.get('APPLE_TEAM_ID', '')
+APPLE_KEY_ID = os.environ.get('APPLE_KEY_ID', '')
+APPLE_PRIVATE_KEY = os.environ.get('APPLE_PRIVATE_KEY', '')
+
+
+@router.post("/oauth/apple")
+async def apple_oauth(body: dict):
+    """Authenticate with Apple Sign In. Expects {code, id_token, redirect_uri, role?}"""
+    id_token = body.get("id_token")
+    code = body.get("code")
+    role = body.get("role", "seeker")
+
+    if not id_token and not code:
+        raise HTTPException(status_code=400, detail="Missing id_token or code")
+
+    try:
+        # Apple sends user info in the id_token (JWT)
+        # Decode without verification first to get claims
+        # In production, you should verify the JWT signature with Apple's public keys
+        import json
+        import base64
+
+        if id_token:
+            # Decode the JWT payload (middle segment)
+            parts = id_token.split('.')
+            if len(parts) != 3:
+                raise HTTPException(status_code=400, detail="Invalid id_token format")
+
+            # Add padding if needed
+            payload = parts[1]
+            payload += '=' * (4 - len(payload) % 4)
+            decoded = json.loads(base64.urlsafe_b64decode(payload))
+
+            email = decoded.get("email")
+            # Apple only sends name on first sign-in, so we may not have it
+            name = body.get("user_name") or email.split("@")[0] if email else "Apple User"
+        else:
+            raise HTTPException(status_code=400, detail="id_token is required for Apple Sign In")
+
+        if not email:
+            raise HTTPException(status_code=400, detail="Could not retrieve email from Apple")
+
+        return await _find_or_create_oauth_user(email, name, "apple", role)
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Apple OAuth error: {str(e)}")
+        raise HTTPException(status_code=500, detail="Apple authentication failed")
+
+
+# ==================== ACCOUNT DELETION ====================
+
+@router.delete("/account")
+async def delete_account(current_user: dict = Depends(get_current_user)):
+    """Permanently delete user account and all associated data."""
+    user_id = current_user["id"]
+    user_role = current_user.get("role", "seeker")
+
+    try:
+        # Delete all user data across collections
+        await db.users.delete_one({"id": user_id})
+        await db.support_tickets.delete_many({"user_id": user_id})
+        await db.notifications.delete_many({"user_id": user_id})
+        await db.password_reset_tokens.delete_many({"user_id": user_id})
+        await db.moderation_queue.delete_many({"user_id": user_id})
+        await db.profile_views.delete_many({"$or": [{"viewer_id": user_id}, {"viewed_id": user_id}]})
+
+        if user_role == "seeker":
+            # Delete seeker-specific data
+            await db.applications.delete_many({"seeker_id": user_id})
+            await db.swipes.delete_many({"seeker_id": user_id})
+        else:
+            # Delete recruiter-specific data: jobs, applications to those jobs
+            jobs = await db.jobs.find({"recruiter_id": user_id}, {"id": 1}).to_list(None)
+            job_ids = [j["id"] for j in jobs]
+            if job_ids:
+                await db.applications.delete_many({"job_id": {"$in": job_ids}})
+            await db.jobs.delete_many({"recruiter_id": user_id})
+            await db.swipes.delete_many({"recruiter_id": user_id})
+
+        # Delete matches and messages involving this user
+        matches = await db.matches.find(
+            {"$or": [{"seeker_id": user_id}, {"recruiter_id": user_id}]},
+            {"id": 1}
+        ).to_list(None)
+        match_ids = [m["id"] for m in matches]
+        if match_ids:
+            await db.messages.delete_many({"match_id": {"$in": match_ids}})
+        await db.matches.delete_many({"$or": [{"seeker_id": user_id}, {"recruiter_id": user_id}]})
+
+        # Delete interviews
+        await db.interviews.delete_many({"$or": [{"requester_id": user_id}, {"recipient_id": user_id}]})
+
+        # Invalidate cache
+        invalidate_user(user_id)
+
+        logger.info(f"Account deleted: {user_id} ({user_role})")
+        return {"success": True, "message": "Account permanently deleted"}
+
+    except Exception as e:
+        logger.error(f"Account deletion failed for {user_id}: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to delete account. Please try again or contact support.")

@@ -353,6 +353,40 @@ async def update_job(job_id: str, updates: dict, current_user: dict = Depends(ge
     updated_job = await db.jobs.find_one({"id": job_id}, {"_id": 0})
     return updated_job
 
+@router.post("/{job_id}/duplicate")
+async def duplicate_job(job_id: str, current_user: dict = Depends(get_current_user)):
+    """Duplicate an existing job posting."""
+    if current_user["role"] != "recruiter":
+        raise HTTPException(status_code=403, detail="Only recruiters can duplicate jobs")
+
+    job = await db.jobs.find_one({"id": job_id, "recruiter_id": current_user["id"]}, {"_id": 0})
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found or not authorized")
+
+    new_id = str(uuid.uuid4())
+    new_job = {**job}
+    new_job["id"] = new_id
+    new_job["title"] = f"{job['title']} (Copy)"
+    new_job["created_at"] = datetime.now(timezone.utc).isoformat()
+    new_job["is_active"] = True
+    new_job.pop("is_boosted", None)
+    new_job.pop("boost_until", None)
+    new_job.pop("is_flagged", None)
+
+    backgrounds = [
+        "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+        "linear-gradient(135deg, #f093fb 0%, #f5576c 100%)",
+        "linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)",
+        "linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)",
+        "linear-gradient(135deg, #fa709a 0%, #fee140 100%)",
+        "linear-gradient(135deg, #a18cd1 0%, #fbc2eb 100%)",
+    ]
+    new_job["background_image"] = backgrounds[hash(new_id) % len(backgrounds)]
+
+    await db.jobs.insert_one(new_job)
+    return {k: v for k, v in new_job.items() if k != '_id'}
+
+
 @router.delete("/{job_id}")
 async def delete_job(job_id: str, current_user: dict = Depends(get_current_user)):
     """Delete a job posting"""
@@ -364,3 +398,77 @@ async def delete_job(job_id: str, current_user: dict = Depends(get_current_user)
         raise HTTPException(status_code=404, detail="Job not found or not authorized")
     
     return {"message": "Job deleted successfully"}
+
+
+# ==================== SAVED JOBS ====================
+
+@router.post("/{job_id}/save")
+async def save_job(job_id: str, current_user: dict = Depends(get_current_user)):
+    """Save/bookmark a job for later."""
+    if current_user["role"] != "seeker":
+        raise HTTPException(status_code=403, detail="Only seekers can save jobs")
+
+    job = await db.jobs.find_one({"id": job_id}, {"_id": 0, "id": 1})
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    existing = await db.saved_jobs.find_one({"user_id": current_user["id"], "job_id": job_id})
+    if existing:
+        return {"saved": True, "message": "Already saved"}
+
+    await db.saved_jobs.insert_one({
+        "id": str(uuid.uuid4()),
+        "user_id": current_user["id"],
+        "job_id": job_id,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    })
+    return {"saved": True, "message": "Job saved"}
+
+
+@router.delete("/{job_id}/save")
+async def unsave_job(job_id: str, current_user: dict = Depends(get_current_user)):
+    """Remove a saved/bookmarked job."""
+    await db.saved_jobs.delete_one({"user_id": current_user["id"], "job_id": job_id})
+    return {"saved": False, "message": "Job removed from saved"}
+
+
+@router.get("/saved/list")
+async def get_saved_jobs(current_user: dict = Depends(get_current_user)):
+    """Get all saved jobs for the current user."""
+    if current_user["role"] != "seeker":
+        raise HTTPException(status_code=403, detail="Only seekers can view saved jobs")
+
+    saved = await db.saved_jobs.find(
+        {"user_id": current_user["id"]},
+        {"_id": 0}
+    ).sort("created_at", -1).to_list(100)
+
+    job_ids = [s["job_id"] for s in saved]
+    if not job_ids:
+        return {"jobs": []}
+
+    jobs = await db.jobs.find(
+        {"id": {"$in": job_ids}},
+        {"_id": 0}
+    ).to_list(100)
+
+    # Preserve saved order
+    job_map = {j["id"]: j for j in jobs}
+    ordered = []
+    for s in saved:
+        job = job_map.get(s["job_id"])
+        if job:
+            job["saved_at"] = s["created_at"]
+            ordered.append(job)
+
+    return {"jobs": ordered}
+
+
+@router.get("/saved/ids")
+async def get_saved_job_ids(current_user: dict = Depends(get_current_user)):
+    """Get just the IDs of saved jobs (for UI bookmark state)."""
+    saved = await db.saved_jobs.find(
+        {"user_id": current_user["id"]},
+        {"_id": 0, "job_id": 1}
+    ).to_list(500)
+    return {"job_ids": [s["job_id"] for s in saved]}

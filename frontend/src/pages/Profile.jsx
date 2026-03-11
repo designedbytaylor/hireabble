@@ -14,6 +14,7 @@ import VideoUpload from '../components/VideoUpload';
 import { getPhotoUrl, handleImgError } from '../utils/helpers';
 import { isPushSupported, getPermissionStatus, subscribeToPush, unsubscribeFromPush } from '../utils/pushNotifications';
 import { UpgradePrompt } from '../components/UpgradeModal';
+import ConfirmDialog from '../components/ConfirmDialog';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
@@ -333,6 +334,25 @@ export default function Profile() {
   const handleLogout = () => {
     logout();
     toast.success('Logged out successfully');
+  };
+
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleteLoading, setDeleteLoading] = useState(false);
+
+  const handleDeleteAccount = async () => {
+    setDeleteLoading(true);
+    try {
+      await axios.delete(`${API}/auth/account`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      toast.success('Account deleted');
+      logout();
+    } catch {
+      toast.error('Failed to delete account. Please try again or contact support.');
+    } finally {
+      setDeleteLoading(false);
+      setShowDeleteConfirm(false);
+    }
   };
 
   const handleDetectLocation = () => {
@@ -1206,6 +1226,31 @@ export default function Profile() {
             <LogOut className="w-5 h-5 mr-2" />
             Sign Out
           </Button>
+
+          {/* Delete Account */}
+          <button
+            onClick={() => setShowDeleteConfirm(true)}
+            className="w-full mt-6 text-center text-sm text-muted-foreground hover:text-destructive transition-colors"
+          >
+            Delete Account
+          </button>
+
+          <ConfirmDialog
+            open={showDeleteConfirm}
+            onOpenChange={setShowDeleteConfirm}
+            title="Delete your account?"
+            description="This will permanently delete your account, profile, applications, matches, and messages. This action cannot be undone."
+            confirmLabel={deleteLoading ? 'Deleting...' : 'Delete My Account'}
+            variant="destructive"
+            onConfirm={handleDeleteAccount}
+          />
+
+          {/* Legal Links */}
+          <div className="flex items-center justify-center gap-4 mt-6 mb-4">
+            <Link to="/privacy" className="text-xs text-muted-foreground hover:text-foreground">Privacy Policy</Link>
+            <span className="text-xs text-muted-foreground">·</span>
+            <Link to="/terms" className="text-xs text-muted-foreground hover:text-foreground">Terms of Service</Link>
+          </div>
         </div>
       </main>
 
