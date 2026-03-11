@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback, memo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence, useMotionValue, useTransform } from 'framer-motion';
-import { X, Heart, Star, Briefcase, MapPin, DollarSign, Building2, Clock, ChevronDown, Filter, SlidersHorizontal, Zap, CheckCircle, Globe, Wifi, Navigation2, Info, Calendar, Undo2, Eye, EyeOff, Rocket, Crown, Sparkles, Lock } from 'lucide-react';
+import { X, Heart, Star, Briefcase, MapPin, DollarSign, Building2, Clock, ChevronDown, Filter, SlidersHorizontal, Zap, CheckCircle, Globe, Wifi, Navigation2, Info, Calendar, Undo2, Eye, EyeOff, Rocket, Crown, Sparkles, Lock, Bookmark } from 'lucide-react';
 import { toast } from 'sonner';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
@@ -167,6 +167,7 @@ export default function SeekerDashboard() {
   const [superlikeNote, setSuperlikeNote] = useState('');
   const [showNoteInput, setShowNoteInput] = useState(false);
   const [enteringCard, setEnteringCard] = useState(null); // card animating back in (undo)
+  const [savedJobIds, setSavedJobIds] = useState(new Set());
   const [upgradeTrigger, setUpgradeTrigger] = useState('super_likes'); // what triggered upgrade modal
   const lastSwipedRef = useRef(null); // track last swiped card for undo animation
   const fetchingMoreRef = useRef(false);
@@ -290,6 +291,38 @@ export default function SeekerDashboard() {
     flushSwipeQueue().then(() => fetchDashboard());
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Fetch saved job IDs for bookmark state
+  useEffect(() => {
+    axios.get(`${API}/jobs/saved/ids`, {
+      headers: { Authorization: `Bearer ${tokenRef.current}` },
+    }).then(res => setSavedJobIds(new Set(res.data.job_ids))).catch(() => {});
+  }, []);
+
+  const toggleSaveJob = useCallback(async (jobId) => {
+    const isSaved = savedJobIds.has(jobId);
+    // Optimistic update
+    setSavedJobIds(prev => {
+      const next = new Set(prev);
+      if (isSaved) next.delete(jobId); else next.add(jobId);
+      return next;
+    });
+    try {
+      if (isSaved) {
+        await axios.delete(`${API}/jobs/${jobId}/save`, { headers: { Authorization: `Bearer ${tokenRef.current}` } });
+      } else {
+        await axios.post(`${API}/jobs/${jobId}/save`, {}, { headers: { Authorization: `Bearer ${tokenRef.current}` } });
+        toast.success('Job saved!');
+      }
+    } catch {
+      // Revert on error
+      setSavedJobIds(prev => {
+        const next = new Set(prev);
+        if (isSaved) next.add(jobId); else next.delete(jobId);
+        return next;
+      });
+    }
+  }, [savedJobIds]);
 
   // Fetch top picks for premium subscribers
   useEffect(() => {
@@ -847,6 +880,15 @@ export default function SeekerDashboard() {
               <div className="text-xs text-muted-foreground">Applied</div>
             </div>
           </button>
+          <button onClick={() => navigate('/saved')} className="glass-card rounded-2xl px-5 py-3 flex items-center gap-3 whitespace-nowrap hover:border-primary/30 transition-colors text-left">
+            <div className="w-10 h-10 rounded-xl bg-blue-500/20 flex items-center justify-center">
+              <Bookmark className="w-5 h-5 text-blue-500" />
+            </div>
+            <div>
+              <div className="text-xl font-bold">{savedJobIds.size}</div>
+              <div className="text-xs text-muted-foreground">Saved</div>
+            </div>
+          </button>
           <div className="glass-card rounded-2xl px-5 py-3 flex items-center gap-3 whitespace-nowrap">
             <div className="w-10 h-10 rounded-xl bg-secondary/20 flex items-center justify-center">
               <Star className="w-5 h-5 text-secondary" />
@@ -1093,6 +1135,17 @@ export default function SeekerDashboard() {
                   data-testid="like-btn"
                 >
                   <Heart className="w-7 h-7 text-success" />
+                </button>
+                <button
+                  onClick={() => currentJob && toggleSaveJob(currentJob.id)}
+                  className={`w-12 h-12 rounded-full flex items-center justify-center transition-all duration-300 ${
+                    currentJob && savedJobIds.has(currentJob.id)
+                      ? 'bg-primary/20 border border-primary/40 text-primary'
+                      : 'bg-muted/10 border border-muted/20 text-muted-foreground hover:scale-110'
+                  }`}
+                  title="Save for later"
+                >
+                  <Bookmark className={`w-5 h-5 ${currentJob && savedJobIds.has(currentJob.id) ? 'fill-current' : ''}`} />
                 </button>
               </div>
               {/* Super Like Note (Premium) */}

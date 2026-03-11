@@ -312,10 +312,23 @@ export default function Upgrade() {
           </div>
         </div>
 
-        <p className="text-[10px] text-muted-foreground text-center py-4">
-          Subscriptions auto-renew. Cancel anytime from your profile settings.
-          Prices may vary by region.
-        </p>
+        <div className="text-[10px] text-muted-foreground text-center py-4 space-y-2">
+          <p>
+            Subscriptions auto-renew until cancelled. Payment will be charged to your account at confirmation of purchase.
+            Your subscription automatically renews unless auto-renew is turned off at least 24 hours before the end of the current period.
+          </p>
+          <p>
+            You can manage or cancel your subscription in your {/iPhone|iPad|iPod|Macintosh/.test(navigator.userAgent) ? (
+              <a href="https://apps.apple.com/account/subscriptions" className="text-primary underline">App Store settings</a>
+            ) : 'account settings'}.
+            Prices may vary by region.
+          </p>
+          <p>
+            <a href="/terms" className="text-primary underline">Terms of Service</a>
+            {' · '}
+            <a href="/privacy" className="text-primary underline">Privacy Policy</a>
+          </p>
+        </div>
       </main>
 
       <Navigation />

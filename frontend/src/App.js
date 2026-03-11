@@ -25,6 +25,7 @@ const Chat = React.lazy(() => import("./pages/Chat"));
 const InterviewScheduler = React.lazy(() => import("./pages/InterviewScheduler"));
 const RecruiterAnalytics = React.lazy(() => import("./pages/RecruiterAnalytics"));
 const AppliedJobs = React.lazy(() => import("./pages/AppliedJobs"));
+const SavedJobs = React.lazy(() => import("./pages/SavedJobs"));
 const RecruiterApplications = React.lazy(() => import("./pages/RecruiterApplications"));
 const Messages = React.lazy(() => import("./pages/Messages"));
 const Upgrade = React.lazy(() => import("./pages/Upgrade"));
@@ -259,6 +260,14 @@ function AppRoutes() {
         element={
           <ProtectedRoute allowedRoles={['seeker']}>
             <AppliedJobs />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/saved"
+        element={
+          <ProtectedRoute allowedRoles={['seeker']}>
+            <SavedJobs />
           </ProtectedRoute>
         }
       />

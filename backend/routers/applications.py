@@ -1430,3 +1430,53 @@ async def get_top_picks(current_user: dict = Depends(get_current_user)):
         )
 
     return {"picks": top_3, "date": today}
+
+
+# ==================== CANDIDATE NOTES ====================
+
+from pydantic import BaseModel
+
+
+class CandidateNoteBody(BaseModel):
+    note: str
+
+
+@router.put("/candidates/{seeker_id}/note")
+async def save_candidate_note(
+    seeker_id: str,
+    body: CandidateNoteBody,
+    current_user: dict = Depends(get_current_user),
+):
+    """Save or update a recruiter's private note on a candidate."""
+    if current_user["role"] != "recruiter":
+        raise HTTPException(status_code=403, detail="Only recruiters can add notes")
+
+    note_text = body.note.strip()[:2000]  # max 2000 chars
+
+    await db.candidate_notes.update_one(
+        {"recruiter_id": current_user["id"], "seeker_id": seeker_id},
+        {"$set": {
+            "recruiter_id": current_user["id"],
+            "seeker_id": seeker_id,
+            "note": note_text,
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+        }},
+        upsert=True,
+    )
+    return {"success": True}
+
+
+@router.get("/candidates/{seeker_id}/note")
+async def get_candidate_note(
+    seeker_id: str,
+    current_user: dict = Depends(get_current_user),
+):
+    """Get a recruiter's private note on a candidate."""
+    if current_user["role"] != "recruiter":
+        raise HTTPException(status_code=403, detail="Only recruiters can view notes")
+
+    doc = await db.candidate_notes.find_one(
+        {"recruiter_id": current_user["id"], "seeker_id": seeker_id},
+        {"_id": 0, "note": 1, "updated_at": 1},
+    )
+    return {"note": doc["note"] if doc else "", "updated_at": doc.get("updated_at") if doc else None}

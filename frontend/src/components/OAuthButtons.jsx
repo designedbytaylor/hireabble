@@ -20,10 +20,16 @@ const GitHubIcon = () => (
   </svg>
 );
 
+const AppleIcon = () => (
+  <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+    <path d="M17.05 20.28c-.98.95-2.05.88-3.08.4-1.09-.5-2.08-.48-3.24 0-1.44.62-2.2.44-3.06-.4C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z"/>
+  </svg>
+);
+
 export default function OAuthButtons({ role = 'seeker' }) {
   const navigate = useNavigate();
   const [oauthConfig, setOauthConfig] = useState(null);
-  const [loading, setLoading] = useState({ google: false, github: false });
+  const [loading, setLoading] = useState({ google: false, github: false, apple: false });
 
   useEffect(() => {
     axios.get(`${API}/auth/oauth/config`).then(res => {
@@ -62,34 +68,65 @@ export default function OAuthButtons({ role = 'seeker' }) {
     window.location.href = `https://github.com/login/oauth/authorize?${params}`;
   }, [oauthConfig, role]);
 
+  const handleAppleLogin = useCallback(() => {
+    if (!oauthConfig?.apple?.enabled) return;
+
+    const redirectUri = `${window.location.origin}/login`;
+    const params = new URLSearchParams({
+      client_id: oauthConfig.apple.client_id,
+      redirect_uri: redirectUri,
+      response_type: 'code id_token',
+      scope: 'name email',
+      response_mode: 'fragment',
+      state: JSON.stringify({ role, provider: 'apple' }),
+    });
+
+    window.location.href = `https://appleid.apple.com/auth/authorize?${params}`;
+  }, [oauthConfig, role]);
+
   // Handle OAuth callback
   useEffect(() => {
+    // Check URL search params (Google/GitHub) and hash fragment (Apple)
     const urlParams = new URLSearchParams(window.location.search);
-    const code = urlParams.get('code');
-    const state = urlParams.get('state');
+    const hashParams = new URLSearchParams(window.location.hash.replace('#', ''));
 
-    if (!code) return;
+    const code = urlParams.get('code') || hashParams.get('code');
+    const state = urlParams.get('state') || hashParams.get('state');
+    const idToken = hashParams.get('id_token');
+
+    if (!code && !idToken) return;
 
     let parsedRole = role;
+    let parsedProvider = null;
     try {
       const parsed = JSON.parse(state || '{}');
       parsedRole = parsed.role || role;
+      parsedProvider = parsed.provider || null;
     } catch {}
 
     // Clean URL
     window.history.replaceState({}, '', window.location.pathname);
 
-    // Determine provider by checking URL patterns or state
-    const isGithub = !urlParams.get('scope'); // Google has scope in callback, GitHub doesn't
+    // Determine provider
+    let provider;
+    if (parsedProvider === 'apple' || idToken) {
+      provider = 'apple';
+    } else if (!urlParams.get('scope')) {
+      provider = 'github'; // Google has scope in callback, GitHub doesn't
+    } else {
+      provider = 'google';
+    }
 
     const exchangeCode = async () => {
-      const provider = isGithub ? 'github' : 'google';
       setLoading(prev => ({ ...prev, [provider]: true }));
 
       try {
         const payload = { code, role: parsedRole };
         if (provider === 'google') {
           payload.redirect_uri = `${window.location.origin}/login`;
+        }
+        if (provider === 'apple') {
+          payload.id_token = idToken;
         }
 
         const response = await axios.post(`${API}/auth/oauth/${provider}`, payload);
@@ -112,7 +149,7 @@ export default function OAuthButtons({ role = 'seeker' }) {
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Don't render if no OAuth providers are configured
-  if (!oauthConfig || (!oauthConfig.google?.enabled && !oauthConfig.github?.enabled)) {
+  if (!oauthConfig || (!oauthConfig.google?.enabled && !oauthConfig.github?.enabled && !oauthConfig.apple?.enabled)) {
     return null;
   }
 
@@ -123,6 +160,24 @@ export default function OAuthButtons({ role = 'seeker' }) {
         <span className="text-xs text-muted-foreground uppercase">or continue with</span>
         <div className="flex-1 h-px bg-border" />
       </div>
+
+      {oauthConfig.apple?.enabled && (
+        <button
+          type="button"
+          onClick={handleAppleLogin}
+          disabled={loading.apple}
+          className="w-full h-12 rounded-xl bg-white text-black hover:bg-gray-100 flex items-center justify-center gap-2 transition-colors disabled:opacity-50 font-medium"
+        >
+          {loading.apple ? (
+            <div className="w-5 h-5 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" />
+          ) : (
+            <>
+              <AppleIcon />
+              <span className="text-sm font-medium">Sign in with Apple</span>
+            </>
+          )}
+        </button>
+      )}
 
       <div className="flex gap-3">
         {oauthConfig.google?.enabled && (

@@ -18,6 +18,7 @@ import { useAuth } from '../context/AuthContext';
 import Navigation from '../components/Navigation';
 import { getPhotoUrl } from '../utils/helpers';
 import { SkeletonPageBackground, SkeletonListItem, SkeletonFilterTabs } from '../components/skeletons';
+import CandidateNotes from '../components/CandidateNotes';
 import { Skeleton } from '../components/ui/skeleton';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
@@ -313,6 +314,9 @@ export default function RecruiterApplications() {
                   <Calendar className="w-4 h-4 mr-1.5" /> Schedule Interview
                 </Button>
               </div>
+
+              {/* Candidate Notes */}
+              <CandidateNotes seekerId={selectedApp.seeker_id} token={token} />
 
               {/* Resume Content */}
               {loadingResume ? (

@@ -5,7 +5,7 @@ import {
   Plus, Briefcase, Users, Star, Heart, X, Check,
   MapPin, DollarSign, Building2, ChevronRight, Clock,
   Edit, GraduationCap, Trash2, BarChart3, Calendar, Globe,
-  FileText, Send, Info
+  FileText, Send, Info, Copy
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -125,6 +125,18 @@ export default function RecruiterDashboard() {
       fetchData();
     } catch (error) {
       toast.error('Failed to delete job');
+    }
+  };
+
+  const handleDuplicateJob = async (jobId) => {
+    try {
+      await axios.post(`${API}/jobs/${jobId}/duplicate`, {}, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      toast.success('Job duplicated');
+      fetchData();
+    } catch {
+      toast.error('Failed to duplicate job');
     }
   };
 
@@ -436,6 +448,13 @@ export default function RecruiterDashboard() {
                         data-testid={`edit-job-${job.id}`}
                       >
                         <Edit className="w-5 h-5 text-muted-foreground" />
+                      </button>
+                      <button
+                        onClick={() => handleDuplicateJob(job.id)}
+                        className="p-2 rounded-lg hover:bg-accent transition-colors"
+                        title="Duplicate job"
+                      >
+                        <Copy className="w-5 h-5 text-muted-foreground" />
                       </button>
                       <button
                         onClick={() => setConfirmDelete(job.id)}

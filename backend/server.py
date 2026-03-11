@@ -324,5 +324,12 @@ async def startup():
     await ensure_index(db.support_tickets, [("status", 1), ("updated_at", -1)])
     await ensure_index(db.support_tickets, [("assigned_to", 1), ("status", 1)])
 
+    # Saved jobs
+    await ensure_index(db.saved_jobs, [("user_id", 1), ("job_id", 1)], unique=True)
+    await ensure_index(db.saved_jobs, [("user_id", 1), ("created_at", -1)])
+
+    # Candidate notes
+    await ensure_index(db.candidate_notes, [("recruiter_id", 1), ("seeker_id", 1)], unique=True)
+
     logger.info("Database indexes created")
     logger.info("Hireabble API started successfully!")

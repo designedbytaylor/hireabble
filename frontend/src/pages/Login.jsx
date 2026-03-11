@@ -173,6 +173,12 @@ export default function Login() {
                 Create one
               </Link>
             </p>
+
+            <div className="flex items-center justify-center gap-3 mt-4">
+              <Link to="/privacy" className="text-xs text-muted-foreground hover:text-foreground">Privacy Policy</Link>
+              <span className="text-xs text-muted-foreground">·</span>
+              <Link to="/terms" className="text-xs text-muted-foreground hover:text-foreground">Terms</Link>
+            </div>
           </div>
         </div>
       </div>
