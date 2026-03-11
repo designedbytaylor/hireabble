@@ -286,13 +286,26 @@ async def admin_update_ticket(ticket_id: str, update: TicketUpdate, admin=Depend
     changes["updated_at"] = datetime.now(timezone.utc).isoformat()
     await db.support_tickets.update_one({"id": ticket_id}, {"$set": changes})
 
-    # Notify user of status change
+    # Add automated message and notify user on resolve/close
     if update.status and update.status in ("resolved", "closed"):
+        status_label = "resolved" if update.status == "resolved" else "closed"
+        system_message = {
+            "id": str(uuid.uuid4()),
+            "sender_type": "system",
+            "sender_id": admin["id"],
+            "sender_name": "System",
+            "message": f"This ticket has been marked as {status_label}. If you need further help, you can reply to reopen it.",
+            "created_at": datetime.now(timezone.utc).isoformat(),
+        }
+        await db.support_tickets.update_one(
+            {"id": ticket_id},
+            {"$push": {"messages": system_message}},
+        )
         await create_notification(
             user_id=ticket["user_id"],
             notif_type="support_update",
             title="Ticket Updated",
-            message=f"Your ticket '{ticket['subject'][:50]}' has been {update.status}",
+            message=f"Your ticket '{ticket['subject'][:50]}' has been {status_label}",
             data={"ticket_id": ticket_id},
         )
 

@@ -212,22 +212,30 @@ export default function AdminSupport() {
         {/* Messages */}
         <div className="space-y-3 mb-4">
           {selectedTicket.messages?.map((msg) => (
-            <div
-              key={msg.id}
-              className={`rounded-xl p-4 ${
-                msg.sender_type === 'admin'
-                  ? 'bg-red-500/10 border border-red-500/20 ml-8'
-                  : 'bg-gray-900 border border-gray-800 mr-8'
-              }`}
-            >
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-sm font-medium text-white">
-                  {msg.sender_type === 'admin' ? `${msg.sender_name} (Staff)` : `${msg.sender_name} (User)`}
-                </span>
-                <span className="text-xs text-gray-500">{formatDate(msg.created_at)}</span>
+            msg.sender_type === 'system' ? (
+              <div key={msg.id} className="flex items-center gap-3 py-2 px-4">
+                <div className="flex-1 h-px bg-gray-700" />
+                <span className="text-xs text-gray-500 italic">{msg.message}</span>
+                <div className="flex-1 h-px bg-gray-700" />
               </div>
-              <p className="text-sm text-gray-300 whitespace-pre-wrap">{msg.message}</p>
-            </div>
+            ) : (
+              <div
+                key={msg.id}
+                className={`rounded-xl p-4 ${
+                  msg.sender_type === 'admin'
+                    ? 'bg-red-500/10 border border-red-500/20 ml-8'
+                    : 'bg-gray-900 border border-gray-800 mr-8'
+                }`}
+              >
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm font-medium text-white">
+                    {msg.sender_type === 'admin' ? `${msg.sender_name} (Staff)` : `${msg.sender_name} (User)`}
+                  </span>
+                  <span className="text-xs text-gray-500">{formatDate(msg.created_at)}</span>
+                </div>
+                <p className="text-sm text-gray-300 whitespace-pre-wrap">{msg.message}</p>
+              </div>
+            )
           ))}
         </div>
 
