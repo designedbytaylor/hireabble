@@ -6,9 +6,13 @@ from typing import List
 from datetime import datetime, timezone
 import uuid
 
+import asyncio
+
 from database import (
     db, get_current_user, manager, create_notification,
-    MatchResponse, MessageCreate, MessageResponse
+    MatchResponse, MessageCreate, MessageResponse,
+    send_email_notification, get_email_template, get_unsubscribe_url,
+    get_user_email_prefs, FRONTEND_URL, logger,
 )
 from content_filter import check_text, is_severe
 
@@ -193,7 +197,50 @@ async def send_message(message: MessageCreate, current_user: dict = Depends(get_
         "type": "new_message",
         "message": {k: v for k, v in message_doc.items() if k != "_id"}
     })
-    
+
+    # Check if we should send a message digest email (batched, 15min cooldown)
+    async def _maybe_send_digest():
+        try:
+            prefs = await get_user_email_prefs(receiver_id)
+            if not prefs.get("messages", True):
+                return
+            # Check if receiver is online (has active WebSocket)
+            if receiver_id in manager.active_connections and manager.active_connections[receiver_id]:
+                return  # User is online, skip email
+            receiver = await db.users.find_one({"id": receiver_id}, {"_id": 0, "email": 1, "last_email_digest_at": 1})
+            if not receiver or not receiver.get("email"):
+                return
+            last_digest = receiver.get("last_email_digest_at", "")
+            from datetime import timedelta
+            cooldown = (datetime.now(timezone.utc) - timedelta(minutes=15)).isoformat()
+            if last_digest and last_digest > cooldown:
+                return  # Too soon since last digest
+            # Count unread messages
+            unread = await db.messages.count_documents({"receiver_id": receiver_id, "is_read": False})
+            if unread < 1:
+                return
+            # Get unique senders
+            pipeline = [
+                {"$match": {"receiver_id": receiver_id, "is_read": False}},
+                {"$group": {"_id": "$sender_name"}},
+            ]
+            senders = [doc["_id"] async for doc in db.messages.aggregate(pipeline)]
+            sender_list = ", ".join(senders[:3])
+            if len(senders) > 3:
+                sender_list += f" and {len(senders) - 3} more"
+            html = get_email_template(
+                title="You have unread messages",
+                body_html=f"<p>You have <strong>{unread}</strong> unread message{'s' if unread != 1 else ''} from {sender_list}.</p>",
+                cta_text="Read Messages",
+                cta_url=f"{FRONTEND_URL}/messages",
+                unsubscribe_url=get_unsubscribe_url(receiver_id, "messages"),
+            )
+            await send_email_notification(receiver["email"], f"You have {unread} unread message{'s' if unread != 1 else ''} on Hireabble", html)
+            await db.users.update_one({"id": receiver_id}, {"$set": {"last_email_digest_at": datetime.now(timezone.utc).isoformat()}})
+        except Exception as e:
+            logger.error(f"Message digest email error: {e}")
+    asyncio.create_task(_maybe_send_digest())
+
     return {k: v for k, v in message_doc.items() if k != "_id"}
 
 @router.get("/messages/{match_id}", response_model=List[MessageResponse])

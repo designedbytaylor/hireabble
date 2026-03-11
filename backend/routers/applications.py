@@ -2,6 +2,7 @@
 Applications/Swipe routes for Hireabble API
 """
 from fastapi import APIRouter, HTTPException, Depends, Request, Query
+from pydantic import BaseModel
 from typing import List, Optional
 import os
 import json
@@ -890,6 +891,7 @@ async def get_my_applications(current_user: dict = Depends(get_current_user)):
             "job_id": app.get("job_id"),
             "action": app.get("action", "like"),
             "status": status,
+            "pipeline_stage": app.get("pipeline_stage", "applied"),
             "recruiter_action": app.get("recruiter_action"),
             "is_matched": app.get("is_matched", False),
             "created_at": app.get("created_at", ""),
@@ -934,11 +936,13 @@ async def respond_to_application(response: RecruiterAction, current_user: dict =
 
     is_matched = response.action == "accept"
     
+    stage_update = "shortlisted" if is_matched else "declined"
     await db.applications.update_one(
         {"id": response.application_id},
         {"$set": {
             "recruiter_action": response.action,
-            "is_matched": is_matched
+            "is_matched": is_matched,
+            "pipeline_stage": stage_update,
         }}
     )
     
@@ -994,6 +998,71 @@ async def respond_to_application(response: RecruiterAction, current_user: dict =
     invalidate_user(application["seeker_id"])
 
     return {"message": f"Application {response.action}ed", "is_matched": is_matched}
+
+
+# ==================== PIPELINE STAGES ====================
+
+PIPELINE_STAGES = ["applied", "reviewing", "shortlisted", "interviewing", "offered", "hired", "declined"]
+
+class PipelineStageUpdate(BaseModel):
+    stage: str
+
+@router.put("/applications/{application_id}/stage")
+async def update_pipeline_stage(
+    application_id: str,
+    data: PipelineStageUpdate,
+    current_user: dict = Depends(get_current_user),
+):
+    """Recruiter updates an application's pipeline stage"""
+    if current_user["role"] != "recruiter":
+        raise HTTPException(status_code=403, detail="Only recruiters can update pipeline stages")
+    if data.stage not in PIPELINE_STAGES:
+        raise HTTPException(status_code=400, detail=f"Invalid stage. Must be one of: {', '.join(PIPELINE_STAGES)}")
+
+    application = await db.applications.find_one(
+        {"id": application_id, "recruiter_id": current_user["id"]},
+        {"_id": 0}
+    )
+    if not application:
+        raise HTTPException(status_code=404, detail="Application not found")
+
+    await db.applications.update_one(
+        {"id": application_id},
+        {"$set": {"pipeline_stage": data.stage}}
+    )
+
+    # Notify seeker of stage change
+    job_title = application.get("job_title", "a position")
+    stage_label = data.stage.replace("_", " ").title()
+    await create_notification(
+        user_id=application["seeker_id"],
+        notif_type="status_update",
+        title="Application Update",
+        message=f"Your application for {job_title} has moved to: {stage_label}",
+        data={"application_id": application_id, "stage": data.stage}
+    )
+
+    # Send email if user has status_updates enabled
+    from database import send_email_notification, get_email_template, get_unsubscribe_url, get_user_email_prefs, FRONTEND_URL
+    async def _send_stage_email():
+        prefs = await get_user_email_prefs(application["seeker_id"])
+        if not prefs.get("status_updates", True):
+            return
+        seeker = await db.users.find_one({"id": application["seeker_id"]}, {"_id": 0, "email": 1})
+        if not seeker or not seeker.get("email"):
+            return
+        html = get_email_template(
+            title="Application Status Update",
+            body_html=f"<p>Your application for <strong>{job_title}</strong> has moved to: <strong>{stage_label}</strong></p>",
+            cta_text="View Applications",
+            cta_url=f"{FRONTEND_URL}/applied",
+            unsubscribe_url=get_unsubscribe_url(application["seeker_id"], "status_updates"),
+        )
+        await send_email_notification(seeker["email"], f"Application update: {stage_label}", html)
+    asyncio.create_task(_send_stage_email())
+
+    invalidate_user(application["seeker_id"])
+    return {"message": "Stage updated", "stage": data.stage}
 
 
 # ==================== REFERENCES ====================
@@ -1433,8 +1502,6 @@ async def get_top_picks(current_user: dict = Depends(get_current_user)):
 
 
 # ==================== CANDIDATE NOTES ====================
-
-from pydantic import BaseModel
 
 
 class CandidateNoteBody(BaseModel):

@@ -3,7 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, Briefcase, MapPin, DollarSign, Clock,
   CheckCircle, XCircle, Star, Zap, Building2, Eye,
-  BarChart3, ChevronDown, ChevronUp
+  BarChart3, ChevronDown, ChevronUp, Search, UserCheck,
+  CalendarCheck, Award, Trophy
 } from 'lucide-react';
 import { toast } from 'sonner';
 import axios from 'axios';
@@ -14,18 +15,62 @@ import { Skeleton } from '../components/ui/skeleton';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
-const STATUS_CONFIG = {
-  pending: { label: 'Pending', color: 'bg-yellow-500/10 text-yellow-500', icon: Clock },
-  matched: { label: 'Matched', color: 'bg-green-500/10 text-green-500', icon: CheckCircle },
+const PIPELINE_STAGES = [
+  { key: 'applied', label: 'Applied', icon: Briefcase, color: 'text-blue-500', bg: 'bg-blue-500' },
+  { key: 'reviewing', label: 'Reviewing', icon: Eye, color: 'text-yellow-500', bg: 'bg-yellow-500' },
+  { key: 'shortlisted', label: 'Shortlisted', icon: UserCheck, color: 'text-purple-500', bg: 'bg-purple-500' },
+  { key: 'interviewing', label: 'Interviewing', icon: CalendarCheck, color: 'text-cyan-500', bg: 'bg-cyan-500' },
+  { key: 'offered', label: 'Offered', icon: Award, color: 'text-orange-500', bg: 'bg-orange-500' },
+  { key: 'hired', label: 'Hired', icon: Trophy, color: 'text-green-500', bg: 'bg-green-500' },
+];
+
+const STAGE_CONFIG = {
+  applied: { label: 'Applied', color: 'bg-blue-500/10 text-blue-500', icon: Briefcase },
+  reviewing: { label: 'In Review', color: 'bg-yellow-500/10 text-yellow-500', icon: Clock },
+  shortlisted: { label: 'Shortlisted', color: 'bg-purple-500/10 text-purple-500', icon: UserCheck },
+  interviewing: { label: 'Interviewing', color: 'bg-cyan-500/10 text-cyan-500', icon: CalendarCheck },
+  offered: { label: 'Offered', color: 'bg-orange-500/10 text-orange-500', icon: Award },
+  hired: { label: 'Hired', color: 'bg-green-500/10 text-green-500', icon: Trophy },
   declined: { label: 'Not Selected', color: 'bg-red-500/10 text-red-500', icon: XCircle },
 };
+
+function PipelineTracker({ stage }) {
+  const declinedStage = stage === 'declined';
+  const activeIndex = PIPELINE_STAGES.findIndex(s => s.key === stage);
+  // For declined, show progress up to 'applied' minimum
+  const effectiveIndex = declinedStage ? 0 : activeIndex;
+
+  return (
+    <div className="flex items-center gap-0.5 mt-3">
+      {PIPELINE_STAGES.map((s, i) => {
+        const isCompleted = !declinedStage && i < effectiveIndex;
+        const isCurrent = !declinedStage && i === effectiveIndex;
+        return (
+          <div key={s.key} className="flex-1 flex flex-col items-center gap-1">
+            <div className={`h-1.5 w-full rounded-full transition-colors ${
+              isCompleted ? `${s.bg}` :
+              isCurrent ? `${s.bg}` :
+              declinedStage && i === 0 ? 'bg-red-500' :
+              'bg-muted'
+            }`} />
+            {(isCurrent || (declinedStage && i === 0)) && (
+              <span className={`text-[9px] font-medium ${declinedStage ? 'text-red-500' : s.color}`}>
+                {declinedStage ? 'Declined' : s.label}
+              </span>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
 
 export default function AppliedJobs() {
   const navigate = useNavigate();
   const { token } = useAuth();
   const [applications, setApplications] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState('all'); // all, pending, matched, declined
+  const [filter, setFilter] = useState('all');
   const [expandedInsights, setExpandedInsights] = useState({}); // { appId: insightsData }
   const [loadingInsights, setLoadingInsights] = useState({});
 
@@ -65,15 +110,21 @@ export default function AppliedJobs() {
     }
   };
 
+  const getStage = (app) => app.pipeline_stage || (app.status === 'matched' ? 'shortlisted' : app.status === 'declined' ? 'declined' : 'applied');
+
   const filtered = filter === 'all'
     ? applications
-    : applications.filter(a => a.status === filter);
+    : applications.filter(a => getStage(a) === filter);
 
   const counts = {
     all: applications.length,
-    pending: applications.filter(a => a.status === 'pending').length,
-    matched: applications.filter(a => a.status === 'matched').length,
-    declined: applications.filter(a => a.status === 'declined').length,
+    applied: applications.filter(a => getStage(a) === 'applied').length,
+    reviewing: applications.filter(a => getStage(a) === 'reviewing').length,
+    shortlisted: applications.filter(a => getStage(a) === 'shortlisted').length,
+    interviewing: applications.filter(a => getStage(a) === 'interviewing').length,
+    offered: applications.filter(a => getStage(a) === 'offered').length,
+    hired: applications.filter(a => getStage(a) === 'hired').length,
+    declined: applications.filter(a => getStage(a) === 'declined').length,
   };
 
   if (loading) {
@@ -125,10 +176,14 @@ export default function AppliedJobs() {
         <div className="flex gap-2 overflow-x-auto pb-2">
           {[
             { key: 'all', label: 'All' },
-            { key: 'pending', label: 'Pending' },
-            { key: 'matched', label: 'Matched' },
-            { key: 'declined', label: 'Not Selected' },
-          ].map(tab => (
+            { key: 'applied', label: 'Applied' },
+            { key: 'reviewing', label: 'In Review' },
+            { key: 'shortlisted', label: 'Shortlisted' },
+            { key: 'interviewing', label: 'Interviewing' },
+            { key: 'offered', label: 'Offered' },
+            { key: 'hired', label: 'Hired' },
+            { key: 'declined', label: 'Declined' },
+          ].filter(tab => tab.key === 'all' || counts[tab.key] > 0).map(tab => (
             <button
               key={tab.key}
               onClick={() => setFilter(tab.key)}
@@ -161,8 +216,9 @@ export default function AppliedJobs() {
           </div>
         ) : (
           filtered.map(app => {
-            const statusConf = STATUS_CONFIG[app.status] || STATUS_CONFIG.pending;
-            const StatusIcon = statusConf.icon;
+            const stage = getStage(app);
+            const stageConf = STAGE_CONFIG[stage] || STAGE_CONFIG.applied;
+            const StageIcon = stageConf.icon;
             const job = app.job;
 
             return (
@@ -183,9 +239,9 @@ export default function AppliedJobs() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between mb-1">
                       <h3 className="font-bold font-['Outfit'] truncate">{job.title}</h3>
-                      <span className={`px-2 py-0.5 rounded-full text-xs font-medium flex items-center gap-1 whitespace-nowrap ${statusConf.color}`}>
-                        <StatusIcon className="w-3 h-3" />
-                        {statusConf.label}
+                      <span className={`px-2 py-0.5 rounded-full text-xs font-medium flex items-center gap-1 whitespace-nowrap ${stageConf.color}`}>
+                        <StageIcon className="w-3 h-3" />
+                        {stageConf.label}
                       </span>
                     </div>
 
@@ -215,6 +271,9 @@ export default function AppliedJobs() {
                         </span>
                       )}
                     </div>
+
+                    {/* Pipeline Progress Tracker */}
+                    <PipelineTracker stage={stage} />
 
                     <div className="flex items-center justify-between mt-2">
                       <div className="flex items-center gap-3">

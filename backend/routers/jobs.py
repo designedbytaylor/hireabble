@@ -183,6 +183,8 @@ async def get_jobs(
     location: Optional[str] = None,
     category: Optional[str] = None,
     employment_type: Optional[str] = None,
+    search: Optional[str] = None,
+    include_swiped: bool = False,
     skip: int = 0,
     limit: int = 100
 ):
@@ -202,10 +204,22 @@ async def get_jobs(
         ).to_list(1000)
         swiped_job_ids = [s["job_id"] for s in swiped_jobs]
 
-        query = {
-            "id": {"$nin": swiped_job_ids},
-            "is_active": True
-        }
+        query = {"is_active": True}
+
+        # Search page passes include_swiped=true so seekers can find any active job
+        if not include_swiped:
+            query["id"] = {"$nin": swiped_job_ids}
+
+        # Text search across title, company, description
+        if search:
+            import re
+            safe_search = re.escape(search)
+            and_clauses = query.setdefault("$and", [])
+            and_clauses.append({"$or": [
+                {"title": {"$regex": safe_search, "$options": "i"}},
+                {"company": {"$regex": safe_search, "$options": "i"}},
+                {"description": {"$regex": safe_search, "$options": "i"}},
+            ]})
 
         # Apply filters
         if job_type:
@@ -224,12 +238,13 @@ async def get_jobs(
         # Filter out jobs with specific location restrictions if seeker's location doesn't match
         seeker_location = current_user.get("location", "")
         if seeker_location:
-            query["$or"] = [
+            and_clauses = query.setdefault("$and", [])
+            and_clauses.append({"$or": [
                 {"location_restriction": None},
                 {"location_restriction": "any"},
                 {"location_restriction": {"$exists": False}},
                 {"location": {"$regex": seeker_location.split(",")[0].strip(), "$options": "i"}},
-            ]
+            ]})
 
         clamped_limit = min(limit, 200)
         jobs = await db.jobs.find(query, {"_id": 0}).sort("created_at", -1).skip(skip).to_list(clamped_limit)
@@ -248,6 +263,7 @@ async def get_jobs(
                 if sub.get("status") == "active" and sub.get("period_end", "") >= now:
                     recruiter_subs[r["id"]] = sub.get("tier_id", "")
 
+        swiped_set = set(swiped_job_ids)
         for job in jobs:
             job["match_score"] = calculate_job_match_score(current_user, job)
             # Check if job is actively boosted
@@ -257,6 +273,9 @@ async def get_jobs(
             if rec_tier:
                 job["is_premium_listing"] = True
                 job["match_score"] = min(100, job["match_score"] + 15)
+            # Mark already-applied jobs for search page
+            if include_swiped:
+                job["already_applied"] = job["id"] in swiped_set
 
         # Sort: boosted jobs first (interleaved), then premium listings get priority, then by match score
         boosted = [j for j in jobs if j.get("is_boosted")]

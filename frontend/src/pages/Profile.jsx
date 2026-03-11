@@ -19,6 +19,82 @@ import ConfirmDialog from '../components/ConfirmDialog';
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 
+function EmailNotificationSettings({ token }) {
+  const [prefs, setPrefs] = useState(null);
+  const [saving, setSaving] = useState(null);
+
+  useEffect(() => {
+    const fetch = async () => {
+      try {
+        const res = await axios.get(`${API}/notifications/preferences`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        setPrefs(res.data);
+      } catch { /* ignore */ }
+    };
+    fetch();
+  }, [token]);
+
+  const toggle = async (key) => {
+    if (!prefs) return;
+    setSaving(key);
+    const newVal = !prefs[key];
+    setPrefs(prev => ({ ...prev, [key]: newVal }));
+    try {
+      await axios.put(`${API}/notifications/preferences`, { [key]: newVal }, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+    } catch {
+      setPrefs(prev => ({ ...prev, [key]: !newVal }));
+      toast.error('Failed to update preference');
+    } finally {
+      setSaving(null);
+    }
+  };
+
+  if (!prefs) return null;
+
+  const items = [
+    { key: 'matches', label: 'New matches', desc: 'When you match with a job or candidate' },
+    { key: 'interviews', label: 'Interview updates', desc: 'Interview requests, acceptances & changes' },
+    { key: 'messages', label: 'Message digests', desc: 'Summary of unread messages (max every 15 min)' },
+    { key: 'status_updates', label: 'Application updates', desc: 'When your application stage changes' },
+  ];
+
+  return (
+    <div className="glass-card rounded-2xl p-5 mt-6">
+      <h3 className="text-lg font-bold font-['Outfit'] mb-3 flex items-center gap-2">
+        <Mail className="w-5 h-5" /> Email Notifications
+      </h3>
+      <div className="space-y-2">
+        {items.map(({ key, label, desc }) => (
+          <button
+            key={key}
+            type="button"
+            onClick={() => toggle(key)}
+            className={`w-full flex items-center gap-3 p-3 rounded-xl border transition-all ${
+              prefs[key]
+                ? 'bg-primary/5 border-primary/20 text-foreground'
+                : 'bg-background border-border text-muted-foreground hover:border-primary/10'
+            }`}
+          >
+            <div className="flex-1 text-left">
+              <div className="font-medium text-sm">{label}</div>
+              <div className="text-xs opacity-70">{desc}</div>
+            </div>
+            <div className={`w-10 h-6 rounded-full transition-colors shrink-0 ${prefs[key] ? 'bg-primary' : 'bg-muted'}`}>
+              <div className={`w-5 h-5 rounded-full bg-white mt-0.5 transition-transform ${prefs[key] ? 'translate-x-[18px]' : 'translate-x-0.5'}`} />
+            </div>
+          </button>
+        ))}
+      </div>
+      <p className="text-xs text-muted-foreground mt-2">
+        You can also unsubscribe via the link at the bottom of any email.
+      </p>
+    </div>
+  );
+}
+
 export default function Profile() {
   const { user, token, updateProfile, logout } = useAuth();
   const [loading, setLoading] = useState(false);
@@ -1206,6 +1282,9 @@ export default function Profile() {
               </p>
             </div>
           )}
+
+          {/* Email Notifications */}
+          <EmailNotificationSettings token={token} />
 
           {/* Help & Support */}
           <Link

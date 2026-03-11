@@ -150,7 +150,7 @@ export const AuthProvider = ({ children }) => {
     localStorage.setItem('token', impersonateToken);
     setToken(impersonateToken);
     try {
-      const response = await axios.get(`${API}/auth/me`, {
+      const response = await axios.get(`${API}/auth/me?_=${Date.now()}`, {
         headers: { Authorization: `Bearer ${impersonateToken}` }
       });
       setUser(response.data);

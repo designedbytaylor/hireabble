@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, memo, useMemo } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Home, Heart, User, Briefcase, MessageCircle, BarChart3, Calendar } from 'lucide-react';
+import { Home, Heart, User, Briefcase, MessageCircle, BarChart3, Calendar, Search } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import axios from 'axios';
 
@@ -72,6 +72,10 @@ export default memo(function Navigation() {
       path: isSeeker ? '/dashboard' : '/recruiter'
     },
     ...(isSeeker ? [{
+      icon: Search,
+      label: 'Search',
+      path: '/search'
+    }, {
       icon: Briefcase,
       label: 'Applied',
       path: '/applied'

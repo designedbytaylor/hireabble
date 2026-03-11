@@ -154,6 +154,54 @@ async def send_email_notification(to_email: str, subject: str, html_content: str
         logger.error(f"Failed to send email to {to_email}: {str(e)}")
         return None
 
+FRONTEND_URL = os.environ.get('FRONTEND_URL', 'https://hireabble.com')
+
+def get_email_template(title: str, body_html: str, cta_text: str = None, cta_url: str = None, unsubscribe_url: str = None):
+    """Generate branded HTML email template"""
+    cta_block = ""
+    if cta_text and cta_url:
+        cta_block = f'<a href="{cta_url}" style="display: inline-block; background: #6366f1; color: white; padding: 14px 40px; border-radius: 25px; text-decoration: none; font-weight: bold;">{cta_text}</a>'
+    unsub_block = ""
+    if unsubscribe_url:
+        unsub_block = f'<p style="margin-top: 12px;"><a href="{unsubscribe_url}" style="color: #999; text-decoration: underline; font-size: 12px;">Unsubscribe from these emails</a></p>'
+    return f"""
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+        <div style="text-align: center; margin-bottom: 30px;">
+            <h1 style="color: #6366f1; margin: 0;">Hireabble</h1>
+        </div>
+        <div style="padding: 30px 20px; text-align: center;">
+            <h2 style="color: #333; margin: 0 0 15px 0;">{title}</h2>
+            <div style="color: #555; font-size: 16px; margin-bottom: 25px;">{body_html}</div>
+            {cta_block}
+        </div>
+        <div style="border-top: 1px solid #eee; padding-top: 20px; text-align: center; color: #999; font-size: 12px;">
+            <p>Hireabble - Your career starts with a swipe</p>
+            {unsub_block}
+        </div>
+    </div>
+    """
+
+def create_unsubscribe_token(user_id: str, notif_type: str) -> str:
+    """Generate a signed JWT for one-click email unsubscribe"""
+    payload = {"user_id": user_id, "type": notif_type, "action": "unsubscribe"}
+    return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
+
+def get_unsubscribe_url(user_id: str, notif_type: str) -> str:
+    """Build unsubscribe URL for email footer"""
+    token = create_unsubscribe_token(user_id, notif_type)
+    return f"{FRONTEND_URL}/api/notifications/unsubscribe?token={token}&type={notif_type}"
+
+async def get_user_email_prefs(user_id: str) -> dict:
+    """Get user's email notification preferences (defaults all true)"""
+    user = await db.users.find_one({"id": user_id}, {"_id": 0, "email_notifications": 1})
+    prefs = (user or {}).get("email_notifications", {})
+    return {
+        "matches": prefs.get("matches", True),
+        "interviews": prefs.get("interviews", True),
+        "messages": prefs.get("messages", True),
+        "status_updates": prefs.get("status_updates", True),
+    }
+
 # ==================== NOTIFICATION HELPER ====================
 
 async def send_web_push(user_id: str, title: str, body: str, push_data: dict = None):
@@ -345,6 +393,7 @@ class JobResponse(BaseModel):
     match_score: Optional[int] = None
     created_at: str
     is_active: bool = True
+    already_applied: Optional[bool] = None
 
 class SwipeAction(BaseModel):
     job_id: str
@@ -371,6 +420,7 @@ class ApplicationResponse(BaseModel):
     action: str
     is_matched: bool = False
     recruiter_action: Optional[str] = None
+    pipeline_stage: Optional[str] = "applied"
     created_at: str
 
 class RecruiterAction(BaseModel):

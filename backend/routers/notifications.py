@@ -1,12 +1,17 @@
 """
 Notifications routes for Hireabble API
 """
-from fastapi import APIRouter, HTTPException, Depends
-from typing import List
+from fastapi import APIRouter, HTTPException, Depends, Query
+from fastapi.responses import HTMLResponse
+from typing import List, Optional
+from pydantic import BaseModel
+import jwt as pyjwt
 
 from database import (
     db, get_current_user,
-    NotificationResponse
+    NotificationResponse,
+    JWT_SECRET, JWT_ALGORITHM,
+    get_user_email_prefs,
 )
 
 router = APIRouter(prefix="/notifications", tags=["Notifications"])
@@ -49,3 +54,53 @@ async def mark_all_notifications_read(current_user: dict = Depends(get_current_u
         {"$set": {"is_read": True}}
     )
     return {"message": "All notifications marked as read"}
+
+
+# ==================== EMAIL NOTIFICATION PREFERENCES ====================
+
+class EmailPreferences(BaseModel):
+    matches: Optional[bool] = None
+    interviews: Optional[bool] = None
+    messages: Optional[bool] = None
+    status_updates: Optional[bool] = None
+
+@router.get("/preferences")
+async def get_notification_preferences(current_user: dict = Depends(get_current_user)):
+    """Get email notification preferences"""
+    prefs = await get_user_email_prefs(current_user["id"])
+    return prefs
+
+@router.put("/preferences")
+async def update_notification_preferences(data: EmailPreferences, current_user: dict = Depends(get_current_user)):
+    """Update email notification preferences"""
+    update = {}
+    for field in ("matches", "interviews", "messages", "status_updates"):
+        val = getattr(data, field)
+        if val is not None:
+            update[f"email_notifications.{field}"] = val
+    if update:
+        await db.users.update_one({"id": current_user["id"]}, {"$set": update})
+    return await get_user_email_prefs(current_user["id"])
+
+@router.get("/unsubscribe")
+async def unsubscribe_from_emails(token: str = Query(...), type: str = Query(...)):
+    """One-click unsubscribe from email notifications (no auth required)"""
+    try:
+        payload = pyjwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+        if payload.get("action") != "unsubscribe":
+            raise HTTPException(status_code=400, detail="Invalid token")
+        user_id = payload["user_id"]
+        notif_type = payload.get("type", type)
+        valid_types = ("matches", "interviews", "messages", "status_updates")
+        if notif_type not in valid_types:
+            raise HTTPException(status_code=400, detail="Invalid notification type")
+        await db.users.update_one({"id": user_id}, {"$set": {f"email_notifications.{notif_type}": False}})
+        return HTMLResponse(content="""
+        <html><body style="font-family: Arial; text-align: center; padding: 60px;">
+            <h2>Unsubscribed</h2>
+            <p>You've been unsubscribed from these email notifications.</p>
+            <p>You can re-enable them anytime in your Profile settings.</p>
+        </body></html>
+        """)
+    except pyjwt.InvalidTokenError:
+        raise HTTPException(status_code=400, detail="Invalid or expired token")
