@@ -8,8 +8,11 @@ from pydantic import BaseModel
 import uuid
 
 from database import (
-    db, get_current_user, create_notification, send_system_message, manager, logger
+    db, get_current_user, create_notification, send_system_message, manager, logger,
+    send_email_notification, get_email_template, get_unsubscribe_url, get_user_email_prefs,
+    FRONTEND_URL,
 )
+import asyncio
 
 router = APIRouter(prefix="/interviews", tags=["Interview Scheduling"])
 
@@ -87,6 +90,13 @@ async def create_interview(data: InterviewCreate, current_user: dict = Depends(g
 
     await db.interviews.insert_one(interview_doc)
 
+    # Auto-advance pipeline stage to "interviewing"
+    await db.applications.update_many(
+        {"seeker_id": match["seeker_id"], "recruiter_id": match["recruiter_id"],
+         "pipeline_stage": {"$in": ["applied", "reviewing", "shortlisted", None]}},
+        {"$set": {"pipeline_stage": "interviewing"}}
+    )
+
     # Notify the other party
     notif_msg = f"{current_user['name']} wants to schedule an interview: {interview_title}"
     await create_notification(
@@ -96,6 +106,24 @@ async def create_interview(data: InterviewCreate, current_user: dict = Depends(g
         message=notif_msg,
         data={"interview_id": interview_id, "match_id": data.match_id}
     )
+
+    # Send email notification (async, non-blocking)
+    async def _send_interview_email():
+        prefs = await get_user_email_prefs(other_id)
+        if not prefs.get("interviews", True):
+            return
+        other_user = await db.users.find_one({"id": other_id}, {"_id": 0, "email": 1})
+        if not other_user or not other_user.get("email"):
+            return
+        html = get_email_template(
+            title="Interview Request",
+            body_html=f"<p>{current_user['name']} wants to schedule an interview for <strong>{match.get('job_title', 'a position')}</strong> at {match.get('company', 'their company')}.</p><p>Interview: {interview_title}</p>",
+            cta_text="View Interview",
+            cta_url=f"{FRONTEND_URL}/interviews",
+            unsubscribe_url=get_unsubscribe_url(other_id, "interviews"),
+        )
+        await send_email_notification(other_user["email"], f"Interview request: {interview_title}", html)
+    asyncio.create_task(_send_interview_email())
 
     # Send a chat message so it appears in the conversation
     times_text = ""
@@ -200,6 +228,25 @@ async def respond_to_interview(
         message=notif_msg,
         data={"interview_id": interview_id, "match_id": interview["match_id"]}
     )
+
+    # Send email notification (async, non-blocking)
+    async def _send_respond_email():
+        prefs = await get_user_email_prefs(interview["created_by"])
+        if not prefs.get("interviews", True):
+            return
+        creator = await db.users.find_one({"id": interview["created_by"]}, {"_id": 0, "email": 1})
+        if not creator or not creator.get("email"):
+            return
+        action_label = {"accept": "accepted", "decline": "declined", "reschedule": "requested to reschedule"}.get(data.action, data.action)
+        html = get_email_template(
+            title=f"Interview {data.action.capitalize()}d",
+            body_html=f"<p>{current_user['name']} has {action_label} the interview: <strong>{interview['title']}</strong></p>",
+            cta_text="View Interview",
+            cta_url=f"{FRONTEND_URL}/interviews",
+            unsubscribe_url=get_unsubscribe_url(interview["created_by"], "interviews"),
+        )
+        await send_email_notification(creator["email"], f"Interview {action_label}: {interview['title']}", html)
+    asyncio.create_task(_send_respond_email())
 
     updated = await db.interviews.find_one({"id": interview_id}, {"_id": 0})
     return updated

@@ -3,7 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import {
   Users, Briefcase, Star, Check, X, Clock, ArrowLeft,
   MapPin, GraduationCap, Building2, Heart, MessageSquare,
-  Calendar, FileText, ChevronRight, Award, Mail, Phone
+  Calendar, FileText, ChevronRight, Award, Mail, Phone,
+  Eye, UserCheck, Trophy, ChevronDown
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import {
@@ -22,6 +23,18 @@ import CandidateNotes from '../components/CandidateNotes';
 import { Skeleton } from '../components/ui/skeleton';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
+
+const PIPELINE_STAGES = [
+  { key: 'applied', label: 'Applied', color: 'bg-blue-500/20 text-blue-500' },
+  { key: 'reviewing', label: 'Reviewing', color: 'bg-yellow-500/20 text-yellow-500' },
+  { key: 'shortlisted', label: 'Shortlisted', color: 'bg-purple-500/20 text-purple-500' },
+  { key: 'interviewing', label: 'Interviewing', color: 'bg-cyan-500/20 text-cyan-500' },
+  { key: 'offered', label: 'Offered', color: 'bg-orange-500/20 text-orange-500' },
+  { key: 'hired', label: 'Hired', color: 'bg-green-500/20 text-green-500' },
+  { key: 'declined', label: 'Declined', color: 'bg-red-500/20 text-red-500' },
+];
+
+const STAGE_MAP = Object.fromEntries(PIPELINE_STAGES.map(s => [s.key, s]));
 
 export default function RecruiterApplications() {
   const navigate = useNavigate();
@@ -80,36 +93,39 @@ export default function RecruiterApplications() {
     navigate('/interviews', { state: { seekerId: app.seeker_id, seekerName: app.seeker_name } });
   };
 
-  const getStatus = (app) => {
-    if (app.is_matched) return 'matched';
-    if (app.recruiter_action === 'accept') return 'accepted';
-    if (app.recruiter_action === 'reject') return 'rejected';
-    return 'pending';
+  const getStage = (app) => app.pipeline_stage || (app.is_matched ? 'shortlisted' : app.recruiter_action === 'reject' ? 'declined' : 'applied');
+
+  const updateStage = async (appId, newStage, e) => {
+    if (e) e.stopPropagation();
+    try {
+      await axios.put(`${API}/applications/${appId}/stage`, { stage: newStage }, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setApplications(prev => prev.map(a =>
+        a.id === appId ? { ...a, pipeline_stage: newStage } : a
+      ));
+      toast.success(`Stage updated to ${STAGE_MAP[newStage]?.label || newStage}`);
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Failed to update stage');
+    }
   };
 
-  const getStatusBadge = (status) => {
-    switch (status) {
-      case 'matched':
-        return <span className="px-2.5 py-1 rounded-full bg-pink-500/20 text-pink-500 text-xs font-medium flex items-center gap-1"><Heart className="w-3 h-3" /> Matched</span>;
-      case 'accepted':
-        return <span className="px-2.5 py-1 rounded-full bg-success/20 text-success text-xs font-medium flex items-center gap-1"><Check className="w-3 h-3" /> Accepted</span>;
-      case 'rejected':
-        return <span className="px-2.5 py-1 rounded-full bg-destructive/20 text-destructive text-xs font-medium flex items-center gap-1"><X className="w-3 h-3" /> Declined</span>;
-      default:
-        return <span className="px-2.5 py-1 rounded-full bg-amber-500/20 text-amber-500 text-xs font-medium flex items-center gap-1"><Clock className="w-3 h-3" /> Pending</span>;
-    }
+  const getStageBadge = (stage) => {
+    const conf = STAGE_MAP[stage] || STAGE_MAP.applied;
+    return (
+      <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${conf.color}`}>
+        {conf.label}
+      </span>
+    );
   };
 
   const filtered = filter === 'all'
     ? applications
-    : applications.filter(app => getStatus(app) === filter);
+    : applications.filter(app => getStage(app) === filter);
 
   const counts = {
     all: applications.length,
-    pending: applications.filter(a => getStatus(a) === 'pending').length,
-    accepted: applications.filter(a => getStatus(a) === 'accepted').length,
-    rejected: applications.filter(a => getStatus(a) === 'rejected').length,
-    matched: applications.filter(a => getStatus(a) === 'matched').length,
+    ...Object.fromEntries(PIPELINE_STAGES.map(s => [s.key, applications.filter(a => getStage(a) === s.key).length])),
   };
 
   if (loading) {
@@ -162,11 +178,8 @@ export default function RecruiterApplications() {
         <div className="flex gap-2 overflow-x-auto pb-2">
           {[
             { key: 'all', label: 'All' },
-            { key: 'pending', label: 'Pending' },
-            { key: 'accepted', label: 'Accepted' },
-            { key: 'matched', label: 'Matched' },
-            { key: 'rejected', label: 'Declined' },
-          ].map(({ key, label }) => (
+            ...PIPELINE_STAGES.map(s => ({ key: s.key, label: s.label })),
+          ].filter(tab => tab.key === 'all' || counts[tab.key] > 0).map(({ key, label }) => (
             <button
               key={key}
               onClick={() => setFilter(key)}
@@ -197,7 +210,6 @@ export default function RecruiterApplications() {
             </div>
           ) : (
             filtered.map((app) => {
-              const status = getStatus(app);
               return (
                 <button
                   key={app.id}
@@ -237,9 +249,20 @@ export default function RecruiterApplications() {
                     </div>
                   </div>
 
-                  {/* Status Badge + Arrow */}
+                  {/* Stage Badge + Selector + Arrow */}
                   <div className="flex items-center gap-2 flex-shrink-0">
-                    {getStatusBadge(status)}
+                    <div className="relative" onClick={e => e.stopPropagation()}>
+                      <select
+                        value={getStage(app)}
+                        onChange={(e) => updateStage(app.id, e.target.value, e)}
+                        className={`appearance-none pl-2.5 pr-6 py-1 rounded-full text-xs font-medium cursor-pointer border-0 outline-none ${STAGE_MAP[getStage(app)]?.color || 'bg-blue-500/20 text-blue-500'}`}
+                      >
+                        {PIPELINE_STAGES.map(s => (
+                          <option key={s.key} value={s.key}>{s.label}</option>
+                        ))}
+                      </select>
+                      <ChevronDown className="w-3 h-3 absolute right-1.5 top-1/2 -translate-y-1/2 pointer-events-none opacity-60" />
+                    </div>
                     <ChevronRight className="w-4 h-4 text-muted-foreground" />
                   </div>
                 </button>
@@ -298,7 +321,7 @@ export default function RecruiterApplications() {
 
               {/* Action Buttons */}
               <div className="flex gap-2 mb-5">
-                {getStatus(selectedApp) === 'matched' && (
+                {selectedApp.is_matched && (
                   <Button
                     onClick={() => { setSelectedApp(null); handleMessage(selectedApp); }}
                     className="flex-1 h-10 rounded-xl bg-gradient-to-r from-primary to-secondary text-sm"

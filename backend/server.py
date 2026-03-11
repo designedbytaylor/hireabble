@@ -76,7 +76,7 @@ async def add_cache_headers(request: Request, call_next):
         response.headers["Cache-Control"] = "private, max-age=15, stale-while-revalidate=30"
     # Auth check — very short cache to avoid re-calling on every navigation
     elif path == "/api/auth/me":
-        response.headers["Cache-Control"] = "private, max-age=10, stale-while-revalidate=20"
+        response.headers["Cache-Control"] = "no-store"
     # Notifications — short cache
     elif path.startswith("/api/notifications"):
         response.headers["Cache-Control"] = "private, max-age=5, stale-while-revalidate=15"
