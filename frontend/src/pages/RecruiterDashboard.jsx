@@ -33,6 +33,7 @@ import { getPhotoUrl } from '../utils/helpers';
 import { UpgradePrompt, PremiumBlur } from '../components/UpgradeModal';
 import { SkeletonPageBackground, SkeletonStatCard, SkeletonListItem, SkeletonApplicantCard } from '../components/skeletons';
 import { Skeleton } from '../components/ui/skeleton';
+import ConfirmDialog from '../components/ConfirmDialog';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -52,6 +53,7 @@ export default function RecruiterDashboard() {
   const [loadingResume, setLoadingResume] = useState(false);
   const [requestingRefs, setRequestingRefs] = useState(false);
   const [subscription, setSubscription] = useState(null);
+  const [confirmDelete, setConfirmDelete] = useState(null); // job ID to delete
 
   useEffect(() => {
     fetchData();
@@ -115,8 +117,6 @@ export default function RecruiterDashboard() {
   };
 
   const handleDeleteJob = async (jobId) => {
-    if (!window.confirm('Are you sure you want to delete this job posting?')) return;
-    
     try {
       await axios.delete(`${API}/jobs/${jobId}`, {
         headers: { Authorization: `Bearer ${token}` }
@@ -438,7 +438,7 @@ export default function RecruiterDashboard() {
                         <Edit className="w-5 h-5 text-muted-foreground" />
                       </button>
                       <button
-                        onClick={() => handleDeleteJob(job.id)}
+                        onClick={() => setConfirmDelete(job.id)}
                         className="p-2 rounded-lg hover:bg-destructive/10 transition-colors"
                         data-testid={`delete-job-${job.id}`}
                       >
@@ -664,6 +664,16 @@ export default function RecruiterDashboard() {
           )}
         </DialogContent>
       </Dialog>
+
+      <ConfirmDialog
+        open={!!confirmDelete}
+        onOpenChange={(open) => { if (!open) setConfirmDelete(null); }}
+        title="Delete job posting?"
+        description="This will permanently remove the job and all associated applications. This action cannot be undone."
+        confirmLabel="Delete"
+        variant="destructive"
+        onConfirm={() => { handleDeleteJob(confirmDelete); setConfirmDelete(null); }}
+      />
 
       <Navigation />
     </div>
@@ -976,6 +986,7 @@ function JobFormDialog({ open, onClose, onSuccess, token, company, job = null, i
 
 function JobApplicationsDialog({ selectedJob, onClose, jobApplications, onViewCandidate, onRespond }) {
   const [filter, setFilter] = useState('all'); // 'all', 'pending', 'superlike', 'matched', 'declined'
+  const [bulkConfirm, setBulkConfirm] = useState(null); // 'accept' | 'decline' | null
 
   const filteredApps = jobApplications.filter(app => {
     if (filter === 'pending') return !app.recruiter_action;
@@ -988,14 +999,14 @@ function JobApplicationsDialog({ selectedJob, onClose, jobApplications, onViewCa
   const pendingApps = jobApplications.filter(a => !a.recruiter_action);
 
   const handleBulkAccept = async () => {
-    if (!window.confirm(`Accept all ${pendingApps.length} pending applicants?`)) return;
+    setBulkConfirm(null);
     for (const app of pendingApps) {
       await onRespond(app.id, 'accept');
     }
   };
 
   const handleBulkReject = async () => {
-    if (!window.confirm(`Decline all ${pendingApps.length} pending applicants?`)) return;
+    setBulkConfirm(null);
     for (const app of pendingApps) {
       await onRespond(app.id, 'reject');
     }
@@ -1043,14 +1054,14 @@ function JobApplicationsDialog({ selectedJob, onClose, jobApplications, onViewCa
             <Button
               size="sm"
               variant="outline"
-              onClick={handleBulkReject}
+              onClick={() => setBulkConfirm('decline')}
               className="h-7 text-xs border-destructive/30 text-destructive hover:bg-destructive/10"
             >
               Decline All
             </Button>
             <Button
               size="sm"
-              onClick={handleBulkAccept}
+              onClick={() => setBulkConfirm('accept')}
               className="h-7 text-xs bg-success hover:bg-success/90 text-white"
             >
               Accept All
@@ -1136,6 +1147,25 @@ function JobApplicationsDialog({ selectedJob, onClose, jobApplications, onViewCa
           )}
         </div>
       </DialogContent>
+
+      <ConfirmDialog
+        open={bulkConfirm === 'accept'}
+        onOpenChange={(open) => { if (!open) setBulkConfirm(null); }}
+        title={`Accept all ${pendingApps.length} pending applicants?`}
+        description="This will accept all pending applicants for this job. They will be notified of the match."
+        confirmLabel="Accept All"
+        variant="default"
+        onConfirm={handleBulkAccept}
+      />
+      <ConfirmDialog
+        open={bulkConfirm === 'decline'}
+        onOpenChange={(open) => { if (!open) setBulkConfirm(null); }}
+        title={`Decline all ${pendingApps.length} pending applicants?`}
+        description="This will decline all pending applicants for this job. This action cannot be undone."
+        confirmLabel="Decline All"
+        variant="destructive"
+        onConfirm={handleBulkReject}
+      />
     </Dialog>
   );
 }
