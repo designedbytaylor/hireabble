@@ -23,7 +23,7 @@ from database import db, manager, UPLOADS_DIR, logger, JWT_SECRET, JWT_ALGORITHM
 from content_filter import check_text, is_severe
 
 # Import routers
-from routers import auth, jobs, applications, matches, notifications, uploads, stats, admin, interviews, payments
+from routers import auth, jobs, applications, matches, notifications, uploads, stats, admin, interviews, payments, support
 
 # Rate limiter — uses remote IP address by default
 limiter = Limiter(key_func=get_remote_address, default_limits=["120/minute"])
@@ -96,6 +96,7 @@ app.include_router(stats.router, prefix="/api")
 app.include_router(admin.router, prefix="/api")
 app.include_router(interviews.router, prefix="/api")
 app.include_router(payments.router, prefix="/api")
+app.include_router(support.router, prefix="/api")
 
 # ==================== WEBSOCKET ====================
 
@@ -316,6 +317,12 @@ async def startup():
     await ensure_index(db.matches, "recruiter_id")
     await ensure_index(db.matches, "job_id")
     await ensure_index(db.notifications, "user_id")
+
+    # Support ticket indexes
+    await ensure_index(db.support_tickets, "id", unique=True)
+    await ensure_index(db.support_tickets, [("user_id", 1), ("updated_at", -1)])
+    await ensure_index(db.support_tickets, [("status", 1), ("updated_at", -1)])
+    await ensure_index(db.support_tickets, [("assigned_to", 1), ("status", 1)])
 
     logger.info("Database indexes created")
     logger.info("Hireabble API started successfully!")
