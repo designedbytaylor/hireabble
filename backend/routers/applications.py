@@ -98,7 +98,7 @@ async def get_remaining_superlikes(current_user: dict = Depends(get_current_user
         "free_remaining": free_remaining,
         "purchased_remaining": purchased,
         "used_today": superlikes_today,
-        "daily_limit": DAILY_SUPERLIKE_LIMIT
+        "daily_limit": daily_limit,
     }
 
 # ==================== RECRUITER CANDIDATE DISCOVERY ====================
