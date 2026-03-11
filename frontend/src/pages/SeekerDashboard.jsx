@@ -157,6 +157,9 @@ export default function SeekerDashboard() {
   const [exitingCards, setExitingCards] = useState([]); // cards animating off-screen
   const [canUndo, setCanUndo] = useState(false); // subscription allows undo
   const [undoing, setUndoing] = useState(false);
+  const [enteringCard, setEnteringCard] = useState(null); // card animating back in (undo)
+  const [upgradeTrigger, setUpgradeTrigger] = useState('super_likes'); // what triggered upgrade modal
+  const lastSwipedRef = useRef(null); // track last swiped card for undo animation
   const fetchingMoreRef = useRef(false);
   // Seed from localStorage so swiped jobs stay excluded even after F5
   const swipedIdsRef = useRef(loadSwipedIds(uid));
@@ -433,6 +436,7 @@ export default function SeekerDashboard() {
 
     // Check super like limit before sending - show paywall
     if (action === 'superlike' && superLikesRemaining <= 0) {
+      setUpgradeTrigger('super_likes');
       setShowUpgradeModal(true);
       return;
     }
@@ -449,6 +453,9 @@ export default function SeekerDashboard() {
     const nextIndex = currentIndex + 1;
     setCurrentIndex(nextIndex);
     setExpandedCard(false);
+
+    // Track last swiped card for undo animation
+    lastSwipedRef.current = { job, action, exitDirection };
 
     // Add to exiting cards — start from where the user released the drag
     setExitingCards(prev => [...prev, { job, action, exitDirection, id: job.id, startX: dragPos.x, startY: dragPos.y }]);
@@ -611,6 +618,7 @@ export default function SeekerDashboard() {
   const handleUndo = async () => {
     if (undoing) return;
     if (!canUndo) {
+      setUpgradeTrigger('undo');
       setShowUpgradeModal(true);
       return;
     }
@@ -641,11 +649,34 @@ export default function SeekerDashboard() {
         });
       }
       toast.success('Swipe undone!');
-      // Refetch to get the job back in the deck
-      fetchDashboard();
+
+      // Animate the card back in with reverse swipe animation
+      const lastSwiped = lastSwipedRef.current;
+      if (lastSwiped && lastSwiped.job.id === undone_job_id) {
+        // We have the card data — animate it sliding back in
+        setEnteringCard({
+          job: lastSwiped.job,
+          fromDirection: lastSwiped.exitDirection, // where it flew off to
+        });
+        // Insert the job back at the current position
+        setJobs(prev => {
+          const newJobs = [...prev];
+          newJobs.splice(currentIndex, 0, lastSwiped.job);
+          return newJobs;
+        });
+        // Go back one card
+        setCurrentIndex(prev => Math.max(0, prev - 1));
+        // Clear the entering animation after it completes
+        setTimeout(() => setEnteringCard(null), 400);
+        lastSwipedRef.current = null;
+      } else {
+        // Don't have the card data cached — refetch the deck
+        fetchDashboard();
+      }
     } catch (err) {
       const detail = err.response?.data?.detail || 'Could not undo swipe';
       if (err.response?.status === 403 && detail.includes('Upgrade')) {
+        setUpgradeTrigger('undo');
         setShowUpgradeModal(true);
       } else {
         toast.error(detail);
@@ -852,6 +883,11 @@ export default function SeekerDashboard() {
                 {exitingCards.map((card) => (
                   <ExitingCard key={`exit-${card.id}`} card={card} />
                 ))}
+
+                {/* Entering card (undo — animating back in) */}
+                {enteringCard && (
+                  <EnteringCard key={`enter-${enteringCard.job.id}`} card={enteringCard} />
+                )}
 
                 {/* Main Swipeable Card */}
                 <SwipeCard
@@ -1176,7 +1212,8 @@ export default function SeekerDashboard() {
       <UpgradeModal
         open={showUpgradeModal}
         onClose={() => setShowUpgradeModal(false)}
-        trigger="super_likes"
+        onSubscribed={fetchDashboard}
+        trigger={upgradeTrigger}
         highlightTier="seeker_plus"
       />
     </div>
@@ -1268,6 +1305,35 @@ function ExitingCard({ card }) {
         )}
         <div className="absolute inset-0 flex flex-col justify-end p-6 z-10">
           <h2 className="text-2xl font-bold font-['Outfit'] mb-3">{card.job.title}</h2>
+        </div>
+      </div>
+    </motion.div>
+  );
+}
+
+// Card animating back in — reverse of exit animation (undo)
+function EnteringCard({ card }) {
+  const { fromDirection, job } = card;
+  return (
+    <motion.div
+      className="absolute inset-0 z-10 pointer-events-none"
+      initial={{
+        x: fromDirection.x,
+        y: fromDirection.y,
+        rotate: fromDirection.x > 0 ? 20 : fromDirection.x < 0 ? -20 : 0,
+      }}
+      animate={{ x: 0, y: 0, rotate: 0 }}
+      transition={{ duration: 0.35, ease: [0.25, 0.46, 0.45, 0.94] }}
+    >
+      <div className="w-full h-full rounded-3xl overflow-hidden relative gradient-border">
+        <div className="absolute inset-0">
+          <img src={job.background_image} alt="Background" className="w-full h-full object-cover" />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/60 to-black/30" />
+        </div>
+        {/* Undo stamp overlay */}
+        <div className="absolute top-8 left-1/2 -translate-x-1/2 px-6 py-2 rounded-full bg-amber-500 border-2 border-amber-500 font-bold text-white z-20">UNDO</div>
+        <div className="absolute inset-0 flex flex-col justify-end p-6 z-10">
+          <h2 className="text-2xl font-bold font-['Outfit'] mb-3">{job.title}</h2>
         </div>
       </div>
     </motion.div>
