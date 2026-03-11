@@ -9,12 +9,14 @@ import {
   Beaker, UserCheck, Building2
 } from 'lucide-react';
 import { toast } from 'sonner';
+import ConfirmDialog from '../../components/ConfirmDialog';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
 export default function AdminTesting() {
   const { token } = useAdminAuth();
   const [loading, setLoading] = useState({ seed: false, clear: false, impersonate: null });
+  const [showClearConfirm, setShowClearConfirm] = useState(false);
   const [seedResult, setSeedResult] = useState(null);
   const [users, setUsers] = useState([]);
   const [usersLoading, setUsersLoading] = useState(true);
@@ -67,7 +69,7 @@ export default function AdminTesting() {
   };
 
   const handleClear = async () => {
-    if (!window.confirm('This will delete ALL test accounts (@test.hireabble.com) and their data. Continue?')) return;
+    setShowClearConfirm(false);
     setLoading(prev => ({ ...prev, clear: true }));
     try {
       const res = await axios.delete(`${API}/admin/clear-test-data`, {
@@ -177,7 +179,7 @@ export default function AdminTesting() {
           <p className="text-xs text-gray-500 mb-3">
             Only test accounts are removed. Real data is safe.
           </p>
-          <Button onClick={handleClear} disabled={loading.clear} variant="outline" className="w-full border-red-500/30 text-red-400 hover:bg-red-500/10">
+          <Button onClick={() => setShowClearConfirm(true)} disabled={loading.clear} variant="outline" className="w-full border-red-500/30 text-red-400 hover:bg-red-500/10">
             {loading.clear ? <RefreshCw className="w-4 h-4 mr-2 animate-spin" /> : <Trash2 className="w-4 h-4 mr-2" />}
             {loading.clear ? 'Clearing...' : 'Clear Test Data'}
           </Button>
@@ -314,6 +316,16 @@ export default function AdminTesting() {
           </div>
         )}
       </div>
+
+      <ConfirmDialog
+        open={showClearConfirm}
+        onOpenChange={setShowClearConfirm}
+        title="Clear all test data?"
+        description="This will permanently delete ALL test accounts (@test.hireabble.com) and their associated data. Real accounts are not affected."
+        confirmLabel="Clear All Test Data"
+        variant="destructive"
+        onConfirm={handleClear}
+      />
     </div>
   );
 }
