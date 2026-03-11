@@ -471,52 +471,78 @@ async def _parse_resume_with_ai(text: str) -> dict:
         import anthropic
         client = anthropic.Anthropic(api_key=api_key)
 
-        prompt = f"""Parse the following resume text and extract structured data. Return ONLY valid JSON with no extra text.
+        prompt = f"""You are a resume parser. Extract structured data from the resume text below. Return ONLY valid JSON, no extra text.
 
-The JSON must have exactly this structure:
+Required JSON structure:
 {{
   "name": "Full Name",
-  "title": "Most recent job title or professional title",
+  "title": "Most recent or primary job title",
   "email": "email@example.com",
   "phone": "phone number",
   "location": "City, State",
-  "skills": ["skill1", "skill2", ...],
+  "skills": ["skill1", "skill2"],
   "work_history": [
     {{
       "company": "Company Name",
       "position": "Job Title",
-      "start_date": "Month Year",
-      "end_date": "Month Year or empty string if current",
-      "description": "Brief description of responsibilities"
+      "start_date": "Jan 2020",
+      "end_date": "Present",
+      "description": "Combined bullet points describing responsibilities and achievements"
     }}
   ],
   "education": [
     {{
       "school": "University Name",
-      "degree": "Degree type (e.g., Bachelor of Science)",
-      "field": "Field of study",
-      "year": "Graduation year"
+      "degree": "Bachelor of Science",
+      "field": "Computer Science",
+      "year": "2020"
     }}
   ],
-  "certifications": ["cert1", "cert2", ...],
-  "bio": "Brief professional summary if available, otherwise null"
+  "certifications": ["cert1", "cert2"],
+  "bio": "Brief professional summary if one exists, otherwise null",
+  "experience_years": 5
 }}
 
-Rules:
-- For "title": Use the person's most recent or primary job title (e.g., "Software Engineer", "Course Coordinator"). Do NOT use parts of their name.
-- For "skills": Extract actual technical/professional skills. Look for a skills section. Include programming languages, tools, and technologies. Do NOT include random words from descriptions.
-- For "work_history": Each position should be a separate entry with the actual job title and company name correctly identified.
-- For "education": Extract the full school name, complete degree, field of study, and graduation year.
-- Use null for any field you cannot confidently determine.
-- Limit skills to the top 20 most relevant ones.
-- Limit work_history to 10 entries max.
+CRITICAL PARSING RULES:
+
+WORK HISTORY — This is the most important section:
+- Every job listed on the resume MUST be a separate entry in work_history
+- "position" = the job title (e.g., "Software Engineer", "Course Coordinator", "IT Systems Intern")
+- "company" = the employer name (e.g., "Google", "NP Photonics Inc", "Statefarm Insurance")
+- "start_date" = formatted as "Mon YYYY" (e.g., "May 2017", "Aug 2018"). If only a year, use "Jan YYYY"
+- "end_date" = formatted as "Mon YYYY" or "Present" if current/ongoing
+- "description" = Combine ALL bullet points for that position into a single string, separated by newlines. Include the actual content of each bullet point. Do NOT summarize — preserve the original descriptions.
+- Order: most recent job first
+- Research positions, internships, teaching roles, and volunteer work all count as work history entries
+
+EDUCATION:
+- Each school/degree is a separate entry
+- "degree" = the degree type spelled out (e.g., "Bachelor of Science", "Master of Arts", "Associate of Science")
+- "field" = the major/field of study (e.g., "Computer Science", "Mathematics")
+- "year" = graduation year as string, or "Expected YYYY" if not yet graduated
+- Include GPA in the degree field if mentioned (e.g., "Bachelor of Science (GPA: 3.25/4.00)")
+- Awards like "Dean's List" should be appended to the field
+
+SKILLS:
+- Extract from the skills/technologies section
+- Include programming languages, frameworks, tools, methodologies, soft skills
+- Max 30 skills, most relevant first
+- Do NOT extract random words from job descriptions
+
+TITLE: Use the most recent job title, NOT the person's name.
+
+EXPERIENCE_YEARS: Calculate total years of professional experience from work history dates. Round to nearest integer.
+
+CERTIFICATIONS: Include professional certifications, licenses, and significant awards/honors.
+
+Use null for fields you cannot confidently determine.
 
 Resume text:
 {text}"""
 
         message = client.messages.create(
             model="claude-haiku-4-5-20251001",
-            max_tokens=2000,
+            max_tokens=4000,
             messages=[{"role": "user", "content": prompt}],
         )
 
@@ -552,6 +578,7 @@ Resume text:
             "education": [],
             "certifications": parsed.get("certifications", [])[:15],
             "bio": parsed.get("bio"),
+            "experience_years": parsed.get("experience_years"),
         }
 
         # Validate work_history entries

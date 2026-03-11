@@ -226,6 +226,7 @@ export default function Profile() {
         bio: parsed.bio || prev.bio,
         skills: parsed.skills?.length > 0 ? parsed.skills.join(', ') : prev.skills,
         current_employer: parsed.work_history?.[0]?.company || prev.current_employer,
+        experience_years: parsed.experience_years || prev.experience_years,
         location: parsed.location || prev.location,
         school: parsed.education?.[0]?.school || prev.school,
         degree: parsed.education?.[0]?.degree || prev.degree,
