@@ -531,7 +531,7 @@ EDUCATION:
 - "degree" = the degree type spelled out (e.g., "Bachelor of Science", "Master of Arts", "Associate of Science")
 - "field" = the major/field of study (e.g., "Computer Science", "Mathematics")
 - "year" = graduation year as string, or "Expected YYYY" if not yet graduated
-- Include GPA in the degree field if mentioned (e.g., "Bachelor of Science (GPA: 3.25/4.00)")
+- Include GPA in the field if mentioned (e.g., "Computer Science (GPA: 3.25/4.00)")
 - Awards like "Dean's List" should be appended to the field
 
 SKILLS:
@@ -551,11 +551,30 @@ Use null for fields you cannot confidently determine.
 Resume text:
 {text}"""
 
-        message = client.messages.create(
-            model="claude-haiku-4-5-20251001",  # Claude Haiku 4.5
-            max_tokens=4000,
-            messages=[{"role": "user", "content": prompt}],
-        )
+        # Try models in order of preference
+        models = [
+            "claude-haiku-4-5-20251001",
+            "claude-3-5-haiku-20241022",
+            "claude-3-haiku-20240307",
+        ]
+        message = None
+        last_error = None
+        for model_id in models:
+            try:
+                message = client.messages.create(
+                    model=model_id,
+                    max_tokens=4000,
+                    messages=[{"role": "user", "content": prompt}],
+                )
+                logger.info(f"AI resume parsing used model: {model_id}")
+                break
+            except Exception as model_err:
+                last_error = model_err
+                logger.warning(f"Model {model_id} failed: {type(model_err).__name__}: {model_err}")
+                continue
+
+        if message is None:
+            raise last_error or Exception("All models failed")
 
         response_text = message.content[0].text.strip()
 
