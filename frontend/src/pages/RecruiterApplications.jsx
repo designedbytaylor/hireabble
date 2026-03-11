@@ -17,6 +17,8 @@ import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import Navigation from '../components/Navigation';
 import { getPhotoUrl } from '../utils/helpers';
+import { SkeletonPageBackground, SkeletonListItem, SkeletonFilterTabs } from '../components/skeletons';
+import { Skeleton } from '../components/ui/skeleton';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -111,8 +113,25 @@ export default function RecruiterApplications() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="w-10 h-10 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+      <div className="min-h-screen bg-background pb-24">
+        <SkeletonPageBackground />
+        <header className="relative z-10 p-6 md:p-8">
+          <Skeleton className="h-4 w-32 rounded mb-4" />
+          <Skeleton className="h-7 w-36 rounded mb-2" />
+          <Skeleton className="h-4 w-28 rounded" />
+        </header>
+        <div className="relative z-10 px-6 md:px-8 mb-6">
+          <SkeletonFilterTabs count={5} />
+        </div>
+        <main className="relative z-10 px-6 md:px-8">
+          <div className="max-w-2xl mx-auto space-y-3">
+            <SkeletonListItem avatarSize="w-14 h-14" avatarShape="rounded-full" lines={3} badge />
+            <SkeletonListItem avatarSize="w-14 h-14" avatarShape="rounded-full" lines={3} badge />
+            <SkeletonListItem avatarSize="w-14 h-14" avatarShape="rounded-full" lines={3} badge />
+            <SkeletonListItem avatarSize="w-14 h-14" avatarShape="rounded-full" lines={3} badge />
+          </div>
+        </main>
+        <Navigation />
       </div>
     );
   }

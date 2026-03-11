@@ -31,6 +31,8 @@ import Navigation from '../components/Navigation';
 import NotificationBell from '../components/NotificationBell';
 import { getPhotoUrl } from '../utils/helpers';
 import { UpgradePrompt, PremiumBlur } from '../components/UpgradeModal';
+import { SkeletonPageBackground, SkeletonStatCard, SkeletonListItem, SkeletonApplicantCard } from '../components/skeletons';
+import { Skeleton } from '../components/ui/skeleton';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -158,8 +160,43 @@ export default function RecruiterDashboard() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="w-10 h-10 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+      <div className="min-h-screen bg-background pb-24">
+        <SkeletonPageBackground />
+        <header className="relative z-10 p-6 md:p-8">
+          <div className="flex items-center justify-between mb-8">
+            <div className="space-y-2">
+              <Skeleton className="h-7 w-36 rounded" />
+              <Skeleton className="h-4 w-28 rounded" />
+            </div>
+            <Skeleton className="w-24 h-10 rounded-full" />
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <SkeletonStatCard variant="bento" />
+            <SkeletonStatCard variant="bento" />
+            <SkeletonStatCard variant="bento" />
+            <SkeletonStatCard variant="bento" />
+          </div>
+        </header>
+        <main className="relative z-10 px-6 md:px-8">
+          <section className="mb-8">
+            <Skeleton className="h-6 w-40 rounded mb-4" />
+            <div className="flex gap-4 overflow-x-auto pb-4">
+              <SkeletonApplicantCard />
+              <SkeletonApplicantCard />
+              <SkeletonApplicantCard />
+              <SkeletonApplicantCard />
+            </div>
+          </section>
+          <section>
+            <Skeleton className="h-6 w-28 rounded mb-4" />
+            <div className="space-y-4">
+              <SkeletonListItem avatarSize="w-14 h-14" avatarShape="rounded-xl" lines={2} />
+              <SkeletonListItem avatarSize="w-14 h-14" avatarShape="rounded-xl" lines={2} />
+              <SkeletonListItem avatarSize="w-14 h-14" avatarShape="rounded-xl" lines={2} />
+            </div>
+          </section>
+        </main>
+        <Navigation />
       </div>
     );
   }
