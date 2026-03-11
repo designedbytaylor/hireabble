@@ -219,6 +219,9 @@ export default function Profile() {
 
       const parsed = response.data.parsed;
       console.log('Resume parsed response:', JSON.stringify(parsed, null, 2));
+      if (parsed._parser === 'basic') {
+        console.warn('Resume was parsed with BASIC fallback parser. Reason:', parsed._parser_reason);
+      }
 
       // Build the updated form data from parsed resume
       const updatedFormData = {
@@ -255,7 +258,17 @@ export default function Profile() {
           references_hidden: referencesHidden,
         };
         await updateProfile(updates);
-        toast.success('Resume parsed and profile updated!');
+        const partsFound = [
+          newWorkHistory.length > 0 ? `${newWorkHistory.length} positions` : null,
+          newEducation.length > 0 ? `${newEducation.length} education` : null,
+          updatedFormData.skills !== formData.skills ? 'skills' : null,
+        ].filter(Boolean);
+        const summary = partsFound.length > 0 ? ` Found ${partsFound.join(', ')}.` : '';
+        if (parsed._parser === 'basic') {
+          toast.success(`Resume parsed (basic mode) and saved!${summary} For best results, ensure AI parsing is enabled.`);
+        } else {
+          toast.success(`Resume parsed and profile updated!${summary}`);
+        }
         fetchCompleteness();
       } catch {
         toast.success('Resume parsed! Review and save your profile.');
