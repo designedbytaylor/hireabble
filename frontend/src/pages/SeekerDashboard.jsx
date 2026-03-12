@@ -182,14 +182,17 @@ export default function SeekerDashboard() {
   tokenRef.current = token;
   const uidRef = useRef(uid);
   uidRef.current = uid;
-  const [filters, setFilters] = useState({
-    job_type: '',
-    experience_level: '',
-    salary_min: '',
-    location: '',
-    remote_only: false,
-    category: '',
-    employment_type: ''
+  const [filters, setFilters] = useState(() => {
+    try {
+      const saved = localStorage.getItem(storageKey(uid, 'job_filters'));
+      return saved ? JSON.parse(saved) : {
+        job_type: '', experience_level: '', salary_min: '', location: '',
+        remote_only: false, category: '', employment_type: '', keyword: ''
+      };
+    } catch {
+      return { job_type: '', experience_level: '', salary_min: '', location: '',
+        remote_only: false, category: '', employment_type: '', keyword: '' };
+    }
   });
   const [activeFiltersCount, setActiveFiltersCount] = useState(0);
   const [detectingLocation, setDetectingLocation] = useState(false);
@@ -290,9 +293,16 @@ export default function SeekerDashboard() {
     }
   }, []);
 
-  // On mount: flush retry queue then fetch dashboard
+  // On mount: flush retry queue then fetch dashboard (apply saved filters if any)
   useEffect(() => {
-    flushSwipeQueue().then(() => fetchDashboard());
+    flushSwipeQueue().then(async () => {
+      await fetchDashboard();
+      // If user had saved filter preferences, apply them after initial load
+      const hasActiveFilters = Object.entries(filters).some(([k, v]) =>
+        k === 'remote_only' ? v === true : v !== ''
+      );
+      if (hasActiveFilters) fetchJobs(filters);
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -460,6 +470,7 @@ export default function SeekerDashboard() {
       if (filterParams.location) params.append('location', filterParams.location);
       if (filterParams.category) params.append('category', filterParams.category);
       if (filterParams.employment_type) params.append('employment_type', filterParams.employment_type);
+      if (filterParams.keyword) params.append('search', filterParams.keyword);
       // When appending, skip jobs we already have (backend excludes swiped, so skip loaded-but-unswiped)
       if (append) {
         const unswipedCount = jobs.length - currentIndex;
@@ -777,13 +788,15 @@ export default function SeekerDashboard() {
   };
 
   const handleApplyFilters = () => {
+    try { localStorage.setItem(storageKey(uidRef.current, 'job_filters'), JSON.stringify(filters)); } catch { /* quota */ }
     fetchJobs(filters);
     setShowFilters(false);
   };
 
   const handleClearFilters = () => {
-    const clearedFilters = { job_type: '', experience_level: '', salary_min: '', location: '', remote_only: false, category: '', employment_type: '' };
+    const clearedFilters = { job_type: '', experience_level: '', salary_min: '', location: '', remote_only: false, category: '', employment_type: '', keyword: '' };
     setFilters(clearedFilters);
+    try { localStorage.removeItem(storageKey(uidRef.current, 'job_filters')); } catch { /* quota */ }
     fetchJobs(clearedFilters);
     setShowFilters(false);
   };
@@ -1078,11 +1091,27 @@ export default function SeekerDashboard() {
           <DialogHeader>
             <DialogTitle className="font-['Outfit'] flex items-center gap-2">
               <Filter className="w-5 h-5" />
-              Filter Jobs
+              Job Preferences
             </DialogTitle>
           </DialogHeader>
 
           <div className="space-y-5 py-4">
+            {/* Keyword Search */}
+            <div className="space-y-2">
+              <Label className="flex items-center gap-2">
+                <Briefcase className="w-4 h-4" />
+                Keywords
+              </Label>
+              <Input
+                placeholder="e.g. React, Product Manager, Startup..."
+                value={filters.keyword || ''}
+                onChange={(e) => setFilters({ ...filters, keyword: e.target.value })}
+                className="h-11 rounded-xl bg-background"
+                data-testid="filter-keyword"
+              />
+              <p className="text-xs text-muted-foreground">Search by job title, company, or description</p>
+            </div>
+
             {/* Remote Jobs Toggle */}
             <button
               type="button"
