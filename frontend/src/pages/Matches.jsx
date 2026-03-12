@@ -455,7 +455,7 @@ export default function Matches() {
                         </div>
                       ) : (
                         <img
-                          src={getPhotoUrl(match.seeker_avatar, match.seeker_id)}
+                          src={getPhotoUrl(match.seeker_photo || match.seeker_avatar, match.seeker_id)}
                           alt={match.seeker_name}
                           className="w-14 h-14 rounded-xl object-cover border-2 border-primary/50"
                           onError={handleImgError(match.seeker_id)}
