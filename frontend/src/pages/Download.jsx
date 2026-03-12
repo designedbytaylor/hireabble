@@ -13,10 +13,10 @@ function getPlatform() {
   return 'desktop';
 }
 
-// Placeholder URLs — replace with real store links once published
+// Store URLs — configure via env vars, fall back to placeholders
 const STORE_URLS = {
-  ios: 'https://apps.apple.com/app/hireabble/id0000000000',
-  android: 'https://play.google.com/store/apps/details?id=com.hireabble.app',
+  ios: process.env.REACT_APP_APP_STORE_URL || 'https://apps.apple.com/app/hireabble/id0000000000',
+  android: process.env.REACT_APP_PLAY_STORE_URL || 'https://play.google.com/store/apps/details?id=com.hireabble.app',
 };
 
 export default function Download() {
@@ -31,7 +31,7 @@ export default function Download() {
   // If logged in, redirect straight to the job
   useEffect(() => {
     if (!authLoading && user && jobId) {
-      navigate(`/search-jobs?highlight=${jobId}`, { replace: true });
+      navigate(`/dashboard`, { replace: true });
     }
   }, [authLoading, user, jobId, navigate]);
 

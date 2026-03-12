@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, memo, useMemo } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Heart, User, Briefcase, MessageCircle, BarChart3, Search } from 'lucide-react';
+import { Heart, User, Briefcase, MessageCircle, BarChart3, Bookmark } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import axios from 'axios';
 
@@ -28,6 +28,8 @@ const prefetchRoute = (path, token) => {
     axios.get(`${API}/matches`, opts).catch(() => {});
   } else if (path === '/applied') {
     axios.get(`${API}/applications/seeker`, opts).catch(() => {});
+  } else if (path === '/saved') {
+    axios.get(`${API}/jobs/saved`, opts).catch(() => {});
   }
 };
 
@@ -72,9 +74,9 @@ export default memo(function Navigation() {
       path: isSeeker ? '/dashboard' : '/recruiter'
     },
     ...(isSeeker ? [{
-      icon: Search,
-      label: 'Search',
-      path: '/search'
+      icon: Bookmark,
+      label: 'Saved',
+      path: '/saved'
     }, {
       icon: Briefcase,
       label: 'Applied',
@@ -98,8 +100,8 @@ export default memo(function Navigation() {
   ], [isSeeker, unreadMessages]);
 
   return (
-    <nav className="fixed bottom-2 left-1/2 transform -translate-x-1/2 z-50">
-      <div className="glass rounded-full px-4 py-2.5 flex items-center gap-4">
+    <nav className="fixed bottom-2 left-1/2 transform -translate-x-1/2 z-50" aria-label="Main navigation" role="navigation">
+      <div className="glass rounded-full px-4 py-2.5 flex items-center gap-4" role="menubar">
         {navItems.map((item) => {
           const Icon = item.icon;
           const isActive = location.pathname === item.path;
@@ -108,6 +110,9 @@ export default memo(function Navigation() {
             <Link
               key={item.path}
               to={item.path}
+              role="menuitem"
+              aria-label={item.badge > 0 ? `${item.label} (${item.badge} unread)` : item.label}
+              aria-current={isActive ? 'page' : undefined}
               className={`flex flex-col items-center gap-1 transition-all relative ${
                 isActive
                   ? 'text-primary'
