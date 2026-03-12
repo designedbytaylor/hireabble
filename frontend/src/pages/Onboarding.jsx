@@ -20,6 +20,7 @@ import { toast } from 'sonner';
 import { useAuth } from '../context/AuthContext';
 import { isPushSupported, subscribeToPush } from '../utils/pushNotifications';
 import axios from 'axios';
+import PhotoCropModal from '../components/PhotoCropModal';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
@@ -42,6 +43,7 @@ export default function Onboarding() {
   const [currentStep, setCurrentStep] = useState(0);
   const [loading, setLoading] = useState(false);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [cropImageSrc, setCropImageSrc] = useState(null);
   const fileInputRef = useRef(null);
   
   const [detectingLocation, setDetectingLocation] = useState(false);
@@ -221,26 +223,32 @@ export default function Onboarding() {
     }
   };
 
-  const handlePhotoUpload = async (e) => {
+  const handlePhotoSelect = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    e.target.value = '';
 
-    // Validate file type
     if (!file.type.startsWith('image/')) {
       toast.error('Please select an image file');
       return;
     }
 
-    // Validate file size (5MB)
     if (file.size > 5 * 1024 * 1024) {
       toast.error('Image must be less than 5MB');
       return;
     }
 
+    const reader = new FileReader();
+    reader.onload = () => setCropImageSrc(reader.result);
+    reader.readAsDataURL(file);
+  };
+
+  const handleCroppedPhoto = async (blob) => {
+    setCropImageSrc(null);
     setUploadingPhoto(true);
     try {
       const formDataUpload = new FormData();
-      formDataUpload.append('file', file);
+      formDataUpload.append('file', new File([blob], 'photo.jpg', { type: 'image/jpeg' }));
 
       const response = await axios.post(`${API}/upload/photo`, formDataUpload, {
         headers: {
@@ -249,7 +257,6 @@ export default function Onboarding() {
         }
       });
 
-      // The API returns the full public URL from Supabase Storage
       setFormData(prev => ({ ...prev, photo_url: response.data.photo_url }));
       toast.success('Photo uploaded!');
     } catch (error) {
@@ -260,6 +267,11 @@ export default function Onboarding() {
   };
 
   const nextStep = () => {
+    // Require photo on the photo step
+    if (STEPS[currentStep]?.id === 'photo' && !formData.photo_url) {
+      toast.error('Please upload a photo to continue. Recruiters need to see you!');
+      return;
+    }
     if (currentStep < STEPS.length - 1) {
       setCurrentStep(prev => prev + 1);
     }
@@ -483,16 +495,20 @@ export default function Onboarding() {
                         </div>
                       )}
                     </div>
-                    <p className="text-sm text-muted-foreground text-center mb-4">
-                      A professional photo helps recruiters connect with you
+                    <p className="text-sm text-muted-foreground text-center mb-2">
+                      This photo will be shown to recruiters when they browse candidates
                     </p>
+                    <div className="text-xs text-muted-foreground text-center space-y-1 mb-4">
+                      <p>Use a professional, well-lit headshot with a clean background.</p>
+                      <p>Vertical photos work best. Smile and look approachable!</p>
+                    </div>
                   </div>
                   
                   <input
                     ref={fileInputRef}
                     type="file"
                     accept="image/*"
-                    onChange={handlePhotoUpload}
+                    onChange={handlePhotoSelect}
                     className="hidden"
                     data-testid="photo-file-input"
                   />
@@ -862,6 +878,15 @@ export default function Onboarding() {
           </div>
         </div>
       </main>
+
+      {/* Photo Crop Modal */}
+      {cropImageSrc && (
+        <PhotoCropModal
+          imageSrc={cropImageSrc}
+          onCropDone={handleCroppedPhoto}
+          onCancel={() => setCropImageSrc(null)}
+        />
+      )}
     </div>
   );
 }

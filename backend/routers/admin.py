@@ -1024,13 +1024,17 @@ async def impersonate_user(user_id: str, admin: dict = Depends(get_current_admin
 
 # ==================== TEST DATA SEEDING ====================
 
-_FIRST_NAMES = [
-    "Alex", "Priya", "Jordan", "Maya", "Sam", "Emily", "Marcus", "Sofia", "David", "Rachel",
-    "Liam", "Ava", "Noah", "Mia", "Ethan", "Zoe", "Lucas", "Chloe", "Oliver", "Harper",
-    "Aiden", "Ella", "James", "Aria", "Leo", "Luna", "Henry", "Isla", "Owen", "Riley",
-    "Kai", "Nora", "Jack", "Lily", "Ryan", "Grace", "Caleb", "Stella", "Max", "Violet",
-    "Dylan", "Layla", "Asher", "Willow", "Wyatt", "Aurora", "Carter", "Hazel", "Jaxon", "Ivy",
+_MALE_NAMES = [
+    "Marcus", "David", "Liam", "Noah", "Ethan", "Lucas", "Oliver", "Aiden", "James", "Leo",
+    "Henry", "Owen", "Jack", "Ryan", "Caleb", "Max", "Dylan", "Asher", "Wyatt", "Carter",
+    "Jaxon", "Daniel", "Nathan", "Tyler", "Brandon",
 ]
+_FEMALE_NAMES = [
+    "Priya", "Maya", "Emily", "Sofia", "Rachel", "Ava", "Mia", "Zoe", "Chloe", "Harper",
+    "Ella", "Aria", "Luna", "Isla", "Nora", "Lily", "Grace", "Stella", "Violet", "Layla",
+    "Willow", "Aurora", "Hazel", "Ivy", "Riley",
+]
+_FIRST_NAMES = _MALE_NAMES + _FEMALE_NAMES
 _LAST_NAMES = [
     "Chen", "Patel", "Williams", "Rodriguez", "Johnson", "Zhang", "Thompson", "Garcia", "Kim", "O'Brien",
     "Nakamura", "Santos", "Murphy", "Nguyen", "Cohen", "Park", "Singh", "Larsen", "Okafor", "Rivera",
@@ -1084,17 +1088,20 @@ SAMPLE_JOBS = [
 ]
 
 
-def _generate_unique_name(used_names: set) -> str:
-    """Generate a random unique first+last name combination."""
+def _generate_unique_name(used_names: set, gender: str = None) -> tuple:
+    """Generate a random unique first+last name combination. Returns (name, gender)."""
+    if gender is None:
+        gender = random.choice(["male", "female"])
+    name_pool = _MALE_NAMES if gender == "male" else _FEMALE_NAMES
     for _ in range(200):
-        name = f"{random.choice(_FIRST_NAMES)} {random.choice(_LAST_NAMES)}"
+        name = f"{random.choice(name_pool)} {random.choice(_LAST_NAMES)}"
         if name not in used_names:
             used_names.add(name)
-            return name
+            return name, gender
     # Fallback: add random digits
-    name = f"{random.choice(_FIRST_NAMES)} {random.choice(_LAST_NAMES)}{random.randint(10, 99)}"
+    name = f"{random.choice(name_pool)} {random.choice(_LAST_NAMES)}{random.randint(10, 99)}"
     used_names.add(name)
-    return name
+    return name, gender
 
 
 def _generate_unique_company(used_companies: set) -> dict:
@@ -1154,15 +1161,18 @@ async def seed_test_data(body: dict = {}, admin: dict = Depends(get_current_admi
     seeker_docs = []
     for i in range(num_seekers):
         profile = _SEEKER_PROFILES[i % len(_SEEKER_PROFILES)]
-        name = _generate_unique_name(used_names)
+        name, gender = _generate_unique_name(used_names)
         user_id = str(uuid.uuid4())
         email = f"seeker{i+1}@test.hireabble.com"
 
-        avatar = f"https://api.dicebear.com/7.x/avataaars/svg?seed={user_id}"
+        # Use realistic placeholder portraits from randomuser.me
+        photo_index = (i % 99)  # randomuser.me has ~99 photos per gender
+        photo_url = f"https://randomuser.me/api/portraits/{'men' if gender == 'male' else 'women'}/{photo_index}.jpg"
+        avatar = f"https://api.dicebear.com/7.x/initials/svg?seed={user_id}"
         user_doc = {
             "id": user_id, "email": email, "password": password,
             "name": name, "role": "seeker", "company": None,
-            "avatar": avatar, "photo_url": None, "video_url": None,
+            "avatar": avatar, "photo_url": photo_url, "video_url": None,
             "title": profile["title"], "bio": profile["bio"], "skills": profile["skills"],
             "experience_years": profile["experience_years"], "location": random.choice(_LOCATIONS),
             "current_employer": profile.get("current_employer"),
@@ -1179,16 +1189,18 @@ async def seed_test_data(body: dict = {}, admin: dict = Depends(get_current_admi
     recruiter_docs = []
     for i in range(num_recruiters):
         company = _generate_unique_company(used_companies)
-        recruiter_name = _generate_unique_name(used_names)
+        recruiter_name, rec_gender = _generate_unique_name(used_names)
         user_id = str(uuid.uuid4())
         email = f"recruiter{i+1}@test.hireabble.com"
 
-        avatar = f"https://api.dicebear.com/7.x/avataaars/svg?seed={user_id}"
+        photo_index = ((i + 50) % 99)  # offset from seekers to avoid duplicate photos
+        rec_photo = f"https://randomuser.me/api/portraits/{'men' if rec_gender == 'male' else 'women'}/{photo_index}.jpg"
+        avatar = f"https://api.dicebear.com/7.x/initials/svg?seed={user_id}"
         user_doc = {
             "id": user_id, "email": email, "password": password,
             "name": recruiter_name, "role": "recruiter",
             "company": company["name"], "avatar": avatar,
-            "photo_url": None, "video_url": None, "title": "Talent Acquisition",
+            "photo_url": rec_photo, "video_url": None, "title": "Talent Acquisition",
             "bio": company["description"], "skills": [], "experience_years": None,
             "location": random.choice(["San Francisco, CA", "New York, NY", "Remote"]),
             "current_employer": None, "previous_employers": [],

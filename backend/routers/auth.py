@@ -55,7 +55,7 @@ async def register(user: UserCreate, request: Request):
             raise HTTPException(status_code=400, detail="Email already registered")
 
         user_id = str(uuid.uuid4())
-        avatar = f"https://api.dicebear.com/7.x/avataaars/svg?seed={user_id}"
+        avatar = f"https://api.dicebear.com/7.x/initials/svg?seed={user_id}"
 
         user_doc = {
             "id": user_id,
@@ -382,7 +382,7 @@ async def _find_or_create_oauth_user(email: str, name: str, provider: str, role:
 
     # Create new user
     user_id = str(uuid.uuid4())
-    avatar = f"https://api.dicebear.com/7.x/avataaars/svg?seed={user_id}"
+    avatar = f"https://api.dicebear.com/7.x/initials/svg?seed={user_id}"
     user_doc = {
         "id": user_id,
         "email": email,

@@ -4,7 +4,7 @@ const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
  * Build a DiceBear avatar URL for a given seed.
  */
 export function getAvatarFallback(seed) {
-  return `https://api.dicebear.com/7.x/avataaars/svg?seed=${seed || 'default'}`;
+  return `https://api.dicebear.com/7.x/initials/svg?seed=${seed || 'default'}&backgroundColor=0ea5e9,6366f1,8b5cf6,ec4899,f43f5e&fontFamily=Arial`;
 }
 
 /**

@@ -182,9 +182,19 @@ export const AuthProvider = ({ children }) => {
     return response.data;
   }, [token]);
 
+  const refreshUser = useCallback(async () => {
+    if (!token) return null;
+    const response = await axios.get(`${API}/auth/me?_=${Date.now()}`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    setUser(response.data);
+    localStorage.setItem('cached_user', JSON.stringify(response.data));
+    return response.data;
+  }, [token]);
+
   const value = useMemo(() => ({
-    user, token, loading, login, loginWithToken, register, logout, updateProfile
-  }), [user, token, loading, login, loginWithToken, register, logout, updateProfile]);
+    user, token, loading, login, loginWithToken, register, logout, updateProfile, refreshUser
+  }), [user, token, loading, login, loginWithToken, register, logout, updateProfile, refreshUser]);
 
   return (
     <AuthContext.Provider value={value}>
