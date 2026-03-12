@@ -788,12 +788,11 @@ async def generate_job_poster(job_id: str, current_user: dict = Depends(get_curr
         c.rect(0, y, w, strip_h + 0.5, fill=1, stroke=0)
 
     # -- Logo image in banner (logo-white.png) --
-    logo_path = os.path.join(os.path.dirname(__file__), "..", "..", "frontend", "public", "logo-white.png")
+    logo_path = os.path.join(os.path.dirname(__file__), "..", "assets", "logo-white.png")
     logo_size = 50
     logo_x = w / 2 - 110
     logo_y = banner_y + banner_h - logo_size - 28
-    if os.path.exists(logo_path):
-        c.drawImage(ImageReader(logo_path), logo_x, logo_y, logo_size, logo_size, mask='auto')
+    c.drawImage(ImageReader(logo_path), logo_x, logo_y, logo_size, logo_size, mask='auto')
 
     # -- "hireabble" brand text in banner --
     c.setFillColor(HexColor("#ffffff"))
