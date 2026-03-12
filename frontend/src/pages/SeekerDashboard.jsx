@@ -8,6 +8,8 @@ import { useAuth } from '../context/AuthContext';
 import Navigation from '../components/Navigation';
 import NotificationBell from '../components/NotificationBell';
 import MatchModal from '../components/MatchModal';
+import { isPushSupported, getPermissionStatus, subscribeToPush } from '../utils/pushNotifications';
+import { shouldPromptRating, dismissRatingPrompt, getStoreUrl } from '../utils/appRating';
 import { Button } from '../components/ui/button';
 import {
   Dialog,
@@ -292,6 +294,26 @@ export default function SeekerDashboard() {
   useEffect(() => {
     flushSwipeQueue().then(() => fetchDashboard());
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Check if we should prompt for app store rating (after 5 sessions + 1 match)
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      const cachedStats = loadCachedStats(uidRef.current);
+      const matchCount = cachedStats?.matches || 0;
+      if (shouldPromptRating(matchCount)) {
+        const storeUrl = getStoreUrl();
+        if (storeUrl) {
+          toast('Enjoying Hireabble?', {
+            description: 'A quick rating helps us reach more job seekers!',
+            action: { label: 'Rate us', onClick: () => { dismissRatingPrompt(); window.open(storeUrl, '_blank'); } },
+            cancel: { label: 'Not now', onClick: dismissRatingPrompt },
+            duration: 10000,
+          });
+        }
+      }
+    }, 5000);
+    return () => clearTimeout(timer);
   }, []);
 
   // Fetch saved job IDs for bookmark state
@@ -928,6 +950,7 @@ export default function SeekerDashboard() {
                   onClick={() => handleSwipe('pass', { x: -1500, y: 0 })}
                   className="w-16 h-16 rounded-full bg-destructive/10 border border-destructive/30 flex items-center justify-center hover:scale-110 hover:neon-glow-red transition-all duration-300"
                   data-testid="pass-btn"
+                  aria-label="Pass on this job"
                 >
                   <X className="w-7 h-7 text-destructive" />
                 </button>
@@ -941,6 +964,7 @@ export default function SeekerDashboard() {
                         : 'opacity-50 cursor-not-allowed'
                     }`}
                     data-testid="superlike-btn"
+                    aria-label={`Super like this job (${superLikesRemaining} remaining)`}
                   >
                     <Star className={`w-9 h-9 ${superLikesRemaining > 0 ? 'text-secondary' : 'text-muted-foreground'}`} />
                   </button>
@@ -957,6 +981,7 @@ export default function SeekerDashboard() {
                   onClick={() => handleSwipe('like', { x: 1500, y: 0 })}
                   className="w-16 h-16 rounded-full bg-success/10 border border-success/30 flex items-center justify-center hover:scale-110 hover:neon-glow-green transition-all duration-300"
                   data-testid="like-btn"
+                  aria-label="Like this job"
                 >
                   <Heart className="w-7 h-7 text-success" />
                 </button>
@@ -1278,7 +1303,22 @@ export default function SeekerDashboard() {
       {showMatch && (
         <MatchModal
           match={matchData}
-          onClose={() => setShowMatch(false)}
+          onClose={() => {
+            setShowMatch(false);
+            // Prompt for push notifications after first match if not yet asked
+            if (isPushSupported() && getPermissionStatus() === 'default' && !localStorage.getItem('push_prompt_shown')) {
+              localStorage.setItem('push_prompt_shown', '1');
+              setTimeout(() => {
+                toast('Get notified about new matches?', {
+                  action: {
+                    label: 'Enable',
+                    onClick: () => subscribeToPush(token),
+                  },
+                  duration: 8000,
+                });
+              }, 1000);
+            }
+          }}
           onMessage={() => { setShowMatch(false); navigate(matchData?.id ? `/chat/${matchData.id}` : '/matches'); }}
         />
       )}

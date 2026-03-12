@@ -11,6 +11,7 @@ import Login from "./pages/Login";
 import Register from "./pages/Register";
 
 const ImpersonationBanner = React.lazy(() => import("./components/ImpersonationBanner"));
+const OfflineIndicator = React.lazy(() => import("./components/OfflineIndicator"));
 
 // Lazy load everything else — each becomes its own JS chunk
 const VerifyEmail = React.lazy(() => import("./pages/VerifyEmail"));
@@ -28,7 +29,7 @@ const InterviewScheduler = React.lazy(() => import("./pages/InterviewScheduler")
 const RecruiterAnalytics = React.lazy(() => import("./pages/RecruiterAnalytics"));
 const AppliedJobs = React.lazy(() => import("./pages/AppliedJobs"));
 const SavedJobs = React.lazy(() => import("./pages/SavedJobs"));
-const SearchJobs = React.lazy(() => import("./pages/SearchJobs"));
+// SearchJobs removed — search replaced by swipe filters on dashboard
 const RecruiterApplications = React.lazy(() => import("./pages/RecruiterApplications"));
 const Messages = React.lazy(() => import("./pages/Messages"));
 const Upgrade = React.lazy(() => import("./pages/Upgrade"));
@@ -277,14 +278,7 @@ function AppRoutes() {
           </ProtectedRoute>
         }
       />
-      <Route
-        path="/search"
-        element={
-          <ProtectedRoute allowedRoles={['seeker']}>
-            <SearchJobs />
-          </ProtectedRoute>
-        }
-      />
+      {/* /search route removed — swipe dashboard filters replace search */}
       <Route
         path="/profile-viewers"
         element={
@@ -404,6 +398,7 @@ function App() {
         <ThemeProvider>
           <AuthProvider>
             <AdminAuthProvider>
+              <Suspense fallback={null}><OfflineIndicator /></Suspense>
               <AppRoutes />
               <Toaster position="bottom-center" richColors style={{ bottom: '80px' }} />
             </AdminAuthProvider>

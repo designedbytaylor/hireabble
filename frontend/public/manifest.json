@@ -1,4 +1,5 @@
 {
+  "id": "/",
   "short_name": "Hireabble",
   "name": "Hireabble - Job Matching",
   "description": "A Tinder-style job matching platform. Swipe to find your dream job or perfect candidate.",
@@ -7,23 +8,35 @@
       "src": "icons/icon-192.png",
       "type": "image/png",
       "sizes": "192x192",
-      "purpose": "any maskable"
+      "purpose": "any"
+    },
+    {
+      "src": "icons/icon-192.png",
+      "type": "image/png",
+      "sizes": "192x192",
+      "purpose": "maskable"
     },
     {
       "src": "icons/icon-512.png",
       "type": "image/png",
       "sizes": "512x512",
-      "purpose": "any maskable"
+      "purpose": "any"
+    },
+    {
+      "src": "icons/icon-512.png",
+      "type": "image/png",
+      "sizes": "512x512",
+      "purpose": "maskable"
     },
     {
       "src": "icons/icon-192.svg",
       "type": "image/svg+xml",
-      "sizes": "192x192"
+      "sizes": "any"
     },
     {
       "src": "icons/icon-512.svg",
       "type": "image/svg+xml",
-      "sizes": "512x512"
+      "sizes": "any"
     }
   ],
   "start_url": ".",
@@ -32,5 +45,14 @@
   "background_color": "#09090b",
   "orientation": "portrait",
   "scope": "/",
-  "categories": ["business", "productivity"]
+  "categories": ["business", "productivity"],
+  "screenshots": [
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "Hireabble - Swipe to match with jobs"
+    }
+  ]
 }
