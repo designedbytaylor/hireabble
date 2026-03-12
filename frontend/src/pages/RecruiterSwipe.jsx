@@ -4,7 +4,7 @@ import { motion, AnimatePresence, useMotionValue, useTransform } from 'framer-mo
 import {
   X, Heart, Star, MapPin, Briefcase, GraduationCap, Clock,
   ChevronDown, BarChart3, Users, FileText, Building2, SlidersHorizontal,
-  Search, Sparkles, Zap, MessageSquare
+  Search, Sparkles, Zap, MessageSquare, Plus
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { toast } from 'sonner';
@@ -214,6 +214,39 @@ export default function RecruiterSwipe() {
           <div className="max-w-md mx-auto">
             <SkeletonSwipeCard />
             <SkeletonActionButtons />
+          </div>
+        </main>
+        <Navigation />
+      </div>
+    );
+  }
+
+  // Gate: recruiter must have at least one active job to swipe
+  if (stats.active_jobs === 0) {
+    return (
+      <div className="min-h-screen bg-background pb-24 overflow-x-hidden">
+        <div className="fixed inset-0 overflow-hidden pointer-events-none">
+          <div className="absolute top-0 left-1/4 w-96 h-96 bg-primary/10 rounded-full blur-3xl" />
+          <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-secondary/10 rounded-full blur-3xl" />
+        </div>
+        <main className="relative z-10 px-6 md:px-8 pt-20">
+          <div className="max-w-md mx-auto">
+            <div className="aspect-[3/4] rounded-3xl glass-card flex flex-col items-center justify-center p-8 text-center">
+              <div className="w-20 h-20 rounded-full bg-primary/20 flex items-center justify-center mb-6">
+                <Briefcase className="w-10 h-10 text-primary" />
+              </div>
+              <h2 className="text-2xl font-bold font-['Outfit'] mb-3">Post Your First Job</h2>
+              <p className="text-muted-foreground mb-6">
+                You need at least one active job posting before you can review applicants or discover candidates.
+              </p>
+              <Button
+                onClick={() => navigate('/recruiter/dashboard')}
+                className="rounded-full bg-gradient-to-r from-primary to-secondary hover:opacity-90 px-8"
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                Post a Job
+              </Button>
+            </div>
           </div>
         </main>
         <Navigation />

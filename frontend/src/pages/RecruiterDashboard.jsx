@@ -5,7 +5,7 @@ import {
   Plus, Briefcase, Users, Star, Heart, X, Check,
   MapPin, DollarSign, Building2, ChevronRight, Clock,
   Edit, GraduationCap, Trash2, BarChart3, Calendar, Globe,
-  FileText, Send, Info, Copy
+  FileText, Send, Info, Copy, Upload, Sparkles, Wand2, Image as ImageIcon
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -702,6 +702,9 @@ export default function RecruiterDashboard() {
 
 function JobFormDialog({ open, onClose, onSuccess, token, company, job = null, isEditing = false }) {
   const [loading, setLoading] = useState(false);
+  const [screenshots, setScreenshots] = useState([]);
+  const [parsingScreenshots, setParsingScreenshots] = useState(false);
+  const [aiAssisting, setAiAssisting] = useState(null); // 'generate' | 'improve' | null
   const [formData, setFormData] = useState({
     title: '',
     company: company || '',
@@ -748,8 +751,81 @@ function JobFormDialog({ open, onClose, onSuccess, token, company, job = null, i
         category: '',
         employment_type: 'full-time'
       });
+      setScreenshots([]);
     }
   }, [job, isEditing, company]);
+
+  const handleScreenshotSelect = (e) => {
+    const newFiles = Array.from(e.target.files || []);
+    const total = screenshots.length + newFiles.length;
+    if (total > 5) {
+      toast.error('Maximum 5 screenshots allowed');
+      return;
+    }
+    setScreenshots(prev => [...prev, ...newFiles]);
+    e.target.value = '';
+  };
+
+  const removeScreenshot = (index) => {
+    setScreenshots(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const handleParseScreenshots = async () => {
+    if (screenshots.length === 0) return;
+    setParsingScreenshots(true);
+    try {
+      const fd = new FormData();
+      screenshots.forEach(f => fd.append('files', f));
+      const res = await axios.post(`${API}/jobs/parse-screenshots`, fd, {
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'multipart/form-data' },
+      });
+      const parsed = res.data;
+      setFormData(prev => ({
+        ...prev,
+        title: parsed.title || prev.title,
+        company: parsed.company || prev.company,
+        description: parsed.description || prev.description,
+        requirements: parsed.requirements?.join(', ') || prev.requirements,
+        salary_min: parsed.salary_min?.toString() || prev.salary_min,
+        salary_max: parsed.salary_max?.toString() || prev.salary_max,
+        location: parsed.location || prev.location,
+        job_type: parsed.job_type || prev.job_type,
+        experience_level: parsed.experience_level || prev.experience_level,
+        employment_type: parsed.employment_type || prev.employment_type,
+        category: parsed.category || prev.category,
+      }));
+      toast.success('Job details extracted! Review and edit below.');
+    } catch (err) {
+      toast.error(err.response?.data?.detail || 'Failed to parse screenshots');
+    } finally {
+      setParsingScreenshots(false);
+    }
+  };
+
+  const handleAiAssist = async (mode) => {
+    setAiAssisting(mode);
+    try {
+      const res = await axios.post(`${API}/jobs/ai-assist`, {
+        title: formData.title,
+        company: formData.company,
+        description: formData.description,
+        mode,
+      }, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const { description, requirements } = res.data;
+      setFormData(prev => ({
+        ...prev,
+        description: description || prev.description,
+        requirements: requirements?.length ? requirements.join(', ') : prev.requirements,
+      }));
+      toast.success(mode === 'generate' ? 'Description generated!' : 'Description improved!');
+    } catch (err) {
+      toast.error(err.response?.data?.detail || 'AI assist failed');
+    } finally {
+      setAiAssisting(null);
+    }
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -799,6 +875,92 @@ function JobFormDialog({ open, onClose, onSuccess, token, company, job = null, i
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-5">
+          {/* Screenshot upload — create mode only */}
+          {!isEditing && (
+            <div className="space-y-3">
+              <Label className="flex items-center gap-2">
+                <ImageIcon className="w-4 h-4" />
+                Import from Screenshots
+              </Label>
+              <div className="border-2 border-dashed border-border rounded-xl p-4 text-center hover:border-primary/50 transition-colors">
+                {screenshots.length === 0 ? (
+                  <label className="cursor-pointer flex flex-col items-center gap-2">
+                    <Upload className="w-8 h-8 text-muted-foreground" />
+                    <span className="text-sm text-muted-foreground">
+                      Upload screenshots of your job listing (up to 5)
+                    </span>
+                    <span className="text-xs text-muted-foreground">Indeed, LinkedIn, or any job board</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      onChange={handleScreenshotSelect}
+                      className="hidden"
+                    />
+                  </label>
+                ) : (
+                  <div className="space-y-3">
+                    <div className="flex flex-wrap gap-2 justify-center">
+                      {screenshots.map((file, i) => (
+                        <div key={i} className="relative group">
+                          <img
+                            src={URL.createObjectURL(file)}
+                            alt={`Screenshot ${i + 1}`}
+                            className="w-16 h-16 object-cover rounded-lg border border-border"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => removeScreenshot(i)}
+                            className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-destructive text-white text-xs flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        </div>
+                      ))}
+                      {screenshots.length < 5 && (
+                        <label className="w-16 h-16 rounded-lg border-2 border-dashed border-border flex items-center justify-center cursor-pointer hover:border-primary/50 transition-colors">
+                          <Plus className="w-5 h-5 text-muted-foreground" />
+                          <input
+                            type="file"
+                            accept="image/*"
+                            multiple
+                            onChange={handleScreenshotSelect}
+                            className="hidden"
+                          />
+                        </label>
+                      )}
+                    </div>
+                    <Button
+                      type="button"
+                      onClick={handleParseScreenshots}
+                      disabled={parsingScreenshots}
+                      className="w-full h-10 rounded-xl bg-gradient-to-r from-primary to-secondary hover:opacity-90"
+                    >
+                      {parsingScreenshots ? (
+                        <div className="flex items-center gap-2">
+                          <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                          Extracting job details...
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-2">
+                          <Sparkles className="w-4 h-4" />
+                          Parse Screenshots
+                        </div>
+                      )}
+                    </Button>
+                  </div>
+                )}
+              </div>
+              {screenshots.length === 0 && (
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <span className="flex-1 border-t border-border" />
+                  <span>or fill out manually below</span>
+                  <span className="flex-1 border-t border-border" />
+                </div>
+              )}
+            </div>
+          )}
+
           <div className="space-y-2">
             <Label>Job Title *</Label>
             <Input
@@ -822,7 +984,39 @@ function JobFormDialog({ open, onClose, onSuccess, token, company, job = null, i
           </div>
 
           <div className="space-y-2">
-            <Label>Description *</Label>
+            <div className="flex items-center justify-between">
+              <Label>Description *</Label>
+              <div className="flex gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => handleAiAssist('generate')}
+                  disabled={!formData.title || aiAssisting}
+                  className="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-lg bg-primary/10 text-primary hover:bg-primary/20 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                  title={!formData.title ? 'Enter a job title first' : 'Generate a description with AI'}
+                >
+                  {aiAssisting === 'generate' ? (
+                    <div className="w-3 h-3 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                  ) : (
+                    <Sparkles className="w-3 h-3" />
+                  )}
+                  Generate
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleAiAssist('improve')}
+                  disabled={!formData.description || aiAssisting}
+                  className="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-lg bg-secondary/10 text-secondary hover:bg-secondary/20 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                  title={!formData.description ? 'Write a description first' : 'Improve description with AI'}
+                >
+                  {aiAssisting === 'improve' ? (
+                    <div className="w-3 h-3 border-2 border-secondary border-t-transparent rounded-full animate-spin" />
+                  ) : (
+                    <Wand2 className="w-3 h-3" />
+                  )}
+                  Improve
+                </button>
+              </div>
+            </div>
             <Textarea
               placeholder="Describe the role, responsibilities, and what makes it exciting..."
               value={formData.description}
