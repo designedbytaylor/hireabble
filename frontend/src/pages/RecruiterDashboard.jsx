@@ -254,7 +254,7 @@ export default function RecruiterDashboard() {
       <header className="relative z-10 p-6 md:p-8">
         <div className="flex items-center justify-between mb-8">
           <div className="flex items-center gap-3">
-            <img src="/logo.svg" alt="Hireabble" className="w-9 h-9 rounded-lg" />
+            <img src="/logo.png" alt="Hireabble" className="w-9 h-9 rounded-lg" />
             <div>
               <h1 className="text-2xl font-bold font-['Outfit']">Recruiter Hub</h1>
               <p className="text-muted-foreground">{user?.company || 'Your Company'}</p>
