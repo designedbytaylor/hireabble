@@ -20,7 +20,7 @@ export default function Landing() {
         {/* Center: Logo + Tagline */}
         <div className="text-center space-y-6">
           <div className="flex items-center justify-center gap-3 mb-2">
-            <img src="/logo-white.svg" alt="Hireabble" className="w-16 h-16 drop-shadow-lg" />
+            <img src="/logo-white.png" alt="Hireabble" className="w-16 h-16 drop-shadow-lg" />
           </div>
           <h1 className="text-5xl md:text-7xl font-bold font-['Outfit'] text-white tracking-tight">
             hireabble

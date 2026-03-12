@@ -787,31 +787,18 @@ async def generate_job_poster(job_id: str, current_user: dict = Depends(get_curr
         y = banner_y + banner_h - (i + 1) * strip_h
         c.rect(0, y, w, strip_h + 0.5, fill=1, stroke=0)
 
-    # -- Spark/bolt logo in banner (scaled from 512x512 SVG path) --
-    bolt_h = 56
-    bolt_scale = bolt_h / 400  # path spans ~400 units vertically (56 to 456)
-    bolt_cx = w / 2 - 80  # left of "hireabble" text
-    bolt_top = banner_y + banner_h - 30
-    ox = bolt_cx - (256 * bolt_scale)  # center the bolt horizontally
-    oy = bolt_top
-
-    p = c.beginPath()
-    def bpt(sx, sy):
-        return (ox + sx * bolt_scale, oy - (sy - 56) * bolt_scale)
-
-    x0, y0 = bpt(290, 56)
-    p.moveTo(x0, y0)
-    for sx, sy in [(168, 272), (264, 272), (216, 456), (392, 216), (284, 216), (290, 56)]:
-        bx, by = bpt(sx, sy)
-        p.lineTo(bx, by)
-    p.close()
-    c.setFillColor(HexColor("#ffffff"))
-    c.drawPath(p, fill=1, stroke=0)
+    # -- Logo image in banner (logo-white.png) --
+    logo_path = os.path.join(os.path.dirname(__file__), "..", "..", "frontend", "public", "logo-white.png")
+    logo_size = 50
+    logo_x = w / 2 - 110
+    logo_y = banner_y + banner_h - logo_size - 28
+    if os.path.exists(logo_path):
+        c.drawImage(ImageReader(logo_path), logo_x, logo_y, logo_size, logo_size, mask='auto')
 
     # -- "hireabble" brand text in banner --
     c.setFillColor(HexColor("#ffffff"))
     c.setFont("Helvetica-Bold", 36)
-    c.drawString(bolt_cx + 20, bolt_top - 42, "hireabble")
+    c.drawString(logo_x + logo_size + 8, logo_y + 10, "hireabble")
 
     # -- "Swipe right on your next career move" tagline in banner --
     c.setFillColor(Color(1, 1, 1, 0.8))
