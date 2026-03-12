@@ -506,6 +506,17 @@ export default function RecruiterSwipe() {
         </div>
       </main>
 
+      {/* Candidate/Applicant Detail Bottom Sheet */}
+      <AnimatePresence>
+        {expandedCard && currentItem && (
+          <CandidateDetailSheet
+            item={currentItem}
+            mode={mode}
+            onClose={() => setExpandedCard(false)}
+          />
+        )}
+      </AnimatePresence>
+
       <Navigation />
 
       <UpgradeModal
@@ -523,6 +534,168 @@ export default function RecruiterSwipe() {
         />
       )}
     </div>
+  );
+}
+
+// Tinder-style bottom sheet for candidate/applicant details
+function CandidateDetailSheet({ item, mode, onClose }) {
+  const sheetY = useMotionValue(0);
+  const sheetOpacity = useTransform(sheetY, [0, 300], [1, 0]);
+
+  // Normalize fields between applicant mode and candidate mode
+  const name = mode === 'applicants' ? item.seeker_name : item.name;
+  const title = mode === 'applicants' ? (item.seeker_title || 'Job Seeker') : (item.title || 'Job Seeker');
+  const photo = mode === 'applicants'
+    ? getPhotoUrl(item.seeker_photo || item.seeker_avatar, name || item.seeker_id)
+    : getPhotoUrl(item.photo_url || item.avatar, name || item.id);
+  const bio = mode === 'applicants' ? item.seeker_bio : item.bio;
+  const skills = mode === 'applicants' ? item.seeker_skills : item.skills;
+  const experience = mode === 'applicants' ? item.seeker_experience : item.experience;
+  const location = mode === 'applicants' ? item.seeker_location : item.location;
+  const school = mode === 'applicants' ? item.seeker_school : item.school;
+  const employer = mode === 'applicants' ? item.seeker_current_employer : item.current_employer;
+  const degree = mode === 'applicants' ? null : item.degree;
+  const matchScore = item.match_score;
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 z-[100]"
+    >
+      {/* Backdrop */}
+      <motion.div
+        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+        onClick={onClose}
+      />
+
+      {/* Sheet */}
+      <motion.div
+        className="absolute bottom-0 left-0 right-0 bg-card rounded-t-3xl overflow-hidden"
+        style={{ y: sheetY, opacity: sheetOpacity, maxHeight: '85vh' }}
+        initial={{ y: '100%' }}
+        animate={{ y: 0 }}
+        exit={{ y: '100%' }}
+        transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+        drag="y"
+        dragConstraints={{ top: 0, bottom: 0 }}
+        dragElastic={{ top: 0, bottom: 0.6 }}
+        onDragEnd={(_, info) => {
+          if (info.offset.y > 100 || info.velocity.y > 500) {
+            onClose();
+          }
+        }}
+      >
+        {/* Drag Handle */}
+        <div className="flex justify-center pt-3 pb-2">
+          <div className="w-10 h-1 rounded-full bg-muted-foreground/30" />
+        </div>
+
+        {/* Scrollable Content */}
+        <div className="overflow-y-auto px-6 pb-8" style={{ maxHeight: 'calc(85vh - 24px)' }}>
+          {/* Photo + Name Header */}
+          <div className="flex items-center gap-4 mb-4">
+            <img
+              src={photo}
+              alt={name}
+              className="w-16 h-16 rounded-xl object-cover border-2 border-primary/30"
+              onError={handleImgError(name || 'default')}
+            />
+            <div className="flex-1">
+              <h2 className="text-xl font-bold font-['Outfit']">{name}</h2>
+              <p className="text-primary text-sm">{title}</p>
+              {mode === 'applicants' && item.job_title && (
+                <p className="text-muted-foreground text-xs mt-0.5">Applied for: {item.job_title}</p>
+              )}
+            </div>
+            {matchScore != null && (
+              <span className={`px-3 py-1 rounded-full text-sm font-bold flex items-center gap-1 ${
+                matchScore >= 75 ? 'bg-success/20 text-success' :
+                matchScore >= 50 ? 'bg-primary/20 text-primary' :
+                'bg-muted text-muted-foreground'
+              }`}>
+                <Sparkles className="w-3.5 h-3.5" />
+                {matchScore}%
+              </span>
+            )}
+          </div>
+
+          {/* Super Like Note */}
+          {item.superlike_note && (
+            <div className="mb-4 px-3 py-2 rounded-xl bg-secondary/10 border border-secondary/20">
+              <p className="text-xs text-secondary flex items-center gap-1 mb-0.5 font-medium">
+                <MessageSquare className="w-3 h-3" /> Note from applicant
+              </p>
+              <p className="text-sm text-foreground/90 italic">"{item.superlike_note}"</p>
+            </div>
+          )}
+
+          {/* Info Tags */}
+          <div className="flex flex-wrap gap-2 mb-5">
+            {experience && (
+              <span className="px-3 py-1.5 rounded-full bg-primary/20 text-primary text-sm flex items-center gap-1">
+                <Clock className="w-3.5 h-3.5" />
+                {experience}+ yrs
+              </span>
+            )}
+            {location && (
+              <span className="px-3 py-1.5 rounded-full bg-secondary/20 text-secondary text-sm flex items-center gap-1">
+                <MapPin className="w-3.5 h-3.5" />
+                {location}
+              </span>
+            )}
+            {school && (
+              <span className="px-3 py-1.5 rounded-full bg-accent text-accent-foreground text-sm flex items-center gap-1">
+                <GraduationCap className="w-3.5 h-3.5" />
+                {school}
+              </span>
+            )}
+            {employer && (
+              <span className="px-3 py-1.5 rounded-full bg-accent text-accent-foreground text-sm flex items-center gap-1">
+                <Building2 className="w-3.5 h-3.5" />
+                {employer}
+              </span>
+            )}
+            {degree && (
+              <span className="px-3 py-1.5 rounded-full bg-accent text-accent-foreground text-sm capitalize flex items-center gap-1">
+                <GraduationCap className="w-3.5 h-3.5" />
+                {degree}
+              </span>
+            )}
+          </div>
+
+          {/* Bio */}
+          {bio && (
+            <div className="mb-5">
+              <h3 className="text-sm font-bold font-['Outfit'] mb-2 text-foreground">About</h3>
+              <p className="text-sm text-muted-foreground leading-relaxed whitespace-pre-line">{bio}</p>
+            </div>
+          )}
+
+          {/* Skills */}
+          {skills?.length > 0 && (
+            <div className="mb-5">
+              <h3 className="text-sm font-bold font-['Outfit'] mb-2 text-foreground">Skills</h3>
+              <div className="flex flex-wrap gap-2">
+                {skills.map((skill, i) => (
+                  <span key={i} className="px-3 py-1.5 rounded-lg bg-white/5 border border-border text-sm text-muted-foreground">
+                    {skill}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Applied date */}
+          {mode === 'applicants' && item.created_at && (
+            <div className="text-xs text-muted-foreground">
+              Applied {new Date(item.created_at).toLocaleDateString()}
+            </div>
+          )}
+        </div>
+      </motion.div>
+    </motion.div>
   );
 }
 
@@ -595,16 +768,16 @@ function ApplicantCard({ app, onSwipe, expanded, setExpanded }) {
       <div className="w-full h-full rounded-3xl overflow-hidden relative gradient-border bg-card">
         {/* Photo Header */}
         <div className="absolute inset-0">
-          <div className="h-[60%] relative overflow-hidden">
+          <div className="h-[65%] relative overflow-hidden">
             <img
-              src={getPhotoUrl(app.seeker_photo || app.seeker_avatar, app.seeker_id)}
+              src={getPhotoUrl(app.seeker_photo || app.seeker_avatar, app.seeker_name || app.seeker_id)}
               alt={app.seeker_name}
               className="w-full h-full object-cover object-top"
-              onError={handleImgError(app.seeker_id)}
+              onError={handleImgError(app.seeker_name || app.seeker_id)}
             />
             <div className="absolute inset-0 bg-gradient-to-t from-card via-transparent to-transparent" />
           </div>
-          <div className="absolute inset-0 top-[55%] bg-card" />
+          <div className="absolute inset-0 top-[60%] bg-card" />
         </div>
 
         {/* Swipe Indicators */}
@@ -641,7 +814,7 @@ function ApplicantCard({ app, onSwipe, expanded, setExpanded }) {
         )}
 
         {/* Content */}
-        <div className={`absolute inset-0 top-[50%] flex flex-col p-6 z-10 ${expanded ? 'overflow-y-auto' : 'overflow-hidden'}`}>
+        <div className={`absolute inset-0 top-[55%] flex flex-col p-6 z-10 overflow-hidden`}>
           <h2 className="text-2xl font-bold font-['Outfit']">{app.seeker_name}</h2>
           <p className="text-primary text-sm mt-1">{app.seeker_title || 'Job Seeker'}</p>
           <p className="text-muted-foreground text-xs mt-1">Applied for: {app.job_title}</p>
@@ -692,38 +865,12 @@ function ApplicantCard({ app, onSwipe, expanded, setExpanded }) {
           )}
 
           <button
-            onClick={(e) => { e.stopPropagation(); setExpanded(!expanded); }}
+            onClick={(e) => { e.stopPropagation(); setExpanded(true); }}
             className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors mt-4"
           >
-            <ChevronDown className={`w-4 h-4 transition-transform ${expanded ? 'rotate-180' : ''}`} />
-            {expanded ? 'Hide details' : 'Show details'}
+            <ChevronDown className="w-4 h-4" />
+            Show details
           </button>
-
-          <AnimatePresence>
-            {expanded && (
-              <motion.div
-                initial={{ height: 0, opacity: 0 }}
-                animate={{ height: 'auto', opacity: 1 }}
-                exit={{ height: 0, opacity: 0 }}
-                className="overflow-hidden"
-              >
-                <div className="mt-3 pt-3 border-t border-border space-y-2">
-                  {app.seeker_bio && (
-                    <p className="text-sm text-muted-foreground">{app.seeker_bio}</p>
-                  )}
-                  {app.seeker_current_employer && (
-                    <div className="flex items-center gap-2 text-sm">
-                      <Building2 className="w-3.5 h-3.5 text-muted-foreground" />
-                      <span>Currently at {app.seeker_current_employer}</span>
-                    </div>
-                  )}
-                  <div className="text-xs text-muted-foreground">
-                    Applied {new Date(app.created_at).toLocaleDateString()}
-                  </div>
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
         </div>
       </div>
     </motion.div>
@@ -802,7 +949,7 @@ function CandidateCard({ candidate, onSwipe, expanded, setExpanded }) {
       <div className="w-full h-full rounded-3xl overflow-hidden relative gradient-border bg-card">
         {/* Photo Header */}
         <div className="absolute inset-0">
-          <div className="h-[60%] relative overflow-hidden">
+          <div className="h-[65%] relative overflow-hidden">
             <img
               src={getPhotoUrl(candidate.photo_url || candidate.avatar, candidate.id)}
               alt={candidate.name}
@@ -811,7 +958,7 @@ function CandidateCard({ candidate, onSwipe, expanded, setExpanded }) {
             />
             <div className="absolute inset-0 bg-gradient-to-t from-card via-transparent to-transparent" />
           </div>
-          <div className="absolute inset-0 top-[55%] bg-card" />
+          <div className="absolute inset-0 top-[60%] bg-card" />
         </div>
 
         {/* Swipe Indicators */}
@@ -849,7 +996,7 @@ function CandidateCard({ candidate, onSwipe, expanded, setExpanded }) {
         )}
 
         {/* Content */}
-        <div className={`absolute inset-0 top-[50%] flex flex-col p-6 z-10 ${expanded ? 'overflow-y-auto' : 'overflow-hidden'}`}>
+        <div className={`absolute inset-0 top-[55%] flex flex-col p-6 z-10 overflow-hidden`}>
           <h2 className="text-2xl font-bold font-['Outfit']">{candidate.name}</h2>
           <p className="text-primary text-sm mt-1">{candidate.title || 'Job Seeker'}</p>
           {candidate.best_match_job && (
@@ -896,41 +1043,12 @@ function CandidateCard({ candidate, onSwipe, expanded, setExpanded }) {
           )}
 
           <button
-            onClick={(e) => { e.stopPropagation(); setExpanded(!expanded); }}
+            onClick={(e) => { e.stopPropagation(); setExpanded(true); }}
             className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors mt-4"
           >
-            <ChevronDown className={`w-4 h-4 transition-transform ${expanded ? 'rotate-180' : ''}`} />
-            {expanded ? 'Hide details' : 'Show details'}
+            <ChevronDown className="w-4 h-4" />
+            Show details
           </button>
-
-          <AnimatePresence>
-            {expanded && (
-              <motion.div
-                initial={{ height: 0, opacity: 0 }}
-                animate={{ height: 'auto', opacity: 1 }}
-                exit={{ height: 0, opacity: 0 }}
-                className="overflow-hidden"
-              >
-                <div className="mt-3 pt-3 border-t border-border space-y-2">
-                  {candidate.bio && (
-                    <p className="text-sm text-muted-foreground">{candidate.bio}</p>
-                  )}
-                  {candidate.current_employer && (
-                    <div className="flex items-center gap-2 text-sm">
-                      <Building2 className="w-3.5 h-3.5 text-muted-foreground" />
-                      <span>Currently at {candidate.current_employer}</span>
-                    </div>
-                  )}
-                  {candidate.degree && (
-                    <div className="flex items-center gap-2 text-sm">
-                      <GraduationCap className="w-3.5 h-3.5 text-muted-foreground" />
-                      <span className="capitalize">{candidate.degree}</span>
-                    </div>
-                  )}
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
         </div>
       </div>
     </motion.div>
@@ -960,11 +1078,11 @@ function ExitingRecruiterCard({ card }) {
     >
       <div className="w-full h-full rounded-3xl overflow-hidden relative gradient-border bg-card">
         <div className="absolute inset-0">
-          <div className="h-[60%] relative overflow-hidden">
+          <div className="h-[65%] relative overflow-hidden">
             <img src={photoUrl} alt={name} className="w-full h-full object-cover object-top" />
             <div className="absolute inset-0 bg-gradient-to-t from-card via-transparent to-transparent" />
           </div>
-          <div className="absolute inset-0 top-[55%] bg-card" />
+          <div className="absolute inset-0 top-[60%] bg-card" />
         </div>
         {/* Stamp overlay */}
         {action === 'accept' && (
@@ -976,7 +1094,7 @@ function ExitingRecruiterCard({ card }) {
         {action === 'superlike' && (
           <div className="absolute top-8 left-1/2 -translate-x-1/2 px-6 py-2 rounded-full bg-secondary border-2 border-secondary font-bold text-white z-20">SUPER SWIPE</div>
         )}
-        <div className="absolute inset-0 top-[50%] flex flex-col p-6 z-10">
+        <div className="absolute inset-0 top-[55%] flex flex-col p-6 z-10">
           <h2 className="text-2xl font-bold font-['Outfit']">{name}</h2>
           <p className="text-primary text-sm mt-1">{title}</p>
         </div>
@@ -990,7 +1108,7 @@ function StaticApplicantCard({ app }) {
   return (
     <div className="w-full h-full rounded-3xl overflow-hidden relative gradient-border bg-card">
       <div className="absolute inset-0">
-        <div className="h-[60%] relative overflow-hidden">
+        <div className="h-[65%] relative overflow-hidden">
           <img
             src={getPhotoUrl(app.seeker_photo || app.seeker_avatar, app.seeker_id)}
             alt={app.seeker_name}
@@ -998,7 +1116,7 @@ function StaticApplicantCard({ app }) {
           />
           <div className="absolute inset-0 bg-gradient-to-t from-card via-transparent to-transparent" />
         </div>
-        <div className="absolute inset-0 top-[55%] bg-card" />
+        <div className="absolute inset-0 top-[60%] bg-card" />
       </div>
       {app.action === 'superlike' && (
         <div className="absolute top-4 right-4 z-20 px-3 py-1 rounded-full bg-gradient-to-r from-secondary to-pink-500 text-white text-xs font-bold flex items-center gap-1 shadow-lg">
@@ -1010,7 +1128,7 @@ function StaticApplicantCard({ app }) {
           <Zap className="w-3 h-3 fill-white" /> Priority
         </div>
       )}
-      <div className="absolute inset-0 top-[50%] flex flex-col p-6 z-10">
+      <div className="absolute inset-0 top-[55%] flex flex-col p-6 z-10">
         <h2 className="text-2xl font-bold font-['Outfit']">{app.seeker_name}</h2>
         <p className="text-primary text-sm mt-1">{app.seeker_title || 'Job Seeker'}</p>
         <div className="flex flex-wrap gap-2 mt-4">
@@ -1036,7 +1154,7 @@ function StaticCandidateCard({ candidate }) {
   return (
     <div className="w-full h-full rounded-3xl overflow-hidden relative gradient-border bg-card">
       <div className="absolute inset-0">
-        <div className="h-[60%] relative overflow-hidden">
+        <div className="h-[65%] relative overflow-hidden">
           <img
             src={getPhotoUrl(candidate.photo_url || candidate.avatar, candidate.id)}
             alt={candidate.name}
@@ -1044,9 +1162,9 @@ function StaticCandidateCard({ candidate }) {
           />
           <div className="absolute inset-0 bg-gradient-to-t from-card via-transparent to-transparent" />
         </div>
-        <div className="absolute inset-0 top-[55%] bg-card" />
+        <div className="absolute inset-0 top-[60%] bg-card" />
       </div>
-      <div className="absolute inset-0 top-[50%] flex flex-col p-6 z-10">
+      <div className="absolute inset-0 top-[55%] flex flex-col p-6 z-10">
         <h2 className="text-2xl font-bold font-['Outfit']">{candidate.name}</h2>
         <p className="text-primary text-sm mt-1">{candidate.title || 'Job Seeker'}</p>
         <div className="flex flex-wrap gap-2 mt-4">

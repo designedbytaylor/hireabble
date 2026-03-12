@@ -1380,20 +1380,14 @@ async def get_application_insights(application_id: str, current_user: dict = Dep
     }
 
 
-# ==================== INCOGNITO MODE (Premium) ====================
+# ==================== INCOGNITO MODE ====================
 
 @router.post("/profile/incognito")
 async def toggle_incognito(body: dict, current_user: dict = Depends(get_current_user)):
     """Toggle incognito mode — hide profile from recruiter discovery.
-    Premium seekers only."""
+    Available to all seekers."""
     if current_user["role"] != "seeker":
         raise HTTPException(status_code=403, detail="Only seekers can use incognito mode")
-
-    sub = current_user.get("subscription") or {}
-    now = datetime.now(timezone.utc).isoformat()
-    if not (sub.get("status") == "active" and sub.get("period_end", "") >= now
-            and sub.get("tier_id") == "seeker_premium"):
-        raise HTTPException(status_code=403, detail="Premium subscription required for incognito mode")
 
     enabled = bool(body.get("enabled", False))
     await db.users.update_one(

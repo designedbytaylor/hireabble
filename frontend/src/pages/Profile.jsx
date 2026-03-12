@@ -97,7 +97,7 @@ function EmailNotificationSettings({ token }) {
 }
 
 export default function Profile() {
-  const { user, token, updateProfile, logout } = useAuth();
+  const { user, token, updateProfile, logout, refreshUser } = useAuth();
   const [loading, setLoading] = useState(false);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [completeness, setCompleteness] = useState({ percentage: 0, missing_fields: [], is_complete: false });
@@ -1268,6 +1268,51 @@ export default function Profile() {
               </form>
             )}
           </div>
+
+          {/* Private Profile */}
+          {user?.role === 'seeker' && (
+            <div className="glass-card rounded-2xl p-5 mt-6">
+              <h3 className="text-lg font-bold font-['Outfit'] mb-3 flex items-center gap-2">
+                <EyeOff className="w-5 h-5" /> Profile Visibility
+              </h3>
+              <button
+                type="button"
+                onClick={async () => {
+                  const newVal = !user?.incognito_mode;
+                  try {
+                    await axios.post(`${API}/profile/incognito`, { enabled: newVal }, {
+                      headers: { Authorization: `Bearer ${token}` },
+                    });
+                    refreshUser();
+                    toast.success(newVal ? 'Profile set to private' : 'Profile is now visible to recruiters');
+                  } catch (err) {
+                    toast.error(err.response?.data?.detail || 'Failed to update');
+                  }
+                }}
+                className={`w-full flex items-center gap-3 p-4 rounded-xl border transition-all ${
+                  user?.incognito_mode
+                    ? 'bg-primary/10 border-primary/40 text-primary'
+                    : 'bg-background border-border text-muted-foreground hover:border-primary/20'
+                }`}
+              >
+                {user?.incognito_mode ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                <div className="flex-1 text-left">
+                  <div className="font-medium text-sm">Private Profile</div>
+                  <div className="text-xs opacity-70">
+                    {user?.incognito_mode
+                      ? 'Only visible to recruiters for jobs you applied to'
+                      : 'Your profile appears in recruiter search & swipes'}
+                  </div>
+                </div>
+                <div className={`w-10 h-6 rounded-full transition-colors ${user?.incognito_mode ? 'bg-primary' : 'bg-muted'}`}>
+                  <div className={`w-5 h-5 rounded-full bg-white mt-0.5 transition-transform ${user?.incognito_mode ? 'translate-x-[18px]' : 'translate-x-0.5'}`} />
+                </div>
+              </button>
+              <p className="text-xs text-muted-foreground mt-2">
+                When private, recruiters can only see your profile for jobs you've applied to.
+              </p>
+            </div>
+          )}
 
           {/* Push Notifications */}
           {pushSupported && (
