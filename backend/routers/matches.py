@@ -15,6 +15,7 @@ from database import (
     get_user_email_prefs, FRONTEND_URL, logger,
 )
 from content_filter import check_text, is_severe
+from routers.users import get_all_blocked_ids
 
 router = APIRouter(tags=["Matches & Messages"])
 
@@ -23,12 +24,28 @@ router = APIRouter(tags=["Matches & Messages"])
 @router.get("/matches", response_model=List[MatchResponse])
 async def get_matches(current_user: dict = Depends(get_current_user)):
     """Get user's matches with unread message counts"""
+    blocked_ids = await get_all_blocked_ids(current_user["id"])
+
     query = {
         "$or": [
             {"seeker_id": current_user["id"]},
             {"recruiter_id": current_user["id"]}
         ]
     }
+    # Exclude matches involving blocked users
+    if blocked_ids:
+        query["seeker_id"] = {"$nin": blocked_ids} if current_user.get("role") == "recruiter" else current_user["id"]
+        query["recruiter_id"] = {"$nin": blocked_ids} if current_user.get("role") == "seeker" else current_user["id"]
+        # Rebuild with proper $and to handle both directions
+        query = {"$and": [
+            {"$or": [
+                {"seeker_id": current_user["id"]},
+                {"recruiter_id": current_user["id"]}
+            ]},
+            {"seeker_id": {"$nin": blocked_ids}},
+            {"recruiter_id": {"$nin": blocked_ids}}
+        ]}
+
     matches = await db.matches.find(query, {"_id": 0}).sort("created_at", -1).to_list(100)
 
     # Batch-fetch unread counts for all matches
@@ -159,7 +176,13 @@ async def send_message(message: MessageCreate, current_user: dict = Depends(get_
     
     if match["seeker_id"] != current_user["id"] and match["recruiter_id"] != current_user["id"]:
         raise HTTPException(status_code=403, detail="Not authorized to message in this match")
-    
+
+    # Check if either user has blocked the other
+    other_id = match["recruiter_id"] if current_user["id"] == match["seeker_id"] else match["seeker_id"]
+    blocked_ids = await get_all_blocked_ids(current_user["id"])
+    if other_id in blocked_ids:
+        raise HTTPException(status_code=403, detail="Cannot send messages to this user")
+
     # Content moderation on message text
     is_clean, violations = check_text(message.content)
     if not is_clean and is_severe(violations):

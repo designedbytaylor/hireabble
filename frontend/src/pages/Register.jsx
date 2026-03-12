@@ -57,6 +57,7 @@ export default function Register() {
   });
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
   const { register } = useAuth();
   const navigate = useNavigate();
 
@@ -73,6 +74,10 @@ export default function Register() {
     e.preventDefault();
     if (!formData.name || !formData.email || !formData.password) {
       toast.error('Please fill in all required fields');
+      return;
+    }
+    if (!acceptedTerms) {
+      toast.error('Please accept the Terms and Privacy Policy');
       return;
     }
 
@@ -262,9 +267,25 @@ export default function Register() {
                 </>
               )}
 
+              <label className="flex items-start gap-3 mt-4 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={acceptedTerms}
+                  onChange={(e) => setAcceptedTerms(e.target.checked)}
+                  className="mt-1 h-4 w-4 rounded border-border accent-primary"
+                  data-testid="terms-checkbox"
+                />
+                <span className="text-sm text-muted-foreground">
+                  I agree to the{' '}
+                  <Link to="/terms" className="text-primary hover:underline" target="_blank">Terms of Service</Link>
+                  {' '}and{' '}
+                  <Link to="/privacy" className="text-primary hover:underline" target="_blank">Privacy Policy</Link>
+                </span>
+              </label>
+
               <Button
                 type="submit"
-                disabled={loading}
+                disabled={loading || !acceptedTerms}
                 className="w-full h-12 rounded-xl bg-gradient-to-r from-primary to-secondary hover:opacity-90 text-lg font-medium btn-hover-glow mt-2"
                 data-testid="register-submit-btn"
               >
@@ -296,12 +317,6 @@ export default function Register() {
               </Link>
             </p>
 
-            <p className="text-xs text-muted-foreground text-center mt-4">
-              By creating an account, you agree to our{' '}
-              <Link to="/terms" className="text-primary hover:underline">Terms</Link>
-              {' '}and{' '}
-              <Link to="/privacy" className="text-primary hover:underline">Privacy Policy</Link>.
-            </p>
           </div>
         </div>
       </div>

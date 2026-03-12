@@ -83,6 +83,7 @@ async def register(user: UserCreate, request: Request):
             "onboarding_complete": False,
             "email_verified": False,
             "push_subscription": None,
+            "blocked_users": [],
             "created_at": datetime.now(timezone.utc).isoformat()
         }
 
