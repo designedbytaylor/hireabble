@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Send, Briefcase, User, Wifi, WifiOff, Flag, Calendar, CheckCheck, Check, Image, X, Video, Square, Loader2, Clock, Phone, MapPin, FileText } from 'lucide-react';
+import { ArrowLeft, Send, Briefcase, User, Wifi, WifiOff, Flag, ShieldBan, Calendar, CheckCheck, Check, Image, X, Video, Square, Loader2, Clock, Phone, MapPin, FileText } from 'lucide-react';
 import ReportDialog from '../components/ReportDialog';
+import BlockDialog from '../components/BlockDialog';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import axios from 'axios';
@@ -22,6 +23,7 @@ export default function Chat() {
   const [sending, setSending] = useState(false);
   const [wsConnected, setWsConnected] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
+  const [blockOpen, setBlockOpen] = useState(false);
   const [otherTyping, setOtherTyping] = useState(false);
   const [imagePreview, setImagePreview] = useState(null);
   const [videoPreview, setVideoPreview] = useState(null);
@@ -392,6 +394,13 @@ export default function Chat() {
         >
           <Flag className="w-4 h-4" />
         </button>
+        <button
+          onClick={() => setBlockOpen(true)}
+          className="p-2 rounded-lg hover:bg-red-500/10 text-muted-foreground hover:text-red-400 transition-colors"
+          title="Block user"
+        >
+          <ShieldBan className="w-4 h-4" />
+        </button>
 
         <div className={`p-2 rounded-lg ${wsConnected ? 'bg-success/10' : 'bg-muted'}`}>
           {wsConnected ? (
@@ -407,6 +416,14 @@ export default function Chat() {
         onOpenChange={setReportOpen}
         reportedType="user"
         reportedId={user?.role === 'seeker' ? match?.recruiter_id : match?.seeker_id}
+      />
+
+      <BlockDialog
+        open={blockOpen}
+        onOpenChange={setBlockOpen}
+        blockedUserId={otherPersonId}
+        blockedUserName={match?.other_name}
+        onBlockSuccess={() => navigate('/matches')}
       />
 
       {/* Messages */}

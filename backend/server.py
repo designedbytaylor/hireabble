@@ -23,7 +23,7 @@ from database import db, manager, UPLOADS_DIR, logger, JWT_SECRET, JWT_ALGORITHM
 from content_filter import check_text, is_severe
 
 # Import routers
-from routers import auth, jobs, applications, matches, notifications, uploads, stats, admin, interviews, payments, support
+from routers import auth, jobs, applications, matches, notifications, uploads, stats, admin, interviews, payments, support, users
 
 # Rate limiter — uses remote IP address by default
 limiter = Limiter(key_func=get_remote_address, default_limits=["120/minute"])
@@ -97,6 +97,7 @@ app.include_router(admin.router, prefix="/api")
 app.include_router(interviews.router, prefix="/api")
 app.include_router(payments.router, prefix="/api")
 app.include_router(support.router, prefix="/api")
+app.include_router(users.router, prefix="/api")
 
 # ==================== WEBSOCKET ====================
 
