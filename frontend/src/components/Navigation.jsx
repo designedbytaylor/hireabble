@@ -126,11 +126,9 @@ export default memo(function Navigation() {
                 isActive ? 'bg-primary/20 neon-glow' : 'hover:bg-accent'
               }`}>
                 {item.isLogo ? (
-                  <img
-                    src="/logo.svg"
-                    alt="Home"
-                    className={`w-5 h-5 transition-opacity ${isActive ? 'opacity-100' : 'opacity-50'}`}
-                  />
+                  <svg viewBox="0 0 512 512" className="w-5 h-5" fill="currentColor">
+                    <path d="M290 56L168 272h96L216 456l176-240h-108L290 56z"/>
+                  </svg>
                 ) : (
                   <Icon className="w-5 h-5" />
                 )}
