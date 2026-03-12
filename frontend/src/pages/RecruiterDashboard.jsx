@@ -140,16 +140,29 @@ export default function RecruiterDashboard() {
     }
   };
 
+  const [generatingPoster, setGeneratingPoster] = useState(null);
+
   const handleGeneratePoster = async (jobId) => {
+    setGeneratingPoster(jobId);
     try {
       const response = await axios.get(`${API}/jobs/${jobId}/poster`, {
         headers: { Authorization: `Bearer ${token}` },
         responseType: 'blob'
       });
-      const url = window.URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }));
-      window.open(url, '_blank');
+      const blob = new Blob([response.data], { type: 'application/pdf' });
+      const url = window.URL.createObjectURL(blob);
+      // Use <a> download to avoid mobile popup blockers
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'Hiring_Poster.pdf';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => window.URL.revokeObjectURL(url), 1000);
     } catch {
       toast.error('Failed to generate poster');
+    } finally {
+      setGeneratingPoster(null);
     }
   };
 
@@ -477,8 +490,13 @@ export default function RecruiterDashboard() {
                         onClick={() => handleGeneratePoster(job.id)}
                         className="p-2 rounded-lg hover:bg-accent transition-colors"
                         title="Generate hiring poster"
+                        disabled={generatingPoster === job.id}
                       >
-                        <Printer className="w-5 h-5 text-muted-foreground" />
+                        {generatingPoster === job.id ? (
+                          <div className="w-5 h-5 border-2 border-muted-foreground border-t-transparent rounded-full animate-spin" />
+                        ) : (
+                          <Printer className="w-5 h-5 text-muted-foreground" />
+                        )}
                       </button>
                       <button
                         onClick={() => setConfirmDelete(job.id)}
