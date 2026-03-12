@@ -88,6 +88,7 @@ export default function RecruiterSwipe() {
     }
     setCurrentIndex(0);
     setExpandedCard(false);
+    swipedIdsRef.current.clear();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode]);
 
@@ -101,6 +102,7 @@ export default function RecruiterSwipe() {
       const pending = appsRes.data.filter(a => !a.recruiter_action);
       setApplications(pending);
       setStats(statsRes.data);
+      swipedIdsRef.current.clear();
     } catch (error) {
       if (retry < 1 && (!error.response || error.code === 'ECONNABORTED')) {
         return fetchData(retry + 1);
@@ -120,6 +122,7 @@ export default function RecruiterSwipe() {
       ]);
       setCandidates(candidatesRes.data);
       setSuperSwipesRemaining(swipesRes.data);
+      swipedIdsRef.current.clear();
     } catch (error) {
       if (retry < 1 && (!error.response || error.code === 'ECONNABORTED')) {
         return fetchCandidates(retry + 1);
@@ -556,16 +559,16 @@ function ApplicantCard({ app, onSwipe, expanded, setExpanded }) {
       <div className="w-full h-full rounded-3xl overflow-hidden relative gradient-border bg-card">
         {/* Photo Header */}
         <div className="absolute inset-0">
-          <div className="h-[45%] relative overflow-hidden">
+          <div className="h-[60%] relative overflow-hidden">
             <img
               src={getPhotoUrl(app.seeker_photo || app.seeker_avatar, app.seeker_id)}
               alt={app.seeker_name}
-              className="w-full h-full object-cover"
+              className="w-full h-full object-cover object-top"
               onError={handleImgError(app.seeker_id)}
             />
             <div className="absolute inset-0 bg-gradient-to-t from-card via-transparent to-transparent" />
           </div>
-          <div className="absolute inset-0 top-[40%] bg-card" />
+          <div className="absolute inset-0 top-[55%] bg-card" />
         </div>
 
         {/* Swipe Indicators */}
@@ -602,7 +605,7 @@ function ApplicantCard({ app, onSwipe, expanded, setExpanded }) {
         )}
 
         {/* Content */}
-        <div className={`absolute inset-0 top-[35%] flex flex-col p-6 z-10 ${expanded ? 'overflow-y-auto' : 'overflow-hidden'}`}>
+        <div className={`absolute inset-0 top-[50%] flex flex-col p-6 z-10 ${expanded ? 'overflow-y-auto' : 'overflow-hidden'}`}>
           <h2 className="text-2xl font-bold font-['Outfit']">{app.seeker_name}</h2>
           <p className="text-primary text-sm mt-1">{app.seeker_title || 'Job Seeker'}</p>
           <p className="text-muted-foreground text-xs mt-1">Applied for: {app.job_title}</p>
@@ -763,16 +766,16 @@ function CandidateCard({ candidate, onSwipe, expanded, setExpanded }) {
       <div className="w-full h-full rounded-3xl overflow-hidden relative gradient-border bg-card">
         {/* Photo Header */}
         <div className="absolute inset-0">
-          <div className="h-[45%] relative overflow-hidden">
+          <div className="h-[60%] relative overflow-hidden">
             <img
               src={getPhotoUrl(candidate.photo_url || candidate.avatar, candidate.id)}
               alt={candidate.name}
-              className="w-full h-full object-cover"
+              className="w-full h-full object-cover object-top"
               onError={handleImgError(candidate.id)}
             />
             <div className="absolute inset-0 bg-gradient-to-t from-card via-transparent to-transparent" />
           </div>
-          <div className="absolute inset-0 top-[40%] bg-card" />
+          <div className="absolute inset-0 top-[55%] bg-card" />
         </div>
 
         {/* Swipe Indicators */}
@@ -810,7 +813,7 @@ function CandidateCard({ candidate, onSwipe, expanded, setExpanded }) {
         )}
 
         {/* Content */}
-        <div className={`absolute inset-0 top-[35%] flex flex-col p-6 z-10 ${expanded ? 'overflow-y-auto' : 'overflow-hidden'}`}>
+        <div className={`absolute inset-0 top-[50%] flex flex-col p-6 z-10 ${expanded ? 'overflow-y-auto' : 'overflow-hidden'}`}>
           <h2 className="text-2xl font-bold font-['Outfit']">{candidate.name}</h2>
           <p className="text-primary text-sm mt-1">{candidate.title || 'Job Seeker'}</p>
           {candidate.best_match_job && (
@@ -921,11 +924,11 @@ function ExitingRecruiterCard({ card }) {
     >
       <div className="w-full h-full rounded-3xl overflow-hidden relative gradient-border bg-card">
         <div className="absolute inset-0">
-          <div className="h-[45%] relative overflow-hidden">
-            <img src={photoUrl} alt={name} className="w-full h-full object-cover" />
+          <div className="h-[60%] relative overflow-hidden">
+            <img src={photoUrl} alt={name} className="w-full h-full object-cover object-top" />
             <div className="absolute inset-0 bg-gradient-to-t from-card via-transparent to-transparent" />
           </div>
-          <div className="absolute inset-0 top-[40%] bg-card" />
+          <div className="absolute inset-0 top-[55%] bg-card" />
         </div>
         {/* Stamp overlay */}
         {action === 'accept' && (
@@ -937,7 +940,7 @@ function ExitingRecruiterCard({ card }) {
         {action === 'superlike' && (
           <div className="absolute top-8 left-1/2 -translate-x-1/2 px-6 py-2 rounded-full bg-secondary border-2 border-secondary font-bold text-white z-20">SUPER SWIPE</div>
         )}
-        <div className="absolute inset-0 top-[35%] flex flex-col p-6 z-10">
+        <div className="absolute inset-0 top-[50%] flex flex-col p-6 z-10">
           <h2 className="text-2xl font-bold font-['Outfit']">{name}</h2>
           <p className="text-primary text-sm mt-1">{title}</p>
         </div>
@@ -951,15 +954,15 @@ function StaticApplicantCard({ app }) {
   return (
     <div className="w-full h-full rounded-3xl overflow-hidden relative gradient-border bg-card">
       <div className="absolute inset-0">
-        <div className="h-[45%] relative overflow-hidden">
+        <div className="h-[60%] relative overflow-hidden">
           <img
             src={getPhotoUrl(app.seeker_photo || app.seeker_avatar, app.seeker_id)}
             alt={app.seeker_name}
-            className="w-full h-full object-cover"
+            className="w-full h-full object-cover object-top"
           />
           <div className="absolute inset-0 bg-gradient-to-t from-card via-transparent to-transparent" />
         </div>
-        <div className="absolute inset-0 top-[40%] bg-card" />
+        <div className="absolute inset-0 top-[55%] bg-card" />
       </div>
       {app.action === 'superlike' && (
         <div className="absolute top-4 right-4 z-20 px-3 py-1 rounded-full bg-gradient-to-r from-secondary to-pink-500 text-white text-xs font-bold flex items-center gap-1 shadow-lg">
@@ -971,7 +974,7 @@ function StaticApplicantCard({ app }) {
           <Zap className="w-3 h-3 fill-white" /> Priority
         </div>
       )}
-      <div className="absolute inset-0 top-[35%] flex flex-col p-6 z-10">
+      <div className="absolute inset-0 top-[50%] flex flex-col p-6 z-10">
         <h2 className="text-2xl font-bold font-['Outfit']">{app.seeker_name}</h2>
         <p className="text-primary text-sm mt-1">{app.seeker_title || 'Job Seeker'}</p>
         <div className="flex flex-wrap gap-2 mt-4">
@@ -997,17 +1000,17 @@ function StaticCandidateCard({ candidate }) {
   return (
     <div className="w-full h-full rounded-3xl overflow-hidden relative gradient-border bg-card">
       <div className="absolute inset-0">
-        <div className="h-[45%] relative overflow-hidden">
+        <div className="h-[60%] relative overflow-hidden">
           <img
             src={getPhotoUrl(candidate.photo_url || candidate.avatar, candidate.id)}
             alt={candidate.name}
-            className="w-full h-full object-cover"
+            className="w-full h-full object-cover object-top"
           />
           <div className="absolute inset-0 bg-gradient-to-t from-card via-transparent to-transparent" />
         </div>
-        <div className="absolute inset-0 top-[40%] bg-card" />
+        <div className="absolute inset-0 top-[55%] bg-card" />
       </div>
-      <div className="absolute inset-0 top-[35%] flex flex-col p-6 z-10">
+      <div className="absolute inset-0 top-[50%] flex flex-col p-6 z-10">
         <h2 className="text-2xl font-bold font-['Outfit']">{candidate.name}</h2>
         <p className="text-primary text-sm mt-1">{candidate.title || 'Job Seeker'}</p>
         <div className="flex flex-wrap gap-2 mt-4">

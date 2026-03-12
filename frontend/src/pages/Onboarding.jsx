@@ -21,6 +21,7 @@ import { useAuth } from '../context/AuthContext';
 import { isPushSupported, subscribeToPush } from '../utils/pushNotifications';
 import axios from 'axios';
 import PhotoCropModal from '../components/PhotoCropModal';
+import { getPhotoUrl } from '../utils/helpers';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
@@ -471,7 +472,7 @@ export default function Onboarding() {
                       {formData.photo_url ? (
                         <div className="relative">
                           <img 
-                            src={formData.photo_url} 
+                            src={getPhotoUrl(formData.photo_url)} 
                             alt="Profile"
                             className="w-32 h-32 rounded-full object-cover border-4 border-primary"
                           />

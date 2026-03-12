@@ -293,6 +293,7 @@ async def _recruiter_swipe_post_process(
                 "seeker_id": seeker_id,
                 "seeker_name": seeker.get("name", "") if seeker else "",
                 "seeker_avatar": seeker.get("avatar") if seeker else None,
+                "seeker_photo": seeker.get("photo_url") if seeker else None,
                 "recruiter_id": rid,
                 "recruiter_name": recruiter_snapshot["name"],
                 "created_at": now,
@@ -475,6 +476,7 @@ async def _check_match_on_swipe(
         "seeker_id": uid,
         "seeker_name": current_user_snapshot["name"],
         "seeker_avatar": current_user_snapshot.get("avatar"),
+        "seeker_photo": current_user_snapshot.get("photo_url"),
         "recruiter_id": job["recruiter_id"],
         "recruiter_name": job.get("recruiter_name", ""),
         "created_at": now,
@@ -960,6 +962,7 @@ async def respond_to_application(response: RecruiterAction, current_user: dict =
             "seeker_id": application["seeker_id"],
             "seeker_name": application["seeker_name"],
             "seeker_avatar": application.get("seeker_avatar"),
+            "seeker_photo": application.get("seeker_photo"),
             "recruiter_id": current_user["id"],
             "recruiter_name": current_user["name"],
             "created_at": datetime.now(timezone.utc).isoformat()
