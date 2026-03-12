@@ -801,26 +801,19 @@ export default function SeekerDashboard() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-background pb-24 overflow-x-hidden">
+      <div className="h-[100dvh] bg-background flex flex-col overflow-hidden">
         <SkeletonPageBackground />
-        <header className="relative z-20 p-6 md:p-8">
-          <div className="flex items-center justify-between mb-8">
-            <div className="space-y-2">
-              <Skeleton className="h-7 w-40 rounded" />
-              <Skeleton className="h-4 w-32 rounded" />
-            </div>
-            <div className="flex items-center gap-3">
-              <Skeleton className="w-10 h-10 rounded-full" />
-            </div>
+        <header className="relative z-20 px-4 pt-3 pb-2 flex items-center justify-between shrink-0">
+          <div className="flex items-center gap-2.5">
+            <Skeleton className="w-8 h-8 rounded-lg" />
+            <Skeleton className="h-5 w-24 rounded" />
           </div>
-          <div className="flex gap-4 overflow-x-auto pb-2">
-            <SkeletonStatCard />
-            <SkeletonStatCard />
-            <SkeletonStatCard />
+          <div className="flex items-center gap-1">
+            <Skeleton className="w-8 h-8 rounded-full" />
           </div>
         </header>
-        <main className="relative z-10 px-6 md:px-8">
-          <div className="max-w-md mx-auto">
+        <main className="relative z-10 flex-1 flex flex-col px-3 pb-20 min-h-0">
+          <div className="max-w-md mx-auto w-full flex-1 flex flex-col min-h-0">
             <SkeletonSwipeCard />
             <SkeletonActionButtons />
           </div>
@@ -831,258 +824,57 @@ export default function SeekerDashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-background pb-24 overflow-x-hidden">
-      {/* Background Effects — reduced blur for mobile perf */}
+    <div className="h-[100dvh] bg-background flex flex-col overflow-hidden">
+      {/* Background Effects */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none will-change-transform">
         <div className="absolute top-0 left-1/4 w-96 h-96 bg-primary/10 rounded-full blur-3xl" />
         <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-secondary/10 rounded-full blur-3xl" />
       </div>
 
-      {/* Header */}
-      <header className="relative z-20 p-6 md:p-8">
-        <div className="flex items-center justify-between mb-8">
-          <div className="flex items-center gap-3">
-            <img src="/logo.png" alt="Hireabble" className="w-9 h-9 rounded-lg" />
-            <div>
-              <h1 className="text-2xl font-bold font-['Outfit']">Hi, {user?.name?.split(' ')[0]}!</h1>
-              <p className="text-muted-foreground">Find your dream job</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-3">
-            <NotificationBell />
-            <button
-              onClick={() => navigate('/interviews')}
-              className="p-2 rounded-xl hover:bg-accent transition-colors"
-              title="Interviews"
-            >
-              <Calendar className="w-5 h-5 text-muted-foreground" />
-            </button>
-            <button
-              onClick={() => setShowFilters(true)}
-              className="relative p-2 rounded-xl hover:bg-accent transition-colors"
-              data-testid="filter-btn"
-            >
-              <SlidersHorizontal className="w-5 h-5" />
-              {activeFiltersCount > 0 && (
-                <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-primary text-xs flex items-center justify-center">
-                  {activeFiltersCount}
-                </span>
-              )}
-            </button>
-            <img
-              src={getPhotoUrl(user?.photo_url, user?.id) || user?.avatar}
-              alt="Avatar"
-              onClick={() => navigate('/profile')}
-              className="w-10 h-10 rounded-full border-2 border-primary object-cover cursor-pointer hover:opacity-80 transition-opacity"
-              onError={handleImgError(user?.id)}
-            />
-          </div>
+      {/* Slim Header */}
+      <header className="relative z-20 px-4 pt-3 pb-2 flex items-center justify-between shrink-0">
+        <div className="flex items-center gap-2.5">
+          <img src="/logo.png" alt="Hireabble" className="w-8 h-8 rounded-lg" />
+          <h1 className="text-lg font-bold font-['Outfit']">hireabble</h1>
         </div>
-
-        {/* Stats Bar */}
-        <div className="flex gap-4 overflow-x-auto pb-2">
-          <button onClick={() => navigate('/applied')} className="glass-card rounded-2xl px-5 py-3 flex items-center gap-3 whitespace-nowrap hover:border-primary/30 transition-colors text-left">
-            <div className="w-10 h-10 rounded-xl bg-primary/20 flex items-center justify-center">
-              <Heart className="w-5 h-5 text-primary" />
-            </div>
-            <div>
-              <div className="text-xl font-bold">{stats.applications_sent}</div>
-              <div className="text-xs text-muted-foreground">Applied</div>
-            </div>
+        <div className="flex items-center gap-1">
+          <NotificationBell />
+          <button
+            onClick={() => navigate('/interviews')}
+            className="p-2 rounded-xl hover:bg-accent transition-colors"
+            title="Interviews"
+          >
+            <Calendar className="w-5 h-5 text-muted-foreground" />
           </button>
-          <button onClick={() => navigate('/saved')} className="glass-card rounded-2xl px-5 py-3 flex items-center gap-3 whitespace-nowrap hover:border-primary/30 transition-colors text-left">
-            <div className="w-10 h-10 rounded-xl bg-blue-500/20 flex items-center justify-center">
-              <Bookmark className="w-5 h-5 text-blue-500" />
-            </div>
-            <div>
-              <div className="text-xl font-bold">{savedJobIds.size}</div>
-              <div className="text-xs text-muted-foreground">Saved</div>
-            </div>
+          <button
+            onClick={() => setShowFilters(true)}
+            className="relative p-2 rounded-xl hover:bg-accent transition-colors"
+            data-testid="filter-btn"
+          >
+            <SlidersHorizontal className="w-5 h-5" />
+            {activeFiltersCount > 0 && (
+              <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-primary text-xs flex items-center justify-center">
+                {activeFiltersCount}
+              </span>
+            )}
           </button>
-          <div className="glass-card rounded-2xl px-5 py-3 flex items-center gap-3 whitespace-nowrap">
-            <div className="w-10 h-10 rounded-xl bg-secondary/20 flex items-center justify-center">
-              <Star className="w-5 h-5 text-secondary" />
-            </div>
-            <div>
-              <div className="text-xl font-bold">{stats.super_likes_used}</div>
-              <div className="text-xs text-muted-foreground flex items-center gap-1">
-                Super Likes
-                <span className="relative group">
-                  <Info className="w-3 h-3 cursor-help" />
-                  <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 rounded-lg bg-foreground text-background text-xs w-48 text-center opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-50">
-                    Super Likes put you at the top of recruiters' queues! You get 3 free daily, or purchase more.
-                  </span>
-                </span>
-              </div>
-            </div>
-          </div>
-          <div className="glass-card rounded-2xl px-5 py-3 flex items-center gap-3 whitespace-nowrap">
-            <div className="w-10 h-10 rounded-xl bg-success/20 flex items-center justify-center">
-              <Briefcase className="w-5 h-5 text-success" />
-            </div>
-            <div>
-              <div className="text-xl font-bold">{stats.matches}</div>
-              <div className="text-xs text-muted-foreground">Matches</div>
-            </div>
-          </div>
-          {stats.profile_views > 0 && (
-            <button
-              onClick={() => premiumFeatures.can_see_viewers ? navigate('/profile-viewers') : setShowUpgradeModal(true)}
-              className="glass-card rounded-2xl px-5 py-3 flex items-center gap-3 whitespace-nowrap hover:border-primary/30 transition-colors text-left"
-            >
-              <div className="w-10 h-10 rounded-xl bg-amber-500/20 flex items-center justify-center">
-                <Eye className="w-5 h-5 text-amber-500" />
-              </div>
-              <div>
-                <div className="text-xl font-bold">{stats.profile_views}</div>
-                <div className="text-xs text-muted-foreground">
-                  {premiumFeatures.can_see_viewers ? 'Profile Views' : '🔒 Views'}
-                </div>
-              </div>
-            </button>
-          )}
-          {/* Quick Apply Badge */}
-          {profileComplete && (
-            <div className="glass-card rounded-2xl px-5 py-3 flex items-center gap-3 whitespace-nowrap border-success/30 bg-success/5">
-              <div className="w-10 h-10 rounded-xl bg-success/20 flex items-center justify-center">
-                <Zap className="w-5 h-5 text-success" />
-              </div>
-              <div>
-                <div className="text-sm font-bold text-success">Quick Apply</div>
-                <div className="text-xs text-muted-foreground">Profile Ready</div>
-              </div>
-            </div>
-          )}
+          <img
+            src={getPhotoUrl(user?.photo_url, user?.id) || user?.avatar}
+            alt="Avatar"
+            onClick={() => navigate('/profile')}
+            className="w-8 h-8 rounded-full border-2 border-primary object-cover cursor-pointer hover:opacity-80 transition-opacity"
+            onError={handleImgError(user?.id)}
+          />
         </div>
-
-        {/* Premium Quick Actions Bar */}
-        {(premiumFeatures.incognito_mode || premiumFeatures.can_see_viewers) && (
-          <div className="flex gap-2 mt-3">
-            {premiumFeatures.incognito_mode && (
-              <button
-                onClick={async () => {
-                  try {
-                    const res = await axios.post(`${API}/profile/incognito`, { enabled: !incognitoActive }, {
-                      headers: { Authorization: `Bearer ${token}` }
-                    });
-                    setIncognitoActive(res.data.incognito_mode);
-                    toast.success(res.data.incognito_mode ? 'Incognito mode on — you\'re hidden from discovery' : 'Incognito mode off — you\'re visible again');
-                  } catch (e) { toast.error(e.response?.data?.detail || 'Failed to toggle incognito'); }
-                }}
-                className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-medium transition-colors ${
-                  incognitoActive ? 'bg-primary/20 text-primary border border-primary/30' : 'glass-card hover:border-primary/30'
-                }`}
-              >
-                <EyeOff className="w-3.5 h-3.5" />
-                {incognitoActive ? 'Incognito On' : 'Incognito'}
-              </button>
-            )}
-            {premiumFeatures.can_see_viewers && (
-              <button
-                onClick={async () => {
-                  if (boostActiveUntil && new Date(boostActiveUntil) > new Date()) {
-                    toast.info('Profile is already boosted!');
-                    return;
-                  }
-                  try {
-                    const res = await axios.post(`${API}/profile/boost`, {}, {
-                      headers: { Authorization: `Bearer ${token}` }
-                    });
-                    setBoostActiveUntil(res.data.boost_until);
-                    toast.success('Profile boosted for 30 minutes!');
-                  } catch (e) { toast.error(e.response?.data?.detail || 'Failed to boost profile'); }
-                }}
-                className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-medium transition-colors ${
-                  boostActiveUntil && new Date(boostActiveUntil) > new Date()
-                    ? 'bg-amber-500/20 text-amber-500 border border-amber-500/30'
-                    : 'glass-card hover:border-amber-500/30'
-                }`}
-              >
-                <Rocket className="w-3.5 h-3.5" />
-                {boostActiveUntil && new Date(boostActiveUntil) > new Date() ? 'Boosted' : 'Boost'}
-              </button>
-            )}
-          </div>
-        )}
-
-        {/* Top Picks (Premium) */}
-        {topPicks.length > 0 && (
-          <div className="mt-4">
-            <div className="flex items-center gap-2 mb-3">
-              <Crown className="w-4 h-4 text-amber-500" />
-              <span className="text-sm font-bold font-['Outfit']">Today's Top Picks</span>
-              <span className="text-xs text-muted-foreground">Curated for you</span>
-            </div>
-            <div className="flex gap-3 overflow-x-auto pb-2">
-              {topPicks.map(pick => (
-                <div key={pick.id} className="glass-card rounded-2xl p-3 min-w-[200px] max-w-[200px] border-amber-500/20 hover:border-amber-500/40 transition-colors flex-shrink-0">
-                  <div className="flex items-center gap-2 mb-2">
-                    <div className="w-8 h-8 rounded-lg bg-amber-500/20 flex items-center justify-center">
-                      <Sparkles className="w-4 h-4 text-amber-500" />
-                    </div>
-                    <span className="text-xs font-bold text-amber-500">{pick.match_score}% match</span>
-                  </div>
-                  <h4 className="text-sm font-bold font-['Outfit'] truncate">{pick.title}</h4>
-                  <p className="text-xs text-muted-foreground truncate">{pick.company}</p>
-                  {pick.location && <p className="text-xs text-muted-foreground truncate mt-1">{pick.location}</p>}
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Profile Completion Prompt */}
-        {!profileComplete && (
-          <div className="mt-4 p-4 rounded-2xl bg-gradient-to-r from-primary/10 to-secondary/10 border border-primary/20">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-primary/20 flex items-center justify-center shrink-0">
-                <CheckCircle className="w-5 h-5 text-primary" />
-              </div>
-              <div className="flex-1">
-                <p className="text-sm font-medium">Complete your profile to match with more businesses!</p>
-                <p className="text-xs text-muted-foreground mt-0.5">Add your skills, experience, and photo to get better matches.</p>
-              </div>
-              <Button
-                size="sm"
-                onClick={() => navigate('/profile')}
-                className="rounded-full bg-primary/90 hover:bg-primary text-xs px-3 shrink-0"
-              >
-                Complete
-              </Button>
-            </div>
-          </div>
-        )}
       </header>
 
-      {/* Photo Required Notice */}
-      {!user?.photo_url && (
-        <div className="relative z-10 px-6 md:px-8 mb-4">
-          <div className="max-w-md mx-auto">
-            <button
-              onClick={() => navigate('/profile')}
-              className="w-full p-4 rounded-2xl border-2 border-amber-500/30 bg-amber-500/10 text-left transition-all hover:scale-[1.01] active:scale-[0.99]"
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-500 to-yellow-400 flex items-center justify-center flex-shrink-0">
-                  <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" /><path strokeLinecap="round" strokeLinejoin="round" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="font-bold text-sm font-['Outfit'] text-amber-400">Upload a photo to be seen by recruiters</p>
-                  <p className="text-xs text-muted-foreground">You won't appear in recruiter swipe results without a profile photo</p>
-                </div>
-              </div>
-            </button>
-          </div>
-        </div>
-      )}
-
       {/* Main Content - Swipe Area */}
-      <main className="relative z-10 px-6 md:px-8">
-        <div className="max-w-md mx-auto">
+      <main className="relative z-10 flex-1 flex flex-col px-3 pb-20 min-h-0">
+        <div className="max-w-md mx-auto w-full flex-1 flex flex-col min-h-0">
           {currentJob ? (
             <>
               {/* Card Stack */}
-              <div className="relative aspect-[3/4] card-stack overflow-hidden" data-testid="swipe-deck">
+              <div className="relative flex-1 card-stack overflow-hidden min-h-0" data-testid="swipe-deck">
                 {/* Background cards — real job cards for instant reveal */}
                 {jobs.slice(currentIndex + 1, currentIndex + 3).map((bgJob, i) => (
                   <div
@@ -1118,7 +910,7 @@ export default function SeekerDashboard() {
               </div>
 
               {/* Action Buttons */}
-              <div className="flex justify-center items-center gap-5 mt-8">
+              <div className="flex justify-center items-center gap-4 py-3 shrink-0">
                 <button
                   onClick={handleUndo}
                   disabled={undoing}
@@ -1210,7 +1002,7 @@ export default function SeekerDashboard() {
               )}
             </>
           ) : (
-            <div className="aspect-[3/4] rounded-3xl glass-card flex flex-col items-center justify-center p-8 text-center">
+            <div className="flex-1 rounded-3xl glass-card flex flex-col items-center justify-center p-8 text-center">
               <div className="w-20 h-20 rounded-full bg-primary/20 flex items-center justify-center mb-6">
                 <Briefcase className="w-10 h-10 text-primary" />
               </div>
