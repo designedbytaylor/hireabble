@@ -14,6 +14,7 @@ const ImpersonationBanner = React.lazy(() => import("./components/ImpersonationB
 
 // Lazy load everything else — each becomes its own JS chunk
 const VerifyEmail = React.lazy(() => import("./pages/VerifyEmail"));
+const Download = React.lazy(() => import("./pages/Download"));
 const ForgotPassword = React.lazy(() => import("./pages/ForgotPassword"));
 const ResetPassword = React.lazy(() => import("./pages/ResetPassword"));
 const Onboarding = React.lazy(() => import("./pages/Onboarding"));
@@ -185,6 +186,7 @@ function AppRoutes() {
       <Route path="/register" element={<PublicRoute><Register /></PublicRoute>} />
       <Route path="/register/:role" element={<PublicRoute><Register /></PublicRoute>} />
       <Route path="/verify-email" element={<VerifyEmail />} />
+      <Route path="/download" element={<Download />} />
       <Route path="/forgot-password" element={<PublicRoute><ForgotPassword /></PublicRoute>} />
       <Route path="/reset-password" element={<PublicRoute><ResetPassword /></PublicRoute>} />
       <Route
