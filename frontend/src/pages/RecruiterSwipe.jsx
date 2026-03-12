@@ -202,7 +202,7 @@ export default function RecruiterSwipe() {
             <Skeleton className="w-8 h-8 rounded-full" />
           </div>
         </header>
-        <main className="relative z-10 flex-1 flex flex-col px-3 pb-20 min-h-0">
+        <main className="relative z-10 flex-1 flex flex-col px-3 pb-28 min-h-0">
           <div className="max-w-md mx-auto w-full flex-1 flex flex-col min-h-0">
             <Skeleton className="h-10 rounded-xl w-full mb-2" />
             <SkeletonSwipeCard />
@@ -222,7 +222,7 @@ export default function RecruiterSwipe() {
           <div className="absolute top-0 left-1/4 w-96 h-96 bg-primary/10 rounded-full blur-3xl" />
           <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-secondary/10 rounded-full blur-3xl" />
         </div>
-        <main className="relative z-10 flex-1 flex flex-col px-3 pb-20 min-h-0">
+        <main className="relative z-10 flex-1 flex flex-col px-3 pb-28 min-h-0">
           <div className="max-w-md mx-auto w-full flex-1 flex flex-col justify-center">
             <div className="flex-1 rounded-3xl glass-card flex flex-col items-center justify-center p-8 text-center">
               <div className="w-20 h-20 rounded-full bg-primary/20 flex items-center justify-center mb-6">
@@ -308,7 +308,7 @@ export default function RecruiterSwipe() {
       </header>
 
       {/* Main Content - Swipe Area */}
-      <main className="relative z-10 flex-1 flex flex-col px-3 pb-20 min-h-0">
+      <main className="relative z-10 flex-1 flex flex-col px-3 pb-28 min-h-0">
         <div className="max-w-md mx-auto w-full flex-1 flex flex-col min-h-0">
           {currentItem ? (
             <>
