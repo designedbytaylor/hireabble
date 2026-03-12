@@ -19,6 +19,7 @@ from reportlab.lib.utils import ImageReader
 from reportlab.platypus import Paragraph
 from reportlab.lib.styles import ParagraphStyle
 from reportlab.lib.enums import TA_CENTER
+from reportlab.lib.colors import HexColor, Color
 
 from database import (
     db, get_current_user,
@@ -766,40 +767,87 @@ async def generate_job_poster(job_id: str, current_user: dict = Depends(get_curr
     c = canvas.Canvas(pdf_buffer, pagesize=letter)
     w, h = letter  # 612 x 792
 
-    accent = "#6366f1"
+    green_start = (0x2d / 255, 0xd4 / 255, 0xa8 / 255)  # #2dd4a8
+    green_end = (0x1a / 255, 0x8a / 255, 0x7a / 255)    # #1a8a7a
     dark = "#1a1a2e"
     gray = "#6b7280"
+    brand_green = "#2dd4a8"
 
-    # -- Top banner --
-    from reportlab.lib.colors import HexColor
-    c.setFillColor(HexColor(accent))
-    banner_h = 100
+    # -- Green gradient banner (draw as thin horizontal strips) --
+    banner_h = 150
     banner_y = h - banner_h
-    c.rect(0, banner_y, w, banner_h, fill=1, stroke=0)
+    strips = 60
+    strip_h = banner_h / strips
+    for i in range(strips):
+        t = i / max(strips - 1, 1)
+        r = green_start[0] + (green_end[0] - green_start[0]) * t
+        g = green_start[1] + (green_end[1] - green_start[1]) * t
+        b = green_start[2] + (green_end[2] - green_start[2]) * t
+        c.setFillColor(Color(r, g, b))
+        y = banner_y + banner_h - (i + 1) * strip_h
+        c.rect(0, y, w, strip_h + 0.5, fill=1, stroke=0)
 
+    # -- Spark/bolt logo in banner (scaled from 512x512 SVG path) --
+    bolt_h = 56
+    bolt_scale = bolt_h / 400  # path spans ~400 units vertically (56 to 456)
+    bolt_cx = w / 2 - 80  # left of "hireabble" text
+    bolt_top = banner_y + banner_h - 30
+    ox = bolt_cx - (256 * bolt_scale)  # center the bolt horizontally
+    oy = bolt_top
+
+    p = c.beginPath()
+    def bpt(sx, sy):
+        return (ox + sx * bolt_scale, oy - (sy - 56) * bolt_scale)
+
+    x0, y0 = bpt(290, 56)
+    p.moveTo(x0, y0)
+    for sx, sy in [(168, 272), (264, 272), (216, 456), (392, 216), (284, 216), (290, 56)]:
+        bx, by = bpt(sx, sy)
+        p.lineTo(bx, by)
+    p.close()
     c.setFillColor(HexColor("#ffffff"))
-    c.setFont("Helvetica-Bold", 56)
-    c.drawCentredString(w / 2, banner_y + 28, "WE'RE HIRING")
+    c.drawPath(p, fill=1, stroke=0)
+
+    # -- "hireabble" brand text in banner --
+    c.setFillColor(HexColor("#ffffff"))
+    c.setFont("Helvetica-Bold", 36)
+    c.drawString(bolt_cx + 20, bolt_top - 42, "hireabble")
+
+    # -- "Swipe right on your next career move" tagline in banner --
+    c.setFillColor(Color(1, 1, 1, 0.8))
+    c.setFont("Helvetica", 13)
+    c.drawCentredString(w / 2, banner_y + 18, "Swipe right on your next career move")
+
+    # -- WE'RE HIRING --
+    c.setFillColor(HexColor(dark))
+    c.setFont("Helvetica-Bold", 48)
+    c.drawCentredString(w / 2, banner_y - 50, "WE'RE HIRING")
+
+    # -- Thin green accent line under heading --
+    c.setStrokeColor(HexColor(brand_green))
+    c.setLineWidth(3)
+    c.line(w / 2 - 80, banner_y - 58, w / 2 + 80, banner_y - 58)
 
     # -- Company name --
-    c.setFillColor(HexColor(gray))
-    c.setFont("Helvetica", 22)
     company = job.get("company", "")
-    c.drawCentredString(w / 2, banner_y - 40, company)
+    if company:
+        c.setFillColor(HexColor(gray))
+        c.setFont("Helvetica", 20)
+        c.drawCentredString(w / 2, banner_y - 85, company)
 
     # -- Job title (may wrap) --
     title_style = ParagraphStyle(
         "title",
         fontName="Helvetica-Bold",
-        fontSize=34,
-        leading=40,
+        fontSize=30,
+        leading=36,
         alignment=TA_CENTER,
         textColor=HexColor(dark),
     )
     title_text = job.get("title", "Open Position")
     title_para = Paragraph(title_text, title_style)
     tw, th = title_para.wrap(w - 80, 200)
-    title_y = banner_y - 60 - th
+    title_y = banner_y - 100 - th if company else banner_y - 75 - th
     title_para.drawOn(c, 40, title_y)
 
     # -- Details line --
@@ -813,51 +861,66 @@ async def generate_job_poster(job_id: str, current_user: dict = Depends(get_curr
     if job.get("experience_level"):
         details_parts.append(job["experience_level"].title() + " Level")
 
-    details_y = title_y - 30
+    cursor_y = title_y - 24
     if details_parts:
         c.setFillColor(HexColor(gray))
-        c.setFont("Helvetica", 14)
-        c.drawCentredString(w / 2, details_y, "  ·  ".join(details_parts))
-        details_y -= 10
+        c.setFont("Helvetica", 13)
+        c.drawCentredString(w / 2, cursor_y, "  ·  ".join(details_parts))
+        cursor_y -= 10
 
     # -- Salary range --
-    salary_y = details_y - 20
     sal_min = job.get("salary_min")
     sal_max = job.get("salary_max")
     if sal_min:
+        cursor_y -= 16
         c.setFillColor(HexColor(dark))
         c.setFont("Helvetica-Bold", 18)
         if sal_max:
             sal_text = f"${sal_min:,} – ${sal_max:,} / year"
         else:
             sal_text = f"From ${sal_min:,} / year"
-        c.drawCentredString(w / 2, salary_y, sal_text)
-        salary_y -= 10
+        c.drawCentredString(w / 2, cursor_y, sal_text)
+        cursor_y -= 10
 
-    # -- QR code --
+    # -- QR code with rounded border --
     qr_size = 180
     qr_x = (w - qr_size) / 2
-    qr_y = salary_y - qr_size - 30
-    c.drawImage(ImageReader(qr_buffer), qr_x, qr_y, qr_size, qr_size)
-
-    # -- Scan instruction --
-    c.setFillColor(HexColor(dark))
-    c.setFont("Helvetica", 16)
-    c.drawCentredString(w / 2, qr_y - 25, "Scan to apply on")
-    c.setFillColor(HexColor(accent))
-    c.setFont("Helvetica-Bold", 20)
-    c.drawCentredString(w / 2, qr_y - 50, "Hireabble")
-
-    # -- Bottom divider + branding --
+    qr_y = cursor_y - qr_size - 25
+    # Draw a light border/background around QR
+    pad = 12
+    c.setFillColor(HexColor("#f9fafb"))
     c.setStrokeColor(HexColor("#e5e7eb"))
     c.setLineWidth(1)
-    c.line(60, 80, w - 60, 80)
+    c.roundRect(qr_x - pad, qr_y - pad, qr_size + pad * 2, qr_size + pad * 2, 10, fill=1, stroke=1)
+    c.drawImage(ImageReader(qr_buffer), qr_x, qr_y, qr_size, qr_size)
 
+    # -- Prominent scan/download instruction --
+    inst_y = qr_y - pad - 28
+    c.setFillColor(HexColor(dark))
+    c.setFont("Helvetica-Bold", 18)
+    c.drawCentredString(w / 2, inst_y, "Scan to download Hireabble & apply")
+
+    inst_y -= 24
     c.setFillColor(HexColor(gray))
-    c.setFont("Helvetica", 10)
-    c.drawCentredString(w / 2, 55, "Download Hireabble on the App Store or Google Play")
-    c.setFont("Helvetica", 9)
-    c.drawCentredString(w / 2, 40, "Swipe right on your next career move")
+    c.setFont("Helvetica", 13)
+    c.drawCentredString(w / 2, inst_y, "Available on the App Store and Google Play")
+
+    # -- Bottom green accent bar --
+    bottom_bar_h = 36
+    strips_b = 20
+    strip_bh = bottom_bar_h / strips_b
+    for i in range(strips_b):
+        t = i / max(strips_b - 1, 1)
+        r = green_end[0] + (green_start[0] - green_end[0]) * t
+        g = green_end[1] + (green_start[1] - green_end[1]) * t
+        b = green_end[2] + (green_start[2] - green_end[2]) * t
+        c.setFillColor(Color(r, g, b))
+        y = i * strip_bh
+        c.rect(0, y, w, strip_bh + 0.5, fill=1, stroke=0)
+
+    c.setFillColor(HexColor("#ffffff"))
+    c.setFont("Helvetica-Bold", 11)
+    c.drawCentredString(w / 2, 12, "hireabble.com")
 
     c.save()
     pdf_buffer.seek(0)

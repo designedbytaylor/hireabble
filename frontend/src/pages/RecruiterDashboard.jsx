@@ -151,14 +151,17 @@ export default function RecruiterDashboard() {
       });
       const blob = new Blob([response.data], { type: 'application/pdf' });
       const url = window.URL.createObjectURL(blob);
-      // Use <a> download to avoid mobile popup blockers
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'Hiring_Poster.pdf';
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      setTimeout(() => window.URL.revokeObjectURL(url), 1000);
+      // Try opening in new window (works on desktop); fall back to download if popup blocked (mobile)
+      const newWindow = window.open(url, '_blank');
+      if (!newWindow || newWindow.closed) {
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'Hiring_Poster.pdf';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+      }
+      setTimeout(() => window.URL.revokeObjectURL(url), 5000);
     } catch {
       toast.error('Failed to generate poster');
     } finally {
