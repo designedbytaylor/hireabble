@@ -803,7 +803,7 @@ export default function SeekerDashboard() {
     return (
       <div className="h-[100dvh] bg-background flex flex-col overflow-hidden">
         <SkeletonPageBackground />
-        <header className="relative z-20 px-4 pt-3 pb-2 flex items-center justify-between shrink-0">
+        <header className="relative z-20 px-4 pt-4 pb-3 flex items-center justify-between shrink-0">
           <div className="flex items-center gap-2.5">
             <Skeleton className="w-8 h-8 rounded-lg" />
             <Skeleton className="h-5 w-24 rounded" />
@@ -832,9 +832,9 @@ export default function SeekerDashboard() {
       </div>
 
       {/* Slim Header */}
-      <header className="relative z-20 px-4 pt-3 pb-2 flex items-center justify-between shrink-0">
+      <header className="relative z-20 px-4 pt-4 pb-3 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-2.5">
-          <img src="/logo.png" alt="Hireabble" className="w-8 h-8 rounded-lg" />
+          <img src="/logo-white.png" alt="Hireabble" className="w-8 h-8" />
           <h1 className="text-lg font-bold font-['Outfit']">hireabble</h1>
         </div>
         <div className="flex items-center gap-1">
@@ -910,7 +910,7 @@ export default function SeekerDashboard() {
               </div>
 
               {/* Action Buttons */}
-              <div className="flex justify-center items-center gap-4 py-3 shrink-0">
+              <div className="flex justify-center items-center gap-4 pt-4 pb-1 shrink-0">
                 <button
                   onClick={handleUndo}
                   disabled={undoing}
@@ -1298,6 +1298,15 @@ export default function SeekerDashboard() {
 function JobDetailSheet({ job, onClose }) {
   const sheetY = useMotionValue(0);
   const sheetOpacity = useTransform(sheetY, [0, 300], [1, 0]);
+  const scrollRef = React.useRef(null);
+  const [canDragDown, setCanDragDown] = React.useState(true);
+
+  // Allow drag-to-close only when scrolled to top
+  const handleScroll = () => {
+    if (scrollRef.current) {
+      setCanDragDown(scrollRef.current.scrollTop <= 0);
+    }
+  };
 
   return (
     <motion.div
@@ -1320,22 +1329,24 @@ function JobDetailSheet({ job, onClose }) {
         animate={{ y: 0 }}
         exit={{ y: '100%' }}
         transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-        drag="y"
-        dragConstraints={{ top: 0, bottom: 0 }}
-        dragElastic={{ top: 0, bottom: 0.6 }}
+        drag={canDragDown ? "y" : false}
+        dragConstraints={{ top: 0, bottom: 300 }}
+        dragElastic={{ top: 0, bottom: 0.4 }}
         onDragEnd={(_, info) => {
-          if (info.offset.y > 100 || info.velocity.y > 500) {
+          if (info.offset.y > 80 || info.velocity.y > 300) {
             onClose();
           }
         }}
       >
         {/* Drag Handle */}
-        <div className="flex justify-center pt-3 pb-2">
-          <div className="w-10 h-1 rounded-full bg-muted-foreground/30" />
+        <div className="flex justify-center pt-3 pb-2 cursor-grab active:cursor-grabbing touch-none"
+          onPointerDown={() => setCanDragDown(true)}
+        >
+          <div className="w-10 h-1.5 rounded-full bg-muted-foreground/40" />
         </div>
 
         {/* Scrollable Content */}
-        <div className="overflow-y-auto px-6 pb-8" style={{ maxHeight: 'calc(85vh - 24px)' }}>
+        <div ref={scrollRef} onScroll={handleScroll} className="overflow-y-auto px-6 pb-8" style={{ maxHeight: 'calc(85vh - 28px)' }}>
           {/* Header */}
           <div className="flex items-center gap-3 mb-4">
             {job.company_logo && (

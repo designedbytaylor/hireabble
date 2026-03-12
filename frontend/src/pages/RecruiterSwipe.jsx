@@ -258,7 +258,7 @@ export default function RecruiterSwipe() {
       <header className="relative z-20 px-4 pt-3 pb-2 shrink-0">
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-2.5">
-            <img src="/logo.png" alt="Hireabble" className="w-8 h-8 rounded-lg" />
+            <img src="/logo-white.png" alt="Hireabble" className="w-8 h-8" />
             <h1 className="text-lg font-bold font-['Outfit']">hireabble</h1>
           </div>
           <div className="flex items-center gap-1">
@@ -489,6 +489,14 @@ export default function RecruiterSwipe() {
 function CandidateDetailSheet({ item, mode, onClose }) {
   const sheetY = useMotionValue(0);
   const sheetOpacity = useTransform(sheetY, [0, 300], [1, 0]);
+  const scrollRef = React.useRef(null);
+  const [canDragDown, setCanDragDown] = React.useState(true);
+
+  const handleScroll = () => {
+    if (scrollRef.current) {
+      setCanDragDown(scrollRef.current.scrollTop <= 0);
+    }
+  };
 
   // Normalize fields between applicant mode and candidate mode
   const name = mode === 'applicants' ? item.seeker_name : item.name;
@@ -526,22 +534,24 @@ function CandidateDetailSheet({ item, mode, onClose }) {
         animate={{ y: 0 }}
         exit={{ y: '100%' }}
         transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-        drag="y"
-        dragConstraints={{ top: 0, bottom: 0 }}
-        dragElastic={{ top: 0, bottom: 0.6 }}
+        drag={canDragDown ? "y" : false}
+        dragConstraints={{ top: 0, bottom: 300 }}
+        dragElastic={{ top: 0, bottom: 0.4 }}
         onDragEnd={(_, info) => {
-          if (info.offset.y > 100 || info.velocity.y > 500) {
+          if (info.offset.y > 80 || info.velocity.y > 300) {
             onClose();
           }
         }}
       >
         {/* Drag Handle */}
-        <div className="flex justify-center pt-3 pb-2">
-          <div className="w-10 h-1 rounded-full bg-muted-foreground/30" />
+        <div className="flex justify-center pt-3 pb-2 cursor-grab active:cursor-grabbing touch-none"
+          onPointerDown={() => setCanDragDown(true)}
+        >
+          <div className="w-10 h-1.5 rounded-full bg-muted-foreground/40" />
         </div>
 
         {/* Scrollable Content */}
-        <div className="overflow-y-auto px-6 pb-8" style={{ maxHeight: 'calc(85vh - 24px)' }}>
+        <div ref={scrollRef} onScroll={handleScroll} className="overflow-y-auto px-6 pb-8" style={{ maxHeight: 'calc(85vh - 28px)' }}>
           {/* Photo + Name Header */}
           <div className="flex items-center gap-4 mb-4">
             <img
