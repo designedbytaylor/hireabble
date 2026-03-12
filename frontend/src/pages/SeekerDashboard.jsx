@@ -167,6 +167,7 @@ export default function SeekerDashboard() {
   const [superlikeNote, setSuperlikeNote] = useState('');
   const [showNoteInput, setShowNoteInput] = useState(false);
   const [enteringCard, setEnteringCard] = useState(null); // card animating back in (undo)
+  const [undoCounter, setUndoCounter] = useState(0); // forces SwipeCard remount after undo
   const [savedJobIds, setSavedJobIds] = useState(new Set());
   const [upgradeTrigger, setUpgradeTrigger] = useState('super_likes'); // what triggered upgrade modal
   const lastSwipedRef = useRef(null); // track last swiped card for undo animation
@@ -726,15 +727,14 @@ export default function SeekerDashboard() {
           job: lastSwiped.job,
           fromDirection: lastSwiped.exitDirection, // where it flew off to
         });
-        // Insert the job back at the current position
-        setJobs(prev => {
-          const newJobs = [...prev];
-          newJobs.splice(currentIndex, 0, lastSwiped.job);
-          return newJobs;
-        });
-        // Go back one card
+        // Go back one card — the job is still in the array (we only
+        // advanced the index when swiping), so just decrement.
         setCurrentIndex(prev => Math.max(0, prev - 1));
-        // Clear the entering animation after the spring settles
+        // Bump undo counter to force a fresh SwipeCard mount with
+        // clean drag state (same job ID key would reuse stale state)
+        setUndoCounter(prev => prev + 1);
+        // Clear the entering animation after the spring settles so
+        // the real SwipeCard underneath becomes interactive
         setTimeout(() => setEnteringCard(null), 650);
         lastSwipedRef.current = null;
       } else {
@@ -1109,7 +1109,7 @@ export default function SeekerDashboard() {
 
                 {/* Main Swipeable Card */}
                 <SwipeCard
-                  key={currentJob.id}
+                  key={`${currentJob.id}-${undoCounter}`}
                   job={currentJob}
                   onSwipe={handleSwipe}
                   expanded={expandedCard}
