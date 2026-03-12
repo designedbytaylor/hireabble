@@ -812,7 +812,7 @@ export default function SeekerDashboard() {
             <Skeleton className="w-8 h-8 rounded-full" />
           </div>
         </header>
-        <main className="relative z-10 flex-1 flex flex-col px-3 pb-20 min-h-0">
+        <main className="relative z-10 flex-1 flex flex-col px-3 pb-28 min-h-0">
           <div className="max-w-md mx-auto w-full flex-1 flex flex-col min-h-0">
             <SkeletonSwipeCard />
             <SkeletonActionButtons />
@@ -869,7 +869,7 @@ export default function SeekerDashboard() {
       </header>
 
       {/* Main Content - Swipe Area */}
-      <main className="relative z-10 flex-1 flex flex-col px-3 pb-20 min-h-0">
+      <main className="relative z-10 flex-1 flex flex-col px-3 pb-28 min-h-0">
         <div className="max-w-md mx-auto w-full flex-1 flex flex-col min-h-0">
           {currentJob ? (
             <>
