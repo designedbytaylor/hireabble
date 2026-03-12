@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { Briefcase, Mail, Lock, ArrowRight, Eye, EyeOff } from 'lucide-react';
+import { Mail, Lock, ArrowRight, Eye, EyeOff } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
@@ -64,10 +64,8 @@ export default function Login() {
       {/* Left Panel - Branding */}
       <div className="hidden lg:flex lg:w-1/2 relative items-center justify-center p-12">
         <div className="max-w-lg">
-          <Link to="/" className="flex items-center gap-2 mb-12">
-            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary to-secondary flex items-center justify-center">
-              <Briefcase className="w-6 h-6 text-white" />
-            </div>
+          <Link to="/" className="flex items-center gap-3 mb-12">
+            <img src="/logo.svg" alt="Hireabble" className="w-12 h-12 rounded-xl" />
             <span className="text-2xl font-bold font-['Outfit']">Hireabble</span>
           </Link>
           
@@ -87,9 +85,7 @@ export default function Login() {
         <div className="w-full max-w-md">
           {/* Mobile Logo */}
           <Link to="/" className="flex lg:hidden items-center gap-2 mb-8">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-secondary flex items-center justify-center">
-              <Briefcase className="w-5 h-5 text-white" />
-            </div>
+            <img src="/logo.svg" alt="Hireabble" className="w-10 h-10 rounded-xl" />
             <span className="text-xl font-bold font-['Outfit']">Hireabble</span>
           </Link>
 

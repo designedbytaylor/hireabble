@@ -834,9 +834,12 @@ export default function SeekerDashboard() {
       {/* Header */}
       <header className="relative z-20 p-6 md:p-8">
         <div className="flex items-center justify-between mb-8">
-          <div>
-            <h1 className="text-2xl font-bold font-['Outfit']">Hi, {user?.name?.split(' ')[0]}!</h1>
-            <p className="text-muted-foreground">Find your dream job</p>
+          <div className="flex items-center gap-3">
+            <img src="/logo.svg" alt="Hireabble" className="w-9 h-9 rounded-lg" />
+            <div>
+              <h1 className="text-2xl font-bold font-['Outfit']">Hi, {user?.name?.split(' ')[0]}!</h1>
+              <p className="text-muted-foreground">Find your dream job</p>
+            </div>
           </div>
           <div className="flex items-center gap-3">
             <NotificationBell />

@@ -371,6 +371,7 @@ class JobCreate(BaseModel):
     location_restriction: Optional[str] = None  # 'any', 'specific', None
     category: Optional[str] = None  # 'technology', 'healthcare', 'finance', 'marketing', 'design', 'sales', 'engineering', 'education', 'other'
     employment_type: Optional[str] = "full-time"  # 'full-time', 'part-time', 'contract', 'internship'
+    listing_photo: Optional[str] = None  # URL to custom listing photo or 'profile' to use recruiter's photo
 
 class JobResponse(BaseModel):
     model_config = ConfigDict(extra="ignore")

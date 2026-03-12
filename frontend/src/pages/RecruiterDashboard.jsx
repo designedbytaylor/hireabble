@@ -224,9 +224,12 @@ export default function RecruiterDashboard() {
       {/* Header */}
       <header className="relative z-10 p-6 md:p-8">
         <div className="flex items-center justify-between mb-8">
-          <div>
-            <h1 className="text-2xl font-bold font-['Outfit']">Recruiter Hub</h1>
-            <p className="text-muted-foreground">{user?.company || 'Your Company'}</p>
+          <div className="flex items-center gap-3">
+            <img src="/logo.svg" alt="Hireabble" className="w-9 h-9 rounded-lg" />
+            <div>
+              <h1 className="text-2xl font-bold font-['Outfit']">Recruiter Hub</h1>
+              <p className="text-muted-foreground">{user?.company || 'Your Company'}</p>
+            </div>
           </div>
           <div className="flex items-center gap-2">
             <NotificationBell />
@@ -701,10 +704,15 @@ export default function RecruiterDashboard() {
 }
 
 function JobFormDialog({ open, onClose, onSuccess, token, company, job = null, isEditing = false }) {
+  const { user } = useAuth();
   const [loading, setLoading] = useState(false);
   const [screenshots, setScreenshots] = useState([]);
   const [parsingScreenshots, setParsingScreenshots] = useState(false);
   const [aiAssisting, setAiAssisting] = useState(null); // 'generate' | 'improve' | null
+  const [photoOption, setPhotoOption] = useState('none'); // 'none' | 'profile' | 'custom'
+  const [customPhotoFile, setCustomPhotoFile] = useState(null);
+  const [customPhotoPreview, setCustomPhotoPreview] = useState(null);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [formData, setFormData] = useState({
     title: '',
     company: company || '',
@@ -837,12 +845,26 @@ function JobFormDialog({ open, onClose, onSuccess, token, company, job = null, i
 
     setLoading(true);
     try {
+      // Upload custom photo first if selected
+      let listingPhoto = null;
+      if (photoOption === 'profile') {
+        listingPhoto = 'profile';
+      } else if (photoOption === 'custom' && customPhotoFile) {
+        const photoFd = new FormData();
+        photoFd.append('file', customPhotoFile);
+        const photoRes = await axios.post(`${API}/upload/photo`, photoFd, {
+          headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'multipart/form-data' },
+        });
+        listingPhoto = photoRes.data.photo_url;
+      }
+
       const payload = {
         ...formData,
         requirements: formData.requirements.split(',').map(r => r.trim()).filter(Boolean),
         salary_min: formData.salary_min ? parseInt(formData.salary_min) : null,
         salary_max: formData.salary_max ? parseInt(formData.salary_max) : null,
         location_restriction: formData.location_restriction || 'any',
+        listing_photo: listingPhoto,
       };
 
       if (isEditing && job) {
@@ -1176,6 +1198,88 @@ function JobFormDialog({ open, onClose, onSuccess, token, company, job = null, i
                 ? 'Only applicants near this job\'s location will see this posting'
                 : 'Applicants from any location can see and apply to this job'}
             </p>
+          </div>
+
+          {/* Listing Photo */}
+          <div className="space-y-3">
+            <div>
+              <Label>Listing Photo</Label>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                A great photo can make your job stand out. Post a well-lit photo of your team or workspace.
+              </p>
+            </div>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => { setPhotoOption('none'); setCustomPhotoFile(null); setCustomPhotoPreview(null); }}
+                className={`flex-1 py-2.5 px-3 rounded-xl text-sm font-medium border-2 transition-all ${
+                  photoOption === 'none' ? 'border-primary bg-primary/10 text-primary' : 'border-border bg-card hover:border-primary/20'
+                }`}
+              >
+                None
+              </button>
+              {user?.photo_url && (
+                <button
+                  type="button"
+                  onClick={() => { setPhotoOption('profile'); setCustomPhotoFile(null); setCustomPhotoPreview(null); }}
+                  className={`flex-1 py-2.5 px-3 rounded-xl text-sm font-medium border-2 transition-all ${
+                    photoOption === 'profile' ? 'border-primary bg-primary/10 text-primary' : 'border-border bg-card hover:border-primary/20'
+                  }`}
+                >
+                  Profile Photo
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => setPhotoOption('custom')}
+                className={`flex-1 py-2.5 px-3 rounded-xl text-sm font-medium border-2 transition-all ${
+                  photoOption === 'custom' ? 'border-primary bg-primary/10 text-primary' : 'border-border bg-card hover:border-primary/20'
+                }`}
+              >
+                Custom Photo
+              </button>
+            </div>
+            {photoOption === 'profile' && user?.photo_url && (
+              <div className="flex items-center gap-3 p-3 rounded-xl bg-muted/50">
+                <img src={user.photo_url} alt="Profile" className="w-12 h-12 rounded-lg object-cover" />
+                <span className="text-sm text-muted-foreground">Your profile photo will be shown on this listing</span>
+              </div>
+            )}
+            {photoOption === 'custom' && (
+              <div>
+                {customPhotoPreview ? (
+                  <div className="flex items-center gap-3 p-3 rounded-xl bg-muted/50">
+                    <img src={customPhotoPreview} alt="Custom" className="w-12 h-12 rounded-lg object-cover" />
+                    <span className="text-sm text-muted-foreground flex-1">Custom photo selected</span>
+                    <button
+                      type="button"
+                      onClick={() => { setCustomPhotoFile(null); setCustomPhotoPreview(null); }}
+                      className="p-1 rounded-full hover:bg-accent"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                ) : (
+                  <label className="flex items-center justify-center gap-2 p-4 rounded-xl border-2 border-dashed border-border cursor-pointer hover:border-primary/50 transition-colors">
+                    <Upload className="w-5 h-5 text-muted-foreground" />
+                    <span className="text-sm text-muted-foreground">Upload a photo</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          setCustomPhotoFile(file);
+                          setCustomPhotoPreview(URL.createObjectURL(file));
+                        }
+                        e.target.value = '';
+                      }}
+                    />
+                  </label>
+                )}
+              </div>
+            )}
           </div>
 
           <Button
