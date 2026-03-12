@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, memo, useMemo } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Home, Heart, User, Briefcase, MessageCircle, BarChart3, Calendar, Search } from 'lucide-react';
+import { Heart, User, Briefcase, MessageCircle, BarChart3, Calendar, Search } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import axios from 'axios';
 
@@ -67,7 +67,7 @@ export default memo(function Navigation() {
 
   const navItems = useMemo(() => [
     {
-      icon: Home,
+      isLogo: true,
       label: 'Home',
       path: isSeeker ? '/dashboard' : '/recruiter'
     },
@@ -125,7 +125,15 @@ export default memo(function Navigation() {
               <div className={`p-2 rounded-xl transition-all relative ${
                 isActive ? 'bg-primary/20 neon-glow' : 'hover:bg-accent'
               }`}>
-                <Icon className="w-5 h-5" />
+                {item.isLogo ? (
+                  <img
+                    src="/logo.svg"
+                    alt="Home"
+                    className={`w-5 h-5 transition-opacity ${isActive ? 'opacity-100' : 'opacity-50'}`}
+                  />
+                ) : (
+                  <Icon className="w-5 h-5" />
+                )}
                 {item.badge > 0 && (
                   <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center px-1">
                     {item.badge > 99 ? '99+' : item.badge}
