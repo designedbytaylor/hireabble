@@ -342,6 +342,17 @@ async def get_company_jobs(recruiter_id: str, current_user: dict = Depends(get_c
 
     return {"company": recruiter, "jobs": jobs}
 
+@router.get("/{job_id}/public")
+async def get_job_public(job_id: str):
+    """Get basic public info for a job (no auth required) — used by QR code download page."""
+    job = await db.jobs.find_one(
+        {"id": job_id, "is_active": True},
+        {"_id": 0, "title": 1, "company": 1, "location": 1, "job_type": 1}
+    )
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    return job
+
 @router.get("/{job_id}", response_model=JobResponse)
 async def get_job(job_id: str, current_user: dict = Depends(get_current_user)):
     """Get a specific job by ID"""
