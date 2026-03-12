@@ -438,6 +438,7 @@ class MatchResponse(BaseModel):
     seeker_id: str
     seeker_name: str
     seeker_avatar: Optional[str] = None
+    seeker_photo: Optional[str] = None
     recruiter_id: str
     recruiter_name: str
     created_at: str
