@@ -68,7 +68,7 @@ function getSavingsPercent(tier, duration) {
 }
 
 export default function UpgradeModal({ open, onClose, onSubscribed, trigger, highlightTier }) {
-  const { token, user } = useAuth();
+  const { token, user, refreshUser } = useAuth();
   const [tiers, setTiers] = useState([]);
   const [currentTier, setCurrentTier] = useState(null);
   const [selectedTier, setSelectedTier] = useState(null);
@@ -114,22 +114,11 @@ export default function UpgradeModal({ open, onClose, onSubscribed, trigger, hig
         { headers: { Authorization: `Bearer ${token}` } }
       );
       toast.success('Subscription activated! Welcome to premium.');
-      onClose?.();
       // Refresh user data to reflect new subscription
+      await refreshUser();
+      onClose?.();
       if (onSubscribed) {
         onSubscribed();
-      } else {
-        // Re-fetch user data and force a React re-render
-        try {
-          const meRes = await axios.get(`${API}/auth/me`, {
-            headers: { Authorization: `Bearer ${token}` }
-          });
-          localStorage.setItem('cached_user', JSON.stringify(meRes.data));
-        } catch {
-          // ignore fetch failure
-        }
-        // Use location.assign for reliable mobile reload (window.location.reload can produce white screen on iOS)
-        window.location.assign(window.location.pathname);
       }
     } catch (err) {
       toast.error(err.response?.data?.detail || 'Failed to subscribe');
@@ -330,7 +319,7 @@ export default function UpgradeModal({ open, onClose, onSubscribed, trigger, hig
 }
 
 // Small inline upgrade prompt (for embedding in other pages)
-export function UpgradePrompt({ title, subtitle, tierHint, trigger, className = '' }) {
+export function UpgradePrompt({ title, subtitle, tierHint, trigger, className = '', onSubscribed }) {
   const [showModal, setShowModal] = useState(false);
 
   const colors = TIER_COLORS[tierHint] || TIER_COLORS.seeker_plus;
@@ -357,6 +346,7 @@ export function UpgradePrompt({ title, subtitle, tierHint, trigger, className = 
       <UpgradeModal
         open={showModal}
         onClose={() => setShowModal(false)}
+        onSubscribed={onSubscribed}
         trigger={trigger}
         highlightTier={tierHint}
       />

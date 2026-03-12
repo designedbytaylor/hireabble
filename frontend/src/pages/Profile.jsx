@@ -15,6 +15,7 @@ import { getPhotoUrl, handleImgError } from '../utils/helpers';
 import { isPushSupported, getPermissionStatus, subscribeToPush, unsubscribeFromPush } from '../utils/pushNotifications';
 import { UpgradePrompt } from '../components/UpgradeModal';
 import ConfirmDialog from '../components/ConfirmDialog';
+import PhotoCropModal from '../components/PhotoCropModal';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
@@ -136,6 +137,7 @@ export default function Profile() {
   const [referenceRequests, setReferenceRequests] = useState([]);
   const [subscription, setSubscription] = useState(undefined); // undefined = loading, null = no subscription
   const [parsingResume, setParsingResume] = useState(false);
+  const [cropImageSrc, setCropImageSrc] = useState(null);
   const resumeInputRef = useRef(null);
 
   useEffect(() => {
@@ -228,9 +230,11 @@ export default function Profile() {
     }
   };
 
-  const handlePhotoUpload = async (e) => {
+  const handlePhotoSelect = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    // Reset input so same file can be re-selected
+    e.target.value = '';
 
     if (!file.type.startsWith('image/')) {
       toast.error('Please select an image file');
@@ -242,10 +246,18 @@ export default function Profile() {
       return;
     }
 
+    // Open crop modal with the selected image
+    const reader = new FileReader();
+    reader.onload = () => setCropImageSrc(reader.result);
+    reader.readAsDataURL(file);
+  };
+
+  const handleCroppedPhoto = async (blob) => {
+    setCropImageSrc(null);
     setUploadingPhoto(true);
     try {
       const formDataUpload = new FormData();
-      formDataUpload.append('file', file);
+      formDataUpload.append('file', new File([blob], 'photo.jpg', { type: 'image/jpeg' }));
 
       const response = await axios.post(`${API}/upload/photo`, formDataUpload, {
         headers: {
@@ -527,6 +539,7 @@ export default function Profile() {
                 title={user?.role === 'recruiter' ? 'Upgrade to Pro' : 'Upgrade to Plus'}
                 subtitle="Unlock premium features and stand out from the crowd"
                 tierHint={user?.role === 'recruiter' ? 'recruiter_pro' : 'seeker_plus'}
+                onSubscribed={fetchSubscription}
               />
             </div>
           )}
@@ -537,13 +550,13 @@ export default function Profile() {
               <img
                 src={getPhotoUrl(user?.photo_url, user?.id) || user?.avatar}
                 alt="Avatar"
-                className="w-24 h-24 rounded-full border-4 border-primary mx-auto object-cover"
+                className="w-32 h-32 rounded-full border-4 border-primary mx-auto object-cover"
                 onError={handleImgError(user?.id)}
               />
               <button
                 onClick={() => fileInputRef.current?.click()}
                 disabled={uploadingPhoto}
-                className="absolute bottom-0 right-0 w-8 h-8 rounded-full bg-gradient-to-r from-primary to-secondary flex items-center justify-center hover:scale-110 transition-transform"
+                className="absolute bottom-1 right-1 w-9 h-9 rounded-full bg-gradient-to-r from-primary to-secondary flex items-center justify-center hover:scale-110 transition-transform"
               >
                 {uploadingPhoto ? (
                   <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
@@ -555,7 +568,7 @@ export default function Profile() {
                 ref={fileInputRef}
                 type="file"
                 accept="image/*"
-                onChange={handlePhotoUpload}
+                onChange={handlePhotoSelect}
                 className="hidden"
               />
             </div>
@@ -564,6 +577,11 @@ export default function Profile() {
             <span className="inline-block mt-2 px-3 py-1 rounded-full bg-primary/20 text-primary text-sm capitalize">
               {user?.role}
             </span>
+            {user?.role === 'seeker' && (
+              <p className="text-xs text-muted-foreground mt-3">
+                This photo is shown to recruiters when they browse candidates. Use a professional, well-lit vertical photo.
+              </p>
+            )}
           </div>
 
           {/* Subscription Management */}
@@ -1334,6 +1352,15 @@ export default function Profile() {
       </main>
 
       <Navigation />
+
+      {/* Photo Crop Modal */}
+      {cropImageSrc && (
+        <PhotoCropModal
+          imageSrc={cropImageSrc}
+          onCropDone={handleCroppedPhoto}
+          onCancel={() => setCropImageSrc(null)}
+        />
+      )}
     </div>
   );
 }

@@ -317,6 +317,7 @@ export default function RecruiterDashboard() {
               subtitle="Get 3x more visibility and reach top candidates faster"
               tierHint="recruiter_pro"
               trigger="boost"
+              onSubscribed={fetchData}
             />
           </section>
         )}

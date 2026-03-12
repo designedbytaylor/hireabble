@@ -139,6 +139,8 @@ async def browse_candidates(
         "onboarding_complete": True,
         # Exclude incognito mode users
         "incognito_mode": {"$ne": True},
+        # Only show seekers who have uploaded a photo
+        "photo_url": {"$ne": None, "$exists": True},
     }
 
     # Apply filters
