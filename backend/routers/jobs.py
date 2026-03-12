@@ -2,6 +2,7 @@
 Jobs routes for Hireabble API
 """
 from fastapi import APIRouter, HTTPException, Depends, UploadFile, File
+from fastapi.responses import StreamingResponse
 from typing import List, Optional
 from datetime import datetime, timezone
 from pydantic import BaseModel
@@ -11,6 +12,13 @@ import os
 import base64
 import logging
 import io
+import qrcode
+from reportlab.pdfgen import canvas
+from reportlab.lib.pagesizes import letter
+from reportlab.lib.utils import ImageReader
+from reportlab.platypus import Paragraph
+from reportlab.lib.styles import ParagraphStyle
+from reportlab.lib.enums import TA_CENTER
 
 from database import (
     db, get_current_user,
@@ -728,3 +736,136 @@ async def get_saved_job_ids(current_user: dict = Depends(get_current_user)):
         {"_id": 0, "job_id": 1}
     ).to_list(500)
     return {"job_ids": [s["job_id"] for s in saved]}
+
+
+@router.get("/{job_id}/poster")
+async def generate_job_poster(job_id: str, current_user: dict = Depends(get_current_user)):
+    """Generate a printable 'We're Hiring' poster PDF with QR code for a job listing."""
+    if current_user["role"] != "recruiter":
+        raise HTTPException(status_code=403, detail="Only recruiters can generate posters")
+
+    job = await db.jobs.find_one(
+        {"id": job_id, "recruiter_id": current_user["id"]},
+        {"_id": 0}
+    )
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    # Generate QR code
+    qr_url = f"https://hireabble.com/download?ref=poster&job={job_id}"
+    qr = qrcode.QRCode(version=1, box_size=10, border=2)
+    qr.add_data(qr_url)
+    qr.make(fit=True)
+    qr_img = qr.make_image(fill_color="black", back_color="white")
+    qr_buffer = io.BytesIO()
+    qr_img.save(qr_buffer, format="PNG")
+    qr_buffer.seek(0)
+
+    # Build poster PDF
+    pdf_buffer = io.BytesIO()
+    c = canvas.Canvas(pdf_buffer, pagesize=letter)
+    w, h = letter  # 612 x 792
+
+    accent = "#6366f1"
+    dark = "#1a1a2e"
+    gray = "#6b7280"
+
+    # -- Top banner --
+    from reportlab.lib.colors import HexColor
+    c.setFillColor(HexColor(accent))
+    banner_h = 100
+    banner_y = h - banner_h
+    c.rect(0, banner_y, w, banner_h, fill=1, stroke=0)
+
+    c.setFillColor(HexColor("#ffffff"))
+    c.setFont("Helvetica-Bold", 56)
+    c.drawCentredString(w / 2, banner_y + 28, "WE'RE HIRING")
+
+    # -- Company name --
+    c.setFillColor(HexColor(gray))
+    c.setFont("Helvetica", 22)
+    company = job.get("company", "")
+    c.drawCentredString(w / 2, banner_y - 40, company)
+
+    # -- Job title (may wrap) --
+    title_style = ParagraphStyle(
+        "title",
+        fontName="Helvetica-Bold",
+        fontSize=34,
+        leading=40,
+        alignment=TA_CENTER,
+        textColor=HexColor(dark),
+    )
+    title_text = job.get("title", "Open Position")
+    title_para = Paragraph(title_text, title_style)
+    tw, th = title_para.wrap(w - 80, 200)
+    title_y = banner_y - 60 - th
+    title_para.drawOn(c, 40, title_y)
+
+    # -- Details line --
+    details_parts = []
+    if job.get("location"):
+        details_parts.append(job["location"])
+    if job.get("job_type"):
+        details_parts.append(job["job_type"].replace("_", " ").title())
+    if job.get("employment_type"):
+        details_parts.append(job["employment_type"].replace("-", " ").title())
+    if job.get("experience_level"):
+        details_parts.append(job["experience_level"].title() + " Level")
+
+    details_y = title_y - 30
+    if details_parts:
+        c.setFillColor(HexColor(gray))
+        c.setFont("Helvetica", 14)
+        c.drawCentredString(w / 2, details_y, "  ·  ".join(details_parts))
+        details_y -= 10
+
+    # -- Salary range --
+    salary_y = details_y - 20
+    sal_min = job.get("salary_min")
+    sal_max = job.get("salary_max")
+    if sal_min:
+        c.setFillColor(HexColor(dark))
+        c.setFont("Helvetica-Bold", 18)
+        if sal_max:
+            sal_text = f"${sal_min:,} – ${sal_max:,} / year"
+        else:
+            sal_text = f"From ${sal_min:,} / year"
+        c.drawCentredString(w / 2, salary_y, sal_text)
+        salary_y -= 10
+
+    # -- QR code --
+    qr_size = 180
+    qr_x = (w - qr_size) / 2
+    qr_y = salary_y - qr_size - 30
+    c.drawImage(ImageReader(qr_buffer), qr_x, qr_y, qr_size, qr_size)
+
+    # -- Scan instruction --
+    c.setFillColor(HexColor(dark))
+    c.setFont("Helvetica", 16)
+    c.drawCentredString(w / 2, qr_y - 25, "Scan to apply on")
+    c.setFillColor(HexColor(accent))
+    c.setFont("Helvetica-Bold", 20)
+    c.drawCentredString(w / 2, qr_y - 50, "Hireabble")
+
+    # -- Bottom divider + branding --
+    c.setStrokeColor(HexColor("#e5e7eb"))
+    c.setLineWidth(1)
+    c.line(60, 80, w - 60, 80)
+
+    c.setFillColor(HexColor(gray))
+    c.setFont("Helvetica", 10)
+    c.drawCentredString(w / 2, 55, "Download Hireabble on the App Store or Google Play")
+    c.setFont("Helvetica", 9)
+    c.drawCentredString(w / 2, 40, "Swipe right on your next career move")
+
+    c.save()
+    pdf_buffer.seek(0)
+
+    safe_title = job.get("title", "Job").replace(" ", "_")[:40]
+    filename = f"Hiring_Poster_{safe_title}.pdf"
+    return StreamingResponse(
+        pdf_buffer,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f"inline; filename={filename}"}
+    )
