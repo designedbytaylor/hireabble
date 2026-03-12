@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   User, Briefcase, MapPin, GraduationCap, Building2,
   DollarSign, Clock, ArrowRight, ArrowLeft, Camera, CheckCircle2,
-  Wrench, Upload, X, Globe, Navigation2, FileText, Loader2
+  Wrench, Upload, X, Globe, Navigation2, FileText, Loader2, Bell, BellOff
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -18,7 +18,7 @@ import {
 } from '../components/ui/select';
 import { toast } from 'sonner';
 import { useAuth } from '../context/AuthContext';
-import { isPushSupported, subscribeToPush } from '../utils/pushNotifications';
+import { isPushSupported, getPermissionStatus, subscribeToPush } from '../utils/pushNotifications';
 import axios from 'axios';
 import PhotoCropModal from '../components/PhotoCropModal';
 import { getPhotoUrl } from '../utils/helpers';
@@ -36,6 +36,7 @@ const STEPS = [
   { id: 'skills', title: 'Skills', subtitle: 'What are you good at?' },
   { id: 'job_type', title: 'What type of work?', subtitle: 'Tell us what you\'re looking for' },
   { id: 'preferences', title: 'Preferences', subtitle: 'What are you looking for?' },
+  { id: 'notifications', title: 'Stay in the Loop', subtitle: 'Never miss a match or message' },
 ];
 
 export default function Onboarding() {
@@ -48,6 +49,8 @@ export default function Onboarding() {
   const fileInputRef = useRef(null);
   
   const [detectingLocation, setDetectingLocation] = useState(false);
+  const [notificationsEnabled, setNotificationsEnabled] = useState(false);
+  const [enablingNotifications, setEnablingNotifications] = useState(false);
   const [parsingResume, setParsingResume] = useState(false);
   const [resumeUploaded, setResumeUploaded] = useState(false);
   const resumeInputRef = useRef(null);
@@ -313,10 +316,6 @@ export default function Onboarding() {
       
       await updateProfile(updates);
       toast.success('Profile complete! Start swiping!');
-      // Auto-enable push notifications
-      if (isPushSupported()) {
-        subscribeToPush(token).catch(() => {});
-      }
       navigate('/dashboard');
     } catch (error) {
       toast.error('Failed to save profile');
@@ -829,6 +828,88 @@ export default function Onboarding() {
                       <label htmlFor="available" className="text-sm cursor-pointer">
                         I'm available to start immediately
                       </label>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {STEPS[currentStep]?.id === 'notifications' && (
+                <div className="space-y-6">
+                  <div className="text-center py-4">
+                    <div className="w-20 h-20 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center mx-auto mb-4">
+                      {notificationsEnabled ? (
+                        <Bell className="w-10 h-10 text-primary" />
+                      ) : (
+                        <BellOff className="w-10 h-10 text-muted-foreground" />
+                      )}
+                    </div>
+                    {notificationsEnabled ? (
+                      <>
+                        <h3 className="text-lg font-semibold text-foreground mb-2">Notifications Enabled!</h3>
+                        <p className="text-sm text-muted-foreground">You'll be notified about new matches and messages.</p>
+                      </>
+                    ) : getPermissionStatus() === 'denied' ? (
+                      <>
+                        <h3 className="text-lg font-semibold text-foreground mb-2">Notifications Blocked</h3>
+                        <p className="text-sm text-muted-foreground">You've blocked notifications. You can enable them later in your device settings.</p>
+                      </>
+                    ) : (
+                      <>
+                        <h3 className="text-lg font-semibold text-foreground mb-2">Don't miss your next match</h3>
+                        <p className="text-sm text-muted-foreground">Get instant alerts when a recruiter likes you back, sends a message, or schedules an interview.</p>
+                      </>
+                    )}
+                  </div>
+
+                  {!notificationsEnabled && getPermissionStatus() !== 'denied' && (
+                    <Button
+                      onClick={async () => {
+                        setEnablingNotifications(true);
+                        const success = await subscribeToPush(token);
+                        setNotificationsEnabled(success);
+                        setEnablingNotifications(false);
+                        if (success) toast.success('Notifications enabled!');
+                      }}
+                      disabled={enablingNotifications}
+                      className="w-full h-12 rounded-xl bg-gradient-to-r from-primary to-secondary hover:opacity-90"
+                      data-testid="enable-notifications-btn"
+                    >
+                      {enablingNotifications ? (
+                        <Loader2 className="w-5 h-5 animate-spin mr-2" />
+                      ) : (
+                        <Bell className="w-5 h-5 mr-2" />
+                      )}
+                      Enable Notifications
+                    </Button>
+                  )}
+
+                  <div className="space-y-3 bg-card rounded-xl p-4 border border-border">
+                    <div className="flex items-start gap-3">
+                      <div className="w-8 h-8 rounded-full bg-green-500/10 flex items-center justify-center shrink-0 mt-0.5">
+                        <CheckCircle2 className="w-4 h-4 text-green-500" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium">New Matches</p>
+                        <p className="text-xs text-muted-foreground">Know instantly when a recruiter swipes right on you</p>
+                      </div>
+                    </div>
+                    <div className="flex items-start gap-3">
+                      <div className="w-8 h-8 rounded-full bg-blue-500/10 flex items-center justify-center shrink-0 mt-0.5">
+                        <CheckCircle2 className="w-4 h-4 text-blue-500" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium">Messages</p>
+                        <p className="text-xs text-muted-foreground">Never miss a message from a recruiter</p>
+                      </div>
+                    </div>
+                    <div className="flex items-start gap-3">
+                      <div className="w-8 h-8 rounded-full bg-purple-500/10 flex items-center justify-center shrink-0 mt-0.5">
+                        <CheckCircle2 className="w-4 h-4 text-purple-500" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium">Interviews</p>
+                        <p className="text-xs text-muted-foreground">Get reminded about upcoming interviews</p>
+                      </div>
                     </div>
                   </div>
                 </div>
