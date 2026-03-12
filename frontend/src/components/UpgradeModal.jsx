@@ -118,10 +118,12 @@ export default function UpgradeModal({ open, onClose, onSubscribed, trigger, hig
       toast.success('Subscription activated! Welcome to premium.');
       // Refresh user data to reflect new subscription
       await refreshUser();
-      onClose?.();
+      // Call onSubscribed before onClose so parent can re-fetch data
+      // before the modal unmounts
       if (onSubscribed) {
-        onSubscribed();
+        await onSubscribed();
       }
+      onClose?.();
     } catch (err) {
       toast.error(err.response?.data?.detail || 'Failed to subscribe');
     } finally {

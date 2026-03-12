@@ -170,6 +170,7 @@ export default function SeekerDashboard() {
   const [savedJobIds, setSavedJobIds] = useState(new Set());
   const [upgradeTrigger, setUpgradeTrigger] = useState('super_likes'); // what triggered upgrade modal
   const lastSwipedRef = useRef(null); // track last swiped card for undo animation
+  const swipeInFlightRef = useRef(false); // true while a swipe API call is pending (prevents WS race)
   const fetchingMoreRef = useRef(false);
   // Seed from localStorage so swiped jobs stay excluded even after F5
   const swipedIdsRef = useRef(loadSwipedIds(uid));
@@ -345,7 +346,10 @@ export default function SeekerDashboard() {
         try {
           const data = JSON.parse(event.data);
           if (data.type === 'new_match' && data.match) {
-            // Only show modal if not already showing one (API response may have already triggered it)
+            // Skip if a swipe API call is in-flight — the API response
+            // will set the correct match data (avoids stale WS data flash)
+            if (swipeInFlightRef.current) return;
+            // Only show modal if not already showing one
             setShowMatch(prev => {
               if (prev) return prev; // already showing a match modal
               setStats(s => {
@@ -562,10 +566,12 @@ export default function SeekerDashboard() {
     }
     if (action === 'superlike') { setSuperlikeNote(''); setShowNoteInput(false); }
 
+    swipeInFlightRef.current = true;
     const sendSwipe = (retryCount = 0) => axios.post(`${API}/swipe`,
       swipePayload,
       { headers: { Authorization: `Bearer ${token}` }, timeout: 15000 }
     ).then(response => {
+      swipeInFlightRef.current = false;
       if (action === 'superlike' && response.data.remaining_superlikes != null) {
         setSuperLikesRemaining(response.data.remaining_superlikes);
         saveCachedSuperLikes(response.data.remaining_superlikes, uidRef.current);
@@ -584,6 +590,7 @@ export default function SeekerDashboard() {
       const queue = loadSwipeQueue(uidRef.current).filter(q => q.job_id !== job.id);
       saveSwipeQueue(queue, uidRef.current);
     }).catch(error => {
+      swipeInFlightRef.current = false;
       const status = error.response?.status;
       const detail = error.response?.data?.detail || '';
       const isTimeout = error.code === 'ECONNABORTED' || error.message?.includes('timeout');
@@ -727,8 +734,8 @@ export default function SeekerDashboard() {
         });
         // Go back one card
         setCurrentIndex(prev => Math.max(0, prev - 1));
-        // Clear the entering animation after it completes
-        setTimeout(() => setEnteringCard(null), 400);
+        // Clear the entering animation after the spring settles
+        setTimeout(() => setEnteringCard(null), 650);
         lastSwipedRef.current = null;
       } else {
         // Don't have the card data cached — refetch the deck
@@ -1467,6 +1474,13 @@ export default function SeekerDashboard() {
         </DialogContent>
       </Dialog>
 
+      {/* Job Detail Bottom Sheet */}
+      <AnimatePresence>
+        {expandedCard && currentJob && (
+          <JobDetailSheet job={currentJob} onClose={() => setExpandedCard(false)} />
+        )}
+      </AnimatePresence>
+
       <Navigation />
 
       {showMatch && (
@@ -1485,6 +1499,144 @@ export default function SeekerDashboard() {
         highlightTier="seeker_plus"
       />
     </div>
+  );
+}
+
+// Tinder-style bottom sheet for job details
+function JobDetailSheet({ job, onClose }) {
+  const sheetY = useMotionValue(0);
+  const sheetOpacity = useTransform(sheetY, [0, 300], [1, 0]);
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 z-[100]"
+    >
+      {/* Backdrop */}
+      <motion.div
+        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+        onClick={onClose}
+      />
+
+      {/* Sheet */}
+      <motion.div
+        className="absolute bottom-0 left-0 right-0 bg-card rounded-t-3xl overflow-hidden"
+        style={{ y: sheetY, opacity: sheetOpacity, maxHeight: '85vh' }}
+        initial={{ y: '100%' }}
+        animate={{ y: 0 }}
+        exit={{ y: '100%' }}
+        transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+        drag="y"
+        dragConstraints={{ top: 0, bottom: 0 }}
+        dragElastic={{ top: 0, bottom: 0.6 }}
+        onDragEnd={(_, info) => {
+          if (info.offset.y > 100 || info.velocity.y > 500) {
+            onClose();
+          }
+        }}
+      >
+        {/* Drag Handle */}
+        <div className="flex justify-center pt-3 pb-2">
+          <div className="w-10 h-1 rounded-full bg-muted-foreground/30" />
+        </div>
+
+        {/* Scrollable Content */}
+        <div className="overflow-y-auto px-6 pb-8" style={{ maxHeight: 'calc(85vh - 24px)' }}>
+          {/* Header */}
+          <div className="flex items-center gap-3 mb-4">
+            {job.company_logo && (
+              <img src={job.company_logo} alt={job.company} className="w-12 h-12 rounded-xl object-cover border border-border" />
+            )}
+            <div>
+              <div className="text-sm text-muted-foreground">{job.company}</div>
+              <div className="text-xs text-muted-foreground">
+                Posted {new Date(job.created_at).toLocaleDateString()}
+              </div>
+            </div>
+            {job.match_score != null && (
+              <span className={`ml-auto px-3 py-1 rounded-full text-sm font-bold flex items-center gap-1 ${
+                job.match_score >= 75 ? 'bg-success/20 text-success' :
+                job.match_score >= 50 ? 'bg-primary/20 text-primary' :
+                'bg-muted text-muted-foreground'
+              }`}>
+                <Star className="w-3.5 h-3.5" />
+                {job.match_score}%
+              </span>
+            )}
+          </div>
+
+          <h2 className="text-2xl font-bold font-['Outfit'] mb-4">{job.title}</h2>
+
+          {/* Tags */}
+          <div className="flex flex-wrap gap-2 mb-5">
+            {formatSalary(job.salary_min, job.salary_max) && (
+              <span className="px-3 py-1.5 rounded-full bg-primary/20 text-primary text-sm flex items-center gap-1">
+                <DollarSign className="w-3.5 h-3.5" />
+                {formatSalary(job.salary_min, job.salary_max)}
+              </span>
+            )}
+            <span className="px-3 py-1.5 rounded-full bg-secondary/20 text-secondary text-sm flex items-center gap-1">
+              <MapPin className="w-3.5 h-3.5" />
+              {job.location}
+            </span>
+            <span className="px-3 py-1.5 rounded-full bg-accent text-accent-foreground text-sm capitalize">
+              {job.job_type}
+            </span>
+            <span className="px-3 py-1.5 rounded-full bg-accent text-accent-foreground text-sm capitalize">
+              {job.experience_level}
+            </span>
+            {job.employment_type && job.employment_type !== 'full-time' && (
+              <span className="px-3 py-1.5 rounded-full bg-secondary/10 text-secondary text-sm capitalize">
+                {job.employment_type}
+              </span>
+            )}
+            {job.category && job.category !== 'other' && (
+              <span className="px-3 py-1.5 rounded-full bg-primary/10 text-primary text-sm capitalize">
+                {job.category}
+              </span>
+            )}
+          </div>
+
+          {/* Description */}
+          {job.description && (
+            <div className="mb-5">
+              <h3 className="text-sm font-bold font-['Outfit'] mb-2 text-foreground">About this role</h3>
+              <p className="text-sm text-muted-foreground leading-relaxed whitespace-pre-line">{job.description}</p>
+            </div>
+          )}
+
+          {/* Requirements */}
+          {job.requirements?.length > 0 && (
+            <div className="mb-5">
+              <h3 className="text-sm font-bold font-['Outfit'] mb-2 text-foreground">Requirements</h3>
+              <div className="flex flex-wrap gap-2">
+                {job.requirements.map((req, i) => (
+                  <span key={i} className="px-3 py-1.5 rounded-lg bg-white/5 border border-border text-sm text-muted-foreground">
+                    {req}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Benefits */}
+          {job.benefits?.length > 0 && (
+            <div className="mb-5">
+              <h3 className="text-sm font-bold font-['Outfit'] mb-2 text-foreground">Benefits</h3>
+              <div className="flex flex-wrap gap-2">
+                {job.benefits.map((b, i) => (
+                  <span key={i} className="px-3 py-1.5 rounded-lg bg-success/10 border border-success/20 text-sm text-success">
+                    {b}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      </motion.div>
+    </motion.div>
   );
 }
 
@@ -1579,7 +1731,7 @@ function ExitingCard({ card }) {
   );
 }
 
-// Card animating back in — reverse of exit animation (undo)
+// Card animating back in — Tinder-style fly back from where it exited
 function EnteringCard({ card }) {
   const { fromDirection, job } = card;
   return (
@@ -1588,18 +1740,22 @@ function EnteringCard({ card }) {
       initial={{
         x: fromDirection.x,
         y: fromDirection.y,
-        rotate: fromDirection.x > 0 ? 20 : fromDirection.x < 0 ? -20 : 0,
+        rotate: fromDirection.x > 0 ? 15 : fromDirection.x < 0 ? -15 : 0,
+        scale: 0.85,
       }}
-      animate={{ x: 0, y: 0, rotate: 0 }}
-      transition={{ duration: 0.35, ease: [0.25, 0.46, 0.45, 0.94] }}
+      animate={{ x: 0, y: 0, rotate: 0, scale: 1 }}
+      transition={{
+        type: 'spring',
+        stiffness: 260,
+        damping: 24,
+        mass: 0.8,
+      }}
     >
-      <div className="w-full h-full rounded-3xl overflow-hidden relative gradient-border">
+      <div className="w-full h-full rounded-3xl overflow-hidden relative gradient-border shadow-2xl">
         <div className="absolute inset-0">
           <img src={job.background_image} alt="Background" className="w-full h-full object-cover" />
           <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/60 to-black/30" />
         </div>
-        {/* Undo stamp overlay */}
-        <div className="absolute top-8 left-1/2 -translate-x-1/2 px-6 py-2 rounded-full bg-amber-500 border-2 border-amber-500 font-bold text-white z-20">UNDO</div>
         <div className="absolute inset-0 flex flex-col justify-end p-6 z-10">
           <h2 className="text-2xl font-bold font-['Outfit'] mb-3">{job.title}</h2>
         </div>
@@ -1767,36 +1923,12 @@ function SwipeCard({ job, onSwipe, expanded, setExpanded }) {
           </div>
 
           <button
-            onClick={(e) => { e.stopPropagation(); setExpanded(!expanded); }}
+            onClick={(e) => { e.stopPropagation(); setExpanded(true); }}
             className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
           >
-            <ChevronDown className={`w-4 h-4 transition-transform ${expanded ? 'rotate-180' : ''}`} />
-            {expanded ? 'Hide details' : 'Show details'}
+            <ChevronDown className="w-4 h-4" />
+            Show details
           </button>
-
-          <AnimatePresence>
-            {expanded && (
-              <motion.div
-                initial={{ height: 0, opacity: 0 }}
-                animate={{ height: 'auto', opacity: 1 }}
-                exit={{ height: 0, opacity: 0 }}
-                className="overflow-hidden"
-              >
-                <div className="mt-4 pt-4 border-t border-white/10">
-                  <p className="text-sm text-muted-foreground mb-3 line-clamp-4">{job.description}</p>
-                  {job.requirements?.length > 0 && (
-                    <div className="flex flex-wrap gap-1.5">
-                      {job.requirements.slice(0, 5).map((req, i) => (
-                        <span key={i} className="px-2 py-1 rounded-lg bg-white/5 text-xs text-muted-foreground">
-                          {req}
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
         </div>
       </div>
     </motion.div>

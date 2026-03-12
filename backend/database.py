@@ -356,6 +356,7 @@ class UserResponse(BaseModel):
     onboarding_complete: bool = False
     email_verified: bool = False
     push_subscription: Optional[dict] = None
+    incognito_mode: bool = False
     created_at: str
 
 class JobCreate(BaseModel):
