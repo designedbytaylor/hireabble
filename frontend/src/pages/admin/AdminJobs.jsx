@@ -43,6 +43,10 @@ export default function AdminJobs() {
   const [removeReason, setRemoveReason] = useState('');
   const [removing, setRemoving] = useState(false);
 
+  // Quiet delete dialog
+  const [quietDeleteTarget, setQuietDeleteTarget] = useState(null); // { jobId, title }
+  const [quietDeleting, setQuietDeleting] = useState(false);
+
   const [formData, setFormData] = useState({
     title: '',
     company: '',
@@ -126,6 +130,25 @@ export default function AdminJobs() {
       toast.error(e.response?.data?.detail || 'Failed to remove job');
     } finally {
       setRemoving(false);
+    }
+  };
+
+  const quietDeleteJob = async () => {
+    if (!quietDeleteTarget) return;
+    setQuietDeleting(true);
+    try {
+      await axios.delete(`${API}/admin/jobs/${quietDeleteTarget.jobId}/quiet`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      toast.success(`Job "${quietDeleteTarget.title}" deleted`);
+      setQuietDeleteTarget(null);
+      setSelectedJob(null);
+      setJobDetail(null);
+      fetchJobs();
+    } catch (e) {
+      toast.error(e.response?.data?.detail || 'Failed to delete job');
+    } finally {
+      setQuietDeleting(false);
     }
   };
 
@@ -222,6 +245,13 @@ export default function AdminJobs() {
                     className="bg-red-500/20 text-red-400 hover:bg-red-500/30 border border-red-500/30"
                   >
                     <Trash2 className="w-4 h-4 mr-2" /> Remove for Violation
+                  </Button>
+                  <Button
+                    size="sm"
+                    onClick={() => setQuietDeleteTarget({ jobId: jobDetail.job.id, title: jobDetail.job.title })}
+                    className="bg-gray-500/20 text-gray-400 hover:bg-gray-500/30 border border-gray-500/30"
+                  >
+                    <X className="w-4 h-4 mr-2" /> Delete (no strike)
                   </Button>
                 </div>
               </div>
@@ -716,6 +746,48 @@ export default function AdminJobs() {
                   <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
                 ) : (
                   'Remove & Issue Strike'
+                )}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Quiet Delete Confirmation Dialog */}
+      {quietDeleteTarget && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
+          <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6 max-w-md w-full mx-4">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-full bg-gray-500/20 flex items-center justify-center">
+                <X className="w-5 h-5 text-gray-400" />
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-white">Delete Job</h3>
+                <p className="text-gray-400 text-sm">No strike will be issued</p>
+              </div>
+            </div>
+
+            <p className="text-gray-300 text-sm mb-6">
+              Delete &quot;{quietDeleteTarget.title}&quot;? The poster will not be notified or penalized. This action cannot be undone.
+            </p>
+
+            <div className="flex gap-3">
+              <Button
+                variant="outline"
+                className="flex-1 border-gray-700 text-gray-300"
+                onClick={() => setQuietDeleteTarget(null)}
+              >
+                Cancel
+              </Button>
+              <Button
+                className="flex-1 bg-red-500 hover:bg-red-600 text-white"
+                disabled={quietDeleting}
+                onClick={quietDeleteJob}
+              >
+                {quietDeleting ? (
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  'Delete'
                 )}
               </Button>
             </div>

@@ -9,7 +9,7 @@ import { Badge } from '../../components/ui/badge';
 import {
   Search, Ban, ShieldOff, CheckCircle, ChevronLeft, ChevronRight,
   ArrowLeft, User, MapPin, Briefcase, Calendar, Mail, AlertTriangle,
-  Heart, FileText, Flag, GraduationCap, Building2, Clock,
+  Heart, FileText, Flag, GraduationCap, Building2, Clock, Trash2,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -35,6 +35,10 @@ export default function AdminUsers() {
   const [actionTarget, setActionTarget] = useState(null); // { userId, action, name }
   const [reason, setReason] = useState('');
   const [actioning, setActioning] = useState(false);
+
+  // Delete dialog
+  const [deleteTarget, setDeleteTarget] = useState(null); // { userId, name }
+  const [deleting, setDeleting] = useState(false);
 
   const fetchUsers = useCallback(async () => {
     setLoading(true);
@@ -92,6 +96,25 @@ export default function AdminUsers() {
       toast.error('Failed to update status');
     } finally {
       setActioning(false);
+    }
+  };
+
+  const deleteUser = async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    try {
+      await axios.delete(`${API}/admin/users/${deleteTarget.userId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      toast.success(`User "${deleteTarget.name}" permanently deleted`);
+      setDeleteTarget(null);
+      setSelectedUserId(null);
+      setUserDetail(null);
+      fetchUsers();
+    } catch (e) {
+      toast.error(e.response?.data?.detail || 'Failed to delete user');
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -181,6 +204,13 @@ export default function AdminUsers() {
                       <CheckCircle className="w-4 h-4 mr-2" /> Reactivate
                     </Button>
                   )}
+                  <Button
+                    size="sm"
+                    onClick={() => setDeleteTarget({ userId: userDetail.id, name: userDetail.name })}
+                    className="bg-gray-500/20 text-gray-400 hover:bg-gray-500/30 border border-gray-500/30"
+                  >
+                    <Trash2 className="w-4 h-4 mr-2" /> Delete
+                  </Button>
                 </div>
               </div>
             </div>
@@ -499,6 +529,9 @@ export default function AdminUsers() {
                         <CheckCircle className="w-4 h-4" />
                       </Button>
                     )}
+                    <Button size="sm" variant="ghost" onClick={() => setDeleteTarget({ userId: u.id, name: u.name })} className="text-gray-400 hover:text-gray-300">
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
                   </div>
                 </td>
               </tr>
@@ -577,6 +610,48 @@ export default function AdminUsers() {
                   <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
                 ) : (
                   actionTarget.action === 'banned' ? 'Ban User' : 'Suspend User'
+                )}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Dialog */}
+      {deleteTarget && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
+          <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6 max-w-md w-full mx-4">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-full bg-red-500/20 flex items-center justify-center">
+                <Trash2 className="w-5 h-5 text-red-400" />
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-white">Delete {deleteTarget.name}?</h3>
+                <p className="text-gray-400 text-sm">This will permanently delete the user and all their data.</p>
+              </div>
+            </div>
+
+            <p className="text-gray-300 text-sm mb-6">
+              No ban will be issued and the user will not be notified. This action cannot be undone.
+            </p>
+
+            <div className="flex gap-3">
+              <Button
+                variant="outline"
+                className="flex-1 border-gray-700 text-gray-300"
+                onClick={() => setDeleteTarget(null)}
+              >
+                Cancel
+              </Button>
+              <Button
+                className="flex-1 bg-red-500 hover:bg-red-600 text-white"
+                disabled={deleting}
+                onClick={deleteUser}
+              >
+                {deleting ? (
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  'Delete Permanently'
                 )}
               </Button>
             </div>
