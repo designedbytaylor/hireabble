@@ -365,6 +365,57 @@ async def update_user_status(
     logger.info(f"Admin {admin['id']} set user {user_id} status to {new_status}")
     return {"message": f"User status updated to {new_status}"}
 
+
+@router.delete("/admin/users/{user_id}")
+async def admin_delete_user(
+    user_id: str,
+    admin: dict = Depends(get_current_admin),
+):
+    """Permanently delete a user and all associated data. No ban, no notification."""
+    user = await db.users.find_one({"id": user_id})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    user_role = user.get("role", "seeker")
+
+    # Delete all user data across collections
+    await db.users.delete_one({"id": user_id})
+    await db.support_tickets.delete_many({"user_id": user_id})
+    await db.notifications.delete_many({"user_id": user_id})
+    await db.password_reset_tokens.delete_many({"user_id": user_id})
+    await db.moderation_queue.delete_many({"user_id": user_id})
+    await db.profile_views.delete_many({"$or": [{"viewer_id": user_id}, {"viewed_id": user_id}]})
+
+    if user_role == "seeker":
+        await db.applications.delete_many({"seeker_id": user_id})
+        await db.swipes.delete_many({"seeker_id": user_id})
+    else:
+        jobs = await db.jobs.find({"recruiter_id": user_id}, {"id": 1}).to_list(None)
+        job_ids = [j["id"] for j in jobs]
+        if job_ids:
+            await db.applications.delete_many({"job_id": {"$in": job_ids}})
+        await db.jobs.delete_many({"recruiter_id": user_id})
+        await db.swipes.delete_many({"recruiter_id": user_id})
+
+    # Delete matches and messages
+    matches = await db.matches.find(
+        {"$or": [{"seeker_id": user_id}, {"recruiter_id": user_id}]},
+        {"id": 1}
+    ).to_list(None)
+    match_ids = [m["id"] for m in matches]
+    if match_ids:
+        await db.messages.delete_many({"match_id": {"$in": match_ids}})
+    await db.matches.delete_many({"$or": [{"seeker_id": user_id}, {"recruiter_id": user_id}]})
+
+    # Delete interviews
+    await db.interviews.delete_many({"$or": [{"requester_id": user_id}, {"recipient_id": user_id}]})
+
+    invalidate_user(user_id)
+
+    logger.info(f"Admin {admin['id']} permanently deleted user {user_id} ({user.get('email')})")
+    return {"message": f"User {user.get('name', user_id)} permanently deleted"}
+
+
 # ==================== MODERATION QUEUE ====================
 
 @router.get("/admin/moderation")
@@ -797,6 +848,23 @@ async def admin_delete_job(
             return {"message": "Job removed. User has been banned (3 strikes).", "strikes": strike_count, "banned": True}
 
     return {"message": "Job removed and poster notified.", "strikes": strike_count if recruiter_id else 0, "banned": False}
+
+
+@router.delete("/admin/jobs/{job_id}/quiet")
+async def admin_quiet_delete_job(
+    job_id: str,
+    admin: dict = Depends(get_current_admin),
+):
+    """Delete a job without issuing a strike or notifying the poster."""
+    job = await db.jobs.find_one({"id": job_id})
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    await db.jobs.delete_one({"id": job_id})
+    await db.applications.delete_many({"job_id": job_id})
+
+    logger.info(f"Admin {admin['id']} quietly deleted job {job_id} ({job.get('title')})")
+    return {"message": f"Job \"{job.get('title', job_id)}\" deleted"}
 
 
 # ==================== MEDIA MODERATION ====================
