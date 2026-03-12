@@ -1298,8 +1298,8 @@ export default function SeekerDashboard() {
 function JobDetailSheet({ job, onClose }) {
   const sheetY = useMotionValue(0);
   const sheetOpacity = useTransform(sheetY, [0, 300], [1, 0]);
-  const scrollRef = React.useRef(null);
-  const [canDragDown, setCanDragDown] = React.useState(true);
+  const scrollRef = useRef(null);
+  const [canDragDown, setCanDragDown] = useState(true);
 
   // Allow drag-to-close only when scrolled to top
   const handleScroll = () => {
