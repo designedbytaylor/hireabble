@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams, Link, useNavigate } from 'react-router-dom';
-import { Briefcase, Mail, CheckCircle, XCircle, Loader2 } from 'lucide-react';
+import { Mail, CheckCircle, XCircle, Loader2 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { toast } from 'sonner';
 import { useAuth } from '../context/AuthContext';
@@ -76,9 +76,7 @@ export default function VerifyEmail() {
 
       <div className="w-full max-w-md relative z-10">
         <Link to="/" className="flex items-center gap-2 mb-8 justify-center">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-secondary flex items-center justify-center">
-            <Briefcase className="w-5 h-5 text-white" />
-          </div>
+          <img src="/logo.svg" alt="Hireabble" className="w-10 h-10 rounded-xl" />
           <span className="text-xl font-bold font-['Outfit']">Hireabble</span>
         </Link>
 

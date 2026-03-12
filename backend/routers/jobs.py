@@ -148,6 +148,7 @@ async def create_job(job: JobCreate, current_user: dict = Depends(get_current_us
         "company_logo": f"https://api.dicebear.com/7.x/identicon/svg?seed={job.company}",
         "background_image": backgrounds[hash(job_id) % len(backgrounds)],
         "created_at": datetime.now(timezone.utc).isoformat(),
+        "listing_photo": job.listing_photo if job.listing_photo and job.listing_photo != "profile" else (current_user.get("photo_url") if job.listing_photo == "profile" else None),
         "location_restriction": job.location_restriction,
         "category": category,
         "employment_type": job.employment_type or "full-time",
@@ -352,7 +353,8 @@ async def update_job(job_id: str, updates: dict, current_user: dict = Depends(ge
     
     allowed_fields = ["title", "company", "description", "requirements",
                       "salary_min", "salary_max", "location", "job_type",
-                      "experience_level", "is_active", "location_restriction", "category", "employment_type"]
+                      "experience_level", "is_active", "location_restriction", "category", "employment_type",
+                      "listing_photo"]
     update_data = {k: v for k, v in updates.items() if k in allowed_fields}
 
     # Content moderation on text fields being updated

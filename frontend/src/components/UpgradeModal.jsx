@@ -71,6 +71,7 @@ export default function UpgradeModal({ open, onClose, onSubscribed, trigger, hig
   const { token, user, refreshUser } = useAuth();
   const [tiers, setTiers] = useState([]);
   const [currentTier, setCurrentTier] = useState(null);
+  const [currentDuration, setCurrentDuration] = useState(null);
   const [selectedTier, setSelectedTier] = useState(null);
   const [selectedDuration, setSelectedDuration] = useState('monthly');
   const [loading, setLoading] = useState(false);
@@ -91,6 +92,7 @@ export default function UpgradeModal({ open, onClose, onSubscribed, trigger, hig
       });
       setTiers(res.data.tiers);
       setCurrentTier(res.data.current_tier);
+      setCurrentDuration(res.data.current_duration);
       // Pre-select the highlighted tier or the first one
       if (highlightTier) {
         setSelectedTier(highlightTier);
@@ -287,7 +289,7 @@ export default function UpgradeModal({ open, onClose, onSubscribed, trigger, hig
 
             {/* CTA Button */}
             <div className="px-4 pb-6 pt-2">
-              {currentTier === selectedTier ? (
+              {currentTier === selectedTier && currentDuration === selectedDuration ? (
                 <div className="w-full py-4 rounded-2xl bg-muted text-muted-foreground text-center font-bold text-sm">
                   Current Plan
                 </div>
@@ -303,7 +305,7 @@ export default function UpgradeModal({ open, onClose, onSubscribed, trigger, hig
                       Processing...
                     </span>
                   ) : (
-                    <>Continue — {activeTier && formatPrice(activeTier.prices[selectedDuration])}</>
+                    <>{currentTier === selectedTier ? 'Switch to' : 'Continue —'} {activeTier && formatPrice(activeTier.prices[selectedDuration])}/{DURATION_LABELS[selectedDuration]}</>
                   )}
                 </button>
               )}

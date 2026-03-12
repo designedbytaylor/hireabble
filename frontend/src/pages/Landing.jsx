@@ -1,6 +1,4 @@
 import { Link } from 'react-router-dom';
-import { Briefcase } from 'lucide-react';
-
 export default function Landing() {
   return (
     <div className="min-h-screen relative overflow-hidden flex flex-col">
@@ -22,9 +20,7 @@ export default function Landing() {
         {/* Center: Logo + Tagline */}
         <div className="text-center space-y-6">
           <div className="flex items-center justify-center gap-3 mb-2">
-            <div className="w-16 h-16 rounded-2xl bg-white/20 backdrop-blur-sm flex items-center justify-center">
-              <Briefcase className="w-8 h-8 text-white" />
-            </div>
+            <img src="/logo-white.svg" alt="Hireabble" className="w-16 h-16 drop-shadow-lg" />
           </div>
           <h1 className="text-5xl md:text-7xl font-bold font-['Outfit'] text-white tracking-tight">
             hireabble

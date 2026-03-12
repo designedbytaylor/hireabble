@@ -9,6 +9,8 @@ import Navigation from '../components/Navigation';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
+const DURATION_LABELS = { weekly: 'Weekly', monthly: 'Monthly', '6month': '6 Months' };
+
 const TIER_STYLES = {
   seeker_plus: {
     gradient: 'from-blue-500 to-cyan-400',
@@ -59,6 +61,7 @@ export default function Upgrade() {
   const { user, token } = useAuth();
   const [tiers, setTiers] = useState([]);
   const [currentTier, setCurrentTier] = useState(null);
+  const [currentDuration, setCurrentDuration] = useState(null);
   const [selectedDuration, setSelectedDuration] = useState('monthly');
   const [purchasing, setPurchasing] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -78,6 +81,7 @@ export default function Upgrade() {
       });
       setTiers(res.data.tiers);
       setCurrentTier(res.data.current_tier);
+      setCurrentDuration(res.data.current_duration);
     } catch (err) {
       console.error('Failed to fetch tiers:', err);
     } finally {
@@ -192,7 +196,7 @@ export default function Upgrade() {
         {tiers.map((tier, idx) => {
           const style = TIER_STYLES[tier.id] || TIER_STYLES.seeker_plus;
           const TierIcon = style.icon;
-          const isCurrent = currentTier === tier.id;
+          const isCurrent = currentTier === tier.id && currentDuration === selectedDuration;
           const isHighlighted = preselect === tier.id || (!preselect && tier.tier_level === 2);
           const price = tier.prices[selectedDuration];
           const monthlyPrice = selectedDuration === '6month'
@@ -281,7 +285,7 @@ export default function Upgrade() {
                       Processing...
                     </span>
                   ) : (
-                    `Get ${tier.name} — ${formatPrice(price)}`
+                    currentTier === tier.id ? `Switch to ${DURATION_LABELS[selectedDuration]} — ${formatPrice(price)}` : `Get ${tier.name} — ${formatPrice(price)}`
                   )}
                 </button>
               )}

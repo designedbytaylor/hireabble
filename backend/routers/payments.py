@@ -251,6 +251,7 @@ async def get_subscription_tiers(current_user: dict = Depends(get_current_user))
     return {
         "tiers": sorted(tiers, key=lambda t: t["tier_level"]),
         "current_tier": current_sub.get("tier_id"),
+        "current_duration": current_sub.get("duration"),
         "current_period_end": current_sub.get("period_end"),
     }
 
