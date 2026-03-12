@@ -360,15 +360,22 @@ async def update_profile(updates: dict, current_user: dict = Depends(get_current
 
 # ==================== OAUTH / SSO ====================
 
-async def _find_or_create_oauth_user(email: str, name: str, provider: str, role: str = "seeker"):
+async def _find_or_create_oauth_user(email: str, name: str, provider: str, role: str = "seeker", photo_url: str = None):
     """Find existing user by email or create a new one from OAuth data"""
     existing = await db.users.find_one({"email": email})
     if existing:
         # Link OAuth provider if not already linked
+        updates = {}
         providers = existing.get("oauth_providers", [])
         if provider not in providers:
             providers.append(provider)
-            await db.users.update_one({"email": email}, {"$set": {"oauth_providers": providers}})
+            updates["oauth_providers"] = providers
+        # Set photo from OAuth if user has no photo yet
+        if photo_url and not existing.get("photo_url"):
+            updates["photo_url"] = photo_url
+        if updates:
+            await db.users.update_one({"email": email}, {"$set": updates})
+            existing.update(updates)
         token = create_token(existing["id"], existing["role"])
         user_response = {k: v for k, v in existing.items() if k not in ['_id', 'password']}
         return {"token": token, "user": user_response}
@@ -384,7 +391,7 @@ async def _find_or_create_oauth_user(email: str, name: str, provider: str, role:
         "role": role,
         "company": None,
         "avatar": avatar,
-        "photo_url": None,
+        "photo_url": photo_url,
         "video_url": None,
         "title": None,
         "bio": None,
@@ -586,11 +593,12 @@ async def linkedin_oauth(body: dict):
 
         email = userinfo.get("email")
         name = userinfo.get("name") or f"{userinfo.get('given_name', '')} {userinfo.get('family_name', '')}".strip()
+        picture_url = userinfo.get("picture")
 
         if not email:
             raise HTTPException(status_code=400, detail="Could not retrieve email from LinkedIn")
 
-        return await _find_or_create_oauth_user(email, name or email.split("@")[0], "linkedin", role)
+        return await _find_or_create_oauth_user(email, name or email.split("@")[0], "linkedin", role, photo_url=picture_url)
 
     except HTTPException:
         raise
