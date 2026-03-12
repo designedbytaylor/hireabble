@@ -1,17 +1,24 @@
 """
 Jobs routes for Hireabble API
 """
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, UploadFile, File
 from typing import List, Optional
 from datetime import datetime, timezone
+from pydantic import BaseModel
 import asyncio
 import uuid
+import os
+import base64
+import logging
+import io
 
 from database import (
     db, get_current_user,
     JobCreate, JobResponse
 )
 from content_filter import check_fields, is_severe
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/jobs", tags=["Jobs"])
 
@@ -417,6 +424,234 @@ async def delete_job(job_id: str, current_user: dict = Depends(get_current_user)
         raise HTTPException(status_code=404, detail="Job not found or not authorized")
     
     return {"message": "Job deleted successfully"}
+
+
+# ==================== SCREENSHOT PARSING & AI ASSIST ====================
+
+ALLOWED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/webp"}
+MAX_IMAGE_SIZE = 5 * 1024 * 1024  # 5MB
+
+def _resize_image_bytes(img_bytes: bytes, max_dim: int = 1500) -> bytes:
+    """Resize image to max dimension while preserving aspect ratio."""
+    from PIL import Image
+    img = Image.open(io.BytesIO(img_bytes))
+    if max(img.size) > max_dim:
+        img.thumbnail((max_dim, max_dim), Image.LANCZOS)
+    buf = io.BytesIO()
+    fmt = img.format or "JPEG"
+    if fmt.upper() not in ("JPEG", "PNG", "WEBP"):
+        fmt = "JPEG"
+    img.save(buf, format=fmt)
+    return buf.getvalue()
+
+def _extract_json(text: str) -> dict:
+    """Extract JSON from model response, handling markdown code blocks."""
+    import json as json_module
+    text = text.strip()
+    if text.startswith("```"):
+        lines = text.split("\n")
+        json_lines = []
+        in_block = False
+        for line in lines:
+            if line.startswith("```") and not in_block:
+                in_block = True
+                continue
+            elif line.startswith("```") and in_block:
+                break
+            elif in_block:
+                json_lines.append(line)
+        text = "\n".join(json_lines)
+    return json_module.loads(text)
+
+def _get_anthropic_client():
+    """Create Anthropic client or raise."""
+    api_key = os.environ.get("ANTHROPIC_API_KEY")
+    if not api_key:
+        raise HTTPException(status_code=500, detail="AI service not configured")
+    import anthropic
+    return anthropic.Anthropic(api_key=api_key)
+
+def _call_anthropic(client, messages, max_tokens=4000):
+    """Call Anthropic API with model fallback chain."""
+    models = [
+        "claude-haiku-4-5-20251001",
+        "claude-3-5-haiku-20241022",
+        "claude-3-haiku-20240307",
+    ]
+    last_error = None
+    for model_id in models:
+        try:
+            message = client.messages.create(
+                model=model_id,
+                max_tokens=max_tokens,
+                messages=messages,
+            )
+            logger.info(f"Anthropic call used model: {model_id}")
+            return message
+        except Exception as e:
+            last_error = e
+            logger.warning(f"Model {model_id} failed: {type(e).__name__}: {e}")
+            continue
+    raise last_error or Exception("All models failed")
+
+
+@router.post("/parse-screenshots")
+async def parse_job_screenshots(
+    files: List[UploadFile] = File(...),
+    current_user: dict = Depends(get_current_user),
+):
+    """Parse job listing screenshots using Claude Vision to extract structured job data."""
+    if current_user["role"] != "recruiter":
+        raise HTTPException(status_code=403, detail="Only recruiters can use this feature")
+
+    if len(files) > 5:
+        raise HTTPException(status_code=400, detail="Maximum 5 images allowed")
+    if len(files) == 0:
+        raise HTTPException(status_code=400, detail="At least one image is required")
+
+    # Validate and read images
+    images = []
+    for f in files:
+        if f.content_type not in ALLOWED_IMAGE_TYPES:
+            raise HTTPException(status_code=400, detail=f"Invalid image type: {f.content_type}. Use JPEG, PNG, or WebP.")
+        data = await f.read()
+        if len(data) > MAX_IMAGE_SIZE:
+            raise HTTPException(status_code=400, detail=f"Image {f.filename} exceeds 5MB limit")
+        # Resize to keep API payload small
+        data = _resize_image_bytes(data)
+        images.append((data, f.content_type))
+
+    client = _get_anthropic_client()
+
+    # Build multi-image content
+    content = []
+    for img_bytes, media_type in images:
+        content.append({
+            "type": "image",
+            "source": {
+                "type": "base64",
+                "media_type": media_type,
+                "data": base64.b64encode(img_bytes).decode("utf-8"),
+            },
+        })
+
+    content.append({
+        "type": "text",
+        "text": """You are parsing a job listing from screenshots. Extract ALL available information and return ONLY valid JSON with this structure:
+
+{
+  "title": "Job Title",
+  "company": "Company Name",
+  "description": "Full job description text",
+  "requirements": ["requirement 1", "requirement 2"],
+  "salary_min": 80000,
+  "salary_max": 120000,
+  "location": "City, State",
+  "job_type": "remote",
+  "experience_level": "mid",
+  "employment_type": "full-time",
+  "category": "technology"
+}
+
+Rules:
+- "job_type": one of "remote", "onsite", "hybrid". Default "onsite" if unclear.
+- "experience_level": one of "entry", "mid", "senior", "lead". Infer from title/requirements.
+- "employment_type": one of "full-time", "part-time", "contract", "internship". Default "full-time".
+- "category": one of "technology", "design", "marketing", "sales", "finance", "healthcare", "engineering", "education", "other".
+- "salary_min"/"salary_max": integers (annual USD). Convert hourly rates to annual (×2080). Use null if not found.
+- "requirements": array of individual skills/qualifications extracted from the listing.
+- "description": the full job description. Combine text across multiple screenshots if needed.
+- Use null for any field you cannot determine.
+- Return ONLY the JSON object, no explanation.""",
+    })
+
+    try:
+        message = _call_anthropic(client, [{"role": "user", "content": content}])
+        parsed = _extract_json(message.content[0].text)
+
+        # Normalize and validate
+        result = {
+            "title": parsed.get("title"),
+            "company": parsed.get("company"),
+            "description": parsed.get("description"),
+            "requirements": parsed.get("requirements", [])[:30],
+            "salary_min": parsed.get("salary_min"),
+            "salary_max": parsed.get("salary_max"),
+            "location": parsed.get("location"),
+            "job_type": parsed.get("job_type", "onsite"),
+            "experience_level": parsed.get("experience_level", "mid"),
+            "employment_type": parsed.get("employment_type", "full-time"),
+            "category": parsed.get("category"),
+        }
+        return result
+
+    except Exception as e:
+        logger.error(f"Screenshot parsing failed: {type(e).__name__}: {e}")
+        raise HTTPException(status_code=500, detail="Failed to parse screenshots. Please try again.")
+
+
+class AIAssistRequest(BaseModel):
+    title: str = ""
+    company: str = ""
+    description: str = ""
+    mode: str = "generate"  # "generate" or "improve"
+
+
+@router.post("/ai-assist")
+async def ai_assist_job(
+    req: AIAssistRequest,
+    current_user: dict = Depends(get_current_user),
+):
+    """Use AI to generate or improve a job description."""
+    if current_user["role"] != "recruiter":
+        raise HTTPException(status_code=403, detail="Only recruiters can use this feature")
+
+    if req.mode == "generate" and not req.title:
+        raise HTTPException(status_code=400, detail="Job title is required to generate a description")
+    if req.mode == "improve" and not req.description:
+        raise HTTPException(status_code=400, detail="Existing description is required to improve")
+
+    client = _get_anthropic_client()
+
+    if req.mode == "generate":
+        prompt = f"""Write a compelling job description for the following position. Return ONLY valid JSON.
+
+Job Title: {req.title}
+Company: {req.company or "a growing company"}
+
+Return JSON:
+{{
+  "description": "A professional, engaging job description (3-4 paragraphs covering role overview, responsibilities, and what makes this opportunity exciting)",
+  "requirements": ["requirement 1", "requirement 2", "...up to 8 key requirements"]
+}}
+
+Write in a professional but approachable tone. Do NOT include salary or location — just the description and requirements."""
+    else:
+        prompt = f"""Improve the following job description to be more professional, engaging, and well-structured. Return ONLY valid JSON.
+
+Job Title: {req.title or "Not specified"}
+Company: {req.company or "Not specified"}
+Current Description:
+{req.description}
+
+Return JSON:
+{{
+  "description": "The improved, polished job description",
+  "requirements": ["requirement 1", "requirement 2", "...extracted or improved requirements"]
+}}
+
+Keep the core content but make it more compelling and well-organized. Do NOT include salary or location."""
+
+    try:
+        message = _call_anthropic(client, [{"role": "user", "content": prompt}])
+        parsed = _extract_json(message.content[0].text)
+        return {
+            "description": parsed.get("description", ""),
+            "requirements": parsed.get("requirements", [])[:15],
+        }
+    except Exception as e:
+        logger.error(f"AI assist failed: {type(e).__name__}: {e}")
+        raise HTTPException(status_code=500, detail="AI assist failed. Please try again.")
 
 
 # ==================== SAVED JOBS ====================
