@@ -676,14 +676,14 @@ async def stripe_webhook(request: Request):
     return {"status": "ok"}
 
 
-async def fulfill_subscription(metadata: dict, source: str = "stripe"):
-    """Activate a subscription after successful Stripe payment"""
+async def fulfill_subscription(metadata: dict, source: str = "stripe", promo_code: str = None, custom_duration_days: int = None):
+    """Activate a subscription after successful payment or promo redemption"""
     user_id = metadata.get("user_id")
     tier_id = metadata.get("tier_id")
-    duration = metadata.get("duration")
+    duration = metadata.get("duration", "custom")
     price = int(metadata.get("price", 0))
 
-    if not user_id or not tier_id or not duration:
+    if not user_id or not tier_id:
         logger.error(f"Missing subscription metadata: {metadata}")
         return
 
@@ -692,7 +692,10 @@ async def fulfill_subscription(metadata: dict, source: str = "stripe"):
         logger.error(f"Invalid tier in webhook: {tier_id}")
         return
 
-    duration_days = {"weekly": 7, "monthly": 30, "6month": 180}.get(duration, 30)
+    if custom_duration_days:
+        duration_days = custom_duration_days
+    else:
+        duration_days = {"weekly": 7, "monthly": 30, "6month": 180}.get(duration, 30)
     period_end = (datetime.now(timezone.utc) + timedelta(days=duration_days)).isoformat()
 
     subscription = {
@@ -712,7 +715,7 @@ async def fulfill_subscription(metadata: dict, source: str = "stripe"):
 
     invalidate_user(user_id)
 
-    await db.transactions.insert_one({
+    transaction = {
         "id": str(uuid.uuid4()),
         "user_id": user_id,
         "product_id": tier_id,
@@ -721,7 +724,10 @@ async def fulfill_subscription(metadata: dict, source: str = "stripe"):
         "status": "completed",
         "description": f"{tier['name']} - {duration}",
         "created_at": datetime.now(timezone.utc).isoformat(),
-    })
+    }
+    if promo_code:
+        transaction["promo_code"] = promo_code
+    await db.transactions.insert_one(transaction)
 
     await create_notification(
         user_id=user_id,
@@ -731,7 +737,111 @@ async def fulfill_subscription(metadata: dict, source: str = "stripe"):
         data={"tier_id": tier_id}
     )
 
-    logger.info(f"Subscription fulfilled: user={user_id} tier={tier_id} duration={duration} source={source}")
+    logger.info(f"Subscription fulfilled: user={user_id} tier={tier_id} duration={duration} source={source}{f' promo={promo_code}' if promo_code else ''}")
+
+
+# ==================== PROMO CODES ====================
+
+class PromoRedeemRequest(BaseModel):
+    code: str
+
+@router.post("/redeem-promo")
+async def redeem_promo(body: PromoRedeemRequest, current_user: dict = Depends(get_current_user)):
+    """Redeem a promo code to activate a free subscription."""
+    user_id = current_user["id"]
+    user_role = current_user.get("role", "seeker")
+    code = body.code.strip().upper()
+
+    # Look up promo code
+    promo = await db.promo_codes.find_one({"code": code})
+    if not promo or not promo.get("active", False):
+        raise HTTPException(status_code=400, detail="Invalid or expired promo code.")
+
+    # Check expiry
+    if promo.get("expires_at"):
+        if promo["expires_at"] < datetime.now(timezone.utc).isoformat():
+            raise HTTPException(status_code=400, detail="This promo code has expired.")
+
+    # Check max uses
+    if promo.get("max_uses") is not None and promo.get("uses", 0) >= promo["max_uses"]:
+        raise HTTPException(status_code=400, detail="This promo code has reached its maximum number of uses.")
+
+    # Check role restriction
+    if promo.get("role_restriction") and promo["role_restriction"] != user_role:
+        raise HTTPException(status_code=400, detail=f"This promo code is only available for {promo['role_restriction']}s.")
+
+    # Check per-user limit
+    per_user_limit = promo.get("per_user_limit", 1)
+    existing_redemptions = await db.promo_redemptions.count_documents({
+        "code_id": promo["id"],
+        "user_id": user_id,
+    })
+    if existing_redemptions >= per_user_limit:
+        raise HTTPException(status_code=400, detail="You have already used this promo code.")
+
+    # Check if user already has an active subscription with a later end date
+    sub = current_user.get("subscription", {})
+    if sub.get("status") == "active" and sub.get("period_end", ""):
+        promo_end = (datetime.now(timezone.utc) + timedelta(days=promo["duration_days"])).isoformat()
+        if sub["period_end"] >= promo_end:
+            raise HTTPException(status_code=400, detail="You already have an active subscription that extends beyond this promo.")
+
+    # Redeem: activate subscription
+    tier_id = promo["tier_id"]
+    await fulfill_subscription(
+        metadata={"user_id": user_id, "tier_id": tier_id, "duration": "promo", "price": 0},
+        source="promo",
+        promo_code=code,
+        custom_duration_days=promo["duration_days"],
+    )
+
+    # Track redemption
+    await db.promo_redemptions.insert_one({
+        "id": str(uuid.uuid4()),
+        "code_id": promo["id"],
+        "code": code,
+        "user_id": user_id,
+        "redeemed_at": datetime.now(timezone.utc).isoformat(),
+    })
+
+    # Increment usage count
+    await db.promo_codes.update_one({"id": promo["id"]}, {"$inc": {"uses": 1}})
+
+    tier = SUBSCRIPTION_TIERS.get(tier_id, {})
+    logger.info(f"Promo redeemed: user={user_id} code={code} tier={tier_id}")
+    return {
+        "success": True,
+        "tier_name": tier.get("name", tier_id),
+        "duration_days": promo["duration_days"],
+        "message": f"Promo code applied! You now have {tier.get('name', 'Premium')} for {promo['duration_days']} days.",
+    }
+
+
+@router.get("/validate-promo")
+async def validate_promo(code: str, current_user: dict = Depends(get_current_user)):
+    """Check if a promo code is valid without redeeming it."""
+    code = code.strip().upper()
+    promo = await db.promo_codes.find_one({"code": code})
+
+    if not promo or not promo.get("active", False):
+        return {"valid": False, "reason": "Invalid promo code."}
+
+    if promo.get("expires_at") and promo["expires_at"] < datetime.now(timezone.utc).isoformat():
+        return {"valid": False, "reason": "This promo code has expired."}
+
+    if promo.get("max_uses") is not None and promo.get("uses", 0) >= promo["max_uses"]:
+        return {"valid": False, "reason": "This promo code is no longer available."}
+
+    user_role = current_user.get("role", "seeker")
+    if promo.get("role_restriction") and promo["role_restriction"] != user_role:
+        return {"valid": False, "reason": f"This code is for {promo['role_restriction']}s only."}
+
+    tier = SUBSCRIPTION_TIERS.get(promo["tier_id"], {})
+    return {
+        "valid": True,
+        "tier_name": tier.get("name", promo["tier_id"]),
+        "duration_days": promo["duration_days"],
+    }
 
 
 # ==================== FULFILLMENT ====================
