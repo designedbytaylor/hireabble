@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
-import { ArrowLeft, Check, Star, Zap, Crown, Sparkles, Shield } from 'lucide-react';
+import { ArrowLeft, Check, Star, Zap, Crown, Sparkles, Shield, Tag, ChevronDown } from 'lucide-react';
 import { motion } from 'framer-motion';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
@@ -382,6 +382,9 @@ export default function Upgrade() {
           </button>
         </div>
 
+        {/* Promo Code */}
+        <PromoCodeSection token={token} onRedeemed={() => window.location.reload()} />
+
         <div className="text-xs text-muted-foreground text-center py-4 space-y-2">
           <p>
             Payment will be charged to your {isIOS ? 'Apple ID account' : isAndroid ? 'Google Play account' : 'payment method'} at
@@ -408,6 +411,60 @@ export default function Upgrade() {
       </main>
 
       <Navigation />
+    </div>
+  );
+}
+
+function PromoCodeSection({ token, onRedeemed }) {
+  const [open, setOpen] = useState(false);
+  const [code, setCode] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const handleRedeem = async () => {
+    if (!code.trim()) return;
+    setLoading(true);
+    try {
+      const res = await axios.post(`${API}/payments/redeem-promo`, { code: code.trim() }, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      toast.success(res.data.message);
+      onRedeemed();
+    } catch (err) {
+      toast.error(err.response?.data?.detail || 'Invalid promo code.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="py-4">
+      <button
+        onClick={() => setOpen(o => !o)}
+        className="flex items-center justify-center gap-1.5 mx-auto text-xs text-muted-foreground hover:text-primary transition-colors"
+      >
+        <Tag className="w-3.5 h-3.5" />
+        Have a promo code?
+        <ChevronDown className={`w-3.5 h-3.5 transition-transform ${open ? 'rotate-180' : ''}`} />
+      </button>
+      {open && (
+        <div className="mt-3 flex gap-2 max-w-xs mx-auto">
+          <input
+            type="text"
+            value={code}
+            onChange={e => setCode(e.target.value.toUpperCase())}
+            placeholder="Enter code"
+            className="flex-1 h-10 px-3 rounded-xl bg-card border border-border text-sm text-foreground placeholder:text-muted-foreground focus:border-primary/50 outline-none"
+            onKeyDown={e => e.key === 'Enter' && handleRedeem()}
+          />
+          <button
+            onClick={handleRedeem}
+            disabled={loading || !code.trim()}
+            className="h-10 px-4 rounded-xl bg-primary text-primary-foreground text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-50"
+          >
+            {loading ? 'Applying...' : 'Apply'}
+          </button>
+        </div>
+      )}
     </div>
   );
 }

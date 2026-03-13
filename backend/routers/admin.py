@@ -1014,6 +1014,101 @@ async def impersonate_user(user_id: str, admin: dict = Depends(get_current_admin
     return {"token": token, "user": user}
 
 
+# ==================== PROMO CODES ====================
+
+@router.post("/admin/promo-codes")
+async def create_promo_code(
+    code: str = Body(...),
+    tier_id: str = Body(...),
+    duration_days: int = Body(90),
+    max_uses: Optional[int] = Body(None),
+    per_user_limit: int = Body(1),
+    role_restriction: Optional[str] = Body(None),
+    expires_at: Optional[str] = Body(None),
+    admin: dict = Depends(get_current_admin),
+):
+    """Create a new promo code."""
+    code = code.strip().upper()
+
+    # Validate tier exists
+    from routers.payments import SUBSCRIPTION_TIERS
+    if tier_id not in SUBSCRIPTION_TIERS:
+        raise HTTPException(status_code=400, detail=f"Invalid tier: {tier_id}")
+
+    if role_restriction and role_restriction not in ("seeker", "recruiter"):
+        raise HTTPException(status_code=400, detail="role_restriction must be 'seeker' or 'recruiter'")
+
+    # Check uniqueness
+    existing = await db.promo_codes.find_one({"code": code})
+    if existing:
+        raise HTTPException(status_code=400, detail=f"Promo code '{code}' already exists.")
+
+    promo = {
+        "id": str(uuid.uuid4()),
+        "code": code,
+        "tier_id": tier_id,
+        "duration_days": duration_days,
+        "max_uses": max_uses,
+        "uses": 0,
+        "per_user_limit": per_user_limit,
+        "role_restriction": role_restriction,
+        "expires_at": expires_at,
+        "active": True,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "created_by": admin["id"],
+    }
+    await db.promo_codes.insert_one(promo)
+    promo.pop("_id", None)
+    logger.info(f"Promo code created: {code} by admin {admin['id']}")
+    return promo
+
+
+@router.get("/admin/promo-codes")
+async def list_promo_codes(admin: dict = Depends(get_current_admin)):
+    """List all promo codes with usage stats."""
+    codes = await db.promo_codes.find({}, {"_id": 0}).sort("created_at", -1).to_list(None)
+    return codes
+
+
+@router.patch("/admin/promo-codes/{code_id}")
+async def update_promo_code(
+    code_id: str,
+    admin: dict = Depends(get_current_admin),
+    active: Optional[bool] = Body(None),
+    max_uses: Optional[int] = Body(None),
+    expires_at: Optional[str] = Body(None),
+):
+    """Update a promo code (toggle active, change max_uses, etc.)."""
+    updates = {}
+    if active is not None:
+        updates["active"] = active
+    if max_uses is not None:
+        updates["max_uses"] = max_uses
+    if expires_at is not None:
+        updates["expires_at"] = expires_at
+
+    if not updates:
+        raise HTTPException(status_code=400, detail="No fields to update.")
+
+    result = await db.promo_codes.update_one({"id": code_id}, {"$set": updates})
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Promo code not found.")
+
+    logger.info(f"Promo code {code_id} updated by admin {admin['id']}: {updates}")
+    return {"success": True}
+
+
+@router.delete("/admin/promo-codes/{code_id}")
+async def delete_promo_code(code_id: str, admin: dict = Depends(get_current_admin)):
+    """Deactivate a promo code."""
+    result = await db.promo_codes.update_one({"id": code_id}, {"$set": {"active": False}})
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Promo code not found.")
+
+    logger.info(f"Promo code {code_id} deactivated by admin {admin['id']}")
+    return {"success": True}
+
+
 # ==================== TEST DATA SEEDING ====================
 
 _MALE_NAMES = [

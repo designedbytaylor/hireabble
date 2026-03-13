@@ -68,6 +68,7 @@ const AdminTesting = React.lazy(() => import("./pages/admin/AdminTesting"));
 const AdminMedia = React.lazy(() => import("./pages/admin/AdminMedia"));
 const AdminThemes = React.lazy(() => import("./pages/admin/AdminThemes"));
 const AdminSupport = React.lazy(() => import("./pages/admin/AdminSupport"));
+const AdminPromos = React.lazy(() => import("./pages/admin/AdminPromos"));
 const Support = React.lazy(() => import("./pages/Support"));
 
 const PageSpinner = () => (
@@ -358,6 +359,7 @@ function AppRoutes() {
         <Route path="testing" element={<AdminTesting />} />
         <Route path="themes" element={<AdminThemes />} />
         <Route path="support" element={<AdminSupport />} />
+        <Route path="promos" element={<AdminPromos />} />
         <Route path="settings" element={<AdminSettings />} />
       </Route>
     </Routes>
