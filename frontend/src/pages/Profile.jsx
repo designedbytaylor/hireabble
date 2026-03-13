@@ -1267,7 +1267,7 @@ export default function Profile() {
                     await axios.post(`${API}/profile/incognito`, { enabled: newVal }, {
                       headers: { Authorization: `Bearer ${token}` },
                     });
-                    refreshUser();
+                    await refreshUser();
                     toast.success(newVal ? 'Profile set to private' : 'Profile is now visible to recruiters');
                   } catch (err) {
                     toast.error(err.response?.data?.detail || 'Failed to update');
