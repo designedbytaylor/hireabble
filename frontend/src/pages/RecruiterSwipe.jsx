@@ -512,6 +512,10 @@ function CandidateDetailSheet({ item, mode, onClose }) {
   const employer = mode === 'applicants' ? item.seeker_current_employer : item.current_employer;
   const degree = mode === 'applicants' ? null : item.degree;
   const matchScore = item.match_score;
+  const previousEmployers = mode === 'applicants' ? null : item.previous_employers;
+  const certifications = mode === 'applicants' ? null : item.certifications;
+  const workPreference = mode === 'applicants' ? null : item.work_preference;
+  const desiredSalary = mode === 'applicants' ? null : item.desired_salary;
 
   return (
     <motion.div
@@ -578,6 +582,18 @@ function CandidateDetailSheet({ item, mode, onClose }) {
               </span>
             )}
           </div>
+
+          {/* Also Applied To */}
+          {mode === 'applicants' && item.other_applications?.length > 0 && (
+            <div className="mb-4 px-3 py-2 rounded-xl bg-primary/10 border border-primary/20">
+              <p className="text-xs text-primary flex items-center gap-1 font-medium">
+                <Briefcase className="w-3 h-3" /> Also applied to your other {item.other_applications.length === 1 ? 'job' : 'jobs'}:
+              </p>
+              {item.other_applications.map((a, i) => (
+                <p key={i} className="text-sm text-foreground/80 ml-4 mt-0.5">{a.job_title}</p>
+              ))}
+            </div>
+          )}
 
           {/* Super Like Note */}
           {item.superlike_note && (
@@ -657,6 +673,44 @@ function CandidateDetailSheet({ item, mode, onClose }) {
                 {skills.map((skill, i) => (
                   <span key={i} className="px-3 py-1.5 rounded-lg bg-white/5 border border-border text-sm text-muted-foreground">
                     {skill}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Work Preference & Desired Salary (discover mode) */}
+          {(workPreference || desiredSalary) && (
+            <div className="flex flex-wrap gap-2 mb-5">
+              {workPreference && (
+                <span className="px-3 py-1.5 rounded-full bg-primary/10 text-primary text-sm capitalize">
+                  Prefers {workPreference}
+                </span>
+              )}
+              {desiredSalary && (
+                <span className="px-3 py-1.5 rounded-full bg-success/10 text-success text-sm">
+                  Desired: ${Number(desiredSalary).toLocaleString()}/yr
+                </span>
+              )}
+            </div>
+          )}
+
+          {/* Previous Employers */}
+          {previousEmployers && (
+            <div className="mb-5">
+              <h3 className="text-sm font-bold font-['Outfit'] mb-2 text-foreground">Previous Experience</h3>
+              <p className="text-sm text-muted-foreground">{previousEmployers}</p>
+            </div>
+          )}
+
+          {/* Certifications */}
+          {certifications && (
+            <div className="mb-5">
+              <h3 className="text-sm font-bold font-['Outfit'] mb-2 text-foreground">Certifications</h3>
+              <div className="flex flex-wrap gap-2">
+                {(Array.isArray(certifications) ? certifications : certifications.split(',').map(c => c.trim()).filter(Boolean)).map((cert, i) => (
+                  <span key={i} className="px-3 py-1.5 rounded-lg bg-amber-500/10 border border-amber-500/20 text-sm text-amber-400">
+                    {cert}
                   </span>
                 ))}
               </div>
@@ -799,6 +853,15 @@ function ApplicantCard({ app, onSwipe, expanded, setExpanded }) {
               <Briefcase className="w-3 h-3" />
               Also applied to {app.other_applications.length} other {app.other_applications.length === 1 ? 'job' : 'jobs'}
             </p>
+          )}
+
+          {app.other_applications?.length > 0 && (
+            <div className="mt-1 px-2 py-1 rounded-lg bg-primary/10 border border-primary/20 inline-flex items-center gap-1.5">
+              <Briefcase className="w-3 h-3 text-primary" />
+              <span className="text-xs text-primary font-medium">
+                Also applied to: {app.other_applications.map(a => a.job_title).join(', ')}
+              </span>
+            </div>
           )}
 
           {app.superlike_note && (

@@ -16,6 +16,7 @@ import { isPushSupported, getPermissionStatus, subscribeToPush, unsubscribeFromP
 import { UpgradePrompt } from '../components/UpgradeModal';
 import ConfirmDialog from '../components/ConfirmDialog';
 import PhotoCropModal from '../components/PhotoCropModal';
+import LocationAutocomplete from '../components/LocationAutocomplete';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
@@ -1108,30 +1109,13 @@ export default function Profile() {
 
             <div className="space-y-2">
               <Label htmlFor="location">Location</Label>
-              <div className="relative">
-                <MapPin className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-                <Input
-                  id="location"
-                  value={formData.location}
-                  onChange={(e) => setFormData({ ...formData, location: e.target.value })}
-                  placeholder="e.g., San Francisco, CA"
-                  className="pl-12 h-12 rounded-xl bg-background border-border"
-                  data-testid="profile-location-input"
-                />
-              </div>
-              <button
-                type="button"
-                onClick={handleDetectLocation}
-                disabled={detectingLocation}
-                className="flex items-center gap-2 text-sm text-primary hover:text-primary/80 transition-colors"
-              >
-                {detectingLocation ? (
-                  <div className="w-3.5 h-3.5 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-                ) : (
-                  <Navigation2 className="w-3.5 h-3.5" />
-                )}
-                {detectingLocation ? 'Detecting...' : 'Use my current location'}
-              </button>
+              <LocationAutocomplete
+                value={formData.location}
+                onChange={(val) => setFormData({ ...formData, location: val })}
+                placeholder="e.g., San Francisco, CA"
+                showDetectButton
+                data-testid="profile-location-input"
+              />
             </div>
 
             <div className="space-y-2">

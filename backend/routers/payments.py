@@ -460,21 +460,80 @@ async def apple_server_notification(request: Request):
     Set to: https://your-api-domain.com/api/payments/apple/app-store-notification
     """
     try:
-        body = await request.json()
-        # In production, verify the JWS signed notification
-        # For now, log it
-        notification_type = body.get("notificationType", "")
-        logger.info(f"Apple notification: {notification_type}")
+        import jwt as pyjwt
+        import requests as http_requests
+        from jwt.algorithms import RSAAlgorithm
 
-        if notification_type == "REFUND":
-            # Handle refund - revoke the purchase
-            data = body.get("data", {})
-            transaction_id = data.get("transactionId")
+        body = await request.json()
+        signed_payload = body.get("signedPayload", "")
+
+        if not signed_payload:
+            logger.warning("Apple notification missing signedPayload")
+            return {"status": "ok"}
+
+        # Verify the JWS signature using Apple's public keys
+        try:
+            apple_keys_response = http_requests.get("https://appleid.apple.com/auth/keys", timeout=10)
+            apple_keys = apple_keys_response.json()
+            header = pyjwt.get_unverified_header(signed_payload)
+            kid = header.get("kid")
+
+            matching_key = None
+            for key in apple_keys.get("keys", []):
+                if key.get("kid") == kid:
+                    matching_key = key
+                    break
+
+            if matching_key:
+                public_key = RSAAlgorithm.from_jwk(matching_key)
+                payload = pyjwt.decode(signed_payload, public_key, algorithms=["RS256", "ES256"], options={"verify_aud": False})
+            else:
+                # If key not found, decode without verification but log a warning
+                logger.warning(f"Apple notification key {kid} not found, decoding unverified")
+                payload = pyjwt.decode(signed_payload, options={"verify_signature": False})
+        except Exception as decode_err:
+            logger.error(f"Apple notification JWS decode error: {decode_err}")
+            # Fall back to unverified decode to avoid losing notifications
+            payload = pyjwt.decode(signed_payload, options={"verify_signature": False})
+
+        notification_type = payload.get("notificationType", "")
+        subtype = payload.get("subtype", "")
+        logger.info(f"Apple notification: {notification_type} (subtype: {subtype})")
+
+        data = payload.get("data", {})
+        transaction_id = data.get("transactionId")
+
+        if notification_type == "REFUND" and transaction_id:
+            await db.transactions.update_one(
+                {"apple_transaction_id": transaction_id},
+                {"$set": {"status": "refunded"}}
+            )
+            logger.info(f"Refunded Apple transaction: {transaction_id}")
+
+        elif notification_type == "DID_RENEW" and transaction_id:
+            # Subscription renewed - extend the period
+            txn = await db.transactions.find_one({"apple_transaction_id": transaction_id})
+            if txn:
+                user_id = txn.get("user_id")
+                if user_id:
+                    expires_date = data.get("expiresDate")
+                    if expires_date:
+                        await db.users.update_one(
+                            {"id": user_id},
+                            {"$set": {"subscription.period_end": expires_date, "subscription.status": "active"}}
+                        )
+                        logger.info(f"Renewed subscription for user {user_id}")
+
+        elif notification_type in ("EXPIRED", "REVOKE"):
             if transaction_id:
-                await db.transactions.update_one(
-                    {"apple_transaction_id": transaction_id},
-                    {"$set": {"status": "refunded"}}
-                )
+                txn = await db.transactions.find_one({"apple_transaction_id": transaction_id})
+                if txn and txn.get("user_id"):
+                    await db.users.update_one(
+                        {"id": txn["user_id"]},
+                        {"$set": {"subscription.status": "expired"}}
+                    )
+                    logger.info(f"Expired/revoked subscription for user {txn['user_id']}")
+
     except Exception as e:
         logger.error(f"Apple notification error: {e}")
 

@@ -19,6 +19,7 @@ const Download = React.lazy(() => import("./pages/Download"));
 const ForgotPassword = React.lazy(() => import("./pages/ForgotPassword"));
 const ResetPassword = React.lazy(() => import("./pages/ResetPassword"));
 const Onboarding = React.lazy(() => import("./pages/Onboarding"));
+const RecruiterOnboarding = React.lazy(() => import("./pages/RecruiterOnboarding"));
 const SeekerDashboard = React.lazy(() => import("./pages/SeekerDashboard"));
 const RecruiterDashboard = React.lazy(() => import("./pages/RecruiterDashboard"));
 const RecruiterSwipe = React.lazy(() => import("./pages/RecruiterSwipe"));
@@ -90,9 +91,14 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
     return <Navigate to="/login" replace />;
   }
 
-  // Redirect seekers to onboarding if not complete
-  if (user.role === 'seeker' && !user.onboarding_complete) {
-    return <Navigate to="/onboarding" replace />;
+  // Redirect users to onboarding if not complete
+  if (!user.onboarding_complete) {
+    if (user.role === 'seeker') {
+      return <Navigate to="/onboarding" replace />;
+    }
+    if (user.role === 'recruiter') {
+      return <Navigate to="/recruiter/onboarding" replace />;
+    }
   }
 
   if (allowedRoles && !allowedRoles.includes(user.role)) {
@@ -117,14 +123,9 @@ const OnboardingRoute = ({ children }) => {
     return <Navigate to="/login" replace />;
   }
 
-  // If already completed onboarding, go to dashboard
+  // If already completed onboarding, go to appropriate dashboard
   if (user.onboarding_complete) {
-    return <Navigate to="/dashboard" replace />;
-  }
-
-  // Only seekers need onboarding
-  if (user.role !== 'seeker') {
-    return <Navigate to="/recruiter" replace />;
+    return <Navigate to={user.role === 'seeker' ? '/dashboard' : '/recruiter'} replace />;
   }
 
   return children;
@@ -142,9 +143,8 @@ const PublicRoute = ({ children }) => {
   }
 
   if (user) {
-    // Check if seeker needs onboarding
-    if (user.role === 'seeker' && !user.onboarding_complete) {
-      return <Navigate to="/onboarding" replace />;
+    if (!user.onboarding_complete) {
+      return <Navigate to={user.role === 'seeker' ? '/onboarding' : '/recruiter/onboarding'} replace />;
     }
     return <Navigate to={user.role === 'seeker' ? '/dashboard' : '/recruiter'} replace />;
   }
@@ -195,6 +195,14 @@ function AppRoutes() {
         element={
           <OnboardingRoute>
             <Onboarding />
+          </OnboardingRoute>
+        }
+      />
+      <Route
+        path="/recruiter/onboarding"
+        element={
+          <OnboardingRoute>
+            <RecruiterOnboarding />
           </OnboardingRoute>
         }
       />

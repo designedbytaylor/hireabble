@@ -23,6 +23,7 @@ import axios from 'axios';
 import PhotoCropModal from '../components/PhotoCropModal';
 import LocationInput from '../components/LocationInput';
 import { getPhotoUrl } from '../utils/helpers';
+import LocationAutocomplete from '../components/LocationAutocomplete';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
@@ -738,12 +739,12 @@ export default function Onboarding() {
                         <MapPin className="w-4 h-4" />
                         Where are you located?
                       </Label>
-                      <LocationInput
+                      <LocationAutocomplete
                         value={formData.location}
-                        onChange={(loc) => handleChange('location', loc)}
+                        onChange={(val) => handleChange('location', val)}
                         placeholder="Start typing your city..."
-                        allowRemote
-                        testId="location-input"
+                        showDetectButton
+                        data-testid="location-input"
                       />
                     </div>
                     <div className="space-y-2">

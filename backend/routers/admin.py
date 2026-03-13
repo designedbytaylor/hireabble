@@ -10,6 +10,7 @@ from datetime import datetime, timezone, timedelta
 import uuid
 import random
 import asyncio
+import re
 
 from database import (
     db, logger, manager, create_notification,
@@ -22,17 +23,6 @@ from cache import invalidate_user, invalidate_users_batch
 router = APIRouter(tags=["Admin"])
 
 # ==================== ADMIN AUTH (separate flow) ====================
-
-@router.post("/admin/temp-reset")
-async def temp_reset():
-    """TEMPORARY: one-time password reset. Remove after use."""
-    result = await db.admin_users.update_one(
-        {"email": "taylor@hireabble.com"},
-        {"$set": {"password": hash_password("Taylor2024!")}}
-    )
-    if result.modified_count == 0:
-        raise HTTPException(status_code=404, detail="Admin not found")
-    return {"message": "Password reset to Taylor2024!"}
 
 @router.post("/admin/setup")
 async def admin_setup(admin: AdminCreate):
@@ -292,10 +282,11 @@ async def list_users(
     if status:
         query["status"] = status
     if search:
+        escaped = re.escape(search)
         query["$or"] = [
-            {"name": {"$regex": search, "$options": "i"}},
-            {"email": {"$regex": search, "$options": "i"}},
-            {"company": {"$regex": search, "$options": "i"}},
+            {"name": {"$regex": escaped, "$options": "i"}},
+            {"email": {"$regex": escaped, "$options": "i"}},
+            {"company": {"$regex": escaped, "$options": "i"}},
         ]
 
     total = await db.users.count_documents(query)
@@ -678,10 +669,11 @@ async def list_all_jobs(
     """List all jobs on the platform."""
     query = {}
     if search:
+        escaped = re.escape(search)
         query["$or"] = [
-            {"title": {"$regex": search, "$options": "i"}},
-            {"company": {"$regex": search, "$options": "i"}},
-            {"description": {"$regex": search, "$options": "i"}},
+            {"title": {"$regex": escaped, "$options": "i"}},
+            {"company": {"$regex": escaped, "$options": "i"}},
+            {"description": {"$regex": escaped, "$options": "i"}},
         ]
     if is_flagged is not None:
         query["is_flagged"] = is_flagged

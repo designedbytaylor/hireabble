@@ -10,7 +10,7 @@ export default function CookiePolicy() {
         </Link>
 
         <h1 className="text-3xl font-bold font-['Outfit'] mb-2">Cookie Policy</h1>
-        <p className="text-muted-foreground mb-8">Last updated: March 9, 2026</p>
+        <p className="text-muted-foreground mb-8">Last updated: March 13, 2026</p>
 
         <div className="prose prose-invert max-w-none space-y-6 text-sm leading-relaxed">
           <section>

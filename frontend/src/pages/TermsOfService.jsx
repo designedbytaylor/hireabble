@@ -10,7 +10,7 @@ export default function TermsOfService() {
         </Link>
 
         <h1 className="text-3xl font-bold font-['Outfit'] mb-2">Terms of Service</h1>
-        <p className="text-muted-foreground mb-8">Last updated: March 9, 2026</p>
+        <p className="text-muted-foreground mb-8">Last updated: March 13, 2026</p>
 
         <div className="prose prose-invert max-w-none space-y-6 text-sm leading-relaxed">
           <section>
@@ -23,7 +23,7 @@ export default function TermsOfService() {
           <section>
             <h2 className="text-lg font-bold font-['Outfit'] mb-3">2. Eligibility</h2>
             <p className="text-muted-foreground">
-              You must be at least 18 years old and legally able to enter into contracts to use Hireabble. By using the Service, you represent and warrant that you meet these requirements. Accounts registered by automated means are not permitted.
+              You must be at least 16 years old to use Hireabble. By using the Service, you represent and warrant that you meet this requirement. If you are under the age of majority in your jurisdiction, you confirm that you have your parent or guardian's consent to use the Service. Accounts registered by automated means are not permitted.
             </p>
           </section>
 

@@ -840,10 +840,24 @@ async def get_applications(
             if sub.get("status") == "active" and sub.get("period_end", "") >= now:
                 premium_seekers.add(s["id"])
 
-    # Mark premium applicants
+    # Mark premium applicants and cross-applications (same seeker applied to multiple jobs)
+    # Build a map of seeker_id -> list of (job_id, job_title)
+    seeker_jobs = {}
+    for app in applications:
+        sid = app.get("seeker_id")
+        if sid:
+            if sid not in seeker_jobs:
+                seeker_jobs[sid] = []
+            seeker_jobs[sid].append({"job_id": app.get("job_id"), "job_title": app.get("job_title")})
+
     for app in applications:
         if app.get("seeker_id") in premium_seekers:
             app["is_premium_seeker"] = True
+        # Add other applications from the same seeker (excluding current one)
+        sid = app.get("seeker_id")
+        other_apps = [a for a in seeker_jobs.get(sid, []) if a["job_id"] != app.get("job_id")]
+        if other_apps:
+            app["other_applications"] = other_apps
 
     # Find other jobs each seeker has applied to (for "also applied to" feature)
     if seeker_ids:

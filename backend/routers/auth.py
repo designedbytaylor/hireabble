@@ -44,6 +44,18 @@ async def register(user: UserCreate, request: Request):
     try:
         logger.info(f"Registration attempt for email: {user.email}")
 
+        # Age verification: must be at least 16 years old
+        if user.dob:
+            from datetime import date
+            try:
+                dob = date.fromisoformat(user.dob)
+                today = date.today()
+                age = today.year - dob.year - ((today.month, today.day) < (dob.month, dob.day))
+                if age < 16:
+                    raise HTTPException(status_code=400, detail="You must be at least 16 years old to use Hireabble")
+            except ValueError:
+                raise HTTPException(status_code=400, detail="Invalid date of birth format")
+
         # Content moderation on registration fields
         is_clean, violations = check_fields({"name": user.name, "company": user.company or ""})
         if not is_clean and is_severe(violations):
@@ -64,6 +76,7 @@ async def register(user: UserCreate, request: Request):
             "name": user.name,
             "role": user.role,
             "company": user.company,
+            "date_of_birth": user.dob,
             "avatar": avatar,
             "photo_url": None,
             "video_url": None,
@@ -195,9 +208,10 @@ async def get_me(current_user: dict = Depends(get_current_user)):
 # ==================== FORGOT PASSWORD ====================
 
 @router.post("/forgot-password")
-async def forgot_password(request: ForgotPasswordRequest):
+@limiter.limit("3/minute")
+async def forgot_password(body: ForgotPasswordRequest, request: Request):
     """Send password reset email"""
-    user = await db.users.find_one({"email": request.email})
+    user = await db.users.find_one({"email": body.email})
     
     # Always return success to prevent email enumeration
     if not user:
@@ -212,7 +226,7 @@ async def forgot_password(request: ForgotPasswordRequest):
     await db.password_reset_tokens.insert_one({
         "token": reset_token,
         "user_id": user["id"],
-        "email": request.email,
+        "email": body.email,
         "expires_at": expires_at.isoformat(),
         "created_at": datetime.now(timezone.utc).isoformat()
     })
@@ -248,7 +262,7 @@ async def forgot_password(request: ForgotPasswordRequest):
         </div>
         """
         asyncio.create_task(send_email_notification(
-            request.email,
+            body.email,
             "Reset Your Hireabble Password",
             email_html
         ))
@@ -258,10 +272,11 @@ async def forgot_password(request: ForgotPasswordRequest):
     return {"message": "If an account exists with this email, a reset link has been sent."}
 
 @router.post("/reset-password")
-async def reset_password(request: ResetPasswordRequest):
+@limiter.limit("5/minute")
+async def reset_password(body: ResetPasswordRequest, request: Request):
     """Reset password using token"""
     # Find token
-    token_doc = await db.password_reset_tokens.find_one({"token": request.token})
+    token_doc = await db.password_reset_tokens.find_one({"token": body.token})
     
     if not token_doc:
         raise HTTPException(status_code=400, detail="Invalid or expired reset token")
@@ -269,18 +284,18 @@ async def reset_password(request: ResetPasswordRequest):
     # Check expiration
     expires_at = datetime.fromisoformat(token_doc["expires_at"].replace('Z', '+00:00'))
     if datetime.now(timezone.utc) > expires_at:
-        await db.password_reset_tokens.delete_one({"token": request.token})
+        await db.password_reset_tokens.delete_one({"token": body.token})
         raise HTTPException(status_code=400, detail="Reset token has expired")
-    
+
     # Update password
-    hashed_password = hash_password(request.password)
+    hashed_password = hash_password(body.password)
     await db.users.update_one(
         {"id": token_doc["user_id"]},
         {"$set": {"password": hashed_password}}
     )
-    
+
     # Delete used token
-    await db.password_reset_tokens.delete_one({"token": request.token})
+    await db.password_reset_tokens.delete_one({"token": body.token})
     
     return {"message": "Password has been reset successfully"}
 
@@ -680,22 +695,45 @@ async def apple_oauth(body: dict):
         raise HTTPException(status_code=400, detail="Missing id_token or code")
 
     try:
-        # Apple sends user info in the id_token (JWT)
-        # Decode without verification first to get claims
-        # In production, you should verify the JWT signature with Apple's public keys
-        import json
-        import base64
+        import jwt as pyjwt
+        import requests as http_requests
 
         if id_token:
-            # Decode the JWT payload (middle segment)
-            parts = id_token.split('.')
-            if len(parts) != 3:
-                raise HTTPException(status_code=400, detail="Invalid id_token format")
+            # Fetch Apple's public keys and verify the JWT signature
+            try:
+                apple_keys_response = http_requests.get("https://appleid.apple.com/auth/keys", timeout=10)
+                apple_keys = apple_keys_response.json()
 
-            # Add padding if needed
-            payload = parts[1]
-            payload += '=' * (4 - len(payload) % 4)
-            decoded = json.loads(base64.urlsafe_b64decode(payload))
+                # Decode the JWT header to find the key ID
+                header = pyjwt.get_unverified_header(id_token)
+                kid = header.get("kid")
+
+                # Find the matching key
+                matching_key = None
+                for key in apple_keys.get("keys", []):
+                    if key.get("kid") == kid:
+                        matching_key = key
+                        break
+
+                if not matching_key:
+                    raise HTTPException(status_code=400, detail="Apple public key not found")
+
+                # Build the public key and verify the token
+                from jwt.algorithms import RSAAlgorithm
+                public_key = RSAAlgorithm.from_jwk(matching_key)
+
+                decoded = pyjwt.decode(
+                    id_token,
+                    public_key,
+                    algorithms=["RS256"],
+                    audience=APPLE_CLIENT_ID,
+                    issuer="https://appleid.apple.com",
+                )
+            except pyjwt.ExpiredSignatureError:
+                raise HTTPException(status_code=401, detail="Apple token has expired")
+            except pyjwt.InvalidTokenError as jwt_err:
+                logger.error(f"Apple JWT verification failed: {jwt_err}")
+                raise HTTPException(status_code=400, detail="Invalid Apple token")
 
             email = decoded.get("email")
             # Apple only sends name on first sign-in, so we may not have it

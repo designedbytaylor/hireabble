@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Heart, MessageCircle, Briefcase, Building2, Calendar, ChevronRight,
-  X, MapPin, GraduationCap, Clock, User, Mail, ArrowLeft, Star, FileText, Award, Download, ShieldBan,
+  X, MapPin, GraduationCap, Clock, User, Mail, ArrowLeft, Star, FileText, Award, Download,
 } from 'lucide-react';
 import { Badge } from '../components/ui/badge';
 import { Button } from '../components/ui/button';
@@ -11,7 +11,6 @@ import { useAuth } from '../context/AuthContext';
 import Navigation from '../components/Navigation';
 import { getPhotoUrl, handleImgError } from '../utils/helpers';
 import { toast } from 'sonner';
-import BlockDialog from '../components/BlockDialog';
 import { SkeletonPageBackground, SkeletonListItem } from '../components/skeletons';
 import { Skeleton } from '../components/ui/skeleton';
 
@@ -26,7 +25,6 @@ export default function Matches() {
   // Profile view state
   const [viewingProfile, setViewingProfile] = useState(null);
   const [profileLoading, setProfileLoading] = useState(false);
-  const [blockTarget, setBlockTarget] = useState(null);
   const tokenRef = useRef(token);
   tokenRef.current = token;
 
@@ -513,16 +511,6 @@ export default function Matches() {
                       >
                         <MessageCircle className="w-5 h-5" />
                       </button>
-                      <button
-                        onClick={() => setBlockTarget({
-                          id: user?.role === 'seeker' ? match.recruiter_id : match.seeker_id,
-                          name: user?.role === 'seeker' ? (match.company || 'this user') : (match.seeker_name || 'this user'),
-                        })}
-                        className="p-3 rounded-xl bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-colors"
-                        title="Block user"
-                      >
-                        <ShieldBan className="w-5 h-5" />
-                      </button>
                     </div>
                   </div>
                 </div>
@@ -543,17 +531,6 @@ export default function Matches() {
           )}
         </div>
       </main>
-
-      <BlockDialog
-        open={!!blockTarget}
-        onOpenChange={(open) => !open && setBlockTarget(null)}
-        blockedUserId={blockTarget?.id}
-        blockedUserName={blockTarget?.name}
-        onBlockSuccess={() => {
-          setBlockTarget(null);
-          fetchMatches();
-        }}
-      />
 
       <Navigation />
 

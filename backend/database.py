@@ -325,6 +325,7 @@ class UserCreate(BaseModel):
     name: str
     role: str  # 'seeker' or 'recruiter'
     company: Optional[str] = None
+    dob: Optional[str] = None  # Date of birth, ISO format YYYY-MM-DD
 
 class UserLogin(BaseModel):
     email: EmailStr
@@ -425,6 +426,7 @@ class ApplicationResponse(BaseModel):
     recruiter_action: Optional[str] = None
     pipeline_stage: Optional[str] = "applied"
     created_at: str
+    other_applications: Optional[List[dict]] = None  # other jobs this seeker applied to
 
 class RecruiterAction(BaseModel):
     application_id: str

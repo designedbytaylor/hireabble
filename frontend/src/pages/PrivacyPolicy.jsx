@@ -10,14 +10,14 @@ export default function PrivacyPolicy() {
         </Link>
 
         <h1 className="text-3xl font-bold font-['Outfit'] mb-2">Privacy Policy</h1>
-        <p className="text-muted-foreground mb-8">Last updated: March 12, 2026</p>
+        <p className="text-muted-foreground mb-8">Last updated: March 13, 2026</p>
 
         <div className="prose prose-invert max-w-none space-y-6 text-sm leading-relaxed">
           <section>
             <h2 className="text-lg font-bold font-['Outfit'] mb-3">1. Information We Collect</h2>
             <p className="text-muted-foreground mb-2">We collect information you provide directly:</p>
             <ul className="list-disc pl-6 text-muted-foreground space-y-1">
-              <li><strong>Account Information:</strong> Name, email address, password, phone number</li>
+              <li><strong>Account Information:</strong> Name, email address, password, date of birth</li>
               <li><strong>Profile Information:</strong> Job title, skills, work history, education, certifications, bio, location, photos, videos</li>
               <li><strong>Resume Data:</strong> Information extracted from uploaded PDF resumes</li>
               <li><strong>Job Listings:</strong> Job details, requirements, salary ranges (recruiters)</li>
@@ -108,7 +108,7 @@ export default function PrivacyPolicy() {
           <section>
             <h2 className="text-lg font-bold font-['Outfit'] mb-3">8. Children's Privacy</h2>
             <p className="text-muted-foreground">
-              Hireabble is not intended for anyone under the age of 18. We do not knowingly collect personal information from children. If we learn we have collected data from a child under 18, we will promptly delete that information.
+              Hireabble is not intended for anyone under the age of 16. We do not knowingly collect personal information from children under 16. If we learn we have collected data from a user under 16, we will promptly delete that information.
             </p>
           </section>
 

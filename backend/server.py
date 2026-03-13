@@ -44,13 +44,21 @@ app.mount("/uploads", StaticFiles(directory=str(UPLOADS_DIR)), name="uploads")
 app.add_middleware(BrotliMiddleware, minimum_size=500)
 app.add_middleware(GZipMiddleware, minimum_size=500)
 
-# CORS middleware
+# CORS middleware — restrict to known origins in production
+import os as _os
+_frontend_url = _os.getenv("FRONTEND_URL", "http://localhost:3000")
+_cors_origins = [
+    _frontend_url,
+    "http://localhost:3000",
+    "http://localhost:3001",
+]
+# In production, FRONTEND_URL should be set to the actual domain (e.g., https://hireabble.com)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=_cors_origins,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type"],
 )
 
 

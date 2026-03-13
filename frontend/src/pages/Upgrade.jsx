@@ -119,6 +119,12 @@ export default function Upgrade() {
         return;
       }
 
+      // iOS without StoreKit handler — cannot use Stripe (Apple Guideline 3.1.1)
+      if (isIOS) {
+        toast.error('Please download the app from the App Store to subscribe.');
+        return;
+      }
+
       if (isAndroid && window.Android?.purchase) {
         // Android installed PWA — delegate to Google Play Billing
         const productId = `com.hireabble.${tierId}.${selectedDuration}`;
@@ -149,6 +155,18 @@ export default function Upgrade() {
       toast.error(err.response?.data?.detail || 'Failed to subscribe');
     } finally {
       setPurchasing(null);
+    }
+  };
+
+  const handleRestorePurchases = () => {
+    if (isIOS && window.webkit?.messageHandlers?.storeKit) {
+      window.webkit.messageHandlers.storeKit.postMessage({ action: 'restore' });
+      toast.success('Restoring purchases...');
+    } else if (isAndroid && window.Android?.restorePurchases) {
+      window.Android.restorePurchases();
+      toast.success('Restoring purchases...');
+    } else {
+      toast('Your subscription is managed through your account settings.', { duration: 4000 });
     }
   };
 
@@ -362,10 +380,19 @@ export default function Upgrade() {
           </div>
         </div>
 
-        <div className="text-[10px] text-muted-foreground text-center py-4 space-y-2">
+        <div className="text-center py-4">
+          <button
+            onClick={handleRestorePurchases}
+            className="text-xs text-primary hover:underline mb-4 inline-block"
+          >
+            Restore Purchases
+          </button>
+        </div>
+
+        <div className="text-xs text-muted-foreground text-center py-4 space-y-2">
           <p>
             Payment will be charged to your {isIOS ? 'Apple ID account' : isAndroid ? 'Google Play account' : 'payment method'} at
-            confirmation of purchase. Subscriptions automatically renew unless auto-renew is turned off at least 24 hours before
+            confirmation of purchase. Subscriptions automatically renew for the same duration and price unless auto-renew is turned off at least 24 hours before
             the end of the current period. Your account will be charged for renewal within 24 hours prior to the end of the current period.
           </p>
           <p>

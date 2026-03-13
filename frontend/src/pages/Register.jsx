@@ -1,12 +1,13 @@
 import { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { Mail, Lock, User, Building2, ArrowRight, Eye, EyeOff, MapPin, Search, Users, Zap, Target, Shield, BarChart3, Briefcase } from 'lucide-react';
+import { Mail, Lock, User, Building2, ArrowRight, Eye, EyeOff, MapPin, Search, Users, Zap, Target, Shield, BarChart3, Briefcase, Calendar } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { toast } from 'sonner';
 import { useAuth } from '../context/AuthContext';
 import OAuthButtons from '../components/OAuthButtons';
+import LocationAutocomplete from '../components/LocationAutocomplete';
 
 const ROLE_CONFIG = {
   seeker: {
@@ -53,7 +54,8 @@ export default function Register() {
     role,
     company: '',
     title: '',
-    location: ''
+    location: '',
+    dob: ''
   });
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -74,6 +76,22 @@ export default function Register() {
     e.preventDefault();
     if (!formData.name || !formData.email || !formData.password) {
       toast.error('Please fill in all required fields');
+      return;
+    }
+    if (!formData.dob) {
+      toast.error('Please enter your date of birth');
+      return;
+    }
+    // Age check: must be at least 16
+    const dob = new Date(formData.dob);
+    const today = new Date();
+    let age = today.getFullYear() - dob.getFullYear();
+    const monthDiff = today.getMonth() - dob.getMonth();
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < dob.getDate())) {
+      age--;
+    }
+    if (age < 16) {
+      toast.error('You must be at least 16 years old to use Hireabble');
       return;
     }
     if (!acceptedTerms) {
@@ -211,6 +229,23 @@ export default function Register() {
                 </div>
               </div>
 
+              <div className="space-y-2">
+                <Label htmlFor="dob">Date of Birth</Label>
+                <div className="relative">
+                  <Calendar className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+                  <Input
+                    id="dob"
+                    name="dob"
+                    type="date"
+                    value={formData.dob}
+                    onChange={handleChange}
+                    max={new Date().toISOString().split('T')[0]}
+                    className="pl-12 h-12 rounded-xl bg-background border-border"
+                    data-testid="register-dob-input"
+                  />
+                </div>
+              </div>
+
               {role === 'recruiter' && (
                 <div className="space-y-2">
                   <Label htmlFor="company">Company Name</Label>
@@ -251,15 +286,12 @@ export default function Register() {
                   <div className="space-y-2">
                     <Label htmlFor="location">Location</Label>
                     <div className="relative">
-                      <MapPin className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-                      <Input
-                        id="location"
-                        name="location"
-                        type="text"
-                        placeholder="San Francisco, CA"
+                      <MapPin className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-muted-foreground z-10" />
+                      <LocationAutocomplete
                         value={formData.location}
-                        onChange={handleChange}
-                        className="pl-12 h-12 rounded-xl bg-background border-border"
+                        onChange={(val) => setFormData(prev => ({ ...prev, location: val }))}
+                        placeholder="San Francisco, CA"
+                        inputClassName="pl-12 h-12"
                         data-testid="register-location-input"
                       />
                     </div>
