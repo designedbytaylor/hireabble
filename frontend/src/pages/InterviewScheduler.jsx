@@ -115,7 +115,7 @@ export default function InterviewScheduler() {
       <header className="relative z-10 p-6 md:p-8">
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-3">
-            <button onClick={() => navigate(-1)} className="p-2 rounded-xl hover:bg-accent transition-colors">
+            <button onClick={() => navigate(-1)} className="p-2 rounded-xl hover:bg-accent transition-colors" aria-label="Go back">
               <ArrowLeft className="w-5 h-5" />
             </button>
             <div>
@@ -129,6 +129,7 @@ export default function InterviewScheduler() {
             <Button
               onClick={() => setShowCreate(true)}
               className="bg-gradient-to-r from-primary to-secondary rounded-full px-5"
+              aria-label="Schedule new interview"
             >
               <Plus className="w-5 h-5 mr-2" />
               Schedule
@@ -137,16 +138,16 @@ export default function InterviewScheduler() {
         </div>
 
         {/* Quick Stats */}
-        <div className="grid grid-cols-3 gap-3">
-          <div className="glass-card rounded-2xl p-4 text-center">
+        <div className="grid grid-cols-3 gap-3" role="group" aria-label="Interview statistics">
+          <div className="glass-card rounded-2xl p-4 text-center" aria-label={`${upcoming.length} upcoming interviews`}>
             <div className="text-2xl font-bold font-['Outfit'] text-green-500">{upcoming.length}</div>
             <div className="text-xs text-muted-foreground">Upcoming</div>
           </div>
-          <div className="glass-card rounded-2xl p-4 text-center">
+          <div className="glass-card rounded-2xl p-4 text-center" aria-label={`${pending.length} pending interviews`}>
             <div className="text-2xl font-bold font-['Outfit'] text-yellow-500">{pending.length}</div>
             <div className="text-xs text-muted-foreground">Pending</div>
           </div>
-          <div className="glass-card rounded-2xl p-4 text-center">
+          <div className="glass-card rounded-2xl p-4 text-center" aria-label={`${interviews.length} total interviews`}>
             <div className="text-2xl font-bold font-['Outfit']">{interviews.length}</div>
             <div className="text-xs text-muted-foreground">Total</div>
           </div>

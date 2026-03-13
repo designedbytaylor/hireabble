@@ -346,13 +346,14 @@ export default function Chat() {
   });
 
   return (
-    <div className="h-screen bg-background flex flex-col">
+    <div className="h-screen bg-background flex flex-col" role="main" aria-label="Chat">
       {/* Header */}
-      <header className="glass border-b border-border p-4 flex items-center gap-4">
+      <header className="glass border-b border-border p-4 flex items-center gap-4" aria-label="Chat header">
         <button
           onClick={() => navigate('/matches')}
           className="p-2 rounded-xl hover:bg-accent transition-colors"
           data-testid="back-btn"
+          aria-label="Back to matches"
         >
           <ArrowLeft className="w-5 h-5" />
         </button>
@@ -391,6 +392,7 @@ export default function Chat() {
           onClick={() => setReportOpen(true)}
           className="p-2 rounded-lg hover:bg-red-500/10 text-muted-foreground hover:text-red-400 transition-colors"
           title="Report user"
+          aria-label="Report user"
         >
           <Flag className="w-4 h-4" />
         </button>
@@ -398,11 +400,12 @@ export default function Chat() {
           onClick={() => setBlockOpen(true)}
           className="p-2 rounded-lg hover:bg-red-500/10 text-muted-foreground hover:text-red-400 transition-colors"
           title="Block user"
+          aria-label="Block user"
         >
           <ShieldBan className="w-4 h-4" />
         </button>
 
-        <div className={`p-2 rounded-lg ${wsConnected ? 'bg-success/10' : 'bg-muted'}`}>
+        <div className={`p-2 rounded-lg ${wsConnected ? 'bg-success/10' : 'bg-muted'}`} aria-label={wsConnected ? 'Connected' : 'Disconnected'} role="status">
           {wsConnected ? (
             <Wifi className="w-4 h-4 text-success" />
           ) : (
@@ -566,14 +569,15 @@ export default function Chat() {
       )}
 
       {/* Input */}
-      <footer className="glass border-t border-border p-4">
-        <form onSubmit={handleSend} className="flex gap-3">
+      <footer className="glass border-t border-border p-4" aria-label="Message input">
+        <form onSubmit={handleSend} className="flex gap-3" aria-label="Send message">
           <input
             ref={fileInputRef}
             type="file"
             accept="image/*"
             onChange={handleImageSelect}
             className="hidden"
+            aria-label="Upload image"
           />
           <input
             ref={videoInputRef}
@@ -581,11 +585,13 @@ export default function Chat() {
             accept="video/*"
             onChange={handleVideoSelect}
             className="hidden"
+            aria-label="Upload video"
           />
           <button
             type="button"
             onClick={() => fileInputRef.current?.click()}
             className="h-10 w-10 rounded-full bg-accent flex items-center justify-center hover:bg-accent/80 transition-colors flex-shrink-0"
+            aria-label="Attach image"
           >
             <Image className="w-4 h-4 text-muted-foreground" />
           </button>
@@ -622,12 +628,14 @@ export default function Chat() {
             placeholder="Type a message..."
             className="flex-1 h-12 rounded-full bg-background border-border px-5"
             data-testid="message-input"
+            aria-label="Message text"
           />
           <Button
             type="submit"
             disabled={(!newMessage.trim() && !imagePreview && !videoPreview) || sending || uploadingVideo}
             className="h-12 w-12 rounded-full bg-gradient-to-r from-primary to-secondary p-0"
             data-testid="send-btn"
+            aria-label="Send message"
           >
             {uploadingVideo ? <Loader2 className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5" />}
           </Button>

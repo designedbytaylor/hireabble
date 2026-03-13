@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useState, useEffect, useMemo } from 'react';
+import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { ArrowLeft, Check, Star, Zap, Crown, Sparkles, Shield } from 'lucide-react';
 import { motion } from 'framer-motion';
 import axios from 'axios';
@@ -8,6 +8,17 @@ import { toast } from 'sonner';
 import Navigation from '../components/Navigation';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
+
+/** Detect if running as installed PWA on iOS (StoreKit required) */
+function isIOSInstalled() {
+  return window.navigator.standalone === true ||
+    (window.matchMedia?.('(display-mode: standalone)').matches && /iPhone|iPad|iPod/.test(navigator.userAgent));
+}
+
+/** Detect if running as installed PWA on Android (Google Play Billing may apply) */
+function isAndroidInstalled() {
+  return window.matchMedia?.('(display-mode: standalone)').matches && /Android/.test(navigator.userAgent);
+}
 
 const DURATION_LABELS = { weekly: 'Weekly', monthly: 'Monthly', '6month': '6 Months' };
 
@@ -68,6 +79,9 @@ export default function Upgrade() {
 
   const isSeeker = user?.role === 'seeker';
   const preselect = searchParams.get('tier');
+  const isIOS = useMemo(() => isIOSInstalled(), []);
+  const isAndroid = useMemo(() => isAndroidInstalled(), []);
+  const isNativeStore = isIOS || isAndroid;
 
   useEffect(() => {
     fetchTiers();
@@ -92,6 +106,38 @@ export default function Upgrade() {
   const handleSubscribe = async (tierId) => {
     setPurchasing(tierId);
     try {
+      if (isIOS && window.webkit?.messageHandlers?.storeKit) {
+        // iOS installed PWA — delegate to native StoreKit handler
+        const productId = `com.hireabble.${tierId}.${selectedDuration}`;
+        window.webkit.messageHandlers.storeKit.postMessage({
+          action: 'purchase',
+          productId,
+          tier_id: tierId,
+          duration: selectedDuration,
+        });
+        // StoreKit callback will handle the rest via receipt verification
+        return;
+      }
+
+      if (isAndroid && window.Android?.purchase) {
+        // Android installed PWA — delegate to Google Play Billing
+        const productId = `com.hireabble.${tierId}.${selectedDuration}`;
+        window.Android.purchase(productId, tierId, selectedDuration);
+        return;
+      }
+
+      // Web — use Stripe checkout
+      const res = await axios.post(
+        `${API}/payments/create-checkout-session`,
+        { tier_id: tierId, duration: selectedDuration },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      if (res.data.checkout_url) {
+        window.location.href = res.data.checkout_url;
+        return;
+      }
+
+      // Fallback — direct subscription (dev/testing)
       await axios.post(
         `${API}/payments/subscribe`,
         { tier_id: tierId, duration: selectedDuration },
@@ -318,19 +364,25 @@ export default function Upgrade() {
 
         <div className="text-[10px] text-muted-foreground text-center py-4 space-y-2">
           <p>
-            Subscriptions auto-renew until cancelled. Payment will be charged to your account at confirmation of purchase.
-            Your subscription automatically renews unless auto-renew is turned off at least 24 hours before the end of the current period.
+            Payment will be charged to your {isIOS ? 'Apple ID account' : isAndroid ? 'Google Play account' : 'payment method'} at
+            confirmation of purchase. Subscriptions automatically renew unless auto-renew is turned off at least 24 hours before
+            the end of the current period. Your account will be charged for renewal within 24 hours prior to the end of the current period.
           </p>
           <p>
-            You can manage or cancel your subscription in your {/iPhone|iPad|iPod|Macintosh/.test(navigator.userAgent) ? (
+            You can manage or cancel your subscription anytime in your{' '}
+            {isIOS ? (
               <a href="https://apps.apple.com/account/subscriptions" className="text-primary underline">App Store settings</a>
-            ) : 'account settings'}.
-            Prices may vary by region.
+            ) : isAndroid ? (
+              <a href="https://play.google.com/store/account/subscriptions" className="text-primary underline">Google Play settings</a>
+            ) : (
+              <Link to="/profile" className="text-primary underline">account settings</Link>
+            )}.
+            {' '}Prices shown are in USD and may vary by region. Any unused portion of a free trial period will be forfeited when you purchase a subscription.
           </p>
           <p>
-            <a href="/terms" className="text-primary underline">Terms of Service</a>
+            <Link to="/terms" className="text-primary underline">Terms of Service</Link>
             {' · '}
-            <a href="/privacy" className="text-primary underline">Privacy Policy</a>
+            <Link to="/privacy" className="text-primary underline">Privacy Policy</Link>
           </p>
         </div>
       </main>

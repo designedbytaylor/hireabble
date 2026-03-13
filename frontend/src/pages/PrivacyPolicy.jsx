@@ -113,9 +113,22 @@ export default function PrivacyPolicy() {
           </section>
 
           <section>
-            <h2 className="text-lg font-bold font-['Outfit'] mb-3">9. California Privacy Rights (CCPA)</h2>
-            <p className="text-muted-foreground">
-              California residents have the right to know what personal information is collected, request deletion of personal information, and opt out of the sale of personal information. We do not sell personal information. To exercise these rights, contact us at privacy@hireabble.com.
+            <h2 className="text-lg font-bold font-['Outfit'] mb-3">9. California Privacy Rights (CCPA/CPRA)</h2>
+            <p className="text-muted-foreground mb-2">
+              If you are a California resident, you have the following rights under the California Consumer Privacy Act (CCPA) and the California Privacy Rights Act (CPRA):
+            </p>
+            <ul className="list-disc pl-6 text-muted-foreground space-y-1">
+              <li><strong>Right to Know:</strong> You may request disclosure of the categories and specific pieces of personal information we have collected about you in the past 12 months</li>
+              <li><strong>Right to Delete:</strong> You may request deletion of your personal information. You can do this directly via Profile &gt; Settings &gt; Delete Account, or by emailing us</li>
+              <li><strong>Right to Correct:</strong> You may request correction of inaccurate personal information</li>
+              <li><strong>Right to Opt Out of Sale/Sharing:</strong> <strong>We do not sell or share your personal information</strong> for cross-context behavioral advertising as defined by the CCPA/CPRA. Because we do not sell or share your data, no opt-out is necessary</li>
+              <li><strong>Right to Non-Discrimination:</strong> We will not discriminate against you for exercising any of these rights</li>
+            </ul>
+            <p className="text-muted-foreground mt-2">
+              <strong>Categories of information collected:</strong> Identifiers (name, email), professional information (resume, work history), commercial information (subscription purchases), internet activity (app usage, swipe history), geolocation data (approximate location).
+            </p>
+            <p className="text-muted-foreground mt-2">
+              To exercise your rights, email <a href="mailto:privacy@hireabble.com" className="text-primary hover:underline">privacy@hireabble.com</a> or use the in-app account deletion feature. We will verify your identity and respond within 45 days.
             </p>
           </section>
 
