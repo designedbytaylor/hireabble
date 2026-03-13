@@ -181,9 +181,11 @@ export default function OAuthButtons({ role = 'seeker' }) {
         toast.success(`Welcome${user.name ? ', ' + user.name : ''}!`);
 
         // Force page reload to pick up new auth state
-        window.location.href = user.role === 'seeker'
-          ? (user.onboarding_complete ? '/dashboard' : '/onboarding')
-          : '/recruiter';
+        if (!user.onboarding_complete) {
+          window.location.href = user.role === 'seeker' ? '/onboarding' : '/recruiter/onboarding';
+        } else {
+          window.location.href = user.role === 'seeker' ? '/dashboard' : '/recruiter';
+        }
       } catch (error) {
         toast.error(error.response?.data?.detail || `${provider} sign-in failed`);
       } finally {
