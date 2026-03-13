@@ -805,3 +805,87 @@ async def delete_account(current_user: dict = Depends(get_current_user)):
     except Exception as e:
         logger.error(f"Account deletion failed for {user_id}: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to delete account. Please try again or contact support.")
+
+
+# ==================== DATA EXPORT ====================
+
+@router.get("/account/export")
+async def export_account_data(current_user: dict = Depends(get_current_user)):
+    """Export all user data as JSON (GDPR / privacy compliance)."""
+    user_id = current_user["id"]
+    user_role = current_user.get("role", "seeker")
+
+    try:
+        # Core user profile (exclude internal fields)
+        user_doc = await db.users.find_one({"id": user_id}, {"_id": 0, "password": 0})
+
+        # Common data
+        notifications = await db.notifications.find(
+            {"user_id": user_id}, {"_id": 0}
+        ).to_list(None)
+
+        support_tickets = await db.support_tickets.find(
+            {"user_id": user_id}, {"_id": 0}
+        ).to_list(None)
+
+        profile_views = await db.profile_views.find(
+            {"$or": [{"viewer_id": user_id}, {"viewed_id": user_id}]}, {"_id": 0}
+        ).to_list(None)
+
+        export = {
+            "exported_at": datetime.now(timezone.utc).isoformat(),
+            "profile": user_doc,
+            "notifications": notifications,
+            "support_tickets": support_tickets,
+            "profile_views": profile_views,
+        }
+
+        # Role-specific data
+        if user_role == "seeker":
+            export["applications"] = await db.applications.find(
+                {"seeker_id": user_id}, {"_id": 0}
+            ).to_list(None)
+            export["swipes"] = await db.swipes.find(
+                {"seeker_id": user_id}, {"_id": 0}
+            ).to_list(None)
+        else:
+            jobs = await db.jobs.find(
+                {"recruiter_id": user_id}, {"_id": 0}
+            ).to_list(None)
+            job_ids = [j["id"] for j in jobs]
+            applications = []
+            if job_ids:
+                applications = await db.applications.find(
+                    {"job_id": {"$in": job_ids}}, {"_id": 0}
+                ).to_list(None)
+            export["jobs"] = jobs
+            export["applications_received"] = applications
+            export["swipes"] = await db.swipes.find(
+                {"recruiter_id": user_id}, {"_id": 0}
+            ).to_list(None)
+
+        # Matches, messages, interviews
+        matches = await db.matches.find(
+            {"$or": [{"seeker_id": user_id}, {"recruiter_id": user_id}]}, {"_id": 0}
+        ).to_list(None)
+        match_ids = [m["id"] for m in matches]
+        messages = []
+        if match_ids:
+            messages = await db.messages.find(
+                {"match_id": {"$in": match_ids}}, {"_id": 0}
+            ).to_list(None)
+
+        interviews = await db.interviews.find(
+            {"$or": [{"requester_id": user_id}, {"recipient_id": user_id}]}, {"_id": 0}
+        ).to_list(None)
+
+        export["matches"] = matches
+        export["messages"] = messages
+        export["interviews"] = interviews
+
+        logger.info(f"Data exported for user: {user_id}")
+        return export
+
+    except Exception as e:
+        logger.error(f"Data export failed for {user_id}: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to export data. Please try again.")
