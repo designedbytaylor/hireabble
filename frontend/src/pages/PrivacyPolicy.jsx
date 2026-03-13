@@ -17,7 +17,7 @@ export default function PrivacyPolicy() {
             <h2 className="text-lg font-bold font-['Outfit'] mb-3">1. Information We Collect</h2>
             <p className="text-muted-foreground mb-2">We collect information you provide directly:</p>
             <ul className="list-disc pl-6 text-muted-foreground space-y-1">
-              <li><strong>Account Information:</strong> Name, email address, password, phone number</li>
+              <li><strong>Account Information:</strong> Name, email address, password, date of birth</li>
               <li><strong>Profile Information:</strong> Job title, skills, work history, education, certifications, bio, location, photos, videos</li>
               <li><strong>Resume Data:</strong> Information extracted from uploaded PDF resumes</li>
               <li><strong>Job Listings:</strong> Job details, requirements, salary ranges (recruiters)</li>
