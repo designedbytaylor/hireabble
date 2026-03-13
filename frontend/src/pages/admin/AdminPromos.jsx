@@ -32,18 +32,18 @@ export default function AdminPromos() {
     expires_at: '',
   });
 
-  const headers = { Authorization: `Bearer ${token}` };
+  const getHeaders = useCallback(() => ({ Authorization: `Bearer ${token}` }), [token]);
 
   const fetchCodes = useCallback(async () => {
     try {
-      const res = await axios.get(`${API}/admin/promo-codes`, { headers });
+      const res = await axios.get(`${API}/admin/promo-codes`, { headers: getHeaders() });
       setCodes(res.data);
     } catch {
       toast.error('Failed to load promo codes');
     } finally {
       setLoading(false);
     }
-  }, [token]);
+  }, [getHeaders]);
 
   useEffect(() => { fetchCodes(); }, [fetchCodes]);
 
@@ -60,7 +60,7 @@ export default function AdminPromos() {
         per_user_limit: parseInt(form.per_user_limit) || 1,
         role_restriction: form.role_restriction || null,
         expires_at: form.expires_at || null,
-      }, { headers });
+      }, { headers: getHeaders() });
       toast.success(`Promo code "${form.code.toUpperCase()}" created`);
       setForm({ code: '', tier_id: 'recruiter_pro', duration_days: 90, max_uses: '', per_user_limit: 1, role_restriction: '', expires_at: '' });
       setShowCreate(false);
@@ -74,7 +74,7 @@ export default function AdminPromos() {
 
   const toggleActive = async (codeItem) => {
     try {
-      await axios.patch(`${API}/admin/promo-codes/${codeItem.id}`, { active: !codeItem.active }, { headers });
+      await axios.patch(`${API}/admin/promo-codes/${codeItem.id}`, { active: !codeItem.active }, { headers: getHeaders() });
       toast.success(`Code ${codeItem.active ? 'deactivated' : 'activated'}`);
       fetchCodes();
     } catch {
