@@ -29,6 +29,7 @@ import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import Navigation from '../components/Navigation';
 import NotificationBell from '../components/NotificationBell';
+import LocationInput from '../components/LocationInput';
 import { getPhotoUrl } from '../utils/helpers';
 import { UpgradePrompt, PremiumBlur } from '../components/UpgradeModal';
 import { SkeletonPageBackground, SkeletonStatCard, SkeletonListItem, SkeletonApplicantCard } from '../components/skeletons';
@@ -950,9 +951,9 @@ function JobFormDialog({ open, onClose, onSuccess, token, company, job = null, i
                   <label className="cursor-pointer flex flex-col items-center gap-2">
                     <Upload className="w-8 h-8 text-muted-foreground" />
                     <span className="text-sm text-muted-foreground">
-                      Upload screenshots of your job listing (up to 5)
+                      Already posted your job elsewhere? Quick-upload here
                     </span>
-                    <span className="text-xs text-muted-foreground">Indeed, LinkedIn, or any job board</span>
+                    <span className="text-xs text-muted-foreground">Upload screenshots of your listing (up to 5)</span>
                     <input
                       type="file"
                       accept="image/*"
@@ -1084,18 +1085,18 @@ function JobFormDialog({ open, onClose, onSuccess, token, company, job = null, i
               placeholder="Describe the role, responsibilities, and what makes it exciting..."
               value={formData.description}
               onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-              className="min-h-[100px] rounded-xl bg-background resize-none"
+              className="min-h-[180px] rounded-xl bg-background resize-y"
               data-testid="job-description-input"
             />
           </div>
 
           <div className="space-y-2">
-            <Label>Requirements (comma-separated)</Label>
-            <Input
-              placeholder="e.g., React, Node.js, 3+ years experience"
+            <Label>Requirements (one per line or comma-separated)</Label>
+            <Textarea
+              placeholder={"e.g.,\n8+ years of professional software engineering experience\nProficient in React, Node.js, TypeScript\nExperience with cloud platforms (AWS, GCP, or Azure)\nStrong communication and collaboration skills"}
               value={formData.requirements}
               onChange={(e) => setFormData({ ...formData, requirements: e.target.value })}
-              className="h-11 rounded-xl bg-background"
+              className="min-h-[120px] rounded-xl bg-background resize-y text-sm leading-relaxed"
               data-testid="job-requirements-input"
             />
           </div>
@@ -1127,12 +1128,12 @@ function JobFormDialog({ open, onClose, onSuccess, token, company, job = null, i
 
           <div className="space-y-2">
             <Label>Location *</Label>
-            <Input
-              placeholder="e.g., San Francisco, CA or Remote"
+            <LocationInput
               value={formData.location}
-              onChange={(e) => setFormData({ ...formData, location: e.target.value })}
-              className="h-11 rounded-xl bg-background"
-              data-testid="job-location-input"
+              onChange={(loc) => setFormData({ ...formData, location: loc })}
+              placeholder="Start typing a city (e.g., San Francisco)..."
+              allowRemote
+              testId="job-location-input"
             />
           </div>
 
@@ -1246,7 +1247,7 @@ function JobFormDialog({ open, onClose, onSuccess, token, company, job = null, i
             <div>
               <Label>Listing Photo</Label>
               <p className="text-xs text-muted-foreground mt-0.5">
-                A great photo can make your job stand out. Post a well-lit photo of your team or workspace.
+                A great photo can make your job stand out. Post your business logo, team or workspace.
               </p>
             </div>
             <div className="flex gap-2">

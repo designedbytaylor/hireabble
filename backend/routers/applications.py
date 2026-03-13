@@ -845,6 +845,28 @@ async def get_applications(
         if app.get("seeker_id") in premium_seekers:
             app["is_premium_seeker"] = True
 
+    # Find other jobs each seeker has applied to (for "also applied to" feature)
+    if seeker_ids:
+        # Get all applications from these seekers to this recruiter's jobs
+        all_seeker_apps = await db.applications.find(
+            {"seeker_id": {"$in": seeker_ids}, "recruiter_id": current_user["id"]},
+            {"_id": 0, "seeker_id": 1, "job_id": 1, "job_title": 1, "action": 1}
+        ).to_list(500)
+        # Group by seeker
+        seeker_other_apps = {}
+        for sa in all_seeker_apps:
+            sid = sa["seeker_id"]
+            if sid not in seeker_other_apps:
+                seeker_other_apps[sid] = []
+            seeker_other_apps[sid].append({"job_id": sa.get("job_id"), "job_title": sa.get("job_title", ""), "action": sa.get("action", "like")})
+
+        for app in applications:
+            sid = app.get("seeker_id")
+            current_job = app.get("job_id")
+            other = [a for a in seeker_other_apps.get(sid, []) if a["job_id"] != current_job]
+            if other:
+                app["other_applications"] = other
+
     # Sort: superlikes first, then premium seekers, then regular - newest first within each group
     superlikes = [a for a in applications if a.get("action") == "superlike"]
     premium_regulars = [a for a in applications if a.get("action") != "superlike" and a.get("is_premium_seeker")]
