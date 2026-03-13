@@ -54,19 +54,10 @@ _cors_origins = [
 if _frontend_url:
     _cors_origins.append(_frontend_url)
 
-def _cors_origin_allowed(origin: str) -> bool:
-    """Allow exact matches + any Vercel preview deployments for this project"""
-    if origin in _cors_origins:
-        return True
-    # Allow Vercel preview URLs (*.vercel.app)
-    if origin.endswith(".vercel.app") and origin.startswith("https://"):
-        return True
-    return False
-
 app.add_middleware(
     CORSMiddleware,
     allow_origins=_cors_origins,
-    allow_origin_regex=r"https://.*\.vercel\.app",
+    allow_origin_regex=r"https://.*\.(vercel\.app|up\.railway\.app)",
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["Authorization", "Content-Type"],
