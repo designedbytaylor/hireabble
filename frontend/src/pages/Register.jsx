@@ -7,6 +7,7 @@ import { Label } from '../components/ui/label';
 import { toast } from 'sonner';
 import { useAuth } from '../context/AuthContext';
 import OAuthButtons from '../components/OAuthButtons';
+import LocationAutocomplete from '../components/LocationAutocomplete';
 
 const ROLE_CONFIG = {
   seeker: {
@@ -251,15 +252,12 @@ export default function Register() {
                   <div className="space-y-2">
                     <Label htmlFor="location">Location</Label>
                     <div className="relative">
-                      <MapPin className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-                      <Input
-                        id="location"
-                        name="location"
-                        type="text"
-                        placeholder="San Francisco, CA"
+                      <MapPin className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-muted-foreground z-10" />
+                      <LocationAutocomplete
                         value={formData.location}
-                        onChange={handleChange}
-                        className="pl-12 h-12 rounded-xl bg-background border-border"
+                        onChange={(val) => setFormData(prev => ({ ...prev, location: val }))}
+                        placeholder="San Francisco, CA"
+                        inputClassName="pl-12 h-12"
                         data-testid="register-location-input"
                       />
                     </div>

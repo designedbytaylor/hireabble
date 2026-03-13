@@ -2,7 +2,7 @@
   "id": "/",
   "short_name": "Hireabble",
   "name": "Hireabble - Job Matching",
-  "description": "A Tinder-style job matching platform. Swipe to find your dream job or perfect candidate.",
+  "description": "Swipe-based job matching platform. Find your dream job or perfect candidate.",
   "icons": [
     {
       "src": "icons/icon-48.png",

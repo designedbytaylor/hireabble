@@ -425,6 +425,7 @@ class ApplicationResponse(BaseModel):
     recruiter_action: Optional[str] = None
     pipeline_stage: Optional[str] = "applied"
     created_at: str
+    other_applications: Optional[List[dict]] = None  # other jobs this seeker applied to
 
 class RecruiterAction(BaseModel):
     application_id: str

@@ -30,6 +30,7 @@ import { getPhotoUrl, handleImgError } from '../utils/helpers';
 import UpgradeModal from '../components/UpgradeModal';
 import { SkeletonPageBackground, SkeletonStatCard, SkeletonSwipeCard, SkeletonActionButtons } from '../components/skeletons';
 import { Skeleton } from '../components/ui/skeleton';
+import LocationAutocomplete from '../components/LocationAutocomplete';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -1139,50 +1140,11 @@ export default function SeekerDashboard() {
                 <MapPin className="w-4 h-4" />
                 Location
               </Label>
-              <Select
-                value={filters.location || "any"}
-                onValueChange={(v) => setFilters({ ...filters, location: v === "any" ? "" : v })}
-              >
-                <SelectTrigger className="h-11 rounded-xl bg-background" data-testid="filter-location">
-                  <SelectValue placeholder="Any location" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="any">
-                    <span className="flex items-center gap-2"><Globe className="w-3.5 h-3.5" /> Any Location</span>
-                  </SelectItem>
-                  <SelectItem value="San Francisco">San Francisco, CA</SelectItem>
-                  <SelectItem value="New York">New York, NY</SelectItem>
-                  <SelectItem value="Austin">Austin, TX</SelectItem>
-                  <SelectItem value="Seattle">Seattle, WA</SelectItem>
-                  <SelectItem value="Chicago">Chicago, IL</SelectItem>
-                  <SelectItem value="Los Angeles">Los Angeles, CA</SelectItem>
-                  <SelectItem value="Denver">Denver, CO</SelectItem>
-                  <SelectItem value="Portland">Portland, OR</SelectItem>
-                  <SelectItem value="Boston">Boston, MA</SelectItem>
-                  <SelectItem value="Miami">Miami, FL</SelectItem>
-                  <SelectItem value="London">London, UK</SelectItem>
-                  <SelectItem value="Toronto">Toronto, Canada</SelectItem>
-                  <SelectItem value="Berlin">Berlin, Germany</SelectItem>
-                </SelectContent>
-              </Select>
-              <button
-                type="button"
-                onClick={handleDetectLocation}
-                disabled={detectingLocation}
-                className="w-full flex items-center justify-center gap-2 h-10 rounded-xl bg-primary/10 text-primary hover:bg-primary/20 transition-colors text-sm"
-              >
-                {detectingLocation ? (
-                  <div className="w-3.5 h-3.5 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-                ) : (
-                  <Navigation2 className="w-3.5 h-3.5" />
-                )}
-                {detectingLocation ? 'Detecting...' : 'Use my current location'}
-              </button>
-              <Input
-                placeholder="Or type a custom location..."
+              <LocationAutocomplete
                 value={filters.location}
-                onChange={(e) => setFilters({ ...filters, location: e.target.value })}
-                className="h-10 rounded-xl bg-background text-sm"
+                onChange={(val) => setFilters({ ...filters, location: val })}
+                placeholder="Search for a city..."
+                showDetectButton
                 data-testid="filter-location-custom"
               />
             </div>

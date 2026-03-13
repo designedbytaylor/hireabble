@@ -35,6 +35,7 @@ import { UpgradePrompt, PremiumBlur } from '../components/UpgradeModal';
 import { SkeletonPageBackground, SkeletonStatCard, SkeletonListItem, SkeletonApplicantCard } from '../components/skeletons';
 import { Skeleton } from '../components/ui/skeleton';
 import ConfirmDialog from '../components/ConfirmDialog';
+import LocationAutocomplete from '../components/LocationAutocomplete';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -1085,7 +1086,7 @@ function JobFormDialog({ open, onClose, onSuccess, token, company, job = null, i
               placeholder="Describe the role, responsibilities, and what makes it exciting..."
               value={formData.description}
               onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-              className="min-h-[180px] rounded-xl bg-background resize-y"
+              className="min-h-[180px] rounded-xl bg-background resize-y text-sm leading-relaxed"
               data-testid="job-description-input"
             />
           </div>
@@ -1128,12 +1129,12 @@ function JobFormDialog({ open, onClose, onSuccess, token, company, job = null, i
 
           <div className="space-y-2">
             <Label>Location *</Label>
-            <LocationInput
+            <LocationAutocomplete
               value={formData.location}
-              onChange={(loc) => setFormData({ ...formData, location: loc })}
-              placeholder="Start typing a city (e.g., San Francisco)..."
+              onChange={(val) => setFormData({ ...formData, location: val })}
+              placeholder="e.g., San Francisco, CA or Remote"
               allowRemote
-              testId="job-location-input"
+              data-testid="job-location-input"
             />
           </div>
 
