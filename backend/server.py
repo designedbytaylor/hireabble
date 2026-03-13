@@ -46,7 +46,7 @@ app.add_middleware(GZipMiddleware, minimum_size=500)
 
 # CORS middleware — restrict to known origins in production
 import os as _os
-_frontend_url = _os.getenv("FRONTEND_URL", "")
+_frontend_url = _os.getenv("FRONTEND_URL", "https://hireabble.com")
 _cors_origins = [
     "http://localhost:3000",
     "http://localhost:3001",
@@ -57,7 +57,7 @@ if _frontend_url:
 app.add_middleware(
     CORSMiddleware,
     allow_origins=_cors_origins,
-    allow_origin_regex=r"https://.*\.(vercel\.app|up\.railway\.app)",
+    allow_origin_regex=r"https://(.*\.(vercel\.app|up\.railway\.app)|(www\.)?hireabble\.com)",
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["Authorization", "Content-Type"],
