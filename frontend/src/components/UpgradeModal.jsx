@@ -110,20 +110,16 @@ export default function UpgradeModal({ open, onClose, onSubscribed, trigger, hig
     if (!selectedTier || !selectedDuration) return;
     setPurchasing(true);
     try {
-      await axios.post(
-        `${API}/payments/subscribe`,
+      const res = await axios.post(
+        `${API}/payments/create-checkout-session`,
         { tier_id: selectedTier, duration: selectedDuration },
         { headers: { Authorization: `Bearer ${token}` } }
       );
-      toast.success('Subscription activated! Welcome to premium.');
-      // Refresh user data to reflect new subscription
-      await refreshUser();
-      // Call onSubscribed before onClose so parent can re-fetch data
-      // before the modal unmounts
-      if (onSubscribed) {
-        await onSubscribed();
+      if (res.data.checkout_url) {
+        window.location.href = res.data.checkout_url;
+        return;
       }
-      onClose?.();
+      toast.error('Unable to start checkout. Please try again.');
     } catch (err) {
       toast.error(err.response?.data?.detail || 'Failed to subscribe');
     } finally {
