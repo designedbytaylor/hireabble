@@ -680,22 +680,45 @@ async def apple_oauth(body: dict):
         raise HTTPException(status_code=400, detail="Missing id_token or code")
 
     try:
-        # Apple sends user info in the id_token (JWT)
-        # Decode without verification first to get claims
-        # In production, you should verify the JWT signature with Apple's public keys
-        import json
-        import base64
+        import jwt as pyjwt
+        import requests as http_requests
 
         if id_token:
-            # Decode the JWT payload (middle segment)
-            parts = id_token.split('.')
-            if len(parts) != 3:
-                raise HTTPException(status_code=400, detail="Invalid id_token format")
+            # Fetch Apple's public keys and verify the JWT signature
+            try:
+                apple_keys_response = http_requests.get("https://appleid.apple.com/auth/keys", timeout=10)
+                apple_keys = apple_keys_response.json()
 
-            # Add padding if needed
-            payload = parts[1]
-            payload += '=' * (4 - len(payload) % 4)
-            decoded = json.loads(base64.urlsafe_b64decode(payload))
+                # Decode the JWT header to find the key ID
+                header = pyjwt.get_unverified_header(id_token)
+                kid = header.get("kid")
+
+                # Find the matching key
+                matching_key = None
+                for key in apple_keys.get("keys", []):
+                    if key.get("kid") == kid:
+                        matching_key = key
+                        break
+
+                if not matching_key:
+                    raise HTTPException(status_code=400, detail="Apple public key not found")
+
+                # Build the public key and verify the token
+                from jwt.algorithms import RSAAlgorithm
+                public_key = RSAAlgorithm.from_jwk(matching_key)
+
+                decoded = pyjwt.decode(
+                    id_token,
+                    public_key,
+                    algorithms=["RS256"],
+                    audience=APPLE_CLIENT_ID,
+                    issuer="https://appleid.apple.com",
+                )
+            except pyjwt.ExpiredSignatureError:
+                raise HTTPException(status_code=401, detail="Apple token has expired")
+            except pyjwt.InvalidTokenError as jwt_err:
+                logger.error(f"Apple JWT verification failed: {jwt_err}")
+                raise HTTPException(status_code=400, detail="Invalid Apple token")
 
             email = decoded.get("email")
             # Apple only sends name on first sign-in, so we may not have it
