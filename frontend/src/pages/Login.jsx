@@ -16,6 +16,7 @@ export default function Login() {
   const { login, loginWithToken } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const role = searchParams.get('role') === 'recruiter' ? 'recruiter' : 'seeker';
 
   // Handle impersonation from admin test links
   useEffect(() => {
@@ -161,11 +162,11 @@ export default function Login() {
               </Button>
             </form>
 
-            <OAuthButtons />
+            <OAuthButtons role={role} />
 
             <p className="mt-8 text-center text-muted-foreground">
               Don't have an account?{' '}
-              <Link to="/register/seeker" className="text-primary hover:underline font-medium" data-testid="register-link">
+              <Link to={`/register/${role}`} className="text-primary hover:underline font-medium" data-testid="register-link">
                 Create one
               </Link>
             </p>
