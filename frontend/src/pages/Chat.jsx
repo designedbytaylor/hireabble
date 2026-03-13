@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Send, Briefcase, User, Wifi, WifiOff, Flag, ShieldBan, Calendar, CheckCheck, Check, Image, X, Video, Square, Loader2, Clock, Phone, MapPin, FileText } from 'lucide-react';
+import { ArrowLeft, Send, Briefcase, User, Flag, ShieldBan, Calendar, CheckCheck, Check, Image, X, Video, Square, Loader2, Clock, Phone, MapPin, FileText } from 'lucide-react';
 import ReportDialog from '../components/ReportDialog';
 import BlockDialog from '../components/BlockDialog';
 import { Button } from '../components/ui/button';
@@ -405,13 +405,6 @@ export default function Chat() {
           <ShieldBan className="w-4 h-4" />
         </button>
 
-        <div className={`p-2 rounded-lg ${wsConnected ? 'bg-success/10' : 'bg-muted'}`} aria-label={wsConnected ? 'Connected' : 'Disconnected'} role="status">
-          {wsConnected ? (
-            <Wifi className="w-4 h-4 text-success" />
-          ) : (
-            <WifiOff className="w-4 h-4 text-muted-foreground" />
-          )}
-        </div>
       </header>
 
       <ReportDialog

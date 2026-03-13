@@ -231,8 +231,8 @@ export default function Register() {
 
               <div className="space-y-2">
                 <Label htmlFor="dob">Date of Birth</Label>
-                <div className="relative">
-                  <Calendar className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+                <div className="relative overflow-hidden rounded-xl">
+                  <Calendar className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-muted-foreground pointer-events-none z-10" />
                   <Input
                     id="dob"
                     name="dob"
@@ -240,7 +240,8 @@ export default function Register() {
                     value={formData.dob}
                     onChange={handleChange}
                     max={new Date().toISOString().split('T')[0]}
-                    className="pl-12 h-12 rounded-xl bg-background border-border"
+                    className="pl-12 h-12 rounded-xl bg-background border-border w-full min-w-0 [&::-webkit-date-and-time-value]:text-left"
+                    style={{ maxWidth: '100%' }}
                     data-testid="register-dob-input"
                   />
                 </div>
