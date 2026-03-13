@@ -46,16 +46,27 @@ app.add_middleware(GZipMiddleware, minimum_size=500)
 
 # CORS middleware — restrict to known origins in production
 import os as _os
-_frontend_url = _os.getenv("FRONTEND_URL", "http://localhost:3000")
+_frontend_url = _os.getenv("FRONTEND_URL", "")
 _cors_origins = [
-    _frontend_url,
     "http://localhost:3000",
     "http://localhost:3001",
 ]
-# In production, FRONTEND_URL should be set to the actual domain (e.g., https://hireabble.com)
+if _frontend_url:
+    _cors_origins.append(_frontend_url)
+
+def _cors_origin_allowed(origin: str) -> bool:
+    """Allow exact matches + any Vercel preview deployments for this project"""
+    if origin in _cors_origins:
+        return True
+    # Allow Vercel preview URLs (*.vercel.app)
+    if origin.endswith(".vercel.app") and origin.startswith("https://"):
+        return True
+    return False
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=_cors_origins,
+    allow_origin_regex=r"https://.*\.vercel\.app",
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["Authorization", "Content-Type"],
