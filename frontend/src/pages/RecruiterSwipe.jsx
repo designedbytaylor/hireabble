@@ -589,6 +589,24 @@ function CandidateDetailSheet({ item, mode, onClose }) {
             </div>
           )}
 
+          {/* Other Applications */}
+          {item.other_applications?.length > 0 && (
+            <div className="mb-4 px-3 py-2 rounded-xl bg-primary/10 border border-primary/20">
+              <p className="text-xs text-primary flex items-center gap-1 mb-1 font-medium">
+                <Briefcase className="w-3 h-3" /> Also applied to your other {item.other_applications.length === 1 ? 'job' : 'jobs'}
+              </p>
+              {item.other_applications.map((oa, i) => (
+                <p key={i} className="text-sm text-foreground/80 flex items-center gap-1.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-primary/60 flex-shrink-0" />
+                  {oa.job_title}
+                  {oa.action === 'superlike' && (
+                    <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-secondary/20 text-secondary font-medium">Super Like</span>
+                  )}
+                </p>
+              ))}
+            </div>
+          )}
+
           {/* Info Tags */}
           <div className="flex flex-wrap gap-2 mb-5">
             {experience && (
@@ -776,6 +794,12 @@ function ApplicantCard({ app, onSwipe, expanded, setExpanded }) {
           <h2 className="text-2xl font-bold font-['Outfit']">{app.seeker_name}</h2>
           <p className="text-primary text-sm mt-1">{app.seeker_title || 'Job Seeker'}</p>
           <p className="text-muted-foreground text-xs mt-1">Applied for: {app.job_title}</p>
+          {app.other_applications?.length > 0 && (
+            <p className="text-xs mt-0.5 text-primary/80 flex items-center gap-1">
+              <Briefcase className="w-3 h-3" />
+              Also applied to {app.other_applications.length} other {app.other_applications.length === 1 ? 'job' : 'jobs'}
+            </p>
+          )}
 
           {app.superlike_note && (
             <div className="mt-2 px-3 py-2 rounded-xl bg-secondary/10 border border-secondary/20">
@@ -824,10 +848,11 @@ function ApplicantCard({ app, onSwipe, expanded, setExpanded }) {
 
           <button
             onClick={(e) => { e.stopPropagation(); setExpanded(true); }}
-            className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors mt-4"
+            className="flex items-center justify-center gap-2 text-sm font-medium text-primary hover:text-primary/80 transition-colors mt-4 w-full py-2 rounded-xl bg-primary/10 hover:bg-primary/15"
+            aria-label="Show full profile details"
           >
             <ChevronDown className="w-4 h-4" />
-            Show details
+            View full profile
           </button>
         </div>
       </div>
@@ -1002,10 +1027,11 @@ function CandidateCard({ candidate, onSwipe, expanded, setExpanded }) {
 
           <button
             onClick={(e) => { e.stopPropagation(); setExpanded(true); }}
-            className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors mt-4"
+            className="flex items-center justify-center gap-2 text-sm font-medium text-primary hover:text-primary/80 transition-colors mt-4 w-full py-2 rounded-xl bg-primary/10 hover:bg-primary/15"
+            aria-label="Show full profile details"
           >
             <ChevronDown className="w-4 h-4" />
-            Show details
+            View full profile
           </button>
         </div>
       </div>
