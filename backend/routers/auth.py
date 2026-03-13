@@ -44,6 +44,18 @@ async def register(user: UserCreate, request: Request):
     try:
         logger.info(f"Registration attempt for email: {user.email}")
 
+        # Age verification: must be at least 16 years old
+        if user.dob:
+            from datetime import date
+            try:
+                dob = date.fromisoformat(user.dob)
+                today = date.today()
+                age = today.year - dob.year - ((today.month, today.day) < (dob.month, dob.day))
+                if age < 16:
+                    raise HTTPException(status_code=400, detail="You must be at least 16 years old to use Hireabble")
+            except ValueError:
+                raise HTTPException(status_code=400, detail="Invalid date of birth format")
+
         # Content moderation on registration fields
         is_clean, violations = check_fields({"name": user.name, "company": user.company or ""})
         if not is_clean and is_severe(violations):
@@ -64,6 +76,7 @@ async def register(user: UserCreate, request: Request):
             "name": user.name,
             "role": user.role,
             "company": user.company,
+            "date_of_birth": user.dob,
             "avatar": avatar,
             "photo_url": None,
             "video_url": None,
@@ -195,9 +208,10 @@ async def get_me(current_user: dict = Depends(get_current_user)):
 # ==================== FORGOT PASSWORD ====================
 
 @router.post("/forgot-password")
-async def forgot_password(request: ForgotPasswordRequest):
+@limiter.limit("3/minute")
+async def forgot_password(body: ForgotPasswordRequest, request: Request):
     """Send password reset email"""
-    user = await db.users.find_one({"email": request.email})
+    user = await db.users.find_one({"email": body.email})
     
     # Always return success to prevent email enumeration
     if not user:
@@ -212,7 +226,7 @@ async def forgot_password(request: ForgotPasswordRequest):
     await db.password_reset_tokens.insert_one({
         "token": reset_token,
         "user_id": user["id"],
-        "email": request.email,
+        "email": body.email,
         "expires_at": expires_at.isoformat(),
         "created_at": datetime.now(timezone.utc).isoformat()
     })
@@ -248,7 +262,7 @@ async def forgot_password(request: ForgotPasswordRequest):
         </div>
         """
         asyncio.create_task(send_email_notification(
-            request.email,
+            body.email,
             "Reset Your Hireabble Password",
             email_html
         ))
@@ -258,10 +272,11 @@ async def forgot_password(request: ForgotPasswordRequest):
     return {"message": "If an account exists with this email, a reset link has been sent."}
 
 @router.post("/reset-password")
-async def reset_password(request: ResetPasswordRequest):
+@limiter.limit("5/minute")
+async def reset_password(body: ResetPasswordRequest, request: Request):
     """Reset password using token"""
     # Find token
-    token_doc = await db.password_reset_tokens.find_one({"token": request.token})
+    token_doc = await db.password_reset_tokens.find_one({"token": body.token})
     
     if not token_doc:
         raise HTTPException(status_code=400, detail="Invalid or expired reset token")
@@ -269,18 +284,18 @@ async def reset_password(request: ResetPasswordRequest):
     # Check expiration
     expires_at = datetime.fromisoformat(token_doc["expires_at"].replace('Z', '+00:00'))
     if datetime.now(timezone.utc) > expires_at:
-        await db.password_reset_tokens.delete_one({"token": request.token})
+        await db.password_reset_tokens.delete_one({"token": body.token})
         raise HTTPException(status_code=400, detail="Reset token has expired")
-    
+
     # Update password
-    hashed_password = hash_password(request.password)
+    hashed_password = hash_password(body.password)
     await db.users.update_one(
         {"id": token_doc["user_id"]},
         {"$set": {"password": hashed_password}}
     )
-    
+
     # Delete used token
-    await db.password_reset_tokens.delete_one({"token": request.token})
+    await db.password_reset_tokens.delete_one({"token": body.token})
     
     return {"message": "Password has been reset successfully"}
 
