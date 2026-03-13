@@ -408,7 +408,7 @@ function App() {
             <AdminAuthProvider>
               <Suspense fallback={null}><OfflineIndicator /></Suspense>
               <AppRoutes />
-              <Toaster position="bottom-center" richColors style={{ bottom: '80px' }} />
+              <Toaster position="bottom-center" style={{ bottom: '80px' }} duration={3000} closeButton={false} />
             </AdminAuthProvider>
           </AuthProvider>
         </ThemeProvider>
