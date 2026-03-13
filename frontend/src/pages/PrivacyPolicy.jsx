@@ -108,7 +108,7 @@ export default function PrivacyPolicy() {
           <section>
             <h2 className="text-lg font-bold font-['Outfit'] mb-3">8. Children's Privacy</h2>
             <p className="text-muted-foreground">
-              Hireabble is not intended for anyone under the age of 18. We do not knowingly collect personal information from children. If we learn we have collected data from a child under 18, we will promptly delete that information.
+              Hireabble is not intended for anyone under the age of 16. We do not knowingly collect personal information from children under 16. If we learn we have collected data from a user under 16, we will promptly delete that information.
             </p>
           </section>
 
