@@ -13,10 +13,10 @@ function getPlatform() {
   return 'desktop';
 }
 
-// Store URLs — configure via env vars, fall back to placeholders
+// Store URLs — configure via env vars; null when not yet published
 const STORE_URLS = {
-  ios: process.env.REACT_APP_APP_STORE_URL || 'https://apps.apple.com/app/hireabble/id0000000000',
-  android: process.env.REACT_APP_PLAY_STORE_URL || 'https://play.google.com/store/apps/details?id=com.hireabble.app',
+  ios: process.env.REACT_APP_APP_STORE_URL || null,
+  android: process.env.REACT_APP_PLAY_STORE_URL || null,
 };
 
 export default function Download() {
@@ -121,26 +121,44 @@ export default function Download() {
           {/* Download buttons */}
           <div className="space-y-3">
             {(platform === 'ios' || platform === 'desktop') && (
-              <a
-                href={STORE_URLS.ios}
-                className="flex items-center justify-center gap-2 w-full py-3.5 rounded-xl bg-black text-white font-semibold text-sm hover:bg-gray-800 transition-colors"
-              >
-                <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/>
-                </svg>
-                Download on the App Store
-              </a>
+              STORE_URLS.ios ? (
+                <a
+                  href={STORE_URLS.ios}
+                  className="flex items-center justify-center gap-2 w-full py-3.5 rounded-xl bg-black text-white font-semibold text-sm hover:bg-gray-800 transition-colors"
+                >
+                  <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/>
+                  </svg>
+                  Download on the App Store
+                </a>
+              ) : (
+                <div className="flex items-center justify-center gap-2 w-full py-3.5 rounded-xl bg-gray-200 text-gray-400 font-semibold text-sm cursor-not-allowed">
+                  <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/>
+                  </svg>
+                  App Store — Coming Soon
+                </div>
+              )
             )}
             {(platform === 'android' || platform === 'desktop') && (
-              <a
-                href={STORE_URLS.android}
-                className="flex items-center justify-center gap-2 w-full py-3.5 rounded-xl bg-[#2dd4a8] text-white font-semibold text-sm hover:bg-[#1a8a7a] transition-colors"
-              >
-                <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M17.523 2.246l-1.997 3.46A7.953 7.953 0 0012 4.5a7.95 7.95 0 00-3.526 1.206L6.477 2.246a.5.5 0 10-.866.5l1.97 3.412A8.473 8.473 0 003.5 13h17a8.473 8.473 0 00-4.08-6.842l1.97-3.412a.5.5 0 10-.867-.5zM8.5 10.5a1 1 0 110-2 1 1 0 010 2zm7 0a1 1 0 110-2 1 1 0 010 2zM3.5 14v6.5A1.5 1.5 0 005 22h1.5v-8H3.5zm14 0v8H19a1.5 1.5 0 001.5-1.5V14h-3zM6.5 22v-8h11v8h-11z"/>
-                </svg>
-                Get it on Google Play
-              </a>
+              STORE_URLS.android ? (
+                <a
+                  href={STORE_URLS.android}
+                  className="flex items-center justify-center gap-2 w-full py-3.5 rounded-xl bg-[#2dd4a8] text-white font-semibold text-sm hover:bg-[#1a8a7a] transition-colors"
+                >
+                  <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M17.523 2.246l-1.997 3.46A7.953 7.953 0 0012 4.5a7.95 7.95 0 00-3.526 1.206L6.477 2.246a.5.5 0 10-.866.5l1.97 3.412A8.473 8.473 0 003.5 13h17a8.473 8.473 0 00-4.08-6.842l1.97-3.412a.5.5 0 10-.867-.5zM8.5 10.5a1 1 0 110-2 1 1 0 010 2zm7 0a1 1 0 110-2 1 1 0 010 2zM3.5 14v6.5A1.5 1.5 0 005 22h1.5v-8H3.5zm14 0v8H19a1.5 1.5 0 001.5-1.5V14h-3zM6.5 22v-8h11v8h-11z"/>
+                  </svg>
+                  Get it on Google Play
+                </a>
+              ) : (
+                <div className="flex items-center justify-center gap-2 w-full py-3.5 rounded-xl bg-gray-200 text-gray-400 font-semibold text-sm cursor-not-allowed">
+                  <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M17.523 2.246l-1.997 3.46A7.953 7.953 0 0012 4.5a7.95 7.95 0 00-3.526 1.206L6.477 2.246a.5.5 0 10-.866.5l1.97 3.412A8.473 8.473 0 003.5 13h17a8.473 8.473 0 00-4.08-6.842l1.97-3.412a.5.5 0 10-.867-.5zM8.5 10.5a1 1 0 110-2 1 1 0 010 2zm7 0a1 1 0 110-2 1 1 0 010 2zM3.5 14v6.5A1.5 1.5 0 005 22h1.5v-8H3.5zm14 0v8H19a1.5 1.5 0 001.5-1.5V14h-3zM6.5 22v-8h11v8h-11z"/>
+                  </svg>
+                  Google Play — Coming Soon
+                </div>
+              )
             )}
           </div>
 

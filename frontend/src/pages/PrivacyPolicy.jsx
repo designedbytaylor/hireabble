@@ -101,7 +101,7 @@ export default function PrivacyPolicy() {
               <li><strong>Update:</strong> You can update your profile information through your account settings</li>
               <li><strong>Delete:</strong> You can delete your account through Profile &gt; Settings &gt; Delete Account. Upon deletion, all personal data (profile, photos, messages, swipe history, matches) will be permanently removed within 30 days. You will receive a confirmation email when deletion is complete</li>
               <li><strong>Notifications:</strong> You can opt out of push notifications through your device settings</li>
-              <li><strong>Data Export:</strong> You can download your profile data as a PDF resume</li>
+              <li><strong>Data Export:</strong> You can download all your data (profile, applications, matches, messages) as a JSON file from your Profile page</li>
             </ul>
           </section>
 

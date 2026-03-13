@@ -363,6 +363,7 @@ export default function RecruiterSwipe() {
                   onClick={() => handleSwipe('reject', { x: -1500, y: 0 })}
                   className="w-16 h-16 rounded-full bg-destructive/10 border border-destructive/30 flex items-center justify-center hover:scale-110 hover:neon-glow-red transition-all duration-300"
                   data-testid="reject-btn"
+                  aria-label="Pass on this candidate"
                 >
                   <X className="w-7 h-7 text-destructive" />
                 </button>
@@ -378,6 +379,7 @@ export default function RecruiterSwipe() {
                     }}
                     className="w-14 h-14 rounded-full bg-secondary/10 border border-secondary/30 flex items-center justify-center hover:scale-110 transition-all duration-300 relative"
                     data-testid="superswipe-btn"
+                    aria-label="Super like this candidate"
                   >
                     <Star className="w-6 h-6 text-secondary fill-secondary" />
                     {superSwipesRemaining && (
@@ -392,6 +394,7 @@ export default function RecruiterSwipe() {
                   onClick={() => handleSwipe('accept', { x: 1500, y: 0 })}
                   className="w-20 h-20 rounded-full bg-success/10 border border-success/30 flex items-center justify-center hover:scale-110 hover:neon-glow-green transition-all duration-300"
                   data-testid="accept-btn"
+                  aria-label="Like this candidate"
                 >
                   <Heart className="w-9 h-9 text-success" />
                 </button>

@@ -41,10 +41,10 @@ export function dismissRatingPrompt() {
 export function getStoreUrl() {
   const ua = navigator.userAgent || '';
   if (/iPhone|iPad|iPod/i.test(ua)) {
-    return process.env.REACT_APP_APP_STORE_URL || 'https://apps.apple.com/app/hireabble/id0000000000';
+    return process.env.REACT_APP_APP_STORE_URL || null;
   }
   if (/Android/i.test(ua)) {
-    return process.env.REACT_APP_PLAY_STORE_URL || 'https://play.google.com/store/apps/details?id=com.hireabble.app';
+    return process.env.REACT_APP_PLAY_STORE_URL || null;
   }
   return null;
 }

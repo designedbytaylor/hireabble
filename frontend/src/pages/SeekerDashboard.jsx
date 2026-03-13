@@ -956,6 +956,7 @@ export default function SeekerDashboard() {
                       : 'bg-muted/10 border border-muted/20 text-muted-foreground opacity-50'
                   }`}
                   title={canUndo ? 'Undo last swipe' : 'Upgrade to undo'}
+                  aria-label={canUndo ? 'Undo last swipe' : 'Undo (upgrade required)'}
                   data-testid="undo-btn"
                 >
                   <Undo2 className="w-5 h-5" />
@@ -1007,6 +1008,7 @@ export default function SeekerDashboard() {
                       : 'bg-muted/10 border border-muted/20 text-muted-foreground hover:scale-110'
                   }`}
                   title="Save for later"
+                  aria-label={currentJob && savedJobIds.has(currentJob.id) ? 'Unsave this job' : 'Save this job for later'}
                 >
                   <Bookmark className={`w-5 h-5 ${currentJob && savedJobIds.has(currentJob.id) ? 'fill-current' : ''}`} />
                 </button>

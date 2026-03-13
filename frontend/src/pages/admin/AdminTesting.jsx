@@ -18,6 +18,7 @@ export default function AdminTesting() {
   const [loading, setLoading] = useState({ seed: false, clear: false, impersonate: null });
   const [showClearConfirm, setShowClearConfirm] = useState(false);
   const [seedResult, setSeedResult] = useState(null);
+  const [showPassword, setShowPassword] = useState(false);
   const [users, setUsers] = useState([]);
   const [usersLoading, setUsersLoading] = useState(true);
   const [filter, setFilter] = useState('all');
@@ -158,7 +159,13 @@ export default function AdminTesting() {
             </div>
           </div>
           <p className="text-xs text-gray-500 mb-3">
-            Password: <code className="text-green-400 bg-gray-800 px-2 py-0.5 rounded">testpass123</code>
+            Password:{' '}
+            <button
+              onClick={() => setShowPassword(p => !p)}
+              className="text-green-400 bg-gray-800 px-2 py-0.5 rounded font-mono text-xs hover:bg-gray-700 transition-colors"
+            >
+              {showPassword ? 'testpass123' : '••••••••••'}
+            </button>
           </p>
           <Button onClick={handleSeed} disabled={loading.seed} className="w-full bg-green-600 hover:bg-green-700">
             {loading.seed ? <RefreshCw className="w-4 h-4 mr-2 animate-spin" /> : <Play className="w-4 h-4 mr-2" />}
@@ -202,7 +209,15 @@ export default function AdminTesting() {
             ))}
           </div>
           <div className="bg-gray-800 rounded-xl p-3">
-            <div className="text-xs text-gray-400 mb-1">Password: <code className="text-green-400">testpass123</code></div>
+            <div className="text-xs text-gray-400 mb-1">
+              Password:{' '}
+              <button
+                onClick={() => setShowPassword(p => !p)}
+                className="text-green-400 font-mono hover:opacity-80"
+              >
+                {showPassword ? 'testpass123' : '••••••••••'}
+              </button>
+            </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-2">
               <div>
                 <div className="text-xs font-medium text-blue-400 mb-1">Seekers</div>

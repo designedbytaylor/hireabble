@@ -427,6 +427,28 @@ export default function Profile() {
 
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleteLoading, setDeleteLoading] = useState(false);
+  const [exportLoading, setExportLoading] = useState(false);
+
+  const handleExportData = async () => {
+    setExportLoading(true);
+    try {
+      const res = await axios.get(`${API}/auth/account/export`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const blob = new Blob([JSON.stringify(res.data, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `hireabble-data-export-${new Date().toISOString().slice(0, 10)}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast.success('Data exported successfully');
+    } catch {
+      toast.error('Failed to export data. Please try again.');
+    } finally {
+      setExportLoading(false);
+    }
+  };
 
   const handleDeleteAccount = async () => {
     setDeleteLoading(true);
@@ -1351,6 +1373,17 @@ export default function Profile() {
           >
             <LogOut className="w-5 h-5 mr-2" />
             Sign Out
+          </Button>
+
+          {/* Export Data */}
+          <Button
+            variant="outline"
+            onClick={handleExportData}
+            disabled={exportLoading}
+            className="w-full h-12 rounded-xl mt-3 border-primary/30 text-primary hover:bg-primary/10"
+          >
+            <Download className="w-5 h-5 mr-2" />
+            {exportLoading ? 'Exporting...' : 'Download My Data'}
           </Button>
 
           {/* Delete Account */}
