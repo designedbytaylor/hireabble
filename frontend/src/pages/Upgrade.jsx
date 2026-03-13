@@ -143,14 +143,7 @@ export default function Upgrade() {
         return;
       }
 
-      // Fallback — direct subscription (dev/testing)
-      await axios.post(
-        `${API}/payments/subscribe`,
-        { tier_id: tierId, duration: selectedDuration },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      toast.success('Subscription activated!');
-      window.location.reload();
+      toast.error('Unable to start checkout. Please try again.');
     } catch (err) {
       toast.error(err.response?.data?.detail || 'Failed to subscribe');
     } finally {

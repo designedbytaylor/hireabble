@@ -190,8 +190,10 @@ class BoostCreate(BaseModel):
     product_id: str  # boost_1day, boost_3day, boost_7day
 
 class CreateCheckoutSession(BaseModel):
-    product_id: str
+    product_id: Optional[str] = None
     job_id: Optional[str] = None  # Required for boosts
+    tier_id: Optional[str] = None  # For subscriptions
+    duration: Optional[str] = None  # weekly, monthly, 6month
 
 class SubscriptionCheckout(BaseModel):
     tier_id: str       # seeker_plus, seeker_premium, recruiter_pro, recruiter_enterprise
@@ -547,9 +549,54 @@ async def create_checkout_session(
     data: CreateCheckoutSession,
     current_user: dict = Depends(get_current_user)
 ):
-    """Create a Stripe Checkout session (web only - iOS must use Apple IAP)"""
+    """Create a Stripe Checkout session for consumables or subscriptions (web only - iOS must use Apple IAP)"""
     if not STRIPE_AVAILABLE:
         raise HTTPException(status_code=503, detail="Payment processing is not configured. Set STRIPE_SECRET_KEY.")
+
+    frontend_url = os.getenv("FRONTEND_URL", "https://hireabble.com")
+    success_path = "/recruiter" if current_user.get("role") == "recruiter" else "/dashboard"
+
+    # ---- Subscription checkout ----
+    if data.tier_id and data.duration:
+        tier = SUBSCRIPTION_TIERS.get(data.tier_id)
+        if not tier:
+            raise HTTPException(status_code=400, detail="Invalid tier")
+        if tier["role"] != current_user.get("role"):
+            raise HTTPException(status_code=403, detail="This tier is not available for your role")
+        price = tier["prices"].get(data.duration)
+        if not price:
+            raise HTTPException(status_code=400, detail="Invalid duration")
+
+        try:
+            session = stripe.checkout.Session.create(
+                payment_method_types=["card"],
+                line_items=[{
+                    "price_data": {
+                        "currency": "usd",
+                        "product_data": {"name": f"{tier['name']} — {data.duration}"},
+                        "unit_amount": price,
+                    },
+                    "quantity": 1,
+                }],
+                mode="payment",
+                success_url=f"{frontend_url}{success_path}?payment=success&tier={data.tier_id}",
+                cancel_url=f"{frontend_url}/upgrade?payment=cancelled",
+                metadata={
+                    "user_id": current_user["id"],
+                    "type": "subscription",
+                    "tier_id": data.tier_id,
+                    "duration": data.duration,
+                    "price": str(price),
+                },
+            )
+            return {"checkout_url": session.url, "session_id": session.id}
+        except Exception as e:
+            logger.error(f"Stripe subscription checkout error: {e}")
+            raise HTTPException(status_code=500, detail="Failed to create checkout session")
+
+    # ---- Consumable product checkout ----
+    if not data.product_id:
+        raise HTTPException(status_code=400, detail="Either product_id or tier_id+duration is required")
 
     product = PRODUCTS.get(data.product_id)
     if not product:
@@ -569,9 +616,6 @@ async def create_checkout_session(
         if current_user.get("role") != "recruiter":
             raise HTTPException(status_code=403, detail="Only recruiters can purchase super swipes")
 
-    frontend_url = os.getenv("FRONTEND_URL", "http://localhost:3000")
-    success_path = "/recruiter" if current_user.get("role") == "recruiter" else "/dashboard"
-
     try:
         session = stripe.checkout.Session.create(
             payment_method_types=["card"],
@@ -588,6 +632,7 @@ async def create_checkout_session(
             cancel_url=f"{frontend_url}{success_path}?payment=cancelled",
             metadata={
                 "user_id": current_user["id"],
+                "type": "consumable",
                 "product_id": data.product_id,
                 "job_id": data.job_id or "",
             },
@@ -622,9 +667,71 @@ async def stripe_webhook(request: Request):
     if event["type"] == "checkout.session.completed":
         session = event["data"]["object"]
         metadata = session.get("metadata", {})
-        await fulfill_purchase(metadata, source="stripe")
+
+        if metadata.get("type") == "subscription":
+            await fulfill_subscription(metadata, source="stripe")
+        else:
+            await fulfill_purchase(metadata, source="stripe")
 
     return {"status": "ok"}
+
+
+async def fulfill_subscription(metadata: dict, source: str = "stripe"):
+    """Activate a subscription after successful Stripe payment"""
+    user_id = metadata.get("user_id")
+    tier_id = metadata.get("tier_id")
+    duration = metadata.get("duration")
+    price = int(metadata.get("price", 0))
+
+    if not user_id or not tier_id or not duration:
+        logger.error(f"Missing subscription metadata: {metadata}")
+        return
+
+    tier = SUBSCRIPTION_TIERS.get(tier_id)
+    if not tier:
+        logger.error(f"Invalid tier in webhook: {tier_id}")
+        return
+
+    duration_days = {"weekly": 7, "monthly": 30, "6month": 180}.get(duration, 30)
+    period_end = (datetime.now(timezone.utc) + timedelta(days=duration_days)).isoformat()
+
+    subscription = {
+        "tier_id": tier_id,
+        "tier_name": tier["name"],
+        "duration": duration,
+        "status": "active",
+        "price_paid": price,
+        "started_at": datetime.now(timezone.utc).isoformat(),
+        "period_end": period_end,
+    }
+
+    await db.users.update_one(
+        {"id": user_id},
+        {"$set": {"subscription": subscription}}
+    )
+
+    invalidate_user(user_id)
+
+    await db.transactions.insert_one({
+        "id": str(uuid.uuid4()),
+        "user_id": user_id,
+        "product_id": tier_id,
+        "amount": price,
+        "source": source,
+        "status": "completed",
+        "description": f"{tier['name']} - {duration}",
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    })
+
+    await create_notification(
+        user_id=user_id,
+        notif_type="payment",
+        title=f"Welcome to {tier['name']}!",
+        message=f"Your {tier['name']} subscription is now active. Enjoy your premium features!",
+        data={"tier_id": tier_id}
+    )
+
+    logger.info(f"Subscription fulfilled: user={user_id} tier={tier_id} duration={duration} source={source}")
 
 
 # ==================== FULFILLMENT ====================
