@@ -280,11 +280,11 @@ export default function RecruiterDashboard() {
             </button>
             <Button
               onClick={() => setShowNewJob(true)}
-              className="bg-gradient-to-r from-primary to-secondary rounded-full px-5"
+              className="bg-gradient-to-r from-primary to-secondary rounded-full sm:px-5 px-3"
               data-testid="post-job-btn"
             >
-              <Plus className="w-5 h-5 mr-2" />
-              Post Job
+              <Plus className="w-5 h-5 sm:mr-2" />
+              <span className="hidden sm:inline">Post Job</span>
             </Button>
           </div>
         </div>
@@ -446,75 +446,74 @@ export default function RecruiterDashboard() {
                   className="glass-card rounded-2xl p-5 hover:border-primary/30 transition-colors"
                   data-testid={`job-item-${job.id}`}
                 >
-                  <div className="flex items-start justify-between">
-                    <div 
-                      className="flex items-start gap-4 flex-1 cursor-pointer"
-                      onClick={() => handleViewApplications(job)}
-                    >
-                      <img
-                        src={job.company_logo}
-                        alt={job.company}
-                        className="w-14 h-14 rounded-xl object-cover"
-                        loading="lazy"
-                      />
-                      <div>
-                        <h3 className="font-bold font-['Outfit'] text-lg">{job.title}</h3>
-                        <div className="flex flex-wrap gap-2 mt-2">
-                          <span className="px-2 py-1 rounded-lg bg-accent text-xs text-muted-foreground flex items-center gap-1">
-                            <MapPin className="w-3 h-3" />
-                            {job.location}
+                  <div
+                    className="flex items-start gap-4 cursor-pointer"
+                    onClick={() => handleViewApplications(job)}
+                  >
+                    <img
+                      src={job.company_logo}
+                      alt={job.company}
+                      className="w-14 h-14 rounded-xl object-cover shrink-0"
+                      loading="lazy"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-bold font-['Outfit'] text-lg truncate">{job.title}</h3>
+                      <div className="flex flex-wrap gap-2 mt-2">
+                        <span className="px-2 py-1 rounded-lg bg-accent text-xs text-muted-foreground flex items-center gap-1">
+                          <MapPin className="w-3 h-3" />
+                          {job.location}
+                        </span>
+                        <span className="px-2 py-1 rounded-lg bg-accent text-xs text-muted-foreground capitalize">
+                          {job.job_type}
+                        </span>
+                        {job.salary_min && (
+                          <span className="px-2 py-1 rounded-lg bg-primary/10 text-xs text-primary flex items-center gap-1">
+                            <DollarSign className="w-3 h-3" />
+                            ${Math.round(job.salary_min/1000)}k+
                           </span>
-                          <span className="px-2 py-1 rounded-lg bg-accent text-xs text-muted-foreground capitalize">
-                            {job.job_type}
-                          </span>
-                          {job.salary_min && (
-                            <span className="px-2 py-1 rounded-lg bg-primary/10 text-xs text-primary flex items-center gap-1">
-                              <DollarSign className="w-3 h-3" />
-                              ${Math.round(job.salary_min/1000)}k+
-                            </span>
-                          )}
-                        </div>
+                        )}
                       </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => handleEditJob(job)}
-                        className="p-2 rounded-lg hover:bg-accent transition-colors"
-                        data-testid={`edit-job-${job.id}`}
-                      >
-                        <Edit className="w-5 h-5 text-muted-foreground" />
-                      </button>
-                      <button
-                        onClick={() => handleDuplicateJob(job.id)}
-                        className="p-2 rounded-lg hover:bg-accent transition-colors"
-                        title="Duplicate job"
-                      >
-                        <Copy className="w-5 h-5 text-muted-foreground" />
-                      </button>
-                      <button
-                        onClick={() => handleGeneratePoster(job.id)}
-                        className="p-2 rounded-lg hover:bg-accent transition-colors"
-                        title="Generate hiring poster"
-                        disabled={generatingPoster === job.id}
-                      >
-                        {generatingPoster === job.id ? (
-                          <div className="w-5 h-5 border-2 border-muted-foreground border-t-transparent rounded-full animate-spin" />
-                        ) : (
-                          <Printer className="w-5 h-5 text-muted-foreground" />
-                        )}
-                      </button>
-                      <button
-                        onClick={() => setConfirmDelete(job.id)}
-                        className="p-2 rounded-lg hover:bg-destructive/10 transition-colors"
-                        data-testid={`delete-job-${job.id}`}
-                      >
-                        <Trash2 className="w-5 h-5 text-destructive" />
-                      </button>
-                      <ChevronRight 
-                        className="w-5 h-5 text-muted-foreground cursor-pointer"
-                        onClick={() => handleViewApplications(job)}
-                      />
-                    </div>
+                    <ChevronRight className="w-5 h-5 text-muted-foreground shrink-0 mt-1" />
+                  </div>
+                  <div className="flex items-center gap-1 mt-3 pt-3 border-t border-border/50">
+                    <button
+                      onClick={(e) => { e.stopPropagation(); handleEditJob(job); }}
+                      className="flex-1 flex items-center justify-center gap-1.5 p-2 rounded-lg hover:bg-accent transition-colors text-xs text-muted-foreground"
+                      data-testid={`edit-job-${job.id}`}
+                    >
+                      <Edit className="w-4 h-4" />
+                      <span className="hidden sm:inline">Edit</span>
+                    </button>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); handleDuplicateJob(job.id); }}
+                      className="flex-1 flex items-center justify-center gap-1.5 p-2 rounded-lg hover:bg-accent transition-colors text-xs text-muted-foreground"
+                      title="Duplicate job"
+                    >
+                      <Copy className="w-4 h-4" />
+                      <span className="hidden sm:inline">Copy</span>
+                    </button>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); handleGeneratePoster(job.id); }}
+                      className="flex-1 flex items-center justify-center gap-1.5 p-2 rounded-lg hover:bg-accent transition-colors text-xs text-muted-foreground"
+                      title="Generate hiring poster"
+                      disabled={generatingPoster === job.id}
+                    >
+                      {generatingPoster === job.id ? (
+                        <div className="w-4 h-4 border-2 border-muted-foreground border-t-transparent rounded-full animate-spin" />
+                      ) : (
+                        <Printer className="w-4 h-4" />
+                      )}
+                      <span className="hidden sm:inline">Poster</span>
+                    </button>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setConfirmDelete(job.id); }}
+                      className="flex-1 flex items-center justify-center gap-1.5 p-2 rounded-lg hover:bg-destructive/10 transition-colors text-xs text-destructive"
+                      data-testid={`delete-job-${job.id}`}
+                    >
+                      <Trash2 className="w-4 h-4" />
+                      <span className="hidden sm:inline">Delete</span>
+                    </button>
                   </div>
                 </div>
               ))}
