@@ -49,18 +49,29 @@ export default function RecruiterSwipe() {
     const sessionId = searchParams.get('session_id');
     if (searchParams.get('payment') === 'success' && sessionId && token) {
       window.history.replaceState({}, '', window.location.pathname);
-      axios.get(`${API}/payments/verify-session/${sessionId}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      }).then(res => {
-        if (res.data.status === 'paid') {
-          toast.success('Payment successful! Your subscription is now active.');
-          refreshUser();
+      const verifyPayment = async (retries = 3) => {
+        try {
+          const res = await axios.get(`${API}/payments/verify-session/${sessionId}`, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          if (res.data.status === 'paid') {
+            toast.success('Payment successful! Your subscription is now active.');
+            await refreshUser();
+            fetchData(); // Re-fetch page data with updated subscription
+          } else if (retries > 0) {
+            setTimeout(() => verifyPayment(retries - 1), 2000);
+          }
+        } catch {
+          if (retries > 0) {
+            setTimeout(() => verifyPayment(retries - 1), 2000);
+          } else {
+            toast.success('Payment received! Your subscription will activate shortly.');
+            await refreshUser();
+            fetchData();
+          }
         }
-      }).catch(() => {
-        // Webhook will handle it eventually
-        toast.success('Payment received! Your subscription will activate shortly.');
-        setTimeout(() => refreshUser(), 3000);
-      });
+      };
+      verifyPayment();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -391,34 +402,36 @@ export default function RecruiterSwipe() {
                 </button>
 
                 {mode === 'discover' && (
-                  <button
-                    onClick={() => {
-                      if (superSwipesRemaining && superSwipesRemaining.remaining <= 0) {
-                        setShowUpgradeModal(true);
-                        return;
-                      }
-                      handleSwipe('superlike', { x: 0, y: -1500 });
-                    }}
-                    className="w-14 h-14 rounded-full bg-secondary/10 border border-secondary/30 flex items-center justify-center hover:scale-110 transition-all duration-300 relative"
-                    data-testid="superswipe-btn"
-                    aria-label="Super like this candidate"
-                  >
-                    <Star className="w-6 h-6 text-secondary fill-secondary" />
+                  <div className="relative">
+                    <button
+                      onClick={() => {
+                        if (superSwipesRemaining && superSwipesRemaining.remaining <= 0) {
+                          setShowUpgradeModal(true);
+                          return;
+                        }
+                        handleSwipe('superlike', { x: 0, y: -1500 });
+                      }}
+                      className="w-14 h-14 rounded-full bg-secondary/10 border border-secondary/30 flex items-center justify-center hover:scale-110 transition-all duration-300"
+                      data-testid="superswipe-btn"
+                      aria-label="Super like this candidate"
+                    >
+                      <Star className="w-6 h-6 text-secondary fill-secondary" />
+                    </button>
                     {superSwipesRemaining && (
-                      <span className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-secondary text-[10px] font-bold flex items-center justify-center text-white">
+                      <span className="absolute -top-1 -right-1 w-6 h-6 rounded-full bg-secondary text-xs font-bold flex items-center justify-center text-white">
                         {superSwipesRemaining.remaining}
                       </span>
                     )}
-                  </button>
+                  </div>
                 )}
 
                 <button
                   onClick={() => handleSwipe('accept', { x: 1500, y: 0 })}
-                  className="w-20 h-20 rounded-full bg-success/10 border border-success/30 flex items-center justify-center hover:scale-110 hover:neon-glow-green transition-all duration-300"
+                  className="w-16 h-16 rounded-full bg-success/10 border border-success/30 flex items-center justify-center hover:scale-110 hover:neon-glow-green transition-all duration-300"
                   data-testid="accept-btn"
                   aria-label="Like this candidate"
                 >
-                  <Heart className="w-9 h-9 text-success" />
+                  <Heart className="w-7 h-7 text-success" />
                 </button>
               </div>
             </>

@@ -123,8 +123,11 @@ export default function RecruiterDashboard() {
       await axios.delete(`${API}/jobs/${jobId}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
+      // Immediately remove from UI
+      setJobs(prev => prev.filter(j => j.id !== jobId));
+      setApplications(prev => prev.filter(a => a.job_id !== jobId));
+      setStats(prev => ({ ...prev, active_jobs: Math.max(0, prev.active_jobs - 1) }));
       toast.success('Job deleted');
-      fetchData();
     } catch (error) {
       toast.error('Failed to delete job');
     }
@@ -256,7 +259,7 @@ export default function RecruiterDashboard() {
       <header className="relative z-10 p-6 md:p-8">
         <div className="flex items-center justify-between mb-8">
           <div className="flex items-center gap-3">
-            <img src="/logo.png" alt="Hireabble" className="w-9 h-9 rounded-lg" />
+            <img src="/logo-white.png" alt="Hireabble" className="w-9 h-9" />
             <div>
               <h1 className="text-2xl font-bold font-['Outfit']">Recruiter Hub</h1>
               <p className="text-muted-foreground">{user?.company || 'Your Company'}</p>

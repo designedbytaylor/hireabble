@@ -313,17 +313,29 @@ export default function SeekerDashboard() {
     const sessionId = searchParams.get('session_id');
     if (searchParams.get('payment') === 'success' && sessionId && token) {
       window.history.replaceState({}, '', window.location.pathname);
-      axios.get(`${API}/payments/verify-session/${sessionId}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      }).then(res => {
-        if (res.data.status === 'paid') {
-          toast.success('Payment successful! Your subscription is now active.');
-          refreshUser();
+      const verifyPayment = async (retries = 3) => {
+        try {
+          const res = await axios.get(`${API}/payments/verify-session/${sessionId}`, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          if (res.data.status === 'paid') {
+            toast.success('Payment successful! Your subscription is now active.');
+            await refreshUser();
+            fetchDashboard(); // Re-fetch page data with updated subscription
+          } else if (retries > 0) {
+            setTimeout(() => verifyPayment(retries - 1), 2000);
+          }
+        } catch {
+          if (retries > 0) {
+            setTimeout(() => verifyPayment(retries - 1), 2000);
+          } else {
+            toast.success('Payment received! Your subscription will activate shortly.');
+            await refreshUser();
+            fetchDashboard();
+          }
         }
-      }).catch(() => {
-        toast.success('Payment received! Your subscription will activate shortly.');
-        setTimeout(() => refreshUser(), 3000);
-      });
+      };
+      verifyPayment();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
