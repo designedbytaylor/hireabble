@@ -341,7 +341,7 @@ export default function RecruiterSwipe() {
       </header>
 
       {/* Main Content - Swipe Area */}
-      <main className="relative z-10 flex-1 flex flex-col px-3 pb-28 min-h-0">
+      <main className="relative z-10 flex-1 flex flex-col px-3 pb-20 min-h-0">
         <div className="max-w-md mx-auto w-full flex-1 flex flex-col min-h-0">
           {currentItem ? (
             <>
@@ -836,7 +836,7 @@ function ApplicantCard({ app, onSwipe, expanded, setExpanded }) {
       <div className="w-full h-full rounded-3xl overflow-hidden relative gradient-border bg-card">
         {/* Photo Header */}
         <div className="absolute inset-0">
-          <div className="h-[65%] relative overflow-hidden">
+          <div className="h-[55%] relative overflow-hidden">
             <img
               src={getPhotoUrl(app.seeker_photo || app.seeker_avatar, app.seeker_name || app.seeker_id)}
               alt={app.seeker_name}
@@ -845,7 +845,7 @@ function ApplicantCard({ app, onSwipe, expanded, setExpanded }) {
             />
             <div className="absolute inset-0 bg-gradient-to-t from-card via-transparent to-transparent" />
           </div>
-          <div className="absolute inset-0 top-[60%] bg-card" />
+          <div className="absolute inset-0 top-[50%] bg-card" />
         </div>
 
         {/* Swipe Indicators */}
@@ -882,66 +882,50 @@ function ApplicantCard({ app, onSwipe, expanded, setExpanded }) {
         )}
 
         {/* Content */}
-        <div className={`absolute inset-0 top-[55%] flex flex-col p-6 z-10 overflow-hidden`}>
-          <h2 className="text-2xl font-bold font-['Outfit']">{app.seeker_name}</h2>
-          <p className="text-primary text-sm mt-1">{app.seeker_title || 'Job Seeker'}</p>
-          <p className="text-muted-foreground text-xs mt-1">Applied for: {app.job_title}</p>
-          {app.other_applications?.length > 0 && (
-            <p className="text-xs mt-0.5 text-primary/80 flex items-center gap-1">
-              <Briefcase className="w-3 h-3" />
-              Also applied to {app.other_applications.length} other {app.other_applications.length === 1 ? 'job' : 'jobs'}
-            </p>
-          )}
-
-          {app.other_applications?.length > 0 && (
-            <div className="mt-1 px-2 py-1 rounded-lg bg-primary/10 border border-primary/20 inline-flex items-center gap-1.5">
-              <Briefcase className="w-3 h-3 text-primary" />
-              <span className="text-xs text-primary font-medium">
-                Also applied to: {app.other_applications.map(a => a.job_title).join(', ')}
-              </span>
-            </div>
-          )}
+        <div className={`absolute inset-0 top-[46%] flex flex-col px-5 pt-4 pb-3 z-10 overflow-hidden`}>
+          <h2 className="text-xl font-bold font-['Outfit'] leading-tight">{app.seeker_name}</h2>
+          <p className="text-primary text-sm mt-0.5">{app.seeker_title || 'Job Seeker'}</p>
+          <p className="text-muted-foreground text-xs mt-0.5">Applied for: {app.job_title}</p>
 
           {app.superlike_note && (
-            <div className="mt-2 px-3 py-2 rounded-xl bg-secondary/10 border border-secondary/20">
-              <p className="text-xs text-secondary flex items-center gap-1 mb-0.5 font-medium">
-                <MessageSquare className="w-3 h-3" /> Note from applicant
+            <div className="mt-1.5 px-2.5 py-1.5 rounded-lg bg-secondary/10 border border-secondary/20">
+              <p className="text-xs text-secondary flex items-center gap-1 font-medium">
+                <MessageSquare className="w-3 h-3" /> "{app.superlike_note}"
               </p>
-              <p className="text-sm text-foreground/90 italic">"{app.superlike_note}"</p>
             </div>
           )}
 
-          <div className="flex flex-wrap gap-2 mt-4">
+          <div className="flex flex-wrap gap-1.5 mt-3">
             {app.seeker_experience && (
-              <span className="px-3 py-1.5 rounded-full bg-primary/20 text-primary text-sm flex items-center gap-1">
-                <Clock className="w-3.5 h-3.5" />
+              <span className="px-2.5 py-1 rounded-full bg-primary/20 text-primary text-xs flex items-center gap-1">
+                <Clock className="w-3 h-3" />
                 {app.seeker_experience}+ yrs
               </span>
             )}
             {app.seeker_location && (
-              <span className="px-3 py-1.5 rounded-full bg-secondary/20 text-secondary text-sm flex items-center gap-1">
-                <MapPin className="w-3.5 h-3.5" />
+              <span className="px-2.5 py-1 rounded-full bg-secondary/20 text-secondary text-xs flex items-center gap-1">
+                <MapPin className="w-3 h-3" />
                 {app.seeker_location}
               </span>
             )}
             {app.seeker_school && (
-              <span className="px-3 py-1.5 rounded-full bg-accent text-accent-foreground text-sm flex items-center gap-1">
-                <GraduationCap className="w-3.5 h-3.5" />
+              <span className="px-2.5 py-1 rounded-full bg-accent text-accent-foreground text-xs flex items-center gap-1">
+                <GraduationCap className="w-3 h-3" />
                 {app.seeker_school}
               </span>
             )}
           </div>
 
           {app.seeker_skills?.length > 0 && (
-            <div className="flex flex-wrap gap-1.5 mt-3">
-              {app.seeker_skills.slice(0, 6).map((skill, i) => (
-                <span key={i} className="px-2 py-1 rounded-lg bg-white/5 border border-border text-xs">
+            <div className="flex flex-wrap gap-1 mt-2">
+              {app.seeker_skills.slice(0, 4).map((skill, i) => (
+                <span key={i} className="px-2 py-0.5 rounded-md bg-white/5 border border-border text-[11px]">
                   {skill}
                 </span>
               ))}
-              {app.seeker_skills.length > 6 && (
-                <span className="px-2 py-1 rounded-lg bg-white/5 text-xs text-muted-foreground">
-                  +{app.seeker_skills.length - 6} more
+              {app.seeker_skills.length > 4 && (
+                <span className="px-2 py-0.5 rounded-md bg-white/5 text-[11px] text-muted-foreground">
+                  +{app.seeker_skills.length - 4}
                 </span>
               )}
             </div>
@@ -949,10 +933,10 @@ function ApplicantCard({ app, onSwipe, expanded, setExpanded }) {
 
           <button
             onClick={(e) => { e.stopPropagation(); setExpanded(true); }}
-            className="flex items-center justify-center gap-2 text-sm font-medium text-primary hover:text-primary/80 transition-colors mt-4 w-full py-2 rounded-xl bg-primary/10 hover:bg-primary/15"
+            className="flex items-center justify-center gap-1.5 text-xs font-medium text-primary hover:text-primary/80 transition-colors mt-auto w-full py-2 rounded-xl bg-primary/10 hover:bg-primary/15 shrink-0"
             aria-label="Show full profile details"
           >
-            <ChevronDown className="w-4 h-4" />
+            <ChevronDown className="w-3.5 h-3.5" />
             View full profile
           </button>
         </div>
@@ -1033,7 +1017,7 @@ function CandidateCard({ candidate, onSwipe, expanded, setExpanded }) {
       <div className="w-full h-full rounded-3xl overflow-hidden relative gradient-border bg-card">
         {/* Photo Header */}
         <div className="absolute inset-0">
-          <div className="h-[65%] relative overflow-hidden">
+          <div className="h-[55%] relative overflow-hidden">
             <img
               src={getPhotoUrl(candidate.photo_url || candidate.avatar, candidate.id)}
               alt={candidate.name}
@@ -1042,7 +1026,7 @@ function CandidateCard({ candidate, onSwipe, expanded, setExpanded }) {
             />
             <div className="absolute inset-0 bg-gradient-to-t from-card via-transparent to-transparent" />
           </div>
-          <div className="absolute inset-0 top-[60%] bg-card" />
+          <div className="absolute inset-0 top-[50%] bg-card" />
         </div>
 
         {/* Swipe Indicators */}
@@ -1080,47 +1064,47 @@ function CandidateCard({ candidate, onSwipe, expanded, setExpanded }) {
         )}
 
         {/* Content */}
-        <div className={`absolute inset-0 top-[55%] flex flex-col p-6 z-10 overflow-hidden`}>
-          <h2 className="text-2xl font-bold font-['Outfit']">{candidate.name}</h2>
-          <p className="text-primary text-sm mt-1">{candidate.title || 'Job Seeker'}</p>
+        <div className={`absolute inset-0 top-[46%] flex flex-col px-5 pt-4 pb-3 z-10 overflow-hidden`}>
+          <h2 className="text-xl font-bold font-['Outfit'] leading-tight">{candidate.name}</h2>
+          <p className="text-primary text-sm mt-0.5">{candidate.title || 'Job Seeker'}</p>
           {candidate.best_match_job && (
-            <p className="text-muted-foreground text-xs mt-1 flex items-center gap-1">
+            <p className="text-muted-foreground text-xs mt-0.5 flex items-center gap-1">
               <Zap className="w-3 h-3 text-secondary" />
               Best fit: {candidate.best_match_job}
             </p>
           )}
 
-          <div className="flex flex-wrap gap-2 mt-4">
+          <div className="flex flex-wrap gap-1.5 mt-3">
             {candidate.experience_years && (
-              <span className="px-3 py-1.5 rounded-full bg-primary/20 text-primary text-sm flex items-center gap-1">
-                <Clock className="w-3.5 h-3.5" />
+              <span className="px-2.5 py-1 rounded-full bg-primary/20 text-primary text-xs flex items-center gap-1">
+                <Clock className="w-3 h-3" />
                 {candidate.experience_years}+ yrs
               </span>
             )}
             {candidate.location && (
-              <span className="px-3 py-1.5 rounded-full bg-secondary/20 text-secondary text-sm flex items-center gap-1">
-                <MapPin className="w-3.5 h-3.5" />
+              <span className="px-2.5 py-1 rounded-full bg-secondary/20 text-secondary text-xs flex items-center gap-1">
+                <MapPin className="w-3 h-3" />
                 {candidate.location}
               </span>
             )}
             {candidate.school && (
-              <span className="px-3 py-1.5 rounded-full bg-accent text-accent-foreground text-sm flex items-center gap-1">
-                <GraduationCap className="w-3.5 h-3.5" />
+              <span className="px-2.5 py-1 rounded-full bg-accent text-accent-foreground text-xs flex items-center gap-1">
+                <GraduationCap className="w-3 h-3" />
                 {candidate.school}
               </span>
             )}
           </div>
 
           {candidate.skills?.length > 0 && (
-            <div className="flex flex-wrap gap-1.5 mt-3">
-              {candidate.skills.slice(0, 6).map((skill, i) => (
-                <span key={i} className="px-2 py-1 rounded-lg bg-white/5 border border-border text-xs">
+            <div className="flex flex-wrap gap-1 mt-2">
+              {candidate.skills.slice(0, 4).map((skill, i) => (
+                <span key={i} className="px-2 py-0.5 rounded-md bg-white/5 border border-border text-[11px]">
                   {skill}
                 </span>
               ))}
-              {candidate.skills.length > 6 && (
-                <span className="px-2 py-1 rounded-lg bg-white/5 text-xs text-muted-foreground">
-                  +{candidate.skills.length - 6} more
+              {candidate.skills.length > 4 && (
+                <span className="px-2 py-0.5 rounded-md bg-white/5 text-[11px] text-muted-foreground">
+                  +{candidate.skills.length - 4}
                 </span>
               )}
             </div>
@@ -1128,10 +1112,10 @@ function CandidateCard({ candidate, onSwipe, expanded, setExpanded }) {
 
           <button
             onClick={(e) => { e.stopPropagation(); setExpanded(true); }}
-            className="flex items-center justify-center gap-2 text-sm font-medium text-primary hover:text-primary/80 transition-colors mt-4 w-full py-2 rounded-xl bg-primary/10 hover:bg-primary/15"
+            className="flex items-center justify-center gap-1.5 text-xs font-medium text-primary hover:text-primary/80 transition-colors mt-auto w-full py-2 rounded-xl bg-primary/10 hover:bg-primary/15 shrink-0"
             aria-label="Show full profile details"
           >
-            <ChevronDown className="w-4 h-4" />
+            <ChevronDown className="w-3.5 h-3.5" />
             View full profile
           </button>
         </div>
@@ -1163,11 +1147,11 @@ function ExitingRecruiterCard({ card }) {
     >
       <div className="w-full h-full rounded-3xl overflow-hidden relative gradient-border bg-card">
         <div className="absolute inset-0">
-          <div className="h-[65%] relative overflow-hidden">
+          <div className="h-[55%] relative overflow-hidden">
             <img src={photoUrl} alt={name} className="w-full h-full object-cover object-top" />
             <div className="absolute inset-0 bg-gradient-to-t from-card via-transparent to-transparent" />
           </div>
-          <div className="absolute inset-0 top-[60%] bg-card" />
+          <div className="absolute inset-0 top-[50%] bg-card" />
         </div>
         {/* Stamp overlay */}
         {action === 'accept' && (
@@ -1179,7 +1163,7 @@ function ExitingRecruiterCard({ card }) {
         {action === 'superlike' && (
           <div className="absolute top-8 left-1/2 -translate-x-1/2 px-6 py-2 rounded-full bg-secondary border-2 border-secondary font-bold text-white z-20">SUPER SWIPE</div>
         )}
-        <div className="absolute inset-0 top-[55%] flex flex-col p-6 z-10">
+        <div className="absolute inset-0 top-[46%] flex flex-col px-5 pt-4 pb-3 z-10">
           <h2 className="text-2xl font-bold font-['Outfit']">{name}</h2>
           <p className="text-primary text-sm mt-1">{title}</p>
         </div>
@@ -1193,7 +1177,7 @@ function StaticApplicantCard({ app }) {
   return (
     <div className="w-full h-full rounded-3xl overflow-hidden relative gradient-border bg-card">
       <div className="absolute inset-0">
-        <div className="h-[65%] relative overflow-hidden">
+        <div className="h-[55%] relative overflow-hidden">
           <img
             src={getPhotoUrl(app.seeker_photo || app.seeker_avatar, app.seeker_id)}
             alt={app.seeker_name}
@@ -1201,7 +1185,7 @@ function StaticApplicantCard({ app }) {
           />
           <div className="absolute inset-0 bg-gradient-to-t from-card via-transparent to-transparent" />
         </div>
-        <div className="absolute inset-0 top-[60%] bg-card" />
+        <div className="absolute inset-0 top-[50%] bg-card" />
       </div>
       {app.action === 'superlike' && (
         <div className="absolute top-4 right-4 z-20 px-3 py-1 rounded-full bg-gradient-to-r from-secondary to-pink-500 text-white text-xs font-bold flex items-center gap-1 shadow-lg">
@@ -1213,7 +1197,7 @@ function StaticApplicantCard({ app }) {
           <Zap className="w-3 h-3 fill-white" /> Priority
         </div>
       )}
-      <div className="absolute inset-0 top-[55%] flex flex-col p-6 z-10">
+      <div className="absolute inset-0 top-[46%] flex flex-col px-5 pt-4 pb-3 z-10">
         <h2 className="text-2xl font-bold font-['Outfit']">{app.seeker_name}</h2>
         <p className="text-primary text-sm mt-1">{app.seeker_title || 'Job Seeker'}</p>
         <div className="flex flex-wrap gap-2 mt-4">
@@ -1239,7 +1223,7 @@ function StaticCandidateCard({ candidate }) {
   return (
     <div className="w-full h-full rounded-3xl overflow-hidden relative gradient-border bg-card">
       <div className="absolute inset-0">
-        <div className="h-[65%] relative overflow-hidden">
+        <div className="h-[55%] relative overflow-hidden">
           <img
             src={getPhotoUrl(candidate.photo_url || candidate.avatar, candidate.id)}
             alt={candidate.name}
@@ -1247,9 +1231,9 @@ function StaticCandidateCard({ candidate }) {
           />
           <div className="absolute inset-0 bg-gradient-to-t from-card via-transparent to-transparent" />
         </div>
-        <div className="absolute inset-0 top-[60%] bg-card" />
+        <div className="absolute inset-0 top-[50%] bg-card" />
       </div>
-      <div className="absolute inset-0 top-[55%] flex flex-col p-6 z-10">
+      <div className="absolute inset-0 top-[46%] flex flex-col px-5 pt-4 pb-3 z-10">
         <h2 className="text-2xl font-bold font-['Outfit']">{candidate.name}</h2>
         <p className="text-primary text-sm mt-1">{candidate.title || 'Job Seeker'}</p>
         <div className="flex flex-wrap gap-2 mt-4">
