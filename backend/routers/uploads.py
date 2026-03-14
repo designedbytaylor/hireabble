@@ -10,6 +10,8 @@ import uuid
 import os
 import io
 import re
+import base64
+import asyncio
 
 from database import (
     db, get_current_user, SUPABASE_URL, SUPABASE_KEY, UPLOADS_DIR, logger
@@ -141,6 +143,241 @@ def _analyze_image(contents: bytes) -> dict:
     return result
 
 
+# ==================== AI CONTENT MODERATION ====================
+
+# Verdict constants
+_VERDICT_SAFE = "safe"
+_VERDICT_FLAGGED = "flagged"   # borderline — upload allowed, queued for admin review
+_VERDICT_BLOCKED = "blocked"   # definite violation — upload rejected
+
+
+async def _check_image_content(contents: bytes, content_type: str) -> dict:
+    """
+    Use Claude Vision to check an image for inappropriate content.
+    Returns {"verdict": "safe"|"flagged"|"blocked", "reason": str|None, "categories": list}.
+
+    - "blocked"  → reject the upload immediately (nudity, gore, explicit violence, hate symbols)
+    - "flagged"  → allow the upload but add to moderation queue (suggestive, borderline)
+    - "safe"     → proceed normally
+
+    Falls back gracefully if the API is unavailable (returns "safe" so uploads aren't blocked).
+    """
+    result = {"verdict": _VERDICT_SAFE, "reason": None, "categories": []}
+
+    api_key = os.environ.get("ANTHROPIC_API_KEY")
+    if not api_key:
+        logger.warning("ANTHROPIC_API_KEY not set — skipping AI content moderation")
+        return result
+
+    try:
+        import anthropic
+    except ImportError:
+        logger.warning("anthropic package not installed — skipping AI content moderation")
+        return result
+
+    # Map content types to Claude media types
+    media_type_map = {
+        "image/jpeg": "image/jpeg",
+        "image/png": "image/png",
+        "image/gif": "image/gif",
+        "image/webp": "image/webp",
+    }
+    media_type = media_type_map.get(content_type, "image/jpeg")
+
+    # Resize large images to reduce API cost/latency (max 512px on longest side)
+    image_bytes = contents
+    try:
+        from PIL import Image
+        img = Image.open(io.BytesIO(contents))
+        max_dim = max(img.width, img.height)
+        if max_dim > 512:
+            scale = 512 / max_dim
+            new_size = (int(img.width * scale), int(img.height * scale))
+            img = img.resize(new_size, Image.LANCZOS)
+            buf = io.BytesIO()
+            fmt = "JPEG" if media_type == "image/jpeg" else img.format or "PNG"
+            if img.mode == "RGBA" and fmt == "JPEG":
+                img = img.convert("RGB")
+            img.save(buf, format=fmt)
+            image_bytes = buf.getvalue()
+            media_type = f"image/{fmt.lower()}"
+    except Exception:
+        pass  # Use original bytes if PIL unavailable
+
+    b64_image = base64.standard_b64encode(image_bytes).decode("utf-8")
+
+    prompt = """You are a content moderation system for a professional job recruitment platform (like LinkedIn or Indeed). Analyze this image and determine if it is appropriate.
+
+BLOCK (reject immediately) if the image contains:
+- Full or partial nudity (exposed genitals, bare breasts, bare buttocks)
+- Sexually explicit or pornographic content
+- Graphic violence, gore, or mutilation
+- Hate symbols (swastikas, Confederate flags used in hateful context, white supremacist symbols)
+- Drug use or drug paraphernalia
+- Child exploitation of any kind
+
+FLAG (allow but queue for review) if the image contains:
+- Suggestive/provocative poses in revealing clothing (but not nudity)
+- Underwear/lingerie as the main focus
+- Excessive blood (but not gore)
+- Alcohol as the primary focus
+- Weapons prominently displayed
+
+SAFE — everything else, including:
+- Normal professional photos, headshots, selfies
+- Beach/pool/vacation photos with swimwear (this is NOT nudity)
+- Fitness/gym photos showing athletic wear
+- Photos of people in normal clothing
+- Landscapes, food, pets, objects, artwork
+- Medical/anatomical educational content
+
+Respond with ONLY a JSON object (no other text):
+{"verdict": "safe"|"flagged"|"blocked", "reason": "brief explanation or null", "categories": ["category1"]}
+
+Categories to use: nudity, sexual, violence, gore, hate, drugs, weapons, suggestive, alcohol"""
+
+    try:
+        client = anthropic.Anthropic(api_key=api_key)
+
+        models = ["claude-haiku-4-5-20251001", "claude-3-5-haiku-20241022", "claude-3-haiku-20240307"]
+        message = None
+        last_error = None
+
+        for model_id in models:
+            try:
+                message = await asyncio.to_thread(
+                    client.messages.create,
+                    model=model_id,
+                    max_tokens=200,
+                    messages=[{
+                        "role": "user",
+                        "content": [
+                            {
+                                "type": "image",
+                                "source": {
+                                    "type": "base64",
+                                    "media_type": media_type,
+                                    "data": b64_image,
+                                },
+                            },
+                            {"type": "text", "text": prompt},
+                        ],
+                    }],
+                )
+                break
+            except Exception as model_err:
+                last_error = model_err
+                logger.warning(f"Content moderation model {model_id} failed: {type(model_err).__name__}: {model_err}")
+                continue
+
+        if message is None:
+            raise last_error or Exception("All models failed")
+
+        import json as json_module
+        response_text = message.content[0].text.strip()
+
+        # Handle possible markdown wrapping
+        if response_text.startswith("```"):
+            lines = response_text.split("\n")
+            json_lines = [l for l in lines if not l.startswith("```")]
+            response_text = "\n".join(json_lines)
+
+        parsed = json_module.loads(response_text)
+        result["verdict"] = parsed.get("verdict", _VERDICT_SAFE)
+        result["reason"] = parsed.get("reason")
+        result["categories"] = parsed.get("categories", [])
+
+        # Validate verdict value
+        if result["verdict"] not in (_VERDICT_SAFE, _VERDICT_FLAGGED, _VERDICT_BLOCKED):
+            result["verdict"] = _VERDICT_SAFE
+
+        logger.info(f"AI content moderation verdict: {result['verdict']} — {result['reason']}")
+
+    except Exception as e:
+        logger.error(f"AI content moderation failed: {type(e).__name__}: {e} — defaulting to safe")
+        # Fail open: don't block uploads if AI is unavailable
+        result["verdict"] = _VERDICT_SAFE
+        result["reason"] = f"Moderation unavailable: {type(e).__name__}"
+
+    return result
+
+
+async def _check_video_content(contents: bytes, content_type: str) -> dict:
+    """
+    Extract key frames from a video and check each for inappropriate content using Claude Vision.
+    Samples up to 4 frames spread across the video duration.
+    Returns the worst verdict found across all frames.
+    Falls back to "safe" if frame extraction fails (ffmpeg or cv2 not available).
+    """
+    result = {"verdict": _VERDICT_SAFE, "reason": None, "categories": []}
+
+    # Try extracting frames with ffmpeg (most reliable in server environments)
+    frames = []
+    try:
+        import tempfile
+        import subprocess
+        import glob as glob_mod
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            video_path = os.path.join(tmpdir, "input_video")
+            with open(video_path, "wb") as f:
+                f.write(contents)
+
+            # Get video duration
+            probe = subprocess.run(
+                ["ffprobe", "-v", "error", "-show_entries", "format=duration",
+                 "-of", "default=noprint_wrappers=1:nokey=1", video_path],
+                capture_output=True, text=True, timeout=10
+            )
+            duration = float(probe.stdout.strip()) if probe.stdout.strip() else 10.0
+            duration = max(duration, 1.0)
+
+            # Extract 4 frames spread across the video
+            num_frames = min(4, max(1, int(duration)))
+            for i in range(num_frames):
+                timestamp = (duration / (num_frames + 1)) * (i + 1)
+                frame_path = os.path.join(tmpdir, f"frame_{i}.jpg")
+                subprocess.run(
+                    ["ffmpeg", "-ss", str(timestamp), "-i", video_path,
+                     "-vframes", "1", "-q:v", "2", "-y", frame_path],
+                    capture_output=True, timeout=15
+                )
+                if os.path.exists(frame_path):
+                    with open(frame_path, "rb") as fp:
+                        frames.append(fp.read())
+
+    except FileNotFoundError:
+        logger.warning("ffmpeg not available — skipping video content moderation")
+        return result
+    except Exception as e:
+        logger.warning(f"Video frame extraction failed: {type(e).__name__}: {e}")
+        return result
+
+    if not frames:
+        logger.warning("No frames extracted from video — skipping content moderation")
+        return result
+
+    # Check each frame, collect worst verdict
+    worst_verdict = _VERDICT_SAFE
+    verdict_priority = {_VERDICT_SAFE: 0, _VERDICT_FLAGGED: 1, _VERDICT_BLOCKED: 2}
+    all_categories = []
+
+    for frame_bytes in frames:
+        frame_result = await _check_image_content(frame_bytes, "image/jpeg")
+        if verdict_priority.get(frame_result["verdict"], 0) > verdict_priority.get(worst_verdict, 0):
+            worst_verdict = frame_result["verdict"]
+            result["reason"] = frame_result["reason"]
+        all_categories.extend(frame_result.get("categories", []))
+
+        # Short-circuit: if any frame is blocked, no need to check the rest
+        if worst_verdict == _VERDICT_BLOCKED:
+            break
+
+    result["verdict"] = worst_verdict
+    result["categories"] = list(set(all_categories))
+    return result
+
+
 async def _track_upload(user_id: str, user_name: str, media_type: str, category: str,
                         url: str, filename: str, file_size: int, content_type: str,
                         analysis: dict = None):
@@ -207,8 +444,23 @@ async def upload_file(
     if not _validate_file_magic(contents, ALLOWED_IMAGE_TYPES):
         raise HTTPException(status_code=400, detail="File content does not match an allowed image type")
 
-    # Analyze image content
+    # Analyze image content (heuristic)
     analysis = _analyze_image(contents)
+
+    # AI content moderation — check BEFORE storing
+    ai_check = await _check_image_content(contents, file.content_type)
+    if ai_check["verdict"] == _VERDICT_BLOCKED:
+        logger.warning(f"Profile photo BLOCKED for user {current_user['id']}: {ai_check['reason']} — {ai_check['categories']}")
+        raise HTTPException(
+            status_code=400,
+            detail=f"This image has been rejected because it appears to contain inappropriate content ({', '.join(ai_check['categories'])}). Please upload a different photo."
+        )
+    if ai_check["verdict"] == _VERDICT_FLAGGED:
+        analysis["flagged"] = True
+        analysis["reasons"] = analysis.get("reasons", [])
+        analysis["reasons"].append(f"AI flagged: {ai_check['reason']}")
+    analysis["analysis"] = analysis.get("analysis", {})
+    analysis["analysis"]["ai_moderation"] = ai_check
 
     ext = file.filename.split('.')[-1] if '.' in file.filename else 'jpg'
     filename = f"{current_user['id']}_{uuid.uuid4().hex[:8]}.{ext}"
@@ -281,6 +533,19 @@ async def upload_video(
     if not _validate_file_magic(contents, ALLOWED_VIDEO_TYPES):
         raise HTTPException(status_code=400, detail="File content does not match an allowed video type")
 
+    # AI content moderation — extract frames and check BEFORE storing
+    ai_check = await _check_video_content(contents, file.content_type)
+    analysis = {"flagged": False, "reasons": [], "analysis": {"ai_moderation": ai_check}}
+    if ai_check["verdict"] == _VERDICT_BLOCKED:
+        logger.warning(f"Video BLOCKED for user {current_user['id']}: {ai_check['reason']} — {ai_check['categories']}")
+        raise HTTPException(
+            status_code=400,
+            detail=f"This video has been rejected because it appears to contain inappropriate content ({', '.join(ai_check['categories'])}). Please upload a different video."
+        )
+    if ai_check["verdict"] == _VERDICT_FLAGGED:
+        analysis["flagged"] = True
+        analysis["reasons"].append(f"AI flagged: {ai_check['reason']}")
+
     ext = file.filename.split('.')[-1] if '.' in file.filename else 'mp4'
     filename = f"video_{current_user['id']}_{uuid.uuid4().hex[:8]}.{ext}"
 
@@ -314,7 +579,7 @@ async def upload_video(
         {"$set": {"video_url": video_url}}
     )
 
-    # Track upload (no image analysis for video — flagged for manual review by default if needed)
+    # Track upload with AI moderation analysis
     await _track_upload(
         user_id=current_user["id"],
         user_name=current_user.get("name", "Unknown"),
@@ -324,6 +589,7 @@ async def upload_video(
         filename=filename,
         file_size=len(contents),
         content_type=file.content_type,
+        analysis=analysis,
     )
 
     logger.info(f"Video uploaded for user {current_user['id']}: {filename}")
@@ -376,8 +642,23 @@ async def upload_chat_image(
     if len(contents) > MAX_IMAGE_SIZE:
         raise HTTPException(status_code=400, detail="Image size exceeds 5MB limit")
 
-    # Analyze image content
+    # Analyze image content (heuristic)
     analysis = _analyze_image(contents)
+
+    # AI content moderation — check BEFORE storing
+    ai_check = await _check_image_content(contents, file.content_type)
+    if ai_check["verdict"] == _VERDICT_BLOCKED:
+        logger.warning(f"Chat image BLOCKED for user {current_user['id']}: {ai_check['reason']} — {ai_check['categories']}")
+        raise HTTPException(
+            status_code=400,
+            detail=f"This image has been rejected because it appears to contain inappropriate content ({', '.join(ai_check['categories'])}). Please send a different image."
+        )
+    if ai_check["verdict"] == _VERDICT_FLAGGED:
+        analysis["flagged"] = True
+        analysis["reasons"] = analysis.get("reasons", [])
+        analysis["reasons"].append(f"AI flagged: {ai_check['reason']}")
+    analysis["analysis"] = analysis.get("analysis", {})
+    analysis["analysis"]["ai_moderation"] = ai_check
 
     ext = file.filename.split('.')[-1] if '.' in file.filename else 'jpg'
     filename = f"chat_{current_user['id']}_{uuid.uuid4().hex[:8]}.{ext}"
@@ -427,6 +708,19 @@ async def upload_chat_video(
     if len(contents) > MAX_VIDEO_SIZE:
         raise HTTPException(status_code=400, detail="Video size exceeds 50MB limit")
 
+    # AI content moderation — extract frames and check BEFORE storing
+    ai_check = await _check_video_content(contents, file.content_type)
+    analysis = {"flagged": False, "reasons": [], "analysis": {"ai_moderation": ai_check}}
+    if ai_check["verdict"] == _VERDICT_BLOCKED:
+        logger.warning(f"Chat video BLOCKED for user {current_user['id']}: {ai_check['reason']} — {ai_check['categories']}")
+        raise HTTPException(
+            status_code=400,
+            detail=f"This video has been rejected because it appears to contain inappropriate content ({', '.join(ai_check['categories'])}). Please send a different video."
+        )
+    if ai_check["verdict"] == _VERDICT_FLAGGED:
+        analysis["flagged"] = True
+        analysis["reasons"].append(f"AI flagged: {ai_check['reason']}")
+
     ext = file.filename.split('.')[-1] if '.' in file.filename else 'webm'
     filename = f"chat_{current_user['id']}_{uuid.uuid4().hex[:8]}.{ext}"
 
@@ -445,7 +739,7 @@ async def upload_chat_video(
     else:
         video_url = _save_local("videos", filename, contents)
 
-    # Track upload
+    # Track upload with AI moderation analysis
     await _track_upload(
         user_id=current_user["id"],
         user_name=current_user.get("name", "Unknown"),
@@ -455,6 +749,7 @@ async def upload_chat_video(
         filename=filename,
         file_size=len(contents),
         content_type=file.content_type,
+        analysis=analysis,
     )
 
     logger.info(f"Chat video uploaded by user {current_user['id']}: {filename}")
