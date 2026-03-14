@@ -326,6 +326,7 @@ class UserCreate(BaseModel):
     role: str  # 'seeker' or 'recruiter'
     company: Optional[str] = None
     dob: Optional[str] = None  # Date of birth, ISO format YYYY-MM-DD
+    marketing_emails_opt_in: bool = False
 
 class UserLogin(BaseModel):
     email: EmailStr

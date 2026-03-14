@@ -97,6 +97,7 @@ async def register(user: UserCreate, request: Request):
             "email_verified": False,
             "push_subscription": None,
             "blocked_users": [],
+            "marketing_emails_opt_in": getattr(user, 'marketing_emails_opt_in', False),
             "created_at": datetime.now(timezone.utc).isoformat()
         }
 
@@ -426,6 +427,7 @@ async def _find_or_create_oauth_user(email: str, name: str, provider: str, role:
         "email_verified": True,  # OAuth emails are pre-verified by the provider
         "push_subscription": None,
         "oauth_providers": [provider],
+        "marketing_emails_opt_in": False,
         "created_at": datetime.now(timezone.utc).isoformat()
     }
     await db.users.insert_one(user_doc)

@@ -60,6 +60,7 @@ export default function Register() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [acceptedTerms, setAcceptedTerms] = useState(false);
+  const [marketingOptIn, setMarketingOptIn] = useState(false);
   const { register } = useAuth();
   const navigate = useNavigate();
 
@@ -106,7 +107,7 @@ export default function Register() {
 
     setLoading(true);
     try {
-      const user = await register(formData);
+      const user = await register({ ...formData, marketing_emails_opt_in: marketingOptIn });
       toast.success('Welcome to Hireabble! Please verify your email.');
       navigate('/verify-email');
     } catch (error) {
@@ -313,6 +314,18 @@ export default function Register() {
                   <Link to="/terms" className="text-primary hover:underline" target="_blank">Terms of Service</Link>
                   {' '}and{' '}
                   <Link to="/privacy" className="text-primary hover:underline" target="_blank">Privacy Policy</Link>
+                </span>
+              </label>
+
+              <label className="flex items-start gap-3 mt-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={marketingOptIn}
+                  onChange={(e) => setMarketingOptIn(e.target.checked)}
+                  className="mt-1 h-4 w-4 rounded border-border accent-primary"
+                />
+                <span className="text-xs text-muted-foreground">
+                  I'd like to receive occasional updates, tips, and promotions from Hireabble via email. You can unsubscribe at any time.
                 </span>
               </label>
 
