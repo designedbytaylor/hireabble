@@ -431,7 +431,21 @@ async def verify_apple_receipt(
 
     apple_txn_id = found_transaction.get("transaction_id", data.transaction_id or str(uuid.uuid4()))
 
-    # Check duplicate again with Apple's transaction ID
+    # Atomically check-and-insert to prevent race conditions (TOCTOU)
+    from pymongo.errors import DuplicateKeyError
+    lock_doc = {
+        "apple_transaction_id": apple_txn_id,
+        "user_id": current_user["id"],
+        "product_id": data.product_id,
+        "status": "processing",
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+    try:
+        await db.apple_txn_locks.insert_one(lock_doc)
+    except DuplicateKeyError:
+        return {"status": "already_fulfilled", "message": "This purchase has already been processed"}
+
+    # Double-check transactions collection
     existing = await db.transactions.find_one({"apple_transaction_id": apple_txn_id})
     if existing:
         return {"status": "already_fulfilled", "message": "This purchase has already been processed"}
@@ -490,13 +504,11 @@ async def apple_server_notification(request: Request):
                 public_key = RSAAlgorithm.from_jwk(matching_key)
                 payload = pyjwt.decode(signed_payload, public_key, algorithms=["RS256", "ES256"], options={"verify_aud": False})
             else:
-                # If key not found, decode without verification but log a warning
-                logger.warning(f"Apple notification key {kid} not found, decoding unverified")
-                payload = pyjwt.decode(signed_payload, options={"verify_signature": False})
+                logger.error(f"Apple notification key {kid} not found — rejecting unverified payload")
+                return {"status": "error", "reason": "key_not_found"}
         except Exception as decode_err:
             logger.error(f"Apple notification JWS decode error: {decode_err}")
-            # Fall back to unverified decode to avoid losing notifications
-            payload = pyjwt.decode(signed_payload, options={"verify_signature": False})
+            return {"status": "error", "reason": "signature_verification_failed"}
 
         notification_type = payload.get("notificationType", "")
         subtype = payload.get("subtype", "")
@@ -691,8 +703,15 @@ async def stripe_webhook(request: Request):
     if not STRIPE_AVAILABLE:
         raise HTTPException(status_code=503, detail="Payments not configured")
 
+    if not STRIPE_WEBHOOK_SECRET:
+        logger.error("STRIPE_WEBHOOK_SECRET not configured — rejecting webhook")
+        raise HTTPException(status_code=503, detail="Webhook secret not configured")
+
     payload = await request.body()
     sig_header = request.headers.get("stripe-signature", "")
+
+    if not sig_header:
+        raise HTTPException(status_code=400, detail="Missing stripe-signature header")
 
     try:
         event = stripe.Webhook.construct_event(payload, sig_header, STRIPE_WEBHOOK_SECRET)

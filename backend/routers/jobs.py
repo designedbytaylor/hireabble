@@ -764,7 +764,8 @@ async def generate_job_poster(job_id: str, current_user: dict = Depends(get_curr
         raise HTTPException(status_code=404, detail="Job not found")
 
     # Generate QR code
-    qr_url = f"https://hireabble.com/download?ref=poster&job={job_id}"
+    frontend_url = os.environ.get('FRONTEND_URL', 'https://hireabble.com')
+    qr_url = f"{frontend_url}/download?ref=poster&job={job_id}"
     qr = qrcode.QRCode(version=1, box_size=10, border=2)
     qr.add_data(qr_url)
     qr.make(fit=True)

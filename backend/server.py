@@ -64,6 +64,19 @@ app.add_middleware(
 )
 
 
+# Security headers
+@app.middleware("http")
+async def add_security_headers(request: Request, call_next):
+    response = await call_next(request)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["X-XSS-Protection"] = "1; mode=block"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    if request.url.scheme == "https":
+        response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+    return response
+
+
 # Cache headers — tell browsers what they can cache to avoid redundant requests
 @app.middleware("http")
 async def add_cache_headers(request: Request, call_next):
@@ -341,6 +354,9 @@ async def startup():
 
     # Candidate notes
     await ensure_index(db.candidate_notes, [("recruiter_id", 1), ("seeker_id", 1)], unique=True)
+
+    # Apple IAP transaction lock (prevents duplicate fulfillment)
+    await ensure_index(db.apple_txn_locks, "apple_transaction_id", unique=True)
 
     logger.info("Database indexes created")
     logger.info("Hireabble API started successfully!")

@@ -21,3 +21,8 @@
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+
+# Capacitor
+ios/App/App/public
+ios/App/Pods
+android/app/src/main/assets/public

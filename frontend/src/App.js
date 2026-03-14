@@ -1,5 +1,5 @@
-import React, { Suspense } from "react";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import React, { Suspense, useEffect } from "react";
+import { BrowserRouter, Routes, Route, Navigate, useNavigate } from "react-router-dom";
 import { Toaster } from "./components/ui/sonner";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import { AdminAuthProvider, useAdminAuth } from "./context/AdminAuthContext";
@@ -177,6 +177,59 @@ const AdminIndex = () => {
   const target = admin?.role === 'support' ? '/admin/support' : '/admin/dashboard';
   return <Navigate to={target} replace />;
 };
+
+/** Initialize Capacitor native plugins when running inside iOS/Android shell */
+function CapacitorInit() {
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    let cleanup;
+    (async () => {
+      try {
+        const { Capacitor } = await import('@capacitor/core');
+        if (!Capacitor.isNativePlatform()) return;
+
+        // Handle deep links
+        const { App: CapApp } = await import('@capacitor/app');
+        const listener = await CapApp.addListener('appUrlOpen', (event) => {
+          const url = new URL(event.url);
+          const path = url.pathname + url.search;
+          if (path) navigate(path);
+        });
+
+        // Handle back button (Android)
+        const backListener = await CapApp.addListener('backButton', ({ canGoBack }) => {
+          if (canGoBack) {
+            window.history.back();
+          } else {
+            CapApp.exitApp();
+          }
+        });
+
+        // Configure status bar
+        try {
+          const { StatusBar, Style } = await import('@capacitor/status-bar');
+          await StatusBar.setStyle({ style: Style.Dark });
+        } catch { /* StatusBar plugin not available */ }
+
+        // Hide splash screen
+        try {
+          const { SplashScreen } = await import('@capacitor/splash-screen');
+          await SplashScreen.hide();
+        } catch { /* SplashScreen plugin not available */ }
+
+        cleanup = () => {
+          listener.remove();
+          backListener.remove();
+        };
+      } catch { /* Not running in Capacitor */ }
+    })();
+
+    return () => cleanup?.();
+  }, [navigate]);
+
+  return null;
+}
 
 function AppRoutes() {
   return (
@@ -410,6 +463,7 @@ function App() {
         <ThemeProvider>
           <AuthProvider>
             <AdminAuthProvider>
+              <CapacitorInit />
               <Suspense fallback={null}><OfflineIndicator /></Suspense>
               <AppRoutes />
               <Toaster position="bottom-center" style={{ bottom: '80px' }} duration={3000} closeButton={false} />

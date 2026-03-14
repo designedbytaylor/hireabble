@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { Mail, Lock, User, Building2, ArrowRight, Eye, EyeOff, MapPin, Search, Users, Zap, Target, Shield, BarChart3, Briefcase, Calendar } from 'lucide-react';
 import { Button } from '../components/ui/button';
@@ -65,9 +65,9 @@ export default function Register() {
   const navigate = useNavigate();
 
   // Keep formData.role in sync with URL
-  if (formData.role !== role) {
-    setFormData(prev => ({ ...prev, role }));
-  }
+  useEffect(() => {
+    setFormData(prev => prev.role !== role ? { ...prev, role } : prev);
+  }, [role]);
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });

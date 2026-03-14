@@ -22,6 +22,28 @@ ALLOWED_VIDEO_TYPES = ["video/mp4", "video/webm", "video/quicktime", "video/x-ms
 MAX_IMAGE_SIZE = 5 * 1024 * 1024  # 5MB
 MAX_VIDEO_SIZE = 50 * 1024 * 1024  # 50MB
 
+# Magic number signatures for file type validation
+_IMAGE_MAGIC = {
+    b'\xff\xd8\xff': "image/jpeg",
+    b'\x89PNG': "image/png",
+    b'GIF87a': "image/gif",
+    b'GIF89a': "image/gif",
+    b'RIFF': "image/webp",  # WebP starts with RIFF...WEBP
+}
+
+_VIDEO_MAGIC = {
+    b'\x00\x00\x00': "video/mp4",      # ftyp box (MP4/MOV)
+    b'\x1a\x45\xdf\xa3': "video/webm", # EBML header (WebM/MKV)
+}
+
+
+def _validate_file_magic(contents: bytes, expected_types: list) -> bool:
+    """Validate file contents match expected type via magic numbers."""
+    for magic, mime in {**_IMAGE_MAGIC, **_VIDEO_MAGIC}.items():
+        if contents[:len(magic)] == magic and mime in expected_types:
+            return True
+    return False
+
 PHOTO_BUCKET = "photos"
 VIDEO_BUCKET = "videos"
 
@@ -182,6 +204,9 @@ async def upload_file(
     if len(contents) > MAX_IMAGE_SIZE:
         raise HTTPException(status_code=400, detail="File size exceeds 5MB limit")
 
+    if not _validate_file_magic(contents, ALLOWED_IMAGE_TYPES):
+        raise HTTPException(status_code=400, detail="File content does not match an allowed image type")
+
     # Analyze image content
     analysis = _analyze_image(contents)
 
@@ -252,6 +277,9 @@ async def upload_video(
     contents = await file.read()
     if len(contents) > MAX_VIDEO_SIZE:
         raise HTTPException(status_code=400, detail="Video size exceeds 50MB limit")
+
+    if not _validate_file_magic(contents, ALLOWED_VIDEO_TYPES):
+        raise HTTPException(status_code=400, detail="File content does not match an allowed video type")
 
     ext = file.filename.split('.')[-1] if '.' in file.filename else 'mp4'
     filename = f"video_{current_user['id']}_{uuid.uuid4().hex[:8]}.{ext}"
