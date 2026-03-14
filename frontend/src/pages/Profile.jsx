@@ -272,7 +272,7 @@ export default function Profile() {
       toast.success('Photo updated!');
       fetchCompleteness();
     } catch (error) {
-      toast.error('Failed to upload photo');
+      toast.error(error.response?.data?.detail || 'Failed to upload photo');
     } finally {
       setUploadingPhoto(false);
     }

@@ -227,7 +227,7 @@ export default function Chat() {
       });
       return res.data.url;
     } catch (err) {
-      toast.error('Failed to upload video');
+      toast.error(err.response?.data?.detail || 'Failed to upload video');
       return null;
     } finally {
       setUploadingVideo(false);
@@ -247,7 +247,7 @@ export default function Chat() {
       });
       return uploadRes.data.url;
     } catch (err) {
-      toast.error('Failed to upload image');
+      toast.error(err.response?.data?.detail || 'Failed to upload image');
       return null;
     }
   };
