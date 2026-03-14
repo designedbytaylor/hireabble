@@ -1,0 +1,28 @@
+/**
+ * Capacitor native platform utilities.
+ * Detects if the app is running inside a native iOS/Android shell
+ * and provides helpers for platform-specific behavior.
+ */
+import { Capacitor } from '@capacitor/core';
+
+/** True when running inside the native iOS or Android app */
+export const isNative = Capacitor.isNativePlatform();
+
+/** 'ios' | 'android' | 'web' */
+export const platform = Capacitor.getPlatform();
+
+/** True specifically on iOS native */
+export const isIOS = platform === 'ios';
+
+/** True specifically on Android native */
+export const isAndroid = platform === 'android';
+
+/**
+ * Returns the correct payment method for the current platform.
+ * Apple requires IAP for digital goods on iOS.
+ */
+export function getPaymentMethod() {
+  if (isIOS) return 'apple_iap';
+  if (isAndroid) return 'google_play';
+  return 'stripe';
+}

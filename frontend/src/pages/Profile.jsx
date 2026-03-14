@@ -310,10 +310,6 @@ export default function Profile() {
       });
 
       const parsed = response.data.parsed;
-      console.log('Resume parsed response:', JSON.stringify(parsed, null, 2));
-      if (parsed._parser === 'basic') {
-        console.warn('Resume was parsed with BASIC fallback parser. Reason:', parsed._parser_reason);
-      }
 
       // Build the updated form data from parsed resume
       const updatedFormData = {
@@ -617,7 +613,7 @@ export default function Profile() {
                 </div>
                 <div>
                   <h3 className="font-semibold font-['Outfit']">
-                    {subscription.plan_name || (user?.role === 'recruiter' ? 'Recruiter Pro' : 'Seeker Plus')}
+                    {subscription?.tier_name || subscription?.plan_name || (user?.role === 'recruiter' ? 'Recruiter Pro' : 'Seeker Plus')}
                   </h3>
                   <p className="text-xs text-muted-foreground">Active subscription</p>
                 </div>

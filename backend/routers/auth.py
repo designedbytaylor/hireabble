@@ -234,7 +234,7 @@ async def forgot_password(body: ForgotPasswordRequest, request: Request):
     
     # Get frontend URL from environment or use default
     import os
-    frontend_url = os.environ.get('FRONTEND_URL', 'https://password-reset-47.preview.emergentagent.com')
+    frontend_url = os.environ.get('FRONTEND_URL', 'https://hireabble.com')
     reset_link = f"{frontend_url}/reset-password?token={reset_token}"
     
     # Send email
@@ -769,7 +769,12 @@ async def delete_account(current_user: dict = Depends(get_current_user)):
         await db.support_tickets.delete_many({"user_id": user_id})
         await db.notifications.delete_many({"user_id": user_id})
         await db.password_reset_tokens.delete_many({"user_id": user_id})
+        await db.email_verification_tokens.delete_many({"user_id": user_id})
         await db.moderation_queue.delete_many({"user_id": user_id})
+        await db.candidate_notes.delete_many({"recruiter_id": user_id})
+        await db.saved_jobs.delete_many({"user_id": user_id})
+        await db.transactions.delete_many({"user_id": user_id})
+        await db.boosts.delete_many({"user_id": user_id})
         await db.profile_views.delete_many({"$or": [{"viewer_id": user_id}, {"viewed_id": user_id}]})
 
         if user_role == "seeker":
