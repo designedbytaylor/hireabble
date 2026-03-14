@@ -1402,6 +1402,11 @@ _COMPANY_NAMES = [
     "ByteWave", "NexGen", "Synapse", "Arclight", "VeloCity",
 ]
 _COMPANY_SUFFIXES = ["Labs", "Inc", "AI", "Tech", "Systems", "Digital", "Solutions", "HQ", "Co", "Studio"]
+_BRAND_COLORS = [
+    "0D47A1", "1B5E20", "4A148C", "BF360C", "01579B",
+    "004D40", "311B92", "E65100", "1A237E", "006064",
+    "880E4F", "33691E", "4E342E", "263238", "F57F17",
+]
 _COMPANY_DESCRIPTIONS = [
     "AI-first startup building the future of computer vision for autonomous vehicles.",
     "Enterprise cloud infrastructure platform serving Fortune 500 companies.",
@@ -1500,14 +1505,21 @@ async def seed_test_data(body: dict = {}, admin: dict = Depends(get_current_admi
 
     # Build all documents in memory first, then batch-insert for speed
     seeker_docs = []
+    male_photo_idx = 0
+    female_photo_idx = 0
     for i in range(num_seekers):
         profile = _SEEKER_PROFILES[i % len(_SEEKER_PROFILES)]
         name, gender = _generate_unique_name(used_names)
         user_id = str(uuid.uuid4())
         email = f"seeker{i+1}@test.hireabble.com"
 
-        # Use high-res placeholder portraits (500px for retina displays)
-        photo_url = f"https://i.pravatar.cc/500?u={email}"
+        # Professional adult headshots from randomuser.me (gender-matched, no duplicates)
+        if gender == "male":
+            photo_url = f"https://randomuser.me/api/portraits/men/{male_photo_idx % 100}.jpg"
+            male_photo_idx += 1
+        else:
+            photo_url = f"https://randomuser.me/api/portraits/women/{female_photo_idx % 100}.jpg"
+            female_photo_idx += 1
         avatar = f"https://api.dicebear.com/7.x/initials/svg?seed={user_id}"
         user_doc = {
             "id": user_id, "email": email, "password": password,
@@ -1533,7 +1545,9 @@ async def seed_test_data(body: dict = {}, admin: dict = Depends(get_current_admi
         user_id = str(uuid.uuid4())
         email = f"recruiter{i+1}@test.hireabble.com"
 
-        rec_photo = f"https://i.pravatar.cc/500?u={email}"
+        brand_color = _BRAND_COLORS[i % len(_BRAND_COLORS)]
+        company_url_name = company["name"].replace(" ", "+")
+        rec_photo = f"https://ui-avatars.com/api/?name={company_url_name}&size=500&background={brand_color}&color=fff&bold=true&format=png"
         avatar = f"https://api.dicebear.com/7.x/initials/svg?seed={user_id}"
         user_doc = {
             "id": user_id, "email": email, "password": password,
@@ -1549,10 +1563,12 @@ async def seed_test_data(body: dict = {}, admin: dict = Depends(get_current_admi
             "push_subscription": None,
             "created_at": (datetime.now(timezone.utc) - timedelta(days=random.randint(1, 90))).isoformat(),
         }
+        user_doc["_brand_color"] = brand_color  # in-memory only, for job logo generation
         recruiter_docs.append(user_doc)
 
     # Batch-insert seekers and recruiters in parallel
-    all_user_docs = seeker_docs + recruiter_docs
+    # Strip in-memory-only fields before DB insert
+    all_user_docs = [{k: v for k, v in doc.items() if k != "_brand_color"} for doc in seeker_docs + recruiter_docs]
     if all_user_docs:
         await db.users.insert_many(all_user_docs)
     created_seekers = seeker_docs
@@ -1566,7 +1582,9 @@ async def seed_test_data(body: dict = {}, admin: dict = Depends(get_current_admi
         for j in range(min(jobs_per_recruiter, len(available_jobs))):
             job_data = available_jobs[j]
             job_id = str(uuid.uuid4())
-            logo = f"https://api.dicebear.com/7.x/shapes/svg?seed={recruiter.get('company', 'co')}{j}"
+            company_name = recruiter.get('company', 'Co').replace(" ", "+")
+            brand_clr = recruiter.get('_brand_color', '0D47A1')
+            logo = f"https://ui-avatars.com/api/?name={company_name}&size=200&background={brand_clr}&color=fff&bold=true&format=png"
             bg = f"https://picsum.photos/seed/{job_id}/800/400"
             job_doc = {
                 "id": job_id,
