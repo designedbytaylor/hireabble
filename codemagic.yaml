@@ -8,6 +8,8 @@ workflows:
     environment:
       node: 18
       xcode: latest
+      groups:
+        - hireabble_env
       ios_signing:
         distribution_type: app_store
         bundle_identifier: com.hireabble.app
