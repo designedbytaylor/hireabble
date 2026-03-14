@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback, memo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence, useMotionValue, useTransform } from 'framer-motion';
 import { X, Heart, Star, Briefcase, MapPin, DollarSign, Building2, Clock, ChevronDown, Filter, SlidersHorizontal, Zap, CheckCircle, Globe, Wifi, Navigation2, Info, Calendar, Undo2, Eye, EyeOff, Rocket, Crown, Sparkles, Lock, Bookmark } from 'lucide-react';
 import { toast } from 'sonner';
@@ -145,7 +145,8 @@ let globalPendingSwipes = [];
 
 export default function SeekerDashboard() {
   const navigate = useNavigate();
-  const { user, token } = useAuth();
+  const { user, token, refreshUser } = useAuth();
+  const [searchParams] = useSearchParams();
   const uid = user?.id || getCachedUserId();
   const [jobs, setJobs] = useState([]);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -304,6 +305,26 @@ export default function SeekerDashboard() {
       );
       if (hasActiveFilters) fetchJobs(filters);
     });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Verify Stripe payment on return from checkout
+  useEffect(() => {
+    const sessionId = searchParams.get('session_id');
+    if (searchParams.get('payment') === 'success' && sessionId && token) {
+      window.history.replaceState({}, '', window.location.pathname);
+      axios.get(`${API}/payments/verify-session/${sessionId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      }).then(res => {
+        if (res.data.status === 'paid') {
+          toast.success('Payment successful! Your subscription is now active.');
+          refreshUser();
+        }
+      }).catch(() => {
+        toast.success('Payment received! Your subscription will activate shortly.');
+        setTimeout(() => refreshUser(), 3000);
+      });
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

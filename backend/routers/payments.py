@@ -579,7 +579,7 @@ async def create_checkout_session(
                     "quantity": 1,
                 }],
                 mode="payment",
-                success_url=f"{frontend_url}{success_path}?payment=success&tier={data.tier_id}",
+                success_url=f"{frontend_url}{success_path}?payment=success&tier={data.tier_id}&session_id={{CHECKOUT_SESSION_ID}}",
                 cancel_url=f"{frontend_url}/upgrade?payment=cancelled",
                 metadata={
                     "user_id": current_user["id"],
@@ -650,6 +650,41 @@ async def create_checkout_session(
         raise HTTPException(status_code=500, detail="Failed to create checkout session")
 
 
+@router.get("/verify-session/{session_id}")
+async def verify_session(session_id: str, current_user: dict = Depends(get_current_user)):
+    """Verify a Stripe checkout session and fulfill if paid. Called when user returns from Stripe."""
+    if not STRIPE_AVAILABLE:
+        raise HTTPException(status_code=503, detail="Payments not configured")
+
+    try:
+        session = stripe.checkout.Session.retrieve(session_id)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid session")
+
+    # Verify the session belongs to this user
+    metadata = session.get("metadata", {})
+    if metadata.get("user_id") != current_user["id"]:
+        raise HTTPException(status_code=403, detail="Session does not belong to this user")
+
+    if session.get("payment_status") != "paid":
+        return {"status": "pending", "message": "Payment not yet completed"}
+
+    # Check if already fulfilled (avoid duplicate transactions)
+    existing = await db.transactions.find_one({
+        "user_id": current_user["id"],
+        "stripe_session_id": session_id,
+    })
+    if not existing:
+        if metadata.get("type") == "subscription":
+            await fulfill_subscription(metadata, source="stripe", stripe_session_id=session_id)
+        else:
+            await fulfill_purchase(metadata, source="stripe", stripe_session_id=session_id)
+
+    # Return updated subscription info
+    user = await db.users.find_one({"id": current_user["id"]}, {"_id": 0, "subscription": 1})
+    return {"status": "paid", "subscription": user.get("subscription")}
+
+
 @router.post("/webhook")
 async def stripe_webhook(request: Request):
     """Handle Stripe webhook events"""
@@ -667,16 +702,24 @@ async def stripe_webhook(request: Request):
     if event["type"] == "checkout.session.completed":
         session = event["data"]["object"]
         metadata = session.get("metadata", {})
+        sid = session.get("id")
 
-        if metadata.get("type") == "subscription":
-            await fulfill_subscription(metadata, source="stripe")
-        else:
-            await fulfill_purchase(metadata, source="stripe")
+        # Skip if already fulfilled by verify-session endpoint
+        already = await db.transactions.find_one({
+            "user_id": metadata.get("user_id"),
+            "stripe_session_id": sid,
+        }) if sid else None
+
+        if not already:
+            if metadata.get("type") == "subscription":
+                await fulfill_subscription(metadata, source="stripe", stripe_session_id=sid)
+            else:
+                await fulfill_purchase(metadata, source="stripe", stripe_session_id=sid)
 
     return {"status": "ok"}
 
 
-async def fulfill_subscription(metadata: dict, source: str = "stripe", promo_code: str = None, custom_duration_days: int = None):
+async def fulfill_subscription(metadata: dict, source: str = "stripe", promo_code: str = None, custom_duration_days: int = None, stripe_session_id: str = None):
     """Activate a subscription after successful payment or promo redemption"""
     user_id = metadata.get("user_id")
     tier_id = metadata.get("tier_id")
@@ -727,6 +770,8 @@ async def fulfill_subscription(metadata: dict, source: str = "stripe", promo_cod
     }
     if promo_code:
         transaction["promo_code"] = promo_code
+    if stripe_session_id:
+        transaction["stripe_session_id"] = stripe_session_id
     await db.transactions.insert_one(transaction)
 
     await create_notification(
@@ -846,7 +891,7 @@ async def validate_promo(code: str, current_user: dict = Depends(get_current_use
 
 # ==================== FULFILLMENT ====================
 
-async def fulfill_purchase(metadata: dict, source: str = "unknown", apple_transaction_id: str = None):
+async def fulfill_purchase(metadata: dict, source: str = "unknown", apple_transaction_id: str = None, stripe_session_id: str = None):
     """Fulfill a purchase after successful payment (works for both Stripe and Apple IAP)"""
     user_id = metadata.get("user_id")
     product_id = metadata.get("product_id")
@@ -872,6 +917,8 @@ async def fulfill_purchase(metadata: dict, source: str = "unknown", apple_transa
     }
     if apple_transaction_id:
         transaction["apple_transaction_id"] = apple_transaction_id
+    if stripe_session_id:
+        transaction["stripe_session_id"] = stripe_session_id
 
     await db.transactions.insert_one(transaction)
 

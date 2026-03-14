@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence, useMotionValue, useTransform } from 'framer-motion';
 import {
   X, Heart, Star, MapPin, Briefcase, GraduationCap, Clock,
@@ -22,7 +22,8 @@ const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
 export default function RecruiterSwipe() {
   const navigate = useNavigate();
-  const { user, token } = useAuth();
+  const { user, token, refreshUser } = useAuth();
+  const [searchParams] = useSearchParams();
   const [mode, setMode] = useState('applicants'); // 'applicants' or 'discover'
   const [applications, setApplications] = useState([]);
   const [candidates, setCandidates] = useState([]);
@@ -40,6 +41,27 @@ export default function RecruiterSwipe() {
 
   useEffect(() => {
     fetchData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Verify Stripe payment on return from checkout
+  useEffect(() => {
+    const sessionId = searchParams.get('session_id');
+    if (searchParams.get('payment') === 'success' && sessionId && token) {
+      window.history.replaceState({}, '', window.location.pathname);
+      axios.get(`${API}/payments/verify-session/${sessionId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      }).then(res => {
+        if (res.data.status === 'paid') {
+          toast.success('Payment successful! Your subscription is now active.');
+          refreshUser();
+        }
+      }).catch(() => {
+        // Webhook will handle it eventually
+        toast.success('Payment received! Your subscription will activate shortly.');
+        setTimeout(() => refreshUser(), 3000);
+      });
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
