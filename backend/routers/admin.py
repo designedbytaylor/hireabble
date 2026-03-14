@@ -1426,27 +1426,116 @@ _JOB_BACKGROUNDS = [
     "https://images.unsplash.com/photo-1497366811353-6870744d04b2?w=800&h=400&fit=crop",
     "https://images.unsplash.com/photo-1553877522-43269d4ea984?w=800&h=400&fit=crop",
     "https://images.unsplash.com/photo-1556761175-5973dc0f32e7?w=800&h=400&fit=crop",
+    "https://images.unsplash.com/photo-1604328698692-f76ea9498e76?w=800&h=400&fit=crop",
+    "https://images.unsplash.com/photo-1524758631624-e2822e304c36?w=800&h=400&fit=crop",
+    "https://images.unsplash.com/photo-1564069114553-7215e1ff1890?w=800&h=400&fit=crop",
+    "https://images.unsplash.com/photo-1527192491265-7e15c55b1ed2?w=800&h=400&fit=crop",
+    "https://images.unsplash.com/photo-1600508774634-4e11e34d6e47?w=800&h=400&fit=crop",
+    "https://images.unsplash.com/photo-1572025442646-866d16c84a54?w=800&h=400&fit=crop",
     # Corporate / glass buildings
     "https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=800&h=400&fit=crop",
     "https://images.unsplash.com/photo-1554469384-e58fac16e23a?w=800&h=400&fit=crop",
     "https://images.unsplash.com/photo-1560179707-f14e90ef3623?w=800&h=400&fit=crop",
     "https://images.unsplash.com/photo-1577760258779-e787a1733016?w=800&h=400&fit=crop",
+    "https://images.unsplash.com/photo-1448630360428-65456659c3f9?w=800&h=400&fit=crop",
+    "https://images.unsplash.com/photo-1545579133-99bb5ab189bd?w=800&h=400&fit=crop",
+    "https://images.unsplash.com/photo-1487958449943-2429e8be8625?w=800&h=400&fit=crop",
+    "https://images.unsplash.com/photo-1479839672679-a46483c0e7c8?w=800&h=400&fit=crop",
+    "https://images.unsplash.com/photo-1464938050520-ef2571e0e6e6?w=800&h=400&fit=crop",
+    "https://images.unsplash.com/photo-1512917774080-9991f1c4c750?w=800&h=400&fit=crop",
     # Tech workspace / laptops
     "https://images.unsplash.com/photo-1504384308090-c894fdcc538d?w=800&h=400&fit=crop",
     "https://images.unsplash.com/photo-1519389950473-47ba0277781c?w=800&h=400&fit=crop",
     "https://images.unsplash.com/photo-1497215842964-222b430dc094?w=800&h=400&fit=crop",
     "https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=800&h=400&fit=crop",
+    "https://images.unsplash.com/photo-1498050108023-c5249f4df085?w=800&h=400&fit=crop",
+    "https://images.unsplash.com/photo-1517694712202-14dd9538aa97?w=800&h=400&fit=crop",
+    "https://images.unsplash.com/photo-1537498425277-c283d32ef9db?w=800&h=400&fit=crop",
+    "https://images.unsplash.com/photo-1518455027359-f3f8164ba6bd?w=800&h=400&fit=crop",
+    "https://images.unsplash.com/photo-1550439062-609e1531270e?w=800&h=400&fit=crop",
+    "https://images.unsplash.com/photo-1488590528505-98d2b5aba04b?w=800&h=400&fit=crop",
     # Team collaboration
     "https://images.unsplash.com/photo-1521737604893-d14cc237f11d?w=800&h=400&fit=crop",
     "https://images.unsplash.com/photo-1522071820081-009f0129c71c?w=800&h=400&fit=crop",
-    # City skylines
+    "https://images.unsplash.com/photo-1515187029135-18ee286d815b?w=800&h=400&fit=crop",
+    "https://images.unsplash.com/photo-1517245386807-bb43f82c33c4?w=800&h=400&fit=crop",
+    "https://images.unsplash.com/photo-1552664730-d307ca884978?w=800&h=400&fit=crop",
+    "https://images.unsplash.com/photo-1600880292203-757bb62b4baf?w=800&h=400&fit=crop",
+    "https://images.unsplash.com/photo-1531482615713-2afd69097998?w=800&h=400&fit=crop",
+    "https://images.unsplash.com/photo-1542744094-3a31f272c490?w=800&h=400&fit=crop",
+    "https://images.unsplash.com/photo-1557804506-669a67965ba0?w=800&h=400&fit=crop",
+    "https://images.unsplash.com/photo-1573164713988-8665fc963095?w=800&h=400&fit=crop",
+    # City skylines / downtown
     "https://images.unsplash.com/photo-1449824913935-59a10b8d2000?w=800&h=400&fit=crop",
     "https://images.unsplash.com/photo-1480714378408-67cf0d13bc1b?w=800&h=400&fit=crop",
     "https://images.unsplash.com/photo-1477959858617-67f85cf4f1df?w=800&h=400&fit=crop",
-    # More workspaces / offices
-    "https://images.unsplash.com/photo-1497366754770-3a14252cca30?w=800&h=400&fit=crop",
+    "https://images.unsplash.com/photo-1444723121867-7a241cacace9?w=800&h=400&fit=crop",
+    "https://images.unsplash.com/photo-1514565131-fce0801e5785?w=800&h=400&fit=crop",
+    "https://images.unsplash.com/photo-1534430480872-3498386e7856?w=800&h=400&fit=crop",
+    "https://images.unsplash.com/photo-1470723710355-95304d8aece4?w=800&h=400&fit=crop",
+    "https://images.unsplash.com/photo-1507090960745-b32f65d3113a?w=800&h=400&fit=crop",
+    "https://images.unsplash.com/photo-1496568816025-2a527549dee0?w=800&h=400&fit=crop",
+    "https://images.unsplash.com/photo-1517935706615-2717063c2225?w=800&h=400&fit=crop",
+    # Conference / presentation
+    "https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=800&h=400&fit=crop",
+    "https://images.unsplash.com/photo-1505373877841-8d25f7d46678?w=800&h=400&fit=crop",
+    "https://images.unsplash.com/photo-1475721027785-f74eccf877e2?w=800&h=400&fit=crop",
+    "https://images.unsplash.com/photo-1558403194-611308249627?w=800&h=400&fit=crop",
+    "https://images.unsplash.com/photo-1560523159-6b681a1e1852?w=800&h=400&fit=crop",
+    # Startup / creative spaces
+    "https://images.unsplash.com/photo-1497215728101-856f4ea42174?w=800&h=400&fit=crop",
     "https://images.unsplash.com/photo-1542744173-8e7e91415657?w=800&h=400&fit=crop",
     "https://images.unsplash.com/photo-1531973576160-7125cd663d86?w=800&h=400&fit=crop",
+    "https://images.unsplash.com/photo-1497366754770-3a14252cca30?w=800&h=400&fit=crop",
+    "https://images.unsplash.com/photo-1497366412874-3415097a27e7?w=800&h=400&fit=crop",
+    # Abstract / professional patterns
+    "https://images.unsplash.com/photo-1557683316-973673baf926?w=800&h=400&fit=crop",
+    "https://images.unsplash.com/photo-1557682250-33bd709cbe85?w=800&h=400&fit=crop",
+    "https://images.unsplash.com/photo-1557682224-5b8590cd9ec5?w=800&h=400&fit=crop",
+    "https://images.unsplash.com/photo-1557682260-96773eb01377?w=800&h=400&fit=crop",
+    "https://images.unsplash.com/photo-1557682268-e3955ed5d83f?w=800&h=400&fit=crop",
+    # Data / servers / tech infrastructure
+    "https://images.unsplash.com/photo-1558494949-ef010cbdcc31?w=800&h=400&fit=crop",
+    "https://images.unsplash.com/photo-1544197150-b99a580bb7a8?w=800&h=400&fit=crop",
+    "https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=800&h=400&fit=crop",
+    "https://images.unsplash.com/photo-1518770660439-4636190af475?w=800&h=400&fit=crop",
+    "https://images.unsplash.com/photo-1550751827-4bd374c3f58b?w=800&h=400&fit=crop",
+    # Modern architecture / interiors
+    "https://images.unsplash.com/photo-1431540015159-0f9673772e47?w=800&h=400&fit=crop",
+    "https://images.unsplash.com/photo-1503387837-b154d5074bd2?w=800&h=400&fit=crop",
+    "https://images.unsplash.com/photo-1462826303086-329426d1aef5?w=800&h=400&fit=crop",
+    "https://images.unsplash.com/photo-1504297050568-910d24c426d3?w=800&h=400&fit=crop",
+    "https://images.unsplash.com/photo-1494526585095-c41746248156?w=800&h=400&fit=crop",
+    # Business / finance
+    "https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?w=800&h=400&fit=crop",
+    "https://images.unsplash.com/photo-1460472178825-e5240623afd5?w=800&h=400&fit=crop",
+    "https://images.unsplash.com/photo-1507679799987-c73779587ccf?w=800&h=400&fit=crop",
+    "https://images.unsplash.com/photo-1559136555-9303baea8ebd?w=800&h=400&fit=crop",
+    "https://images.unsplash.com/photo-1551836022-deb4988cc6c0?w=800&h=400&fit=crop",
+    # Coworking / open plan
+    "https://images.unsplash.com/photo-1556740758-90de940da79c?w=800&h=400&fit=crop",
+    "https://images.unsplash.com/photo-1577412647305-991150c7d163?w=800&h=400&fit=crop",
+    "https://images.unsplash.com/photo-1568992687947-868a62a9f521?w=800&h=400&fit=crop",
+    "https://images.unsplash.com/photo-1606857521015-7f9fcf423740?w=800&h=400&fit=crop",
+    "https://images.unsplash.com/photo-1570126618953-d437176e8c79?w=800&h=400&fit=crop",
+    # Night city / urban
+    "https://images.unsplash.com/photo-1519501025264-65ba15a82390?w=800&h=400&fit=crop",
+    "https://images.unsplash.com/photo-1444084316824-dc26d6657664?w=800&h=400&fit=crop",
+    "https://images.unsplash.com/photo-1519608487953-e999c86e7455?w=800&h=400&fit=crop",
+    "https://images.unsplash.com/photo-1502920917128-1aa500764cbd?w=800&h=400&fit=crop",
+    "https://images.unsplash.com/photo-1513635269975-59663e0ac1ad?w=800&h=400&fit=crop",
+    # Innovation / labs
+    "https://images.unsplash.com/photo-1532094349884-543bc11b234d?w=800&h=400&fit=crop",
+    "https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?w=800&h=400&fit=crop",
+    "https://images.unsplash.com/photo-1581092921461-eab62e97a780?w=800&h=400&fit=crop",
+    "https://images.unsplash.com/photo-1581092160607-ee22621dd758?w=800&h=400&fit=crop",
+    "https://images.unsplash.com/photo-1581093458791-9f3c3900df4b?w=800&h=400&fit=crop",
+    # Reception / lobby
+    "https://images.unsplash.com/photo-1497366754770-f9e0845c5860?w=800&h=400&fit=crop",
+    "https://images.unsplash.com/photo-1562664348-2043a2b1dfc5?w=800&h=400&fit=crop",
+    "https://images.unsplash.com/photo-1574958269340-fa927503f3dd?w=800&h=400&fit=crop",
+    "https://images.unsplash.com/photo-1416339306562-f3d12fefd36f?w=800&h=400&fit=crop",
+    "https://images.unsplash.com/photo-1484154218962-a197022b5858?w=800&h=400&fit=crop",
 ]
 
 SAMPLE_JOBS = [
@@ -1597,6 +1686,16 @@ async def seed_test_data(body: dict = {}, admin: dict = Depends(get_current_admi
     created_recruiters = recruiter_docs
 
     # Build job documents and batch-insert
+    # Shuffle backgrounds so no two jobs share the same image
+    total_jobs_estimate = num_recruiters * jobs_per_recruiter
+    shuffled_bgs = list(_JOB_BACKGROUNDS)
+    random.shuffle(shuffled_bgs)
+    # If we need more than available, extend with reshuffled copies
+    while len(shuffled_bgs) < total_jobs_estimate:
+        extra = list(_JOB_BACKGROUNDS)
+        random.shuffle(extra)
+        shuffled_bgs.extend(extra)
+
     job_docs = []
     for recruiter in created_recruiters:
         available_jobs = list(SAMPLE_JOBS)
@@ -1607,7 +1706,7 @@ async def seed_test_data(body: dict = {}, admin: dict = Depends(get_current_admi
             company_name = recruiter.get('company', 'Co').replace(" ", "+")
             brand_clr = recruiter.get('_brand_color', '0D47A1')
             logo = f"https://ui-avatars.com/api/?name={company_name}&size=200&background={brand_clr}&color=fff&bold=true&format=png"
-            bg = _JOB_BACKGROUNDS[(len(job_docs)) % len(_JOB_BACKGROUNDS)]
+            bg = shuffled_bgs[len(job_docs)]
             job_doc = {
                 "id": job_id,
                 "recruiter_id": recruiter["id"],
