@@ -686,6 +686,20 @@ APPLE_KEY_ID = os.environ.get('APPLE_KEY_ID', '')
 APPLE_PRIVATE_KEY = os.environ.get('APPLE_PRIVATE_KEY', '')
 
 
+def _generate_apple_client_secret():
+    """Generate a client secret JWT for Apple Sign In API calls (token exchange, revocation)."""
+    import jwt as pyjwt
+    now = datetime.now(timezone.utc)
+    payload = {
+        "iss": APPLE_TEAM_ID,
+        "iat": now,
+        "exp": now + timedelta(minutes=10),
+        "aud": "https://appleid.apple.com",
+        "sub": APPLE_CLIENT_ID,
+    }
+    return pyjwt.encode(payload, APPLE_PRIVATE_KEY, algorithm="ES256", headers={"kid": APPLE_KEY_ID})
+
+
 @router.post("/oauth/apple")
 async def apple_oauth(body: dict):
     """Authenticate with Apple Sign In. Expects {code, id_token, redirect_uri, role?}"""
@@ -746,7 +760,38 @@ async def apple_oauth(body: dict):
         if not email:
             raise HTTPException(status_code=400, detail="Could not retrieve email from Apple")
 
-        return await _find_or_create_oauth_user(email, name, "apple", role)
+        # Exchange authorization code for refresh token (needed for account deletion revocation per Apple guideline 5.1.1)
+        apple_refresh_token = None
+        if code and APPLE_PRIVATE_KEY and APPLE_TEAM_ID and APPLE_KEY_ID:
+            try:
+                client_secret = _generate_apple_client_secret()
+                token_resp = http_requests.post(
+                    "https://appleid.apple.com/auth/token",
+                    data={
+                        "client_id": APPLE_CLIENT_ID,
+                        "client_secret": client_secret,
+                        "code": code,
+                        "grant_type": "authorization_code",
+                        "redirect_uri": body.get("redirect_uri", ""),
+                    },
+                    timeout=10,
+                )
+                if token_resp.status_code == 200:
+                    token_data = token_resp.json()
+                    apple_refresh_token = token_data.get("refresh_token")
+            except Exception as token_err:
+                logger.warning(f"Failed to exchange Apple auth code for refresh token: {token_err}")
+
+        result = await _find_or_create_oauth_user(email, name, "apple", role)
+
+        # Store the Apple refresh token for future revocation on account deletion
+        if apple_refresh_token:
+            await db.users.update_one(
+                {"email": email},
+                {"$set": {"apple_refresh_token": apple_refresh_token}}
+            )
+
+        return result
 
     except HTTPException:
         raise
@@ -764,6 +809,31 @@ async def delete_account(current_user: dict = Depends(get_current_user)):
     user_role = current_user.get("role", "seeker")
 
     try:
+        # Revoke Sign in with Apple token if user signed in with Apple (required by Apple guideline 5.1.1)
+        user_doc = await db.users.find_one({"id": user_id}, {"_id": 0, "oauth_providers": 1, "apple_refresh_token": 1})
+        if user_doc and "apple" in (user_doc.get("oauth_providers") or []):
+            apple_refresh_token = user_doc.get("apple_refresh_token")
+            if apple_refresh_token and APPLE_CLIENT_ID:
+                try:
+                    import requests as http_requests
+                    client_secret = _generate_apple_client_secret()
+                    revoke_resp = http_requests.post(
+                        "https://appleid.apple.com/auth/revoke",
+                        data={
+                            "client_id": APPLE_CLIENT_ID,
+                            "client_secret": client_secret,
+                            "token": apple_refresh_token,
+                            "token_type_hint": "refresh_token",
+                        },
+                        timeout=10,
+                    )
+                    if revoke_resp.status_code == 200:
+                        logger.info(f"Revoked Apple token for user {user_id}")
+                    else:
+                        logger.warning(f"Apple token revocation returned {revoke_resp.status_code} for user {user_id}")
+                except Exception as apple_err:
+                    logger.warning(f"Apple token revocation failed for {user_id}: {apple_err}")
+
         # Delete all user data across collections
         await db.users.delete_one({"id": user_id})
         await db.support_tickets.delete_many({"user_id": user_id})

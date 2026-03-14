@@ -10,7 +10,7 @@ export default function PrivacyPolicy() {
         </Link>
 
         <h1 className="text-3xl font-bold font-['Outfit'] mb-2">Privacy Policy</h1>
-        <p className="text-muted-foreground mb-8">Last updated: March 13, 2026</p>
+        <p className="text-muted-foreground mb-8">Last updated: March 14, 2026</p>
 
         <div className="prose prose-invert max-w-none space-y-6 text-sm leading-relaxed">
           <section>
@@ -85,12 +85,15 @@ export default function PrivacyPolicy() {
           </section>
 
           <section>
-            <h2 className="text-lg font-bold font-['Outfit'] mb-3">6. Tracking &amp; Advertising</h2>
+            <h2 className="text-lg font-bold font-['Outfit'] mb-3">6. Tracking, Advertising &amp; App Tracking Transparency</h2>
             <p className="text-muted-foreground mb-2">
-              <strong>We do not track you across other apps or websites.</strong> Hireabble does not use the Apple IDFA (Identifier for Advertisers), Google Advertising ID, or any cross-app tracking technology. We do not serve third-party advertisements.
+              <strong>We do not track you across other apps or websites.</strong> Hireabble does not use the Apple IDFA (Identifier for Advertisers), Google Advertising ID, or any cross-app tracking technology. We do not serve third-party advertisements. We do not participate in ad networks, data brokers, or information-sharing programs.
+            </p>
+            <p className="text-muted-foreground mb-2">
+              <strong>Apple App Tracking Transparency:</strong> Because Hireabble does not track users across apps or websites owned by other companies, we do not request App Tracking Transparency (ATT) permission. Our app does not collect or share data for the purpose of tracking as defined by Apple.
             </p>
             <p className="text-muted-foreground">
-              We may use first-party analytics (aggregated, non-personally-identifiable data) to improve the Service, such as understanding which features are most used. This data cannot be used to identify individual users.
+              We may use first-party analytics (aggregated, non-personally-identifiable data) to improve the Service, such as understanding which features are most used. This data cannot be used to identify individual users and is not shared with third parties.
             </p>
           </section>
 
