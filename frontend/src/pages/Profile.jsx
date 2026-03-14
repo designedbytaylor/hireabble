@@ -1352,6 +1352,41 @@ export default function Profile() {
           {/* Email Notifications */}
           <EmailNotificationSettings token={token} />
 
+          {/* Subscription Management */}
+          {user?.subscription?.tier_id && (
+            <div className="glass-card rounded-2xl p-5 mt-6">
+              <h3 className="text-lg font-bold font-['Outfit'] mb-3 flex items-center gap-2">
+                <CreditCard className="w-5 h-5" /> Subscription
+              </h3>
+              <p className="text-sm text-muted-foreground mb-3">
+                You are on the <strong className="text-foreground">{user.subscription.tier_name || user.subscription.tier_id}</strong> plan.
+              </p>
+              <p className="text-xs text-muted-foreground mb-3">
+                To manage or cancel your subscription, use the platform where you subscribed:
+              </p>
+              <div className="space-y-2">
+                <a
+                  href="https://apps.apple.com/account/subscriptions"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-full h-10 rounded-xl border border-border bg-background hover:bg-accent flex items-center justify-center gap-2 text-sm font-medium text-foreground transition-colors"
+                >
+                  <ExternalLink className="w-4 h-4" />
+                  Manage in App Store
+                </a>
+                <a
+                  href="https://play.google.com/store/account/subscriptions"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-full h-10 rounded-xl border border-border bg-background hover:bg-accent flex items-center justify-center gap-2 text-sm font-medium text-foreground transition-colors"
+                >
+                  <ExternalLink className="w-4 h-4" />
+                  Manage in Google Play
+                </a>
+              </div>
+            </div>
+          )}
+
           {/* Help & Support */}
           <Link
             to="/support"
@@ -1395,17 +1430,17 @@ export default function Profile() {
             open={showDeleteConfirm}
             onOpenChange={setShowDeleteConfirm}
             title="Delete your account?"
-            description="This will permanently delete your account, profile, applications, matches, and messages. This action cannot be undone."
+            description="This will permanently delete your account, profile, applications, matches, and messages. This action cannot be undone. If you have an active subscription, please cancel it first in your App Store or Google Play settings to avoid further charges."
             confirmLabel={deleteLoading ? 'Deleting...' : 'Delete My Account'}
             variant="destructive"
             onConfirm={handleDeleteAccount}
           />
 
           {/* Legal Links */}
-          <div className="flex items-center justify-center gap-4 mt-6 mb-4">
+          <div className="flex items-center justify-center gap-4 mt-6 mb-4 flex-wrap">
             <Link to="/privacy" className="text-xs text-muted-foreground hover:text-foreground">Privacy Policy</Link>
             <span className="text-xs text-muted-foreground">·</span>
-            <Link to="/terms" className="text-xs text-muted-foreground hover:text-foreground">Terms of Service</Link>
+            <Link to="/terms" className="text-xs text-muted-foreground hover:text-foreground">Terms & EULA</Link>
           </div>
         </div>
       </main>

@@ -50,6 +50,8 @@ _frontend_url = _os.getenv("FRONTEND_URL", "https://hireabble.com")
 _cors_origins = [
     "http://localhost:3000",
     "http://localhost:3001",
+    "capacitor://localhost",   # iOS Capacitor native app
+    "https://localhost",       # iOS Capacitor WKWebView (iosScheme: https)
 ]
 if _frontend_url:
     _cors_origins.append(_frontend_url)

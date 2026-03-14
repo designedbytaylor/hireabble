@@ -10,7 +10,7 @@ export default function TermsOfService() {
         </Link>
 
         <h1 className="text-3xl font-bold font-['Outfit'] mb-2">Terms of Service</h1>
-        <p className="text-muted-foreground mb-8">Last updated: March 13, 2026</p>
+        <p className="text-muted-foreground mb-8">Last updated: March 14, 2026</p>
 
         <div className="prose prose-invert max-w-none space-y-6 text-sm leading-relaxed">
           <section>
@@ -58,9 +58,22 @@ export default function TermsOfService() {
 
           <section>
             <h2 className="text-lg font-bold font-['Outfit'] mb-3">6. Subscriptions and Payments</h2>
-            <p className="text-muted-foreground">
-              Hireabble offers free and paid subscription tiers. Paid subscriptions are billed in advance on a recurring basis (weekly, monthly, or semi-annually). You may cancel at any time, but refunds are not provided for partial billing periods. We reserve the right to change subscription pricing with reasonable notice. Free trial periods, if offered, will automatically convert to paid subscriptions unless cancelled before the trial ends.
+            <p className="text-muted-foreground mb-3">
+              Hireabble offers free and paid subscription tiers. Paid subscriptions are billed in advance on a recurring basis (weekly, monthly, or semi-annually). We reserve the right to change subscription pricing with reasonable notice.
             </p>
+            <p className="text-muted-foreground mb-2"><strong>Auto-Renewal:</strong></p>
+            <ul className="list-disc pl-6 text-muted-foreground space-y-1 mb-3">
+              <li>Payment will be charged to your Apple ID account (for iOS app purchases), Google Play account (for Android app purchases), or your payment method on file (for web purchases) at confirmation of purchase.</li>
+              <li>Your subscription automatically renews for the same duration and price unless auto-renew is turned off at least 24 hours before the end of the current period.</li>
+              <li>Your account will be charged for renewal within 24 hours prior to the end of the current period at the same rate.</li>
+              <li>Any unused portion of a free trial period, if offered, will be forfeited when you purchase a subscription.</li>
+            </ul>
+            <p className="text-muted-foreground mb-2"><strong>Managing Subscriptions:</strong></p>
+            <ul className="list-disc pl-6 text-muted-foreground space-y-1 mb-3">
+              <li>You can manage or cancel your subscription at any time. For iOS, go to Settings &gt; [Your Name] &gt; Subscriptions. For Android, go to Google Play &gt; Subscriptions. For web purchases, manage your subscription in your Hireabble account settings.</li>
+              <li>Cancellation takes effect at the end of the current billing period. You will continue to have access to paid features until the period ends.</li>
+              <li>Refunds are not provided for partial billing periods, except as required by applicable law or the policies of the platform (Apple App Store, Google Play) through which you purchased the subscription.</li>
+            </ul>
           </section>
 
           <section>
@@ -113,7 +126,54 @@ export default function TermsOfService() {
           </section>
 
           <section>
-            <h2 className="text-lg font-bold font-['Outfit'] mb-3">14. Contact</h2>
+            <h2 className="text-lg font-bold font-['Outfit'] mb-3">14. Account Deletion</h2>
+            <p className="text-muted-foreground mb-2">
+              You may delete your account at any time from within the app by navigating to Profile &gt; Delete Account. Upon deletion:
+            </p>
+            <ul className="list-disc pl-6 text-muted-foreground space-y-1">
+              <li>All personal data (profile, photos, messages, swipe history, matches) will be permanently removed within 30 days.</li>
+              <li>If you have an active subscription purchased through the Apple App Store or Google Play, deleting your account does <strong>not</strong> automatically cancel your subscription. You must cancel your subscription separately through your device settings to avoid further charges.</li>
+              <li>Transaction records may be retained for up to 7 years as required by financial regulations.</li>
+            </ul>
+          </section>
+
+          <section>
+            <h2 className="text-lg font-bold font-['Outfit'] mb-3">15. End User License Agreement (EULA)</h2>
+            <p className="text-muted-foreground mb-3">
+              This End User License Agreement ("EULA") is a binding agreement between you and Hireabble governing your use of the Hireabble application ("Licensed Application").
+            </p>
+            <p className="text-muted-foreground mb-2"><strong>License Grant:</strong></p>
+            <p className="text-muted-foreground mb-3">
+              Hireabble grants you a limited, non-exclusive, non-transferable, revocable license to use the Licensed Application on any Apple-branded device that you own or control, subject to the Usage Rules set forth in the Apple Media Services Terms and Conditions. This license does not allow you to use the Licensed Application on any device that you do not own or control, and you may not distribute or make the Licensed Application available over a network where it could be used by multiple devices at the same time.
+            </p>
+            <p className="text-muted-foreground mb-2"><strong>Third-Party Terms:</strong></p>
+            <p className="text-muted-foreground mb-3">
+              You must comply with applicable third-party terms of agreement when using the Licensed Application, including your wireless data service agreement.
+            </p>
+            <p className="text-muted-foreground mb-2"><strong>Third-Party Beneficiary:</strong></p>
+            <p className="text-muted-foreground mb-3">
+              You acknowledge and agree that Apple, and Apple's subsidiaries, are third-party beneficiaries of this EULA, and that, upon your acceptance of the terms and conditions of this EULA, Apple will have the right (and will be deemed to have accepted the right) to enforce this EULA against you as a third-party beneficiary thereof.
+            </p>
+            <p className="text-muted-foreground mb-2"><strong>Maintenance and Support:</strong></p>
+            <p className="text-muted-foreground mb-3">
+              Hireabble is solely responsible for providing maintenance and support services for the Licensed Application. Apple has no obligation whatsoever to furnish any maintenance and support services with respect to the Licensed Application.
+            </p>
+            <p className="text-muted-foreground mb-2"><strong>Warranty:</strong></p>
+            <p className="text-muted-foreground mb-3">
+              In the event of any failure of the Licensed Application to conform to any applicable warranty, you may notify Apple, and Apple will refund the purchase price (if any) for the Licensed Application. To the maximum extent permitted by applicable law, Apple will have no other warranty obligation whatsoever with respect to the Licensed Application. Any other claims, losses, liabilities, damages, costs, or expenses attributable to any failure to conform to any warranty will be the sole responsibility of Hireabble.
+            </p>
+            <p className="text-muted-foreground mb-2"><strong>Product Claims:</strong></p>
+            <p className="text-muted-foreground mb-3">
+              Hireabble, not Apple, is responsible for addressing any claims relating to the Licensed Application or your possession and/or use of the Licensed Application, including but not limited to: (i) product liability claims; (ii) any claim that the Licensed Application fails to conform to any applicable legal or regulatory requirement; and (iii) claims arising under consumer protection, privacy, or similar legislation.
+            </p>
+            <p className="text-muted-foreground mb-2"><strong>Intellectual Property:</strong></p>
+            <p className="text-muted-foreground">
+              In the event of any third-party claim that the Licensed Application or your possession and use of the Licensed Application infringes that third party's intellectual property rights, Hireabble, not Apple, will be solely responsible for the investigation, defense, settlement, and discharge of any such intellectual property infringement claim.
+            </p>
+          </section>
+
+          <section>
+            <h2 className="text-lg font-bold font-['Outfit'] mb-3">16. Contact</h2>
             <p className="text-muted-foreground">
               If you have questions about these Terms, please contact us at legal@hireabble.com.
             </p>
