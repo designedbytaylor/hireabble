@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Send, Briefcase, User, Flag, ShieldBan, Calendar, CheckCheck, Check, Image, X, Video, Square, Loader2, Clock, Phone, MapPin, FileText } from 'lucide-react';
+import { getPhotoUrl, handleImgError } from '../utils/helpers';
 import ReportDialog from '../components/ReportDialog';
 import BlockDialog from '../components/BlockDialog';
 import { Button } from '../components/ui/button';
@@ -321,8 +322,8 @@ export default function Chat() {
 
   const otherPerson = match ? (
     user?.role === 'seeker'
-      ? { name: match.recruiter_name, subtitle: match.company }
-      : { name: match.seeker_name, subtitle: match.job_title }
+      ? { name: match.recruiter_name, subtitle: match.company, photo: getPhotoUrl(match.recruiter_photo || match.recruiter_avatar, match.recruiter_id) }
+      : { name: match.seeker_name, subtitle: match.job_title, photo: getPhotoUrl(match.seeker_photo || match.seeker_avatar, match.seeker_id) }
   ) : null;
 
   if (loading) {
@@ -359,13 +360,22 @@ export default function Chat() {
         </button>
 
         <div className="flex items-center gap-3 flex-1">
-          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary to-secondary flex items-center justify-center">
-            {user?.role === 'seeker' ? (
-              <Briefcase className="w-5 h-5 text-white" />
-            ) : (
-              <User className="w-5 h-5 text-white" />
-            )}
-          </div>
+          {otherPerson?.photo ? (
+            <img
+              src={otherPerson.photo}
+              alt={otherPerson.name}
+              className="w-10 h-10 rounded-full object-cover border-2 border-primary/30"
+              onError={handleImgError(otherPersonId)}
+            />
+          ) : (
+            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary to-secondary flex items-center justify-center">
+              {user?.role === 'seeker' ? (
+                <Briefcase className="w-5 h-5 text-white" />
+              ) : (
+                <User className="w-5 h-5 text-white" />
+              )}
+            </div>
+          )}
           <div>
             <h2 className="font-bold font-['Outfit']">{otherPerson?.name}</h2>
             <p className="text-xs text-muted-foreground">

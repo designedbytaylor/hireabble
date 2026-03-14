@@ -279,7 +279,7 @@ async def _recruiter_swipe_post_process(
 
             # Mutual interest → auto-match
             seeker, job = await asyncio.gather(
-                db.users.find_one({"id": seeker_id}, {"_id": 0, "name": 1, "avatar": 1}),
+                db.users.find_one({"id": seeker_id}, {"_id": 0, "name": 1, "avatar": 1, "photo_url": 1}),
                 db.jobs.find_one({"id": seeker_app["job_id"]}, {"_id": 0, "title": 1, "company": 1}),
             )
             match_id = str(uuid.uuid4())
@@ -296,6 +296,8 @@ async def _recruiter_swipe_post_process(
                 "seeker_photo": seeker.get("photo_url") if seeker else None,
                 "recruiter_id": rid,
                 "recruiter_name": recruiter_snapshot["name"],
+                "recruiter_avatar": recruiter_snapshot.get("avatar"),
+                "recruiter_photo": recruiter_snapshot.get("photo_url"),
                 "created_at": now,
             }
 
@@ -467,6 +469,10 @@ async def _check_match_on_swipe(
     # Mutual interest — create match
     match_id = str(uuid.uuid4())
     now = datetime.now(timezone.utc).isoformat()
+    recruiter = await db.users.find_one(
+        {"id": job["recruiter_id"]},
+        {"_id": 0, "avatar": 1, "photo_url": 1}
+    )
     match_doc = {
         "id": match_id,
         "application_id": application_id,
@@ -479,6 +485,8 @@ async def _check_match_on_swipe(
         "seeker_photo": current_user_snapshot.get("photo_url"),
         "recruiter_id": job["recruiter_id"],
         "recruiter_name": job.get("recruiter_name", ""),
+        "recruiter_avatar": recruiter.get("avatar") if recruiter else None,
+        "recruiter_photo": recruiter.get("photo_url") if recruiter else None,
         "created_at": now,
     }
 

@@ -1350,12 +1350,18 @@ async def delete_promo_code(code_id: str, admin: dict = Depends(get_current_admi
 _MALE_NAMES = [
     "Marcus", "David", "Liam", "Noah", "Ethan", "Lucas", "Oliver", "Aiden", "James", "Leo",
     "Henry", "Owen", "Jack", "Ryan", "Caleb", "Max", "Dylan", "Asher", "Wyatt", "Carter",
-    "Jaxon", "Daniel", "Nathan", "Tyler", "Brandon",
+    "Jaxon", "Daniel", "Nathan", "Tyler", "Brandon", "Sebastian", "Gabriel", "Samuel", "Julian",
+    "Elijah", "Adrian", "Miles", "Theo", "Finn", "Ezra", "Kai", "Rowan", "Jasper", "Felix",
+    "Hugo", "Oscar", "Silas", "Atlas", "Xavier", "Roman", "Beckett", "Sawyer", "Cole", "Dean",
+    "Grant",
 ]
 _FEMALE_NAMES = [
     "Priya", "Maya", "Emily", "Sofia", "Rachel", "Ava", "Mia", "Zoe", "Chloe", "Harper",
     "Ella", "Aria", "Luna", "Isla", "Nora", "Lily", "Grace", "Stella", "Violet", "Layla",
-    "Willow", "Aurora", "Hazel", "Ivy", "Riley",
+    "Willow", "Aurora", "Hazel", "Ivy", "Riley", "Camila", "Penelope", "Naomi", "Eliana",
+    "Scarlett", "Hannah", "Jade", "Savannah", "Clara", "Emilia", "Quinn", "Sage", "Freya",
+    "Wren", "Piper", "Vera", "Margot", "Eloise", "Leah", "Serena", "Thea", "Alina", "Daphne",
+    "Iris", "Sienna",
 ]
 _FIRST_NAMES = _MALE_NAMES + _FEMALE_NAMES
 _LAST_NAMES = [
@@ -1364,6 +1370,8 @@ _LAST_NAMES = [
     "Foster", "Tanaka", "Bell", "Ahmad", "Cruz", "Hayes", "Ito", "Morgan", "Das", "Campbell",
     "Reyes", "Barnes", "Cho", "Ellis", "Fernandez", "Grant", "Huang", "Jensen", "Kang", "Lopez",
     "Martin", "Nelson", "Ortiz", "Phillips", "Quinn", "Ross", "Shaw", "Torres", "Ueda", "Vargas",
+    "Adler", "Becker", "Chang", "Delgado", "Erikson", "Flynn", "Gutierrez", "Harper", "Ibrahim", "Joshi",
+    "Kaur", "Li", "Mendez", "Novak", "Osman", "Petrov", "Ramirez", "Sato", "Tran", "Walsh",
 ]
 _SEEKER_PROFILES = [
     {"title": "Senior Frontend Engineer", "bio": "Passionate about building beautiful, performant UIs. React enthusiast with a love for design systems.", "skills": ["React", "TypeScript", "Next.js", "Tailwind CSS", "GraphQL"], "experience_years": 6, "school": "Stanford University", "degree": "bachelors", "current_employer": "Meta"},
@@ -1376,6 +1384,16 @@ _SEEKER_PROFILES = [
     {"title": "UI/UX Designer & Developer", "bio": "Design-engineer hybrid. I code what I design and design what I code.", "skills": ["Figma", "React", "CSS", "Framer Motion", "Storybook", "A/B Testing"], "experience_years": 6, "school": "ArtCenter", "degree": "bachelors", "current_employer": "Airbnb"},
     {"title": "Security Engineer", "bio": "AppSec and infrastructure security. Pen tester turned defensive security builder.", "skills": ["Python", "AWS Security", "OWASP", "Kubernetes", "Go", "Burp Suite"], "experience_years": 7, "school": "Georgia Tech", "degree": "masters", "current_employer": "CrowdStrike"},
     {"title": "Junior Full Stack Developer", "bio": "Bootcamp grad eager to learn and grow. Built 5 full stack projects. Ready for the next challenge!", "skills": ["JavaScript", "React", "Node.js", "MongoDB", "HTML/CSS"], "experience_years": 1, "school": "Hack Reactor", "degree": "certificate", "current_employer": "Freelance"},
+    {"title": "Cloud Architect", "bio": "Designing resilient, scalable cloud architectures for enterprise workloads. Multi-cloud certified.", "skills": ["AWS", "Azure", "GCP", "Terraform", "Kubernetes", "Python"], "experience_years": 10, "school": "MIT", "degree": "masters", "current_employer": "Google Cloud"},
+    {"title": "iOS Developer", "bio": "Crafting pixel-perfect iOS experiences with Swift and SwiftUI. App Store featured developer.", "skills": ["Swift", "SwiftUI", "UIKit", "Core Data", "Combine", "Xcode"], "experience_years": 6, "school": "UCLA", "degree": "bachelors", "current_employer": "Apple"},
+    {"title": "Platform Engineer", "bio": "Building developer platforms and internal tools that make engineering teams 10x more productive.", "skills": ["Go", "Kubernetes", "Backstage", "Terraform", "ArgoCD", "PostgreSQL"], "experience_years": 5, "school": "Carnegie Mellon", "degree": "masters", "current_employer": "Spotify"},
+    {"title": "QA Automation Engineer", "bio": "Quality advocate building robust test frameworks. Shift-left testing enthusiast.", "skills": ["Cypress", "Playwright", "Jest", "Python", "Selenium", "CI/CD"], "experience_years": 4, "school": "Purdue", "degree": "bachelors", "current_employer": "Netflix"},
+    {"title": "Blockchain Developer", "bio": "Building decentralized applications and smart contracts on Ethereum and Solana.", "skills": ["Solidity", "Rust", "Web3.js", "React", "Node.js", "TypeScript"], "experience_years": 3, "school": "Waterloo", "degree": "bachelors", "current_employer": "Coinbase"},
+    {"title": "Technical Writer", "bio": "Translating complex technical concepts into clear, developer-friendly documentation.", "skills": ["Technical Writing", "API Documentation", "Markdown", "Git", "Python", "JavaScript"], "experience_years": 5, "school": "Columbia", "degree": "masters", "current_employer": "Twilio"},
+    {"title": "Site Reliability Engineer", "bio": "Keeping systems running at 99.99% uptime. On-call warrior and incident response expert.", "skills": ["Linux", "Prometheus", "Grafana", "Python", "Kubernetes", "Terraform"], "experience_years": 6, "school": "UIUC", "degree": "bachelors", "current_employer": "Datadog"},
+    {"title": "Product Designer", "bio": "End-to-end product designer turning user research into delightful digital experiences.", "skills": ["Figma", "User Research", "Prototyping", "Design Systems", "HTML/CSS", "Accessibility"], "experience_years": 7, "school": "RISD", "degree": "bachelors", "current_employer": "Notion"},
+    {"title": "AI Research Engineer", "bio": "Bridging the gap between research papers and production AI systems. LLM specialist.", "skills": ["Python", "PyTorch", "Transformers", "CUDA", "Hugging Face", "LangChain"], "experience_years": 3, "school": "Stanford University", "degree": "phd", "current_employer": "Anthropic"},
+    {"title": "Android Developer", "bio": "Building modern Android apps with Kotlin and Jetpack Compose. Material Design expert.", "skills": ["Kotlin", "Jetpack Compose", "Android SDK", "Room", "Retrofit", "Coroutines"], "experience_years": 5, "school": "Georgia Tech", "degree": "bachelors", "current_employer": "Google"},
 ]
 _LOCATIONS = ["San Francisco, CA", "New York, NY", "Seattle, WA", "Austin, TX", "Denver, CO", "Chicago, IL", "Los Angeles, CA", "Portland, OR", "Remote", "Boston, MA", "Miami, FL", "Atlanta, GA"]
 _COMPANY_NAMES = [
@@ -1446,8 +1464,8 @@ async def seed_test_data(body: dict = {}, admin: dict = Depends(get_current_admi
     Optional body: { "seekers": 10, "recruiters": 5, "jobs_per_recruiter": 2 }
     Pass "create_applications": true to also generate sample applications (default: fresh accounts with 0 applied).
     """
-    num_seekers = body.get("seekers", 25)
-    num_recruiters = body.get("recruiters", 25)
+    num_seekers = body.get("seekers", 50)
+    num_recruiters = body.get("recruiters", 50)
     jobs_per_recruiter = body.get("jobs_per_recruiter", 2)
     apps_per_seeker = body.get("applications_per_seeker", 0)
 
@@ -1488,9 +1506,8 @@ async def seed_test_data(body: dict = {}, admin: dict = Depends(get_current_admi
         user_id = str(uuid.uuid4())
         email = f"seeker{i+1}@test.hireabble.com"
 
-        # Use realistic placeholder portraits from randomuser.me
-        photo_index = (i % 99)  # randomuser.me has ~99 photos per gender
-        photo_url = f"https://randomuser.me/api/portraits/{'men' if gender == 'male' else 'women'}/{photo_index}.jpg"
+        # Use high-res placeholder portraits (500px for retina displays)
+        photo_url = f"https://i.pravatar.cc/500?u={email}"
         avatar = f"https://api.dicebear.com/7.x/initials/svg?seed={user_id}"
         user_doc = {
             "id": user_id, "email": email, "password": password,
@@ -1516,8 +1533,7 @@ async def seed_test_data(body: dict = {}, admin: dict = Depends(get_current_admi
         user_id = str(uuid.uuid4())
         email = f"recruiter{i+1}@test.hireabble.com"
 
-        photo_index = ((i + 50) % 99)  # offset from seekers to avoid duplicate photos
-        rec_photo = f"https://randomuser.me/api/portraits/{'men' if rec_gender == 'male' else 'women'}/{photo_index}.jpg"
+        rec_photo = f"https://i.pravatar.cc/500?u={email}"
         avatar = f"https://api.dicebear.com/7.x/initials/svg?seed={user_id}"
         user_doc = {
             "id": user_id, "email": email, "password": password,
@@ -1603,8 +1619,9 @@ async def seed_test_data(body: dict = {}, admin: dict = Depends(get_current_admi
             await db.applications.insert_many(app_docs)
         created_applications = app_docs
 
-        # Create some matches — use in-memory job lookup instead of per-app DB queries
+        # Create some matches — use in-memory lookups instead of per-app DB queries
         jobs_by_id = {j["id"]: j for j in created_jobs}
+        recruiters_by_id = {r["id"]: r for r in created_recruiters}
         apps_to_match = random.sample(
             created_applications,
             min(len(created_applications) // 3, len(created_applications))
@@ -1616,6 +1633,7 @@ async def seed_test_data(body: dict = {}, admin: dict = Depends(get_current_admi
             if not job:
                 continue
             match_app_ids.append(app["id"])
+            recruiter_doc = recruiters_by_id.get(job["recruiter_id"], {})
             match_docs.append({
                 "id": str(uuid.uuid4()),
                 "job_id": app["job_id"],
@@ -1624,8 +1642,11 @@ async def seed_test_data(body: dict = {}, admin: dict = Depends(get_current_admi
                 "seeker_id": app["seeker_id"],
                 "seeker_name": app["seeker_name"],
                 "seeker_avatar": app.get("seeker_avatar"),
+                "seeker_photo": app.get("seeker_photo"),
                 "recruiter_id": job["recruiter_id"],
                 "recruiter_name": job.get("recruiter_name", ""),
+                "recruiter_avatar": recruiter_doc.get("avatar"),
+                "recruiter_photo": recruiter_doc.get("photo_url"),
                 "created_at": datetime.now(timezone.utc).isoformat(),
             })
         if match_app_ids:
