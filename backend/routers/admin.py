@@ -1505,21 +1505,14 @@ async def seed_test_data(body: dict = {}, admin: dict = Depends(get_current_admi
 
     # Build all documents in memory first, then batch-insert for speed
     seeker_docs = []
-    male_photo_idx = 0
-    female_photo_idx = 0
     for i in range(num_seekers):
         profile = _SEEKER_PROFILES[i % len(_SEEKER_PROFILES)]
         name, gender = _generate_unique_name(used_names)
         user_id = str(uuid.uuid4())
         email = f"seeker{i+1}@test.hireabble.com"
 
-        # Professional adult headshots from randomuser.me (gender-matched, no duplicates)
-        if gender == "male":
-            photo_url = f"https://randomuser.me/api/portraits/men/{male_photo_idx % 100}.jpg"
-            male_photo_idx += 1
-        else:
-            photo_url = f"https://randomuser.me/api/portraits/women/{female_photo_idx % 100}.jpg"
-            female_photo_idx += 1
+        # Hi-res (500px) curated adult headshots, unique per index (70 available, wraps for >70)
+        photo_url = f"https://i.pravatar.cc/500?img={(i % 70) + 1}"
         avatar = f"https://api.dicebear.com/7.x/initials/svg?seed={user_id}"
         user_doc = {
             "id": user_id, "email": email, "password": password,
