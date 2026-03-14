@@ -1420,6 +1420,35 @@ _COMPANY_DESCRIPTIONS = [
     "Marketplace platform connecting creators with global audiences.",
 ]
 
+_JOB_BACKGROUNDS = [
+    # Modern office interiors
+    "https://images.unsplash.com/photo-1497366216548-37526070297c?w=800&h=400&fit=crop",
+    "https://images.unsplash.com/photo-1497366811353-6870744d04b2?w=800&h=400&fit=crop",
+    "https://images.unsplash.com/photo-1553877522-43269d4ea984?w=800&h=400&fit=crop",
+    "https://images.unsplash.com/photo-1556761175-5973dc0f32e7?w=800&h=400&fit=crop",
+    # Corporate / glass buildings
+    "https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=800&h=400&fit=crop",
+    "https://images.unsplash.com/photo-1554469384-e58fac16e23a?w=800&h=400&fit=crop",
+    "https://images.unsplash.com/photo-1560179707-f14e90ef3623?w=800&h=400&fit=crop",
+    "https://images.unsplash.com/photo-1577760258779-e787a1733016?w=800&h=400&fit=crop",
+    # Tech workspace / laptops
+    "https://images.unsplash.com/photo-1504384308090-c894fdcc538d?w=800&h=400&fit=crop",
+    "https://images.unsplash.com/photo-1519389950473-47ba0277781c?w=800&h=400&fit=crop",
+    "https://images.unsplash.com/photo-1497215842964-222b430dc094?w=800&h=400&fit=crop",
+    "https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=800&h=400&fit=crop",
+    # Team collaboration
+    "https://images.unsplash.com/photo-1521737604893-d14cc237f11d?w=800&h=400&fit=crop",
+    "https://images.unsplash.com/photo-1522071820081-009f0129c71c?w=800&h=400&fit=crop",
+    # City skylines
+    "https://images.unsplash.com/photo-1449824913935-59a10b8d2000?w=800&h=400&fit=crop",
+    "https://images.unsplash.com/photo-1480714378408-67cf0d13bc1b?w=800&h=400&fit=crop",
+    "https://images.unsplash.com/photo-1477959858617-67f85cf4f1df?w=800&h=400&fit=crop",
+    # More workspaces / offices
+    "https://images.unsplash.com/photo-1497366754770-3a14252cca30?w=800&h=400&fit=crop",
+    "https://images.unsplash.com/photo-1542744173-8e7e91415657?w=800&h=400&fit=crop",
+    "https://images.unsplash.com/photo-1531973576160-7125cd663d86?w=800&h=400&fit=crop",
+]
+
 SAMPLE_JOBS = [
     {"title": "Senior React Developer", "description": "Join our frontend team building a next-gen dashboard used by millions. You'll architect component systems, optimize performance, and mentor junior devs.", "requirements": ["React", "TypeScript", "5+ years experience", "Design systems"], "salary_min": 150000, "salary_max": 200000, "location": "San Francisco, CA", "job_type": "hybrid", "experience_level": "senior"},
     {"title": "Backend Engineer (Go)", "description": "Build high-throughput microservices for our real-time data platform. You'll work with distributed systems at scale.", "requirements": ["Go", "Kubernetes", "PostgreSQL", "3+ years experience"], "salary_min": 140000, "salary_max": 190000, "location": "Remote", "job_type": "remote", "experience_level": "mid"},
@@ -1578,7 +1607,7 @@ async def seed_test_data(body: dict = {}, admin: dict = Depends(get_current_admi
             company_name = recruiter.get('company', 'Co').replace(" ", "+")
             brand_clr = recruiter.get('_brand_color', '0D47A1')
             logo = f"https://ui-avatars.com/api/?name={company_name}&size=200&background={brand_clr}&color=fff&bold=true&format=png"
-            bg = f"https://picsum.photos/seed/{job_id}/800/400"
+            bg = _JOB_BACKGROUNDS[(len(job_docs)) % len(_JOB_BACKGROUNDS)]
             job_doc = {
                 "id": job_id,
                 "recruiter_id": recruiter["id"],
