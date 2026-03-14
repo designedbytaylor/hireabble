@@ -241,7 +241,6 @@ export default function RecruiterSwipe() {
     }
   };
 
-  const items = mode === 'applicants' ? applications : candidates;
   const currentItem = items[currentIndex];
 
   if (loading) {
