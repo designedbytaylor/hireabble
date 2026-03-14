@@ -61,6 +61,7 @@ function EmailNotificationSettings({ token }) {
     { key: 'interviews', label: 'Interview updates', desc: 'Interview requests, acceptances & changes' },
     { key: 'messages', label: 'Message digests', desc: 'Summary of unread messages (max every 15 min)' },
     { key: 'status_updates', label: 'Application updates', desc: 'When your application stage changes' },
+    { key: 'marketing_emails_opt_in', label: 'Marketing & promotions', desc: 'Occasional updates, tips, and promotional offers' },
   ];
 
   return (

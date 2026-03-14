@@ -264,6 +264,242 @@ async def get_analytics(admin: dict = Depends(get_current_admin)):
         "job_types": job_types,
     }
 
+
+# ==================== COMPREHENSIVE STATS ====================
+
+@router.get("/admin/stats/comprehensive")
+async def get_comprehensive_stats(admin: dict = Depends(get_current_admin)):
+    """Detailed demographic and platform statistics for marketing planning."""
+    now = datetime.now(timezone.utc)
+
+    # --- Overview counts ---
+    total_users, seekers, recruiters, onboarding_complete, email_verified, marketing_opt_in = await asyncio.gather(
+        db.users.count_documents({}),
+        db.users.count_documents({"role": "seeker"}),
+        db.users.count_documents({"role": "recruiter"}),
+        db.users.count_documents({"onboarding_complete": True}),
+        db.users.count_documents({"email_verified": True}),
+        db.users.count_documents({"marketing_emails_opt_in": True}),
+    )
+
+    # --- Age distribution (from date_of_birth) ---
+    age_pipeline = [
+        {"$match": {"date_of_birth": {"$ne": None, "$exists": True}}},
+        {"$addFields": {
+            "dob_date": {"$dateFromString": {"dateString": "$date_of_birth", "onError": None}},
+        }},
+        {"$match": {"dob_date": {"$ne": None}}},
+        {"$addFields": {
+            "age": {"$dateDiff": {"startDate": "$dob_date", "endDate": now, "unit": "year"}},
+        }},
+        {"$bucket": {
+            "groupBy": "$age",
+            "boundaries": [0, 21, 26, 31, 36, 41, 51, 200],
+            "default": "other",
+            "output": {"count": {"$sum": 1}},
+        }},
+    ]
+    age_results = await db.users.aggregate(age_pipeline).to_list(None)
+    no_dob = await db.users.count_documents({"$or": [{"date_of_birth": None}, {"date_of_birth": {"$exists": False}}]})
+
+    age_labels = {0: "16-20", 21: "21-25", 26: "26-30", 31: "31-35", 36: "36-40", 41: "41-50", 51: "51+"}
+    age_distribution = [{"range": age_labels.get(b["_id"], "Other"), "count": b["count"]} for b in age_results if b["_id"] != "other"]
+    if no_dob > 0:
+        age_distribution.append({"range": "Unknown", "count": no_dob})
+
+    # --- Top locations ---
+    loc_pipeline = [
+        {"$match": {"location": {"$ne": None, "$nin": ["", None]}}},
+        {"$group": {"_id": "$location", "count": {"$sum": 1}}},
+        {"$sort": {"count": -1}},
+        {"$limit": 20},
+    ]
+    top_locations = [{"location": r["_id"], "count": r["count"]} async for r in db.users.aggregate(loc_pipeline)]
+
+    # --- Subscription breakdown ---
+    free_count = await db.users.count_documents({"$or": [
+        {"subscription": {"$exists": False}},
+        {"subscription": None},
+        {"subscription.status": {"$ne": "active"}},
+    ]})
+    plus_pro = await db.users.count_documents({"subscription.status": "active", "subscription.tier_id": {"$in": ["seeker_plus", "recruiter_pro"]}})
+    premium_ent = await db.users.count_documents({"subscription.status": "active", "subscription.tier_id": {"$in": ["seeker_premium", "recruiter_enterprise"]}})
+
+    # --- Growth: weekly (12 weeks) and monthly (12 months) ---
+    weekly_growth = []
+    for w in range(11, -1, -1):
+        week_start = now - timedelta(weeks=w+1)
+        week_end = now - timedelta(weeks=w)
+        count = await db.users.count_documents({"created_at": {"$gte": week_start.isoformat(), "$lt": week_end.isoformat()}})
+        weekly_growth.append({"week": week_start.strftime("%Y-W%V"), "signups": count})
+
+    monthly_growth = []
+    for m in range(11, -1, -1):
+        month_start = (now.replace(day=1) - timedelta(days=30*m)).replace(day=1)
+        if m > 0:
+            month_end = (now.replace(day=1) - timedelta(days=30*(m-1))).replace(day=1)
+        else:
+            month_end = now
+        count = await db.users.count_documents({"created_at": {"$gte": month_start.isoformat(), "$lt": month_end.isoformat()}})
+        monthly_growth.append({"month": month_start.strftime("%Y-%m"), "signups": count})
+
+    # --- Seeker stats ---
+    skills_pipeline = [
+        {"$match": {"role": "seeker", "skills": {"$ne": []}}},
+        {"$unwind": "$skills"},
+        {"$group": {"_id": "$skills", "count": {"$sum": 1}}},
+        {"$sort": {"count": -1}},
+        {"$limit": 20},
+    ]
+    top_skills = [{"skill": r["_id"], "count": r["count"]} async for r in db.users.aggregate(skills_pipeline)]
+
+    jtp_pipeline = [
+        {"$match": {"role": "seeker", "job_type_preference": {"$ne": []}}},
+        {"$unwind": "$job_type_preference"},
+        {"$group": {"_id": "$job_type_preference", "count": {"$sum": 1}}},
+        {"$sort": {"count": -1}},
+    ]
+    job_type_prefs = [{"type": r["_id"], "count": r["count"]} async for r in db.users.aggregate(jtp_pipeline)]
+
+    wp_pipeline = [
+        {"$match": {"role": "seeker", "work_preference": {"$ne": None}}},
+        {"$group": {"_id": "$work_preference", "count": {"$sum": 1}}},
+        {"$sort": {"count": -1}},
+    ]
+    work_prefs = [{"type": r["_id"], "count": r["count"]} async for r in db.users.aggregate(wp_pipeline)]
+
+    degree_pipeline = [
+        {"$match": {"role": "seeker", "degree": {"$ne": None}}},
+        {"$group": {"_id": "$degree", "count": {"$sum": 1}}},
+        {"$sort": {"count": -1}},
+    ]
+    degrees = [{"degree": r["_id"], "count": r["count"]} async for r in db.users.aggregate(degree_pipeline)]
+
+    exp_pipeline = [
+        {"$match": {"role": "seeker", "experience_years": {"$ne": None}}},
+        {"$bucket": {
+            "groupBy": "$experience_years",
+            "boundaries": [0, 2, 4, 6, 11, 100],
+            "default": "other",
+            "output": {"count": {"$sum": 1}},
+        }},
+    ]
+    exp_results = await db.users.aggregate(exp_pipeline).to_list(None)
+    no_exp = await db.users.count_documents({"role": "seeker", "$or": [{"experience_years": None}, {"experience_years": {"$exists": False}}]})
+    exp_labels = {0: "0-1", 2: "2-3", 4: "4-5", 6: "6-10", 11: "10+"}
+    exp_distribution = [{"range": exp_labels.get(b["_id"], "Other"), "count": b["count"]} for b in exp_results if b["_id"] != "other"]
+    if no_exp > 0:
+        exp_distribution.append({"range": "Unknown", "count": no_exp})
+
+    salary_pipeline = [
+        {"$match": {"role": "seeker", "desired_salary": {"$ne": None, "$gt": 0}}},
+        {"$bucket": {
+            "groupBy": "$desired_salary",
+            "boundaries": [0, 40000, 60000, 80000, 100000, 150000, 10000000],
+            "default": "other",
+            "output": {"count": {"$sum": 1}},
+        }},
+    ]
+    salary_results = await db.users.aggregate(salary_pipeline).to_list(None)
+    no_salary = await db.users.count_documents({"role": "seeker", "$or": [{"desired_salary": None}, {"desired_salary": {"$exists": False}}, {"desired_salary": 0}]})
+    salary_labels = {0: "< $40k", 40000: "$40k-60k", 60000: "$60k-80k", 80000: "$80k-100k", 100000: "$100k-150k", 150000: "$150k+"}
+    salary_ranges = [{"range": salary_labels.get(b["_id"], "Other"), "count": b["count"]} for b in salary_results if b["_id"] != "other"]
+    if no_salary > 0:
+        salary_ranges.append({"range": "Not specified", "count": no_salary})
+
+    # --- Recruiter stats ---
+    company_pipeline = [
+        {"$match": {"role": "recruiter", "company": {"$ne": None, "$nin": ["", None]}}},
+        {"$group": {"_id": "$company", "count": {"$sum": 1}}},
+        {"$sort": {"count": -1}},
+        {"$limit": 20},
+    ]
+    top_companies = [{"company": r["_id"], "count": r["count"]} async for r in db.users.aggregate(company_pipeline)]
+
+    active_posters_pipeline = [
+        {"$match": {"is_active": True}},
+        {"$group": {"_id": "$recruiter_id"}},
+        {"$count": "total"},
+    ]
+    active_posters_result = await db.jobs.aggregate(active_posters_pipeline).to_list(1)
+    active_job_posters = active_posters_result[0]["total"] if active_posters_result else 0
+
+    return {
+        "overview": {
+            "total_users": total_users,
+            "seekers": seekers,
+            "recruiters": recruiters,
+            "onboarding_complete_rate": round((onboarding_complete / total_users * 100) if total_users else 0, 1),
+            "email_verified_rate": round((email_verified / total_users * 100) if total_users else 0, 1),
+            "marketing_opt_in_count": marketing_opt_in,
+        },
+        "age_distribution": age_distribution,
+        "top_locations": top_locations,
+        "subscription_breakdown": [
+            {"tier": "Free", "count": free_count},
+            {"tier": "Plus / Pro", "count": plus_pro},
+            {"tier": "Premium / Enterprise", "count": premium_ent},
+        ],
+        "growth": {"weekly": weekly_growth, "monthly": monthly_growth},
+        "seeker_stats": {
+            "top_skills": top_skills,
+            "job_type_preferences": job_type_prefs,
+            "work_preferences": work_prefs,
+            "degree_breakdown": degrees,
+            "experience_distribution": exp_distribution,
+            "salary_ranges": salary_ranges,
+        },
+        "recruiter_stats": {
+            "top_companies": top_companies,
+            "active_job_posters": active_job_posters,
+        },
+    }
+
+
+@router.get("/admin/export/users")
+async def export_users(
+    role: str = "all",
+    admin: dict = Depends(get_current_admin),
+):
+    """Export user data for CSV download. Returns JSON array; frontend converts to CSV."""
+    query = {}
+    if role in ("seeker", "recruiter"):
+        query["role"] = role
+
+    projection = {
+        "_id": 0, "password": 0, "push_subscription": 0, "blocked_users": 0,
+    }
+    users = await db.users.find(query, projection).sort("created_at", -1).to_list(None)
+
+    # Flatten for CSV compatibility
+    export = []
+    for u in users:
+        sub = u.get("subscription") or {}
+        export.append({
+            "id": u.get("id"),
+            "email": u.get("email"),
+            "name": u.get("name"),
+            "role": u.get("role"),
+            "company": u.get("company", ""),
+            "title": u.get("title", ""),
+            "location": u.get("location", ""),
+            "date_of_birth": u.get("date_of_birth", ""),
+            "skills": ", ".join(u.get("skills", [])),
+            "experience_years": u.get("experience_years", ""),
+            "degree": u.get("degree", ""),
+            "work_preference": u.get("work_preference", ""),
+            "desired_salary": u.get("desired_salary", ""),
+            "job_type_preference": ", ".join(u.get("job_type_preference", [])),
+            "subscription_tier": sub.get("tier_id", "free"),
+            "subscription_status": sub.get("status", "none"),
+            "onboarding_complete": u.get("onboarding_complete", False),
+            "email_verified": u.get("email_verified", False),
+            "marketing_emails_opt_in": u.get("marketing_emails_opt_in", False),
+            "created_at": u.get("created_at", ""),
+        })
+    return export
+
+
 # ==================== USER MANAGEMENT ====================
 
 @router.get("/admin/users")

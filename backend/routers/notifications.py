@@ -63,11 +63,15 @@ class EmailPreferences(BaseModel):
     interviews: Optional[bool] = None
     messages: Optional[bool] = None
     status_updates: Optional[bool] = None
+    marketing_emails_opt_in: Optional[bool] = None
 
 @router.get("/preferences")
 async def get_notification_preferences(current_user: dict = Depends(get_current_user)):
     """Get email notification preferences"""
     prefs = await get_user_email_prefs(current_user["id"])
+    # Include marketing opt-in from user doc
+    user = await db.users.find_one({"id": current_user["id"]}, {"marketing_emails_opt_in": 1})
+    prefs["marketing_emails_opt_in"] = user.get("marketing_emails_opt_in", False) if user else False
     return prefs
 
 @router.put("/preferences")
@@ -78,9 +82,11 @@ async def update_notification_preferences(data: EmailPreferences, current_user: 
         val = getattr(data, field)
         if val is not None:
             update[f"email_notifications.{field}"] = val
+    if data.marketing_emails_opt_in is not None:
+        update["marketing_emails_opt_in"] = data.marketing_emails_opt_in
     if update:
         await db.users.update_one({"id": current_user["id"]}, {"$set": update})
-    return await get_user_email_prefs(current_user["id"])
+    return await get_notification_preferences(current_user)
 
 @router.get("/unsubscribe")
 async def unsubscribe_from_emails(token: str = Query(...), type: str = Query(...)):
