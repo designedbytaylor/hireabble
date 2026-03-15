@@ -4,7 +4,7 @@ import { motion, AnimatePresence, useMotionValue, useTransform } from 'framer-mo
 import {
   X, Heart, Star, MapPin, Briefcase, GraduationCap, Clock,
   ChevronDown, BarChart3, Users, FileText, Building2, SlidersHorizontal,
-  Search, Sparkles, Zap, MessageSquare, Plus
+  Search, Sparkles, Zap, MessageSquare, Plus, Lock, Crown, Filter
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { toast } from 'sonner';
@@ -54,6 +54,15 @@ export default function RecruiterSwipe() {
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [showMatch, setShowMatch] = useState(false);
   const [matchData, setMatchData] = useState(null);
+  const [showDiscoverFilters, setShowDiscoverFilters] = useState(false);
+  const [discoverFilters, setDiscoverFilters] = useState({
+    location: '', experience_level: '', skill: '',
+    degree: '', work_preference: '', min_experience: '',
+  });
+  const [showPreMatchMsg, setShowPreMatchMsg] = useState(false);
+  const [preMatchMsgText, setPreMatchMsgText] = useState('');
+  const [sendingPreMatch, setSendingPreMatch] = useState(false);
+  const isEnterprise = user?.subscription?.status === 'active' && user?.subscription?.tier_id === 'recruiter_enterprise';
   const swipedIdsRef = useRef(new Set());
   const readReceiptsSent = useRef(new Set());
 
@@ -169,11 +178,20 @@ export default function RecruiterSwipe() {
     }
   };
 
-  const fetchCandidates = async (retry = 0) => {
+  const fetchCandidates = async (retry = 0, filterParams = null) => {
     try {
       const opts = { headers: { Authorization: `Bearer ${token}` }, timeout: 15000 };
+      const f = filterParams || discoverFilters;
+      const params = new URLSearchParams();
+      if (f.location) params.append('location', f.location);
+      if (f.experience_level) params.append('experience_level', f.experience_level);
+      if (f.skill) params.append('skill', f.skill);
+      if (f.degree) params.append('degree', f.degree);
+      if (f.work_preference) params.append('work_preference', f.work_preference);
+      if (f.min_experience) params.append('min_experience', f.min_experience);
+      const qs = params.toString();
       const [candidatesRes, swipesRes] = await Promise.all([
-        axios.get(`${API}/candidates`, opts),
+        axios.get(`${API}/candidates${qs ? `?${qs}` : ''}`, opts),
         axios.get(`${API}/candidates/superswipes/remaining`, opts),
       ]);
       setCandidates(candidatesRes.data);
@@ -360,7 +378,137 @@ export default function RecruiterSwipe() {
             Discover
           </button>
         </div>
+
+        {/* Discover Filters Toggle */}
+        {mode === 'discover' && (
+          <button
+            onClick={() => setShowDiscoverFilters(f => !f)}
+            className="flex items-center justify-center gap-1.5 mt-1.5 py-1.5 px-3 rounded-lg text-xs text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <Filter className="w-3 h-3" />
+            Filters
+            {Object.values(discoverFilters).some(v => v) && (
+              <span className="w-4 h-4 rounded-full bg-primary text-white text-[10px] flex items-center justify-center">
+                {Object.values(discoverFilters).filter(v => v).length}
+              </span>
+            )}
+          </button>
+        )}
       </header>
+
+      {/* Discover Filter Panel */}
+      <AnimatePresence>
+        {showDiscoverFilters && mode === 'discover' && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            className="relative z-10 px-3 overflow-hidden"
+          >
+            <div className="max-w-md mx-auto glass-card rounded-2xl p-3 mb-2 space-y-2">
+              {/* Basic filters (free) */}
+              <div className="grid grid-cols-2 gap-2">
+                <input
+                  type="text"
+                  placeholder="Location"
+                  value={discoverFilters.location}
+                  onChange={(e) => setDiscoverFilters(f => ({ ...f, location: e.target.value }))}
+                  className="h-9 px-3 rounded-xl bg-background border border-border text-xs focus:border-primary/50 outline-none"
+                />
+                <select
+                  value={discoverFilters.experience_level}
+                  onChange={(e) => setDiscoverFilters(f => ({ ...f, experience_level: e.target.value }))}
+                  className="h-9 px-2 rounded-xl bg-background border border-border text-xs focus:border-primary/50 outline-none"
+                >
+                  <option value="">Experience Level</option>
+                  <option value="entry">Entry (0-2 yrs)</option>
+                  <option value="mid">Mid (2-5 yrs)</option>
+                  <option value="senior">Senior (5-10 yrs)</option>
+                  <option value="lead">Lead (8+ yrs)</option>
+                </select>
+                <input
+                  type="text"
+                  placeholder="Skill (e.g. React)"
+                  value={discoverFilters.skill}
+                  onChange={(e) => setDiscoverFilters(f => ({ ...f, skill: e.target.value }))}
+                  className="col-span-2 h-9 px-3 rounded-xl bg-background border border-border text-xs focus:border-primary/50 outline-none"
+                />
+              </div>
+
+              {/* Advanced filters (Pro+) */}
+              {user?.subscription?.status === 'active' && ['recruiter_pro', 'recruiter_enterprise'].includes(user?.subscription?.tier_id) ? (
+                <div className="grid grid-cols-2 gap-2 pt-1 border-t border-border">
+                  <select
+                    value={discoverFilters.degree}
+                    onChange={(e) => setDiscoverFilters(f => ({ ...f, degree: e.target.value }))}
+                    className="h-9 px-2 rounded-xl bg-background border border-border text-xs focus:border-primary/50 outline-none"
+                  >
+                    <option value="">Education</option>
+                    <option value="high_school">High School</option>
+                    <option value="associates">Associate's</option>
+                    <option value="bachelors">Bachelor's</option>
+                    <option value="masters">Master's</option>
+                    <option value="phd">PhD</option>
+                    <option value="bootcamp">Bootcamp</option>
+                  </select>
+                  <select
+                    value={discoverFilters.work_preference}
+                    onChange={(e) => setDiscoverFilters(f => ({ ...f, work_preference: e.target.value }))}
+                    className="h-9 px-2 rounded-xl bg-background border border-border text-xs focus:border-primary/50 outline-none"
+                  >
+                    <option value="">Work Preference</option>
+                    <option value="remote">Remote</option>
+                    <option value="onsite">On-site</option>
+                    <option value="hybrid">Hybrid</option>
+                  </select>
+                  <input
+                    type="number"
+                    placeholder="Min. years exp"
+                    value={discoverFilters.min_experience}
+                    onChange={(e) => setDiscoverFilters(f => ({ ...f, min_experience: e.target.value }))}
+                    className="col-span-2 h-9 px-3 rounded-xl bg-background border border-border text-xs focus:border-primary/50 outline-none"
+                  />
+                </div>
+              ) : (
+                <button
+                  onClick={() => navigate('/upgrade')}
+                  className="flex items-center gap-2 p-2.5 rounded-xl border border-dashed border-primary/30 bg-primary/5 hover:bg-primary/10 transition-colors w-full text-left"
+                >
+                  <Lock className="w-4 h-4 text-primary flex-shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-semibold">Advanced Filters</p>
+                    <p className="text-[10px] text-muted-foreground">Upgrade to Pro for education, work preference & experience filters</p>
+                  </div>
+                  <Crown className="w-3.5 h-3.5 text-amber-500 flex-shrink-0" />
+                </button>
+              )}
+
+              <div className="flex gap-2">
+                <button
+                  onClick={() => {
+                    setDiscoverFilters({ location: '', experience_level: '', skill: '', degree: '', work_preference: '', min_experience: '' });
+                    setCurrentIndex(0);
+                    fetchCandidates(0, { location: '', experience_level: '', skill: '', degree: '', work_preference: '', min_experience: '' });
+                  }}
+                  className="flex-1 h-8 rounded-xl bg-muted text-muted-foreground text-xs font-medium hover:bg-muted/80"
+                >
+                  Clear
+                </button>
+                <button
+                  onClick={() => {
+                    setCurrentIndex(0);
+                    fetchCandidates(0, discoverFilters);
+                    setShowDiscoverFilters(false);
+                  }}
+                  className="flex-1 h-8 rounded-xl bg-gradient-to-r from-primary to-secondary text-white text-xs font-medium hover:opacity-90"
+                >
+                  Apply Filters
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Main Content - Swipe Area */}
       <main className="relative z-10 flex-1 flex flex-col px-3 pb-20 min-h-0">
@@ -445,6 +593,17 @@ export default function RecruiterSwipe() {
                       </span>
                     )}
                   </div>
+                )}
+
+                {mode === 'discover' && isEnterprise && (
+                  <button
+                    onClick={() => setShowPreMatchMsg(true)}
+                    className="w-12 h-12 rounded-full bg-blue-500/10 border border-blue-500/30 flex items-center justify-center hover:scale-110 transition-all duration-300"
+                    aria-label="Message candidate"
+                    title="Message before matching"
+                  >
+                    <MessageSquare className="w-5 h-5 text-blue-400" />
+                  </button>
                 )}
 
                 <button
@@ -541,6 +700,63 @@ export default function RecruiterSwipe() {
           onMessage={() => { setShowMatch(false); navigate('/matches'); }}
         />
       )}
+
+      {/* Pre-Match Message Modal (Enterprise) */}
+      <AnimatePresence>
+        {showPreMatchMsg && currentItem && mode === 'discover' && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[200] flex items-end sm:items-center justify-center p-4"
+          >
+            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setShowPreMatchMsg(false)} />
+            <motion.div
+              initial={{ y: 100, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: 100, opacity: 0 }}
+              className="relative w-full max-w-md bg-card rounded-2xl p-5 mb-20 sm:mb-0"
+            >
+              <button onClick={() => setShowPreMatchMsg(false)} className="absolute top-3 right-3 p-2 rounded-full hover:bg-accent">
+                <X className="w-4 h-4" />
+              </button>
+              <h3 className="text-lg font-bold font-['Outfit'] mb-1">Message {currentItem.name}</h3>
+              <p className="text-xs text-muted-foreground mb-3">Send a message before matching (Enterprise perk)</p>
+              <textarea
+                value={preMatchMsgText}
+                onChange={(e) => setPreMatchMsgText(e.target.value.slice(0, 500))}
+                placeholder="Introduce yourself or describe the opportunity..."
+                className="w-full h-24 px-3 py-2 rounded-xl bg-background border border-border text-sm resize-none focus:border-primary/50 outline-none"
+              />
+              <p className="text-[10px] text-muted-foreground text-right mb-3">{preMatchMsgText.length}/500</p>
+              <button
+                onClick={async () => {
+                  if (!preMatchMsgText.trim()) return;
+                  setSendingPreMatch(true);
+                  try {
+                    await axios.post(`${API}/messages/pre-match`, {
+                      seeker_id: currentItem.id,
+                      content: preMatchMsgText.trim(),
+                      job_id: currentItem.best_match_job_id,
+                    }, { headers: { Authorization: `Bearer ${token}` } });
+                    toast.success('Message sent!');
+                    setPreMatchMsgText('');
+                    setShowPreMatchMsg(false);
+                  } catch (err) {
+                    toast.error(err.response?.data?.detail || 'Failed to send');
+                  } finally {
+                    setSendingPreMatch(false);
+                  }
+                }}
+                disabled={sendingPreMatch || !preMatchMsgText.trim()}
+                className="w-full py-3 rounded-xl bg-gradient-to-r from-primary to-secondary text-white font-bold text-sm disabled:opacity-50"
+              >
+                {sendingPreMatch ? 'Sending...' : 'Send Message'}
+              </button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

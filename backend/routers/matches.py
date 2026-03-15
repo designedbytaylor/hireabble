@@ -340,3 +340,123 @@ async def mark_messages_read(match_id: str, current_user: dict = Depends(get_cur
         })
 
     return {"marked_read": result.modified_count}
+
+
+# ==================== PRE-MATCH MESSAGING (Enterprise) ====================
+
+@router.post("/messages/pre-match")
+async def send_pre_match_message(body: dict, current_user: dict = Depends(get_current_user)):
+    """Send a message to a candidate before matching (Enterprise recruiter only).
+    Creates an intro conversation the seeker sees in their messages."""
+    if current_user.get("role") != "recruiter":
+        raise HTTPException(status_code=403, detail="Only recruiters can send pre-match messages")
+
+    # Verify Enterprise subscription
+    sub = current_user.get("subscription") or {}
+    now = datetime.now(timezone.utc).isoformat()
+    if not (sub.get("status") == "active" and sub.get("period_end", "") >= now
+            and sub.get("tier_id") == "recruiter_enterprise"):
+        raise HTTPException(status_code=403, detail="Enterprise subscription required to message before matching")
+
+    seeker_id = body.get("seeker_id")
+    content = body.get("content", "").strip()
+    job_id = body.get("job_id")
+
+    if not seeker_id or not content:
+        raise HTTPException(status_code=400, detail="seeker_id and content are required")
+    if len(content) > 500:
+        raise HTTPException(status_code=400, detail="Message must be 500 characters or less")
+
+    # Content moderation
+    is_clean, violations = check_text(content)
+    if not is_clean and is_severe(violations):
+        raise HTTPException(status_code=400, detail="Message contains prohibited content.")
+
+    # Check blocked
+    blocked_ids = await get_all_blocked_ids(current_user["id"])
+    if seeker_id in blocked_ids:
+        raise HTTPException(status_code=403, detail="Cannot message this user")
+
+    # Verify seeker exists
+    seeker = await db.users.find_one({"id": seeker_id, "role": "seeker"}, {"_id": 0, "name": 1, "photo_url": 1, "avatar": 1})
+    if not seeker:
+        raise HTTPException(status_code=404, detail="Candidate not found")
+
+    # Rate limit: max 10 pre-match messages per day
+    today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0).isoformat()
+    sent_today = await db.messages.count_documents({
+        "sender_id": current_user["id"],
+        "is_pre_match": True,
+        "created_at": {"$gte": today_start},
+    })
+    if sent_today >= 10:
+        raise HTTPException(status_code=429, detail="Daily pre-match message limit reached (10/day)")
+
+    # Find or create a pre-match conversation thread (uses a pseudo-match)
+    existing_thread = await db.matches.find_one({
+        "recruiter_id": current_user["id"],
+        "seeker_id": seeker_id,
+        "is_pre_match": True,
+    })
+
+    if existing_thread:
+        thread_id = existing_thread["id"]
+    else:
+        # Get job info if provided
+        job_title = None
+        company = current_user.get("company", "Unknown Company")
+        if job_id:
+            job = await db.jobs.find_one({"id": job_id, "recruiter_id": current_user["id"]}, {"_id": 0, "title": 1, "company": 1})
+            if job:
+                job_title = job.get("title")
+                company = job.get("company", company)
+
+        thread_id = str(uuid.uuid4())
+        thread_doc = {
+            "id": thread_id,
+            "seeker_id": seeker_id,
+            "seeker_name": seeker.get("name", ""),
+            "seeker_avatar": seeker.get("avatar"),
+            "seeker_photo": seeker.get("photo_url"),
+            "recruiter_id": current_user["id"],
+            "recruiter_name": current_user["name"],
+            "recruiter_avatar": current_user.get("avatar"),
+            "job_id": job_id,
+            "job_title": job_title or "Direct Outreach",
+            "company": company,
+            "is_pre_match": True,
+            "created_at": now,
+        }
+        await db.matches.insert_one(thread_doc)
+
+    # Send the message
+    message_id = str(uuid.uuid4())
+    message_doc = {
+        "id": message_id,
+        "match_id": thread_id,
+        "sender_id": current_user["id"],
+        "sender_name": current_user["name"],
+        "sender_avatar": current_user.get("avatar") or current_user.get("photo_url"),
+        "receiver_id": seeker_id,
+        "content": content,
+        "created_at": now,
+        "is_read": False,
+        "is_pre_match": True,
+    }
+    await db.messages.insert_one(message_doc)
+
+    # Notify seeker
+    await create_notification(
+        user_id=seeker_id,
+        notif_type="message",
+        title="New message from a recruiter",
+        message=f"{current_user['name']}: {content[:50]}{'...' if len(content) > 50 else ''}",
+        data={"match_id": thread_id, "message_id": message_id, "is_pre_match": True}
+    )
+
+    await manager.send_to_user(seeker_id, {
+        "type": "new_message",
+        "message": {k: v for k, v in message_doc.items() if k != "_id"},
+    })
+
+    return {"message": "Message sent!", "thread_id": thread_id}

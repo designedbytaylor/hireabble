@@ -115,13 +115,12 @@ SUBSCRIPTION_TIERS = {
             "Featured profile in search results",
             "Application read receipts",
             "Application insights (see how you rank)",
-            "Incognito mode",
             "3 daily Top Picks",
         ],
         "limits": {"daily_super_likes": -1, "can_see_viewers": True, "can_undo": True,
                    "advanced_filters": True, "weekly_boosts": 1,
                    "superlike_notes": True, "featured_profile": True, "read_receipts": True,
-                   "application_insights": True, "incognito_mode": True, "daily_top_picks": 3},
+                   "application_insights": True, "daily_top_picks": 3},
     },
     # Recruiter tiers
     "recruiter_pro": {
@@ -144,6 +143,7 @@ SUBSCRIPTION_TIERS = {
             "1 free Boost per month",
             "Priority in candidate feeds",
             "Advanced candidate filters",
+            "Analytics dashboard",
         ],
         "limits": {"daily_super_swipes": 10, "can_see_all_applicants": True, "free_monthly_boost": 1,
                    "priority_listing": True, "advanced_filters": True},
@@ -171,7 +171,6 @@ SUBSCRIPTION_TIERS = {
             "Message candidates before matching",
             "Featured job listings",
             "Analytics dashboard",
-            "Dedicated support",
         ],
         "limits": {"daily_super_swipes": -1, "can_see_all_applicants": True, "free_monthly_boost": 3,
                    "priority_listing": True, "advanced_filters": True,
@@ -991,6 +990,88 @@ async def get_active_boosts(current_user: dict = Depends(get_current_user)):
         {"_id": 0}
     ).to_list(50)
     return boosts
+
+
+@router.post("/boosts/free")
+async def use_free_monthly_boost(data: BoostCreate, current_user: dict = Depends(get_current_user)):
+    """Use a free monthly boost included with Pro/Enterprise subscription.
+    Pro gets 1/month, Enterprise gets 3/month."""
+    if current_user.get("role") != "recruiter":
+        raise HTTPException(status_code=403, detail="Only recruiters can boost jobs")
+
+    sub = current_user.get("subscription") or {}
+    now = datetime.now(timezone.utc)
+    now_iso = now.isoformat()
+    tier_id = sub.get("tier_id", "")
+
+    if not (sub.get("status") == "active" and sub.get("period_end", "") >= now_iso
+            and tier_id in ("recruiter_pro", "recruiter_enterprise")):
+        raise HTTPException(status_code=403, detail="Pro or Enterprise subscription required")
+
+    monthly_limit = 1 if tier_id == "recruiter_pro" else 3
+
+    # Count free boosts used this month
+    month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0).isoformat()
+    free_boosts_used = await db.boosts.count_documents({
+        "user_id": current_user["id"],
+        "is_free_boost": True,
+        "created_at": {"$gte": month_start},
+    })
+
+    if free_boosts_used >= monthly_limit:
+        raise HTTPException(status_code=400, detail=f"All {monthly_limit} free monthly boost(s) used. Resets next month.")
+
+    job = await db.jobs.find_one({"id": data.job_id, "recruiter_id": current_user["id"]})
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    boost_end = now + timedelta(days=1)
+    boost_doc = {
+        "id": str(uuid.uuid4()),
+        "job_id": data.job_id,
+        "user_id": current_user["id"],
+        "boost_until": boost_end.isoformat(),
+        "multiplier": 3,
+        "is_free_boost": True,
+        "created_at": now_iso,
+    }
+    await db.boosts.insert_one(boost_doc)
+    await db.jobs.update_one(
+        {"id": data.job_id},
+        {"$set": {"is_boosted": True, "boost_until": boost_end.isoformat()}}
+    )
+
+    remaining = monthly_limit - free_boosts_used - 1
+    return {
+        "message": f"Job boosted for 1 day! {remaining} free boost(s) remaining this month.",
+        "remaining_free_boosts": remaining,
+    }
+
+
+@router.get("/boosts/free/remaining")
+async def get_free_boosts_remaining(current_user: dict = Depends(get_current_user)):
+    """Get how many free monthly boosts the recruiter has remaining."""
+    if current_user.get("role") != "recruiter":
+        raise HTTPException(status_code=403, detail="Only recruiters can view boosts")
+
+    sub = current_user.get("subscription") or {}
+    now = datetime.now(timezone.utc)
+    now_iso = now.isoformat()
+    tier_id = sub.get("tier_id", "")
+
+    if not (sub.get("status") == "active" and sub.get("period_end", "") >= now_iso
+            and tier_id in ("recruiter_pro", "recruiter_enterprise")):
+        return {"monthly_limit": 0, "used": 0, "remaining": 0}
+
+    monthly_limit = 1 if tier_id == "recruiter_pro" else 3
+    month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0).isoformat()
+    used = await db.boosts.count_documents({
+        "user_id": current_user["id"],
+        "is_free_boost": True,
+        "created_at": {"$gte": month_start},
+    })
+
+    return {"monthly_limit": monthly_limit, "used": used, "remaining": max(0, monthly_limit - used)}
 
 
 @router.post("/boosts/activate")

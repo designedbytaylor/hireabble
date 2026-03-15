@@ -1533,6 +1533,11 @@ const StaticJobCard = memo(function StaticJobCard({ job }) {
           <Zap className="w-3 h-3" /> Promoted
         </div>
       )}
+      {!job.is_boosted && job.is_premium_listing && (
+        <div className="absolute top-4 right-4 z-20 px-3 py-1 rounded-full bg-gradient-to-r from-blue-500 to-cyan-400 text-white text-xs font-bold flex items-center gap-1 shadow-lg">
+          <Star className="w-3 h-3 fill-white" /> Featured
+        </div>
+      )}
       <div className="absolute inset-0 flex flex-col justify-end p-6 z-10">
         <div className="flex items-center gap-3 mb-4">
           <img src={job.company_logo} alt={job.company} className="w-12 h-12 rounded-xl object-cover border border-white/20" />
@@ -1731,10 +1736,15 @@ function SwipeCard({ job, onSwipe, expanded, setExpanded }) {
           SUPER LIKE
         </motion.div>
 
-        {/* Promoted Badge */}
+        {/* Promoted / Featured Badge */}
         {job.is_boosted && (
           <div className="absolute top-4 right-4 z-20 px-3 py-1 rounded-full bg-gradient-to-r from-amber-500 to-orange-500 text-white text-xs font-bold flex items-center gap-1 shadow-lg">
             <Zap className="w-3 h-3" /> Promoted
+          </div>
+        )}
+        {!job.is_boosted && job.is_premium_listing && (
+          <div className="absolute top-4 right-4 z-20 px-3 py-1 rounded-full bg-gradient-to-r from-blue-500 to-cyan-400 text-white text-xs font-bold flex items-center gap-1 shadow-lg">
+            <Star className="w-3 h-3 fill-white" /> Featured
           </div>
         )}
 
