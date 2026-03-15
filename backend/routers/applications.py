@@ -112,8 +112,12 @@ async def browse_candidates(
     location: str = None,
     experience_level: str = None,
     skill: str = None,
+    degree: str = None,
+    work_preference: str = None,
+    min_experience: int = None,
 ):
-    """Browse seekers for recruiters to discover potential candidates"""
+    """Browse seekers for recruiters to discover potential candidates.
+    Advanced filters (degree, work_preference, min_experience) require Pro+ subscription."""
     if current_user["role"] != "recruiter":
         raise HTTPException(status_code=403, detail="Only recruiters can browse candidates")
 
@@ -143,7 +147,7 @@ async def browse_candidates(
         "photo_url": {"$ne": None, "$exists": True},
     }
 
-    # Apply filters
+    # Apply basic filters (available to all)
     if location:
         query["location"] = {"$regex": location, "$options": "i"}
     if experience_level:
@@ -152,6 +156,22 @@ async def browse_candidates(
         query["experience_years"] = {"$gte": low, "$lte": high}
     if skill:
         query["skills"] = {"$regex": skill, "$options": "i"}
+
+    # Advanced filters (Pro+ subscription required)
+    sub = current_user.get("subscription") or {}
+    now_str = datetime.now(timezone.utc).isoformat()
+    is_pro_plus = (
+        sub.get("status") == "active"
+        and sub.get("period_end", "") >= now_str
+        and sub.get("tier_id", "") in ("recruiter_pro", "recruiter_enterprise")
+    )
+    if is_pro_plus:
+        if degree:
+            query["degree"] = degree
+        if work_preference:
+            query["work_preference"] = work_preference
+        if min_experience is not None:
+            query["experience_years"] = {"$gte": min_experience}
 
     # Exclude banned/suspended users
     query["$or"] = [

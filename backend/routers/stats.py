@@ -113,7 +113,7 @@ async def get_seeker_dashboard(current_user: dict = Depends(get_current_user)):
         job["match_score"] = calculate_job_match_score(current_user, job)
         job["is_boosted"] = bool(job.get("is_boosted") and job.get("boost_until", "") >= now)
         rec_tier = recruiter_subs.get(job.get("recruiter_id"), "")
-        if rec_tier:
+        if rec_tier or job.get("is_featured"):
             job["is_premium_listing"] = True
             job["match_score"] = min(100, job["match_score"] + 15)
 
@@ -178,7 +178,7 @@ async def get_seeker_dashboard(current_user: dict = Depends(get_current_user)):
         "advanced_filters": is_plus_or_premium,
         "superlike_notes": is_premium,
         "application_insights": is_premium,
-        "incognito_mode": is_premium,
+        "incognito_mode": True,  # Free for all seekers
         "top_picks": is_premium,
     }
 

@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, BarChart3, TrendingUp, Users, Briefcase,
   Heart, Star, Calendar, Clock, CheckCircle, XCircle,
-  Target, Zap
+  Target, Zap, Crown, Lock
 } from 'lucide-react';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
@@ -17,8 +17,12 @@ export default function RecruiterAnalytics() {
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
 
+  const sub = user?.subscription || {};
+  const isSubscribed = sub.status === 'active' && ['recruiter_pro', 'recruiter_enterprise'].includes(sub.tier_id);
+
   useEffect(() => {
-    fetchStats();
+    if (isSubscribed) fetchStats();
+    else setLoading(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -39,6 +43,41 @@ export default function RecruiterAnalytics() {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="w-10 h-10 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (!isSubscribed) {
+    return (
+      <div className="min-h-screen bg-background pb-24">
+        <div className="fixed inset-0 overflow-hidden pointer-events-none">
+          <div className="absolute top-0 left-1/4 w-96 h-96 bg-primary/10 rounded-full blur-3xl" />
+        </div>
+        <header className="relative z-10 p-6">
+          <button onClick={() => navigate(-1)} className="flex items-center gap-2 text-muted-foreground hover:text-foreground mb-4 transition-colors">
+            <ArrowLeft className="w-4 h-4" /> Back
+          </button>
+          <h1 className="text-2xl font-bold font-['Outfit']">Analytics</h1>
+        </header>
+        <main className="relative z-10 px-6 flex flex-col items-center justify-center" style={{ minHeight: '50vh' }}>
+          <div className="glass-card rounded-3xl p-8 text-center max-w-md">
+            <div className="w-16 h-16 rounded-full bg-amber-500/20 flex items-center justify-center mx-auto mb-4">
+              <Lock className="w-8 h-8 text-amber-500" />
+            </div>
+            <h2 className="text-xl font-bold font-['Outfit'] mb-2">Unlock Analytics</h2>
+            <p className="text-muted-foreground text-sm mb-6">
+              Get detailed insights into your hiring performance with Pro or Enterprise.
+              Track response rates, match rates, weekly trends, and per-job analytics.
+            </p>
+            <button
+              onClick={() => navigate('/upgrade')}
+              className="w-full py-3 rounded-2xl bg-gradient-to-r from-amber-500 to-yellow-400 text-white font-bold text-sm hover:opacity-90 flex items-center justify-center gap-2"
+            >
+              <Crown className="w-4 h-4" /> Upgrade to Pro
+            </button>
+          </div>
+        </main>
+        <Navigation />
       </div>
     );
   }

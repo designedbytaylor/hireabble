@@ -5,7 +5,7 @@ import {
   Plus, Briefcase, Users, Star, Heart, X, Check,
   MapPin, DollarSign, Building2, ChevronRight, Clock,
   Edit, GraduationCap, Trash2, BarChart3, Calendar, Globe,
-  FileText, Send, Info, Copy, Upload, Sparkles, Wand2, Image as ImageIcon, Printer
+  FileText, Send, Info, Copy, Upload, Sparkles, Wand2, Image as ImageIcon, Printer, Zap
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -146,6 +146,23 @@ export default function RecruiterDashboard() {
   };
 
   const [generatingPoster, setGeneratingPoster] = useState(null);
+  const [boostingJob, setBoostingJob] = useState(null);
+
+  const handleFreeBoost = async (jobId) => {
+    setBoostingJob(jobId);
+    try {
+      const res = await axios.post(`${API}/payments/boosts/free`,
+        { job_id: jobId, product_id: 'boost_1day' },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      toast.success(res.data.message);
+      fetchData();
+    } catch (err) {
+      toast.error(err.response?.data?.detail || 'Failed to boost');
+    } finally {
+      setBoostingJob(null);
+    }
+  };
 
   const handleGeneratePoster = async (jobId) => {
     setGeneratingPoster(jobId);
@@ -509,6 +526,21 @@ export default function RecruiterDashboard() {
                       )}
                       <span className="hidden sm:inline">Poster</span>
                     </button>
+                    {subscription?.subscribed && (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); handleFreeBoost(job.id); }}
+                        className="flex-1 flex items-center justify-center gap-1.5 p-2 rounded-lg hover:bg-secondary/10 transition-colors text-xs text-secondary"
+                        disabled={boostingJob === job.id}
+                        title="Use free monthly boost"
+                      >
+                        {boostingJob === job.id ? (
+                          <div className="w-4 h-4 border-2 border-secondary border-t-transparent rounded-full animate-spin" />
+                        ) : (
+                          <Zap className="w-4 h-4" />
+                        )}
+                        <span className="hidden sm:inline">Boost</span>
+                      </button>
+                    )}
                     <button
                       onClick={(e) => { e.stopPropagation(); setConfirmDelete(job.id); }}
                       className="flex-1 flex items-center justify-center gap-1.5 p-2 rounded-lg hover:bg-destructive/10 transition-colors text-xs text-destructive"

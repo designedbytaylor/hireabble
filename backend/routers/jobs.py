@@ -141,6 +141,15 @@ async def create_job(job: JobCreate, current_user: dict = Depends(get_current_us
     # Auto-detect category from title/requirements if not provided
     category = job.category or auto_categorize_job(job.title, job.requirements, job.description)
 
+    # Check if recruiter has Enterprise subscription for featured listings
+    sub = current_user.get("subscription") or {}
+    now_iso = datetime.now(timezone.utc).isoformat()
+    is_enterprise = (
+        sub.get("status") == "active"
+        and sub.get("period_end", "") >= now_iso
+        and sub.get("tier_id") == "recruiter_enterprise"
+    )
+
     job_doc = {
         "id": job_id,
         "title": job.title,
@@ -161,7 +170,8 @@ async def create_job(job: JobCreate, current_user: dict = Depends(get_current_us
         "location_restriction": job.location_restriction,
         "category": category,
         "employment_type": job.employment_type or "full-time",
-        "is_active": True
+        "is_active": True,
+        "is_featured": is_enterprise,
     }
 
     # Flag for review if non-severe violations found
