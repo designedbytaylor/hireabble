@@ -47,5 +47,11 @@
 	</array>
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<true/>
+	<key>NSCameraUsageDescription</key>
+	<string>Hireabble uses your camera to take a profile photo</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Hireabble accesses your photo library to select a profile photo</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Hireabble uses your location to show relevant jobs near you</string>
 </dict>
 </plist>
