@@ -570,13 +570,13 @@ export default function Profile() {
               <img
                 src={getPhotoUrl(user?.photo_url, user?.id) || user?.avatar}
                 alt="Avatar"
-                className="w-32 h-32 rounded-full border-4 border-primary mx-auto object-cover"
+                className="w-40 h-52 rounded-2xl border-4 border-primary mx-auto object-cover"
                 onError={handleImgError(user?.id)}
               />
               <button
                 onClick={() => fileInputRef.current?.click()}
                 disabled={uploadingPhoto}
-                className="absolute bottom-1 right-1 w-9 h-9 rounded-full bg-gradient-to-r from-primary to-secondary flex items-center justify-center hover:scale-110 transition-transform"
+                className="absolute bottom-2 right-2 w-9 h-9 rounded-full bg-gradient-to-r from-primary to-secondary flex items-center justify-center hover:scale-110 transition-transform"
               >
                 {uploadingPhoto ? (
                   <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
@@ -599,7 +599,7 @@ export default function Profile() {
             </span>
             {user?.role === 'seeker' && (
               <p className="text-xs text-muted-foreground mt-3">
-                This photo is shown to recruiters when they browse candidates. Use a professional, well-lit vertical photo.
+                This is your swipe card photo — recruiters see it when browsing candidates. Use a professional, well-lit vertical photo.
               </p>
             )}
           </div>
@@ -659,18 +659,6 @@ export default function Profile() {
                 </p>
               )}
               
-              {/* Quick Apply Badge Preview */}
-              {completeness.is_complete && (
-                <div className="mt-3 p-3 rounded-xl bg-success/10 border border-success/20">
-                  <div className="flex items-center gap-2 text-success text-sm">
-                    <CheckCircle className="w-4 h-4" />
-                    <span className="font-medium">Quick Apply Enabled</span>
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Recruiters will see your complete profile instantly
-                  </p>
-                </div>
-              )}
             </div>
           )}
 
@@ -692,7 +680,7 @@ export default function Profile() {
                 data-testid="upload-resume-btn"
               >
                 {parsingResume ? (
-                  <><Loader2 className="w-5 h-5 mr-2 animate-spin" /> Parsing...</>
+                  <><Loader2 className="w-5 h-5 mr-2 animate-spin" /> Reading your experience...</>
                 ) : (
                   <><FileText className="w-5 h-5 mr-2" /> Upload Resume to Autofill</>
                 )}

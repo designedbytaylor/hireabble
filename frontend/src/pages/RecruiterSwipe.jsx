@@ -4,7 +4,7 @@ import { motion, AnimatePresence, useMotionValue, useTransform } from 'framer-mo
 import {
   X, Heart, Star, MapPin, Briefcase, GraduationCap, Clock,
   ChevronDown, BarChart3, Users, FileText, Building2, SlidersHorizontal,
-  Search, Sparkles, Zap, MessageSquare, Plus, Lock, Crown, Filter
+  Search, Sparkles, Zap, MessageSquare, Plus, Lock, Crown, Filter, Video
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { toast } from 'sonner';
@@ -792,6 +792,7 @@ function CandidateDetailSheet({ item, mode, onClose }) {
   const certifications = mode === 'applicants' ? null : item.certifications;
   const workPreference = mode === 'applicants' ? null : item.work_preference;
   const desiredSalary = mode === 'applicants' ? null : item.desired_salary;
+  const videoUrl = mode === 'applicants' ? item.seeker_video : item.video_url;
 
   return (
     <motion.div
@@ -938,6 +939,23 @@ function CandidateDetailSheet({ item, mode, onClose }) {
             <div className="mb-5">
               <h3 className="text-sm font-bold font-['Outfit'] mb-2 text-foreground">About</h3>
               <p className="text-sm text-muted-foreground leading-relaxed whitespace-pre-line">{bio}</p>
+            </div>
+          )}
+
+          {/* Video Introduction */}
+          {videoUrl && (
+            <div className="mb-5">
+              <h3 className="text-sm font-bold font-['Outfit'] mb-2 text-foreground flex items-center gap-1.5">
+                <Video className="w-4 h-4 text-primary" /> Video Introduction
+              </h3>
+              <video
+                src={videoUrl}
+                controls
+                playsInline
+                preload="metadata"
+                className="w-full rounded-xl border border-border"
+                style={{ maxHeight: '240px' }}
+              />
             </div>
           )}
 
