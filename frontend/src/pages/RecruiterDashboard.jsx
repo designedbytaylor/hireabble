@@ -397,7 +397,7 @@ export default function RecruiterDashboard() {
                 >
                   <div className="flex items-center gap-3 mb-3">
                     <img
-                      src={getPhotoUrl(app.seeker_photo || app.seeker_avatar, app.seeker_id)}
+                      src={getPhotoUrl(app.seeker_photo || app.seeker_avatar, app.seeker_name || app.seeker_id)}
                       alt={app.seeker_name}
                       className="w-14 h-14 rounded-full border-2 border-primary/50 object-cover"
                       loading="lazy"
@@ -616,7 +616,7 @@ export default function RecruiterDashboard() {
               {/* Photo and Basic Info */}
               <div className="flex items-center gap-4">
                 <img 
-                  src={getPhotoUrl(selectedCandidate.seeker_photo || selectedCandidate.seeker_avatar, selectedCandidate.seeker_id)}
+                  src={getPhotoUrl(selectedCandidate.seeker_photo || selectedCandidate.seeker_avatar, selectedCandidate.seeker_name || selectedCandidate.seeker_id)}
                   alt={selectedCandidate.seeker_name}
                   className="w-20 h-20 rounded-full object-cover border-4 border-primary/50"
                 />
@@ -1474,7 +1474,7 @@ function JobApplicationsDialog({ selectedJob, onClose, jobApplications, onViewCa
               >
                 <div className="flex items-center gap-3">
                   <img
-                    src={getPhotoUrl(app.seeker_photo || app.seeker_avatar, app.seeker_id)}
+                    src={getPhotoUrl(app.seeker_photo || app.seeker_avatar, app.seeker_name || app.seeker_id)}
                     alt={app.seeker_name}
                     className="w-12 h-12 rounded-full object-cover"
                   />

@@ -322,8 +322,8 @@ export default function Chat() {
 
   const otherPerson = match ? (
     user?.role === 'seeker'
-      ? { name: match.recruiter_name, subtitle: match.company, photo: getPhotoUrl(match.recruiter_photo || match.recruiter_avatar, match.recruiter_id) }
-      : { name: match.seeker_name, subtitle: match.job_title, photo: getPhotoUrl(match.seeker_photo || match.seeker_avatar, match.seeker_id) }
+      ? { name: match.recruiter_name, subtitle: match.company, photo: getPhotoUrl(match.recruiter_photo || match.recruiter_avatar, match.recruiter_name || match.recruiter_id) }
+      : { name: match.seeker_name, subtitle: match.job_title, photo: getPhotoUrl(match.seeker_photo || match.seeker_avatar, match.seeker_name || match.seeker_id) }
   ) : null;
 
   if (loading) {
@@ -365,7 +365,7 @@ export default function Chat() {
               src={otherPerson.photo}
               alt={otherPerson.name}
               className="w-10 h-10 rounded-full object-cover border-2 border-primary/30"
-              onError={handleImgError(otherPersonId)}
+              onError={handleImgError(otherPerson?.name || otherPersonId)}
             />
           ) : (
             <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary to-secondary flex items-center justify-center">

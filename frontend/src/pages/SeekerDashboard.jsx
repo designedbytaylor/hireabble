@@ -931,11 +931,11 @@ export default function SeekerDashboard() {
             )}
           </button>
           <img
-            src={getPhotoUrl(user?.photo_url, user?.id) || user?.avatar}
+            src={getPhotoUrl(user?.photo_url, user?.name || user?.id) || user?.avatar}
             alt="Avatar"
             onClick={() => navigate('/profile')}
             className="w-8 h-8 rounded-full border-2 border-primary object-cover cursor-pointer hover:opacity-80 transition-opacity"
-            onError={handleImgError(user?.id)}
+            onError={handleImgError(user?.name || user?.id)}
           />
         </div>
       </header>

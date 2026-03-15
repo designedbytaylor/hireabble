@@ -28,7 +28,7 @@ function useImagePreloader(items, currentIndex, mode) {
     for (const item of upcoming) {
       const url = mode === 'applicants'
         ? getPhotoUrl(item.seeker_photo || item.seeker_avatar, item.seeker_name || item.seeker_id)
-        : getPhotoUrl(item.photo_url || item.avatar, item.id);
+        : getPhotoUrl(item.photo_url || item.avatar, item.name || item.id);
       if (url && !preloadedRef.current.has(url)) {
         preloadedRef.current.add(url);
         const img = new Image();
@@ -355,11 +355,11 @@ export default function RecruiterSwipe() {
               <BarChart3 className="w-5 h-5 text-muted-foreground" />
             </button>
             <img
-              src={getPhotoUrl(user?.photo_url, user?.id) || user?.avatar}
+              src={getPhotoUrl(user?.photo_url, user?.name || user?.id) || user?.avatar}
               alt="Avatar"
               onClick={() => navigate('/profile')}
               className="w-8 h-8 rounded-full border-2 border-primary object-cover cursor-pointer hover:opacity-80 transition-opacity"
-              onError={handleImgError(user?.id)}
+              onError={handleImgError(user?.name || user?.id)}
             />
           </div>
         </div>
@@ -1278,10 +1278,10 @@ function CandidateCard({ candidate, onSwipe, expanded, setExpanded }) {
       <div className="w-full h-full rounded-3xl overflow-hidden relative gradient-border">
         {/* Full-bleed Photo */}
         <img
-          src={getPhotoUrl(candidate.photo_url || candidate.avatar, candidate.id)}
+          src={getPhotoUrl(candidate.photo_url || candidate.avatar, candidate.name || candidate.id)}
           alt={candidate.name}
           className="absolute inset-0 w-full h-full object-cover object-top"
-          onError={handleImgError(candidate.id)}
+          onError={handleImgError(candidate.name || candidate.id)}
         />
         {/* Bottom gradient overlay for text readability */}
         <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 via-[45%] to-transparent" />
@@ -1386,8 +1386,8 @@ function ExitingRecruiterCard({ card }) {
   const { exitDirection, action, item, mode: cardMode, startX = 0, startY = 0 } = card;
   const startRotate = startX !== 0 ? (startX / 200) * 25 : 0;
   const photoUrl = cardMode === 'applicants'
-    ? getPhotoUrl(item.seeker_photo || item.seeker_avatar, item.seeker_id)
-    : getPhotoUrl(item.photo_url || item.avatar, item.id);
+    ? getPhotoUrl(item.seeker_photo || item.seeker_avatar, item.seeker_name || item.seeker_id)
+    : getPhotoUrl(item.photo_url || item.avatar, item.name || item.id);
   const name = cardMode === 'applicants' ? item.seeker_name : item.name;
   const title = cardMode === 'applicants' ? (item.seeker_title || 'Job Seeker') : (item.title || 'Job Seeker');
 
@@ -1429,7 +1429,7 @@ function StaticApplicantCard({ app }) {
   return (
     <div className="w-full h-full rounded-3xl overflow-hidden relative gradient-border">
       <img
-        src={getPhotoUrl(app.seeker_photo || app.seeker_avatar, app.seeker_id)}
+        src={getPhotoUrl(app.seeker_photo || app.seeker_avatar, app.seeker_name || app.seeker_id)}
         alt={app.seeker_name}
         className="absolute inset-0 w-full h-full object-cover object-top"
         onError={handleImgError(app.seeker_name || app.seeker_id)}
@@ -1471,7 +1471,7 @@ function StaticCandidateCard({ candidate }) {
   return (
     <div className="w-full h-full rounded-3xl overflow-hidden relative gradient-border">
       <img
-        src={getPhotoUrl(candidate.photo_url || candidate.avatar, candidate.id)}
+        src={getPhotoUrl(candidate.photo_url || candidate.avatar, candidate.name || candidate.id)}
         alt={candidate.name}
         className="absolute inset-0 w-full h-full object-cover object-top"
         onError={handleImgError(candidate.name || candidate.id)}
