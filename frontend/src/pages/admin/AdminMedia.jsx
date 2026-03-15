@@ -49,13 +49,13 @@ export default function AdminMedia() {
 
   useEffect(() => { fetchItems(); }, [fetchItems]);
 
-  const handleRemove = async (mediaId) => {
+  const handleRemove = async (mediaId, { silent = false } = {}) => {
     try {
       await axios.put(`${API}/admin/media/${mediaId}/remove`,
-        { reason: removeReason || 'Inappropriate content' },
+        { reason: removeReason || 'Removed by admin', silent },
         { headers: { Authorization: `Bearer ${token}` } }
       );
-      toast.success('Media removed and user notified');
+      toast.success(silent ? 'Media removed silently' : 'Media removed and user notified');
       setRemoving(null);
       setRemoveReason('');
       fetchItems();
@@ -325,7 +325,7 @@ export default function AdminMedia() {
           <div className="bg-gray-900 border border-gray-700 rounded-2xl p-6 max-w-md w-full mx-4" onClick={(e) => e.stopPropagation()}>
             <h3 className="text-lg font-bold text-white mb-2">Remove Media</h3>
             <p className="text-gray-400 text-sm mb-4">
-              This will remove the image/video, notify the user, and issue a strike on their account.
+              Choose how to remove this media item.
             </p>
             <input
               type="text"
@@ -334,12 +334,21 @@ export default function AdminMedia() {
               onChange={(e) => setRemoveReason(e.target.value)}
               className="w-full px-4 py-2.5 rounded-xl bg-gray-800 border border-gray-700 text-white text-sm mb-4 focus:outline-none focus:border-red-500"
             />
-            <div className="flex gap-3">
-              <Button variant="outline" onClick={() => setRemoving(null)} className="flex-1 border-gray-700 text-gray-300">
-                Cancel
-              </Button>
-              <Button onClick={() => handleRemove(removing)} className="flex-1 bg-red-600 hover:bg-red-700 text-white">
-                <Trash2 className="w-4 h-4 mr-1" /> Remove & Notify
+            <div className="flex flex-col gap-2">
+              <div className="flex gap-3">
+                <Button variant="outline" onClick={() => setRemoving(null)} className="flex-1 border-gray-700 text-gray-300">
+                  Cancel
+                </Button>
+                <Button onClick={() => handleRemove(removing)} className="flex-1 bg-red-600 hover:bg-red-700 text-white">
+                  <Trash2 className="w-4 h-4 mr-1" /> Remove & Notify
+                </Button>
+              </div>
+              <Button
+                variant="outline"
+                onClick={() => handleRemove(removing, { silent: true })}
+                className="w-full border-gray-700 text-gray-400 hover:text-white"
+              >
+                <Trash2 className="w-4 h-4 mr-1" /> Remove Silently (no notification or strike)
               </Button>
             </div>
           </div>
