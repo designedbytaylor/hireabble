@@ -46,3 +46,13 @@ export function handleImgError(fallbackSeed) {
     e.target.src = getAvatarFallback(fallbackSeed);
   };
 }
+
+/**
+ * onError handler for job background images.
+ * Hides the broken image and lets the gradient overlay act as background.
+ * Usage: <img onError={handleBgImgError} ... />
+ */
+export function handleBgImgError(e) {
+  e.target.onerror = null;
+  e.target.style.display = 'none';
+}

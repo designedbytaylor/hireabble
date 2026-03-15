@@ -62,7 +62,8 @@ export default function RecruiterSwipe() {
   useImagePreloader(items, currentIndex, mode);
 
   useEffect(() => {
-    fetchData();
+    const isPaymentReturn = searchParams.get('payment') === 'success' && searchParams.get('session_id');
+    if (!isPaymentReturn) fetchData(); // skip on Stripe return — payment verify handles it
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -1188,6 +1189,7 @@ function StaticApplicantCard({ app }) {
         src={getPhotoUrl(app.seeker_photo || app.seeker_avatar, app.seeker_id)}
         alt={app.seeker_name}
         className="absolute inset-0 w-full h-full object-cover object-top"
+        onError={handleImgError(app.seeker_name || app.seeker_id)}
       />
       <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 via-[45%] to-transparent" />
       {app.action === 'superlike' && (
@@ -1229,6 +1231,7 @@ function StaticCandidateCard({ candidate }) {
         src={getPhotoUrl(candidate.photo_url || candidate.avatar, candidate.id)}
         alt={candidate.name}
         className="absolute inset-0 w-full h-full object-cover object-top"
+        onError={handleImgError(candidate.name || candidate.id)}
       />
       <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 via-[45%] to-transparent" />
       <div className="absolute inset-x-0 bottom-0 px-5 pb-4 pt-8 z-10">
