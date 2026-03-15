@@ -2,7 +2,7 @@ import { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  User, Briefcase, MapPin, GraduationCap, Building2,
+  User, Briefcase, MapPin, GraduationCap, Building2, Calendar,
   DollarSign, Clock, ArrowRight, ArrowLeft, Camera, CheckCircle2,
   Wrench, Upload, X, Globe, Navigation2, FileText, Loader2, Bell, BellOff
 } from 'lucide-react';
@@ -31,6 +31,7 @@ const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const STEPS = [
   { id: 'resume', title: 'Speed up your signup', subtitle: 'Upload a resume to autofill your profile' },
   { id: 'photo', title: 'Your Photo', subtitle: 'Add a professional photo' },
+  { id: 'dob', title: 'Date of Birth', subtitle: 'We use this to verify your age' },
   { id: 'role', title: 'What do you do?', subtitle: 'Your current or desired role' },
   { id: 'experience', title: 'Experience', subtitle: 'How long have you been working?' },
   { id: 'employment', title: 'Work History', subtitle: 'Where have you worked?' },
@@ -65,6 +66,7 @@ export default function Onboarding() {
 
   const [formData, setFormData] = useState({
     photo_url: '',
+    dob: '',
     title: '',
     experience_years: '',
     current_employer: '',
@@ -278,6 +280,18 @@ export default function Onboarding() {
       toast.error('Please upload a photo to continue. Recruiters need to see you!');
       return;
     }
+    // Age verification on the DOB step
+    if (STEPS[currentStep]?.id === 'dob' && formData.dob) {
+      const dob = new Date(formData.dob);
+      const today = new Date();
+      let age = today.getFullYear() - dob.getFullYear();
+      const m = today.getMonth() - dob.getMonth();
+      if (m < 0 || (m === 0 && today.getDate() < dob.getDate())) age--;
+      if (age < 16) {
+        toast.error('You must be at least 16 years old to use Hireabble');
+        return;
+      }
+    }
     if (currentStep < STEPS.length - 1) {
       setCurrentStep(prev => prev + 1);
     }
@@ -294,6 +308,7 @@ export default function Onboarding() {
     try {
       const updates = {
         photo_url: formData.photo_url || null,
+        date_of_birth: formData.dob || null,
         title: formData.title || null,
         bio: resumeBio || null,
         experience_years: formData.experience_years ? parseInt(formData.experience_years) : null,
@@ -353,7 +368,7 @@ export default function Onboarding() {
       <header className="relative z-10 p-6">
         <div className="flex items-center justify-between mb-6">
           <div className="text-sm text-muted-foreground">
-            Step {currentStep + 1} of {STEPS.length}
+            {STEPS[currentStep]?.title}
           </div>
           <button 
             onClick={handleSkip}
@@ -431,7 +446,7 @@ export default function Onboarding() {
                     {parsingResume ? (
                       <>
                         <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                        Parsing resume...
+                        Reading your experience...
                       </>
                     ) : (
                       <>
@@ -528,6 +543,26 @@ export default function Onboarding() {
                       {uploadingPhoto ? 'Uploading...' : 'Upload Photo'}
                     </Button>
                   )}
+                </div>
+              )}
+
+              {step.id === 'dob' && (
+                <div className="space-y-6">
+                  <div className="w-16 h-16 rounded-2xl bg-primary/20 flex items-center justify-center mb-4">
+                    <Calendar className="w-8 h-8 text-primary" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>When were you born?</Label>
+                    <Input
+                      type="date"
+                      value={formData.dob}
+                      onChange={(e) => handleChange('dob', e.target.value)}
+                      max={new Date().toISOString().split('T')[0]}
+                      className="h-12 rounded-xl bg-card border-border"
+                      data-testid="dob-input"
+                    />
+                    <p className="text-xs text-muted-foreground">You must be at least 16 years old to use Hireabble</p>
+                  </div>
                 </div>
               )}
 

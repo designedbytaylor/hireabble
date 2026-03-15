@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { Mail, Lock, User, Building2, ArrowRight, Eye, EyeOff, MapPin, Search, Users, Zap, Target, Shield, BarChart3, Briefcase, Calendar } from 'lucide-react';
+import { Mail, Lock, User, Building2, ArrowRight, Eye, EyeOff, MapPin, Search, Users, Zap, Target, Shield, BarChart3 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
@@ -53,9 +53,7 @@ export default function Register() {
     password: '',
     role,
     company: '',
-    title: '',
-    location: '',
-    dob: ''
+    location: ''
   });
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -77,22 +75,6 @@ export default function Register() {
     e.preventDefault();
     if (!formData.name || !formData.email || !formData.password) {
       toast.error('Please fill in all required fields');
-      return;
-    }
-    if (!formData.dob) {
-      toast.error('Please enter your date of birth');
-      return;
-    }
-    // Age check: must be at least 16
-    const dob = new Date(formData.dob);
-    const today = new Date();
-    let age = today.getFullYear() - dob.getFullYear();
-    const monthDiff = today.getMonth() - dob.getMonth();
-    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < dob.getDate())) {
-      age--;
-    }
-    if (age < 16) {
-      toast.error('You must be at least 16 years old to use Hireabble');
       return;
     }
     if (!acceptedTerms) {
@@ -230,24 +212,6 @@ export default function Register() {
                 </div>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="dob">Date of Birth</Label>
-                <div className="relative overflow-hidden rounded-xl">
-                  <Calendar className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-muted-foreground pointer-events-none z-10" />
-                  <Input
-                    id="dob"
-                    name="dob"
-                    type="date"
-                    value={formData.dob}
-                    onChange={handleChange}
-                    max={new Date().toISOString().split('T')[0]}
-                    className="pl-12 h-12 rounded-xl bg-background border-border w-full min-w-0 [&::-webkit-date-and-time-value]:text-left"
-                    style={{ maxWidth: '100%' }}
-                    data-testid="register-dob-input"
-                  />
-                </div>
-              </div>
-
               {role === 'recruiter' && (
                 <div className="space-y-2">
                   <Label htmlFor="company">Company Name</Label>
@@ -268,37 +232,19 @@ export default function Register() {
               )}
 
               {role === 'seeker' && (
-                <>
-                  <div className="space-y-2">
-                    <Label htmlFor="title">Job Title</Label>
-                    <div className="relative">
-                      <Briefcase className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-                      <Input
-                        id="title"
-                        name="title"
-                        type="text"
-                        placeholder="Software Engineer"
-                        value={formData.title}
-                        onChange={handleChange}
-                        className="pl-12 h-12 rounded-xl bg-background border-border"
-                        data-testid="register-title-input"
-                      />
-                    </div>
+                <div className="space-y-2">
+                  <Label htmlFor="location">Location</Label>
+                  <div className="relative">
+                    <MapPin className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-muted-foreground z-10" />
+                    <LocationAutocomplete
+                      value={formData.location}
+                      onChange={(val) => setFormData(prev => ({ ...prev, location: val }))}
+                      placeholder="San Francisco, CA"
+                      inputClassName="pl-12 h-12"
+                      data-testid="register-location-input"
+                    />
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="location">Location</Label>
-                    <div className="relative">
-                      <MapPin className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-muted-foreground z-10" />
-                      <LocationAutocomplete
-                        value={formData.location}
-                        onChange={(val) => setFormData(prev => ({ ...prev, location: val }))}
-                        placeholder="San Francisco, CA"
-                        inputClassName="pl-12 h-12"
-                        data-testid="register-location-input"
-                      />
-                    </div>
-                  </div>
-                </>
+                </div>
               )}
 
               <label className="flex items-start gap-3 mt-4 cursor-pointer">
