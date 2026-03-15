@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Bookmark, MapPin, DollarSign, Briefcase, Trash2, Clock } from 'lucide-react';
+import { ArrowLeft, Bookmark, MapPin, DollarSign, Briefcase, Trash2, Clock, X, Building2 } from 'lucide-react';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import { toast } from 'sonner';
@@ -16,11 +16,99 @@ function formatSalary(min, max) {
   return `Up to ${fmt(max)}`;
 }
 
+function JobDetailSheet({ job, onClose }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center">
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative w-full max-w-lg bg-card rounded-t-3xl max-h-[85vh] overflow-y-auto animate-in slide-in-from-bottom duration-300">
+        <div className="sticky top-0 bg-card z-10 p-4 border-b border-border flex items-center justify-between">
+          <h2 className="text-lg font-bold font-['Outfit']">{job.title}</h2>
+          <button onClick={onClose} className="p-2 rounded-full hover:bg-accent transition-colors">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+        <div className="p-6 space-y-5">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 rounded-xl bg-primary/20 flex items-center justify-center overflow-hidden">
+              {job.company_logo ? (
+                <img src={job.company_logo} alt="" className="w-full h-full object-cover" />
+              ) : (
+                <Building2 className="w-6 h-6 text-primary" />
+              )}
+            </div>
+            <div>
+              <p className="font-semibold">{job.company}</p>
+              {job.location && <p className="text-sm text-muted-foreground">{job.location}</p>}
+            </div>
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            {formatSalary(job.salary_min, job.salary_max) && (
+              <span className="text-xs px-3 py-1.5 rounded-full bg-green-500/10 text-green-500 flex items-center gap-1">
+                <DollarSign className="w-3 h-3" /> {formatSalary(job.salary_min, job.salary_max)}
+              </span>
+            )}
+            {job.job_type && (
+              <span className="text-xs px-3 py-1.5 rounded-full bg-accent text-accent-foreground capitalize">
+                {job.job_type}
+              </span>
+            )}
+            {job.employment_type && (
+              <span className="text-xs px-3 py-1.5 rounded-full bg-secondary/10 text-secondary capitalize">
+                {job.employment_type}
+              </span>
+            )}
+            {job.experience_level && (
+              <span className="text-xs px-3 py-1.5 rounded-full bg-primary/10 text-primary capitalize">
+                {job.experience_level}
+              </span>
+            )}
+          </div>
+
+          {job.description && (
+            <div>
+              <h3 className="font-semibold mb-2">About this role</h3>
+              <p className="text-sm text-muted-foreground whitespace-pre-line">{job.description}</p>
+            </div>
+          )}
+
+          {job.requirements?.length > 0 && (
+            <div>
+              <h3 className="font-semibold mb-2">Requirements</h3>
+              <div className="flex flex-wrap gap-2">
+                {job.requirements.map((req, i) => (
+                  <span key={i} className="text-xs px-3 py-1.5 rounded-full bg-accent text-accent-foreground">
+                    {req}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {job.benefits?.length > 0 && (
+            <div>
+              <h3 className="font-semibold mb-2">Benefits</h3>
+              <div className="flex flex-wrap gap-2">
+                {job.benefits.map((b, i) => (
+                  <span key={i} className="text-xs px-3 py-1.5 rounded-full bg-green-500/10 text-green-500">
+                    {b}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function SavedJobs() {
   const { token } = useAuth();
   const navigate = useNavigate();
   const [jobs, setJobs] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [selectedJob, setSelectedJob] = useState(null);
 
   useEffect(() => {
     const fetchSaved = async () => {
@@ -80,7 +168,8 @@ export default function SavedJobs() {
             {jobs.map((job) => (
               <div
                 key={job.id}
-                className="glass-card rounded-2xl p-4 hover:border-primary/20 transition-colors"
+                className="glass-card rounded-2xl p-4 hover:border-primary/20 transition-colors cursor-pointer"
+                onClick={() => setSelectedJob(job)}
               >
                 <div className="flex items-start gap-3">
                   <div className="w-12 h-12 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center shrink-0">
@@ -120,6 +209,10 @@ export default function SavedJobs() {
           </div>
         )}
       </main>
+
+      {selectedJob && (
+        <JobDetailSheet job={selectedJob} onClose={() => setSelectedJob(null)} />
+      )}
 
       <Navigation />
     </div>
