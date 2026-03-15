@@ -234,10 +234,21 @@ export default function RecruiterSwipe() {
         { application_id: item.id, action },
         { headers: { Authorization: `Bearer ${token}` } }
       ).then(res => {
-        if (action === 'accept' || res.data?.is_matched) {
+        if (action === 'accept' || action === 'superlike' || res.data?.is_matched) {
           toast.success("Matched! You can now message this candidate.", { duration: 2000 });
         }
-      }).catch(() => {});
+        if (action === 'superlike') {
+          setSuperSwipesRemaining(prev => prev ? { ...prev, remaining: prev.remaining - 1 } : prev);
+        }
+      }).catch(error => {
+        const detail = error.response?.data?.detail || '';
+        if (detail.includes('Super Swipes remaining')) {
+          setShowUpgradeModal(true);
+        }
+        if (error.response?.status === 400) {
+          toast.error(detail || 'Failed to respond');
+        }
+      });
     } else {
       const swipeAction = action === 'accept' ? 'like' : action === 'superlike' ? 'superlike' : 'pass';
       axios.post(`${API}/candidates/swipe`,
@@ -571,29 +582,27 @@ export default function RecruiterSwipe() {
                   <X className="w-7 h-7 text-destructive" />
                 </button>
 
-                {mode === 'discover' && (
-                  <div className="relative">
-                    <button
-                      onClick={() => {
-                        if (superSwipesRemaining && superSwipesRemaining.remaining <= 0) {
-                          setShowUpgradeModal(true);
-                          return;
-                        }
-                        handleSwipe('superlike', { x: 0, y: -1500 });
-                      }}
-                      className="w-14 h-14 rounded-full bg-secondary/10 border border-secondary/30 flex items-center justify-center hover:scale-110 transition-all duration-300"
-                      data-testid="superswipe-btn"
-                      aria-label="Super like this candidate"
-                    >
-                      <Star className="w-6 h-6 text-secondary fill-secondary" />
-                    </button>
-                    {superSwipesRemaining && (
-                      <span className="absolute -top-1 -right-1 w-6 h-6 rounded-full bg-secondary text-xs font-bold flex items-center justify-center text-white">
-                        {superSwipesRemaining.remaining}
-                      </span>
-                    )}
-                  </div>
-                )}
+                <div className="relative">
+                  <button
+                    onClick={() => {
+                      if (superSwipesRemaining && superSwipesRemaining.remaining <= 0) {
+                        setShowUpgradeModal(true);
+                        return;
+                      }
+                      handleSwipe('superlike', { x: 0, y: -1500 });
+                    }}
+                    className="w-14 h-14 rounded-full bg-secondary/10 border border-secondary/30 flex items-center justify-center hover:scale-110 transition-all duration-300"
+                    data-testid="superswipe-btn"
+                    aria-label="Super like this candidate"
+                  >
+                    <Star className="w-6 h-6 text-secondary fill-secondary" />
+                  </button>
+                  {superSwipesRemaining && (
+                    <span className="absolute -top-1 -right-1 w-6 h-6 rounded-full bg-secondary text-xs font-bold flex items-center justify-center text-white">
+                      {superSwipesRemaining.remaining}
+                    </span>
+                  )}
+                </div>
 
                 {mode === 'discover' && isEnterprise && (
                   <button

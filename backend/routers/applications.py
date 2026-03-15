@@ -1002,14 +1002,59 @@ async def respond_to_application(response: RecruiterAction, current_user: dict =
     if application.get("recruiter_action") is not None:
         return {"message": f"Application already {application['recruiter_action']}ed", "is_matched": application.get("is_matched", False)}
 
-    is_matched = response.action == "accept"
-    
+    is_superlike = response.action == "superlike"
+
+    # Enforce super swipe limits
+    if is_superlike:
+        rid = current_user["id"]
+        today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+        today_end = today_start + timedelta(days=1)
+
+        swipes_today = await db.recruiter_swipes.count_documents({
+            "recruiter_id": rid, "action": "superlike",
+            "created_at": {"$gte": today_start.isoformat(), "$lt": today_end.isoformat()}
+        })
+        user_data = await db.users.find_one({"id": rid}, {"_id": 0, "recruiter_super_swipes": 1, "subscription": 1})
+        purchased = (user_data or {}).get("recruiter_super_swipes", 0)
+
+        sub = (user_data or {}).get("subscription", {})
+        now = datetime.now(timezone.utc).isoformat()
+        daily_limit = DAILY_RECRUITER_SUPERSWIPE_LIMIT
+        if sub.get("status") == "active" and sub.get("period_end", "") >= now:
+            tier = sub.get("tier_id", "")
+            if tier == "recruiter_enterprise":
+                daily_limit = 999
+            elif tier == "recruiter_pro":
+                daily_limit = 10
+
+        free_remaining = max(0, daily_limit - swipes_today)
+        if free_remaining <= 0 and purchased <= 0:
+            raise HTTPException(status_code=400, detail="No Super Swipes remaining! Purchase more or try again tomorrow.")
+        if free_remaining <= 0 and purchased > 0:
+            asyncio.create_task(
+                db.users.update_one({"id": rid}, {"$inc": {"recruiter_super_swipes": -1}})
+            )
+
+        # Record the super swipe for daily tracking
+        await db.recruiter_swipes.insert_one({
+            "id": str(uuid.uuid4()),
+            "recruiter_id": rid,
+            "seeker_id": application["seeker_id"],
+            "action": "superlike",
+            "application_id": response.application_id,
+            "created_at": datetime.now(timezone.utc).isoformat()
+        })
+
+    # Superlike also creates a match (like accept)
+    is_matched = response.action in ("accept", "superlike")
+
     stage_update = "shortlisted" if is_matched else "declined"
     await db.applications.update_one(
         {"id": response.application_id},
         {"$set": {
             "recruiter_action": response.action,
             "is_matched": is_matched,
+            "is_superliked": is_superlike,
             "pipeline_stage": stage_update,
         }}
     )
@@ -1029,16 +1074,23 @@ async def respond_to_application(response: RecruiterAction, current_user: dict =
             "seeker_photo": application.get("seeker_photo"),
             "recruiter_id": current_user["id"],
             "recruiter_name": current_user["name"],
+            "is_superliked": is_superlike,
             "created_at": datetime.now(timezone.utc).isoformat()
         }
         await db.matches.insert_one(match_doc)
-        
+
         # Create in-app notification for seeker
+        notif_title = "Super Match!" if is_superlike else "It's a Match!"
+        notif_msg = (
+            f"{job['company'] if job else 'A company'} super liked your application for {job['title'] if job else 'a position'}!"
+            if is_superlike else
+            f"{job['company'] if job else 'A company'} accepted your application for {job['title'] if job else 'a position'}!"
+        )
         await create_notification(
             user_id=application["seeker_id"],
             notif_type="match",
-            title="It's a Match!",
-            message=f"{job['company'] if job else 'A company'} accepted your application for {job['title'] if job else 'a position'}!",
+            title=notif_title,
+            message=notif_msg,
             data={"match_id": match_doc["id"], "job_id": application["job_id"]}
         )
         
