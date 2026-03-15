@@ -303,8 +303,8 @@ export default function RecruiterSwipe() {
     return (
       <div className="h-[100dvh] bg-background flex flex-col overflow-hidden">
         <div className="fixed inset-0 overflow-hidden pointer-events-none">
-          <div className="absolute top-0 left-1/4 w-96 h-96 bg-primary/10 rounded-full blur-3xl" />
-          <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-secondary/10 rounded-full blur-3xl" />
+          <div className="absolute top-0 left-1/4 w-64 h-64 sm:w-96 sm:h-96 bg-primary/10 rounded-full blur-3xl" />
+          <div className="absolute bottom-0 right-1/4 w-64 h-64 sm:w-96 sm:h-96 bg-secondary/10 rounded-full blur-3xl" />
         </div>
         <main className="relative z-10 flex-1 flex flex-col px-3 pb-28 min-h-0">
           <div className="max-w-md mx-auto w-full flex-1 flex flex-col justify-center">
@@ -334,8 +334,8 @@ export default function RecruiterSwipe() {
   return (
     <div className="h-[100dvh] bg-background flex flex-col overflow-hidden">
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-0 left-1/4 w-96 h-96 bg-primary/10 rounded-full blur-3xl" />
-        <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-secondary/10 rounded-full blur-3xl" />
+        <div className="absolute top-0 left-1/4 w-64 h-64 sm:w-96 sm:h-96 bg-primary/10 rounded-full blur-3xl" />
+        <div className="absolute bottom-0 right-1/4 w-64 h-64 sm:w-96 sm:h-96 bg-secondary/10 rounded-full blur-3xl" />
       </div>
 
       {/* Slim Header */}
@@ -819,7 +819,7 @@ function CandidateDetailSheet({ item, mode, onClose }) {
       {/* Sheet */}
       <motion.div
         className="absolute bottom-0 left-0 right-0 bg-card rounded-t-3xl overflow-hidden"
-        style={{ y: sheetY, opacity: sheetOpacity, maxHeight: '85vh' }}
+        style={{ y: sheetY, opacity: sheetOpacity, maxHeight: '85vh', paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
         initial={{ y: '100%' }}
         animate={{ y: 0 }}
         exit={{ y: '100%' }}
@@ -841,7 +841,7 @@ function CandidateDetailSheet({ item, mode, onClose }) {
         </div>
 
         {/* Scrollable Content */}
-        <div ref={scrollRef} onScroll={handleScroll} className="overflow-y-auto px-6 pb-8" style={{ maxHeight: 'calc(85vh - 28px)' }}>
+        <div ref={scrollRef} onScroll={handleScroll} className="overflow-y-auto px-6 pb-8" style={{ maxHeight: 'calc(85vh - 28px - env(safe-area-inset-bottom, 0px))' }}>
           {/* Photo + Name Header */}
           <div className="flex items-center gap-4 mb-4">
             <img
