@@ -152,10 +152,10 @@ export default function Matches() {
               {isRecruiterViewing ? (
                 (p.photo_url || p.avatar) ? (
                   <img
-                    src={getPhotoUrl(p.photo_url, p.id) || p.avatar}
+                    src={getPhotoUrl(p.photo_url, p.name || p.id) || p.avatar}
                     alt={p.name}
                     className="w-24 h-24 rounded-full border-4 border-primary mx-auto object-cover mb-4"
-                    onError={handleImgError(p.id)}
+                    onError={handleImgError(p.name || p.id)}
                   />
                 ) : (
                   <div className="w-24 h-24 rounded-full bg-primary/20 flex items-center justify-center mx-auto mb-4">

@@ -218,7 +218,7 @@ export default function RecruiterApplications() {
                 >
                   {/* Avatar */}
                   <img
-                    src={getPhotoUrl(app.seeker_photo || app.seeker_avatar, app.seeker_id)}
+                    src={getPhotoUrl(app.seeker_photo || app.seeker_avatar, app.seeker_name || app.seeker_id)}
                     alt={app.seeker_name}
                     className="w-14 h-14 rounded-full border-2 border-border object-cover flex-shrink-0"
                   />
@@ -284,7 +284,7 @@ export default function RecruiterApplications() {
               {/* Profile Header */}
               <div className="flex items-center gap-4 mb-4">
                 <img
-                  src={getPhotoUrl(selectedApp.seeker_photo || selectedApp.seeker_avatar, selectedApp.seeker_id)}
+                  src={getPhotoUrl(selectedApp.seeker_photo || selectedApp.seeker_avatar, selectedApp.seeker_name || selectedApp.seeker_id)}
                   alt={selectedApp.seeker_name}
                   className="w-16 h-16 rounded-full border-2 border-primary object-cover"
                 />

@@ -98,7 +98,7 @@ export default function CompanyJobs() {
         {company && (
           <div className="flex items-center gap-4 mb-6">
             <img
-              src={getPhotoUrl(company.photo_url, company.id) || company.avatar}
+              src={getPhotoUrl(company.photo_url, company.company || company.name || company.id) || company.avatar}
               alt={company.company || company.name}
               className="w-16 h-16 rounded-2xl border-2 border-border object-cover"
             />

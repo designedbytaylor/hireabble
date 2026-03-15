@@ -568,10 +568,10 @@ export default function Profile() {
           <div className="glass-card rounded-3xl p-8 mb-6 text-center">
             <div className="relative inline-block mb-4">
               <img
-                src={getPhotoUrl(user?.photo_url, user?.id) || user?.avatar}
+                src={getPhotoUrl(user?.photo_url, user?.name || user?.id) || user?.avatar}
                 alt="Avatar"
                 className="w-40 h-52 rounded-2xl border-4 border-primary mx-auto object-cover"
-                onError={handleImgError(user?.id)}
+                onError={handleImgError(user?.name || user?.id)}
               />
               <button
                 onClick={() => fileInputRef.current?.click()}
