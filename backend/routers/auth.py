@@ -269,6 +269,34 @@ async def login(credentials: UserLogin, request: Request):
 async def get_me(current_user: dict = Depends(get_current_user)):
     return current_user
 
+# ==================== PROMO CODE CHECK (PUBLIC) ====================
+
+@router.get("/check-promo")
+async def check_promo(code: str, role: str = "seeker"):
+    """Public endpoint to validate a promo code before registration."""
+    from routers.payments import SUBSCRIPTION_TIERS
+    code = code.strip().upper()
+    promo = await db.promo_codes.find_one({"code": code})
+
+    if not promo or not promo.get("active", False):
+        return {"valid": False, "reason": "Invalid promo code."}
+
+    if promo.get("expires_at") and promo["expires_at"] < datetime.now(timezone.utc).isoformat():
+        return {"valid": False, "reason": "This promo code has expired."}
+
+    if promo.get("max_uses") is not None and promo.get("uses", 0) >= promo["max_uses"]:
+        return {"valid": False, "reason": "This promo code is no longer available."}
+
+    if promo.get("role_restriction") and promo["role_restriction"] != role:
+        return {"valid": False, "reason": f"This code is for {promo['role_restriction']}s only."}
+
+    tier = SUBSCRIPTION_TIERS.get(promo["tier_id"], {})
+    return {
+        "valid": True,
+        "tier_name": tier.get("name", promo["tier_id"]),
+        "duration_days": promo["duration_days"],
+    }
+
 # ==================== FORGOT PASSWORD ====================
 
 @router.post("/forgot-password")
@@ -679,7 +707,9 @@ async def linkedin_oauth(body: dict):
         if not email:
             raise HTTPException(status_code=400, detail="Could not retrieve email from LinkedIn")
 
-        return await _find_or_create_oauth_user(email, name or email.split("@")[0], "linkedin", role, photo_url=picture_url)
+        # LinkedIn profile photos are too low-res for swipe cards; skip them
+        # and let the user upload a proper photo during onboarding instead
+        return await _find_or_create_oauth_user(email, name or email.split("@")[0], "linkedin", role, photo_url=None)
 
     except HTTPException:
         raise

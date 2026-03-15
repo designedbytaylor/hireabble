@@ -5,7 +5,10 @@ import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { toast } from 'sonner';
+import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
+
+const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 import OAuthButtons from '../components/OAuthButtons';
 import LocationAutocomplete from '../components/LocationAutocomplete';
 
@@ -61,6 +64,7 @@ export default function Register() {
   const [marketingOptIn, setMarketingOptIn] = useState(false);
   const [promoCode, setPromoCode] = useState('');
   const [showPromo, setShowPromo] = useState(false);
+  const [promoStatus, setPromoStatus] = useState(null); // null | 'checking' | { valid, reason?, tier_name?, duration_days? }
   const { register } = useAuth();
   const navigate = useNavigate();
 
@@ -289,25 +293,55 @@ export default function Register() {
               >
                 <Tag className="w-4 h-4" />
                 Have a promo code?
-                <ChevronDown className={`w-4 h-4 transition-transform ${showPromo ? 'rotate-180' : ''}`} />
+                <ChevronDown className={`w-4 h-4 transition-transform duration-150 ${showPromo ? 'rotate-180' : ''}`} />
               </button>
 
-              {showPromo && (
-                <div className="space-y-2">
-                  <div className="relative">
-                    <Tag className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-                    <Input
-                      name="promo_code"
-                      type="text"
-                      placeholder="Enter promo code"
-                      value={promoCode}
-                      onChange={(e) => setPromoCode(e.target.value.toUpperCase())}
-                      className="pl-12 h-12 rounded-xl bg-background border-border uppercase"
-                      data-testid="register-promo-input"
-                    />
+              <div className={`grid transition-all duration-150 ease-in-out ${showPromo ? 'grid-rows-[1fr] opacity-100 mt-2' : 'grid-rows-[0fr] opacity-0'}`}>
+                <div className="overflow-hidden">
+                  <div className="space-y-2">
+                    <div className="flex gap-2">
+                      <div className="relative flex-1">
+                        <Tag className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+                        <Input
+                          name="promo_code"
+                          type="text"
+                          placeholder="Enter promo code"
+                          value={promoCode}
+                          onChange={(e) => { setPromoCode(e.target.value.toUpperCase()); setPromoStatus(null); }}
+                          className="pl-12 h-12 rounded-xl bg-background border-border uppercase"
+                          data-testid="register-promo-input"
+                        />
+                      </div>
+                      <Button
+                        type="button"
+                        disabled={!promoCode.trim() || promoStatus === 'checking'}
+                        onClick={async () => {
+                          setPromoStatus('checking');
+                          try {
+                            const res = await axios.get(`${API}/auth/check-promo`, { params: { code: promoCode.trim(), role } });
+                            setPromoStatus(res.data);
+                          } catch {
+                            setPromoStatus({ valid: false, reason: 'Could not verify code.' });
+                          }
+                        }}
+                        className="h-12 px-5 rounded-xl"
+                        variant={promoStatus?.valid ? 'default' : 'outline'}
+                      >
+                        {promoStatus === 'checking' ? (
+                          <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                        ) : 'Apply'}
+                      </Button>
+                    </div>
+                    {promoStatus && promoStatus !== 'checking' && (
+                      <p className={`text-xs ${promoStatus.valid ? 'text-green-500' : 'text-destructive'}`}>
+                        {promoStatus.valid
+                          ? `${promoStatus.tier_name} for ${promoStatus.duration_days} days — will be applied on signup!`
+                          : promoStatus.reason}
+                      </p>
+                    )}
                   </div>
                 </div>
-              )}
+              </div>
 
               <Button
                 type="submit"

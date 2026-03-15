@@ -99,7 +99,7 @@ function EmailNotificationSettings({ token }) {
 }
 
 export default function Profile() {
-  const { user, token, updateProfile, logout, refreshUser } = useAuth();
+  const { user, token, updateProfile, logout, refreshUser, patchUser } = useAuth();
   const [loading, setLoading] = useState(false);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [completeness, setCompleteness] = useState({ percentage: 0, missing_fields: [], is_complete: false });
@@ -1268,17 +1268,15 @@ export default function Profile() {
               </h3>
               <button
                 type="button"
-                onClick={async () => {
+                onClick={() => {
                   const newVal = !user?.incognito_mode;
-                  try {
-                    await axios.post(`${API}/profile/incognito`, { enabled: newVal }, {
-                      headers: { Authorization: `Bearer ${token}` },
-                    });
-                    await refreshUser();
-                    toast.success(newVal ? 'Profile set to private' : 'Profile is now visible to recruiters');
-                  } catch (err) {
-                    toast.error(err.response?.data?.detail || 'Failed to update');
-                  }
+                  patchUser({ incognito_mode: newVal });
+                  axios.post(`${API}/profile/incognito`, { enabled: newVal }, {
+                    headers: { Authorization: `Bearer ${token}` },
+                  }).catch(() => {
+                    patchUser({ incognito_mode: !newVal });
+                    toast.error('Failed to update');
+                  });
                 }}
                 className={`w-full flex items-center gap-3 p-4 rounded-xl border transition-all ${
                   user?.incognito_mode

@@ -195,9 +195,17 @@ export const AuthProvider = ({ children }) => {
     return response.data;
   }, [token]);
 
+  const patchUser = useCallback((updates) => {
+    setUser(prev => {
+      const next = { ...prev, ...updates };
+      localStorage.setItem('cached_user', JSON.stringify(next));
+      return next;
+    });
+  }, []);
+
   const value = useMemo(() => ({
-    user, token, loading, login, loginWithToken, register, logout, updateProfile, refreshUser
-  }), [user, token, loading, login, loginWithToken, register, logout, updateProfile, refreshUser]);
+    user, token, loading, login, loginWithToken, register, logout, updateProfile, refreshUser, patchUser
+  }), [user, token, loading, login, loginWithToken, register, logout, updateProfile, refreshUser, patchUser]);
 
   return (
     <AuthContext.Provider value={value}>
