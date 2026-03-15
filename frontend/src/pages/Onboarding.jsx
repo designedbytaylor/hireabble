@@ -74,8 +74,8 @@ export default function Onboarding() {
     skills: '',
     certifications: '',
     location: '',
-    work_preference: 'remote',
-    desired_salary: '',
+    work_preference: 'flexible',
+    desired_salary: '80000',
     available_immediately: true,
     job_type_preference: [],
   });

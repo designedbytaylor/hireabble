@@ -26,7 +26,7 @@ import {
 } from '../components/ui/select';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
-import { getPhotoUrl, handleImgError } from '../utils/helpers';
+import { getPhotoUrl, handleImgError, handleBgImgError } from '../utils/helpers';
 import UpgradeModal from '../components/UpgradeModal';
 import { SkeletonPageBackground, SkeletonStatCard, SkeletonSwipeCard, SkeletonActionButtons } from '../components/skeletons';
 import { Skeleton } from '../components/ui/skeleton';
@@ -296,8 +296,11 @@ export default function SeekerDashboard() {
   }, []);
 
   // On mount: flush retry queue then fetch dashboard (apply saved filters if any)
+  // Skip initial fetch on Stripe payment return — the payment verify effect handles it
   useEffect(() => {
+    const isPaymentReturn = searchParams.get('payment') === 'success' && searchParams.get('session_id');
     flushSwipeQueue().then(async () => {
+      if (isPaymentReturn) return; // let payment verify effect handle the fetch
       await fetchDashboard();
       // If user had saved filter preferences, apply them after initial load
       const hasActiveFilters = Object.entries(filters).some(([k, v]) =>
@@ -1522,7 +1525,7 @@ const StaticJobCard = memo(function StaticJobCard({ job }) {
   return (
     <div className="w-full h-full rounded-3xl overflow-hidden relative gradient-border">
       <div className="absolute inset-0">
-        <img src={job.background_image} alt="Background" className="w-full h-full object-cover" />
+        <img src={job.background_image} alt="" className="w-full h-full object-cover" onError={handleBgImgError} />
         <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/60 to-black/30" />
       </div>
       {job.is_boosted && (
@@ -1579,7 +1582,7 @@ function ExitingCard({ card }) {
     >
       <div className="w-full h-full rounded-3xl overflow-hidden relative gradient-border">
         <div className="absolute inset-0">
-          <img src={card.job.background_image} alt="Background" className="w-full h-full object-cover" />
+          <img src={card.job.background_image} alt="" className="w-full h-full object-cover" onError={handleBgImgError} />
           <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/60 to-black/30" />
         </div>
         {/* Stamp overlay */}
@@ -1622,7 +1625,7 @@ function EnteringCard({ card }) {
     >
       <div className="w-full h-full rounded-3xl overflow-hidden relative gradient-border shadow-2xl">
         <div className="absolute inset-0">
-          <img src={job.background_image} alt="Background" className="w-full h-full object-cover" />
+          <img src={job.background_image} alt="" className="w-full h-full object-cover" onError={handleBgImgError} />
           <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/60 to-black/30" />
         </div>
         <div className="absolute inset-0 flex flex-col justify-end p-6 z-10">
@@ -1704,7 +1707,7 @@ function SwipeCard({ job, onSwipe, expanded, setExpanded }) {
       <div className="w-full h-full rounded-3xl overflow-hidden relative gradient-border">
         {/* Background Image */}
         <div className="absolute inset-0">
-          <img src={job.background_image} alt="Background" className="w-full h-full object-cover" />
+          <img src={job.background_image} alt="" className="w-full h-full object-cover" onError={handleBgImgError} />
           <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/60 to-black/30" />
         </div>
 
