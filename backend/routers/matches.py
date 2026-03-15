@@ -48,10 +48,12 @@ async def get_matches(current_user: dict = Depends(get_current_user)):
 
     matches = await db.matches.find(query, {"_id": 0}).sort("created_at", -1).to_list(100)
 
-    # Batch-fetch unread counts for all matches
     if matches:
         match_ids = [m["id"] for m in matches]
-        pipeline = [
+
+        # Batch-fetch unread counts and job photos in parallel
+        job_ids = list(set(m.get("job_id") for m in matches if m.get("job_id")))
+        unread_pipeline = [
             {"$match": {
                 "match_id": {"$in": match_ids},
                 "receiver_id": current_user["id"],
@@ -59,10 +61,26 @@ async def get_matches(current_user: dict = Depends(get_current_user)):
             }},
             {"$group": {"_id": "$match_id", "count": {"$sum": 1}}}
         ]
-        unread_results = await db.messages.aggregate(pipeline).to_list(len(match_ids))
+
+        unread_task = db.messages.aggregate(unread_pipeline).to_list(len(match_ids))
+        if job_ids:
+            jobs_task = db.jobs.find(
+                {"id": {"$in": job_ids}},
+                {"_id": 0, "id": 1, "listing_photo": 1, "company_logo": 1}
+            ).to_list(len(job_ids))
+            unread_results, jobs_list = await asyncio.gather(unread_task, jobs_task)
+        else:
+            unread_results = await unread_task
+            jobs_list = []
+
         unread_map = {r["_id"]: r["count"] for r in unread_results}
+        jobs_map = {j["id"]: j for j in jobs_list}
+
         for m in matches:
             m["unread_count"] = unread_map.get(m["id"], 0)
+            job_data = jobs_map.get(m.get("job_id"), {})
+            m["listing_photo"] = job_data.get("listing_photo")
+            m["company_logo"] = job_data.get("company_logo")
 
     return matches
 

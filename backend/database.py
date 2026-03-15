@@ -451,6 +451,8 @@ class MatchResponse(BaseModel):
     recruiter_name: str
     recruiter_avatar: Optional[str] = None
     recruiter_photo: Optional[str] = None
+    listing_photo: Optional[str] = None
+    company_logo: Optional[str] = None
     created_at: str
     last_message: Optional[str] = None
     last_message_sender: Optional[str] = None
