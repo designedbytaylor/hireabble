@@ -88,6 +88,55 @@ export default function Upgrade() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Handle native StoreKit responses from iOS
+  useEffect(() => {
+    const handleStoreKitResponse = async (e) => {
+      const data = e.detail;
+      if (!data) return;
+
+      switch (data.type) {
+        case 'purchaseSuccess':
+        case 'restoreSuccess': {
+          try {
+            const res = await axios.post(
+              `${API}/payments/apple/verify-receipt`,
+              {
+                receipt_data: data.receipt_data,
+                product_id: data.product_id,
+                transaction_id: data.transaction_id,
+                job_id: data.job_id || null,
+              },
+              { headers: { Authorization: `Bearer ${token}` } }
+            );
+            toast.success(res.data.message || 'Purchase successful!');
+            fetchTiers(); // Refresh to show updated subscription
+          } catch (err) {
+            toast.error(err.response?.data?.detail || 'Failed to verify purchase. Please try restoring purchases.');
+          }
+          break;
+        }
+        case 'purchaseCancelled':
+          break; // User cancelled, no action needed
+        case 'purchasePending':
+          toast('Purchase is pending approval.', { duration: 4000 });
+          break;
+        case 'purchaseError':
+          toast.error(data.error || 'Purchase failed. Please try again.');
+          break;
+        case 'restoreEmpty':
+          toast('No purchases to restore.', { duration: 4000 });
+          break;
+        default:
+          break;
+      }
+      setPurchasing(null);
+    };
+
+    window.addEventListener('storeKitResponse', handleStoreKitResponse);
+    return () => window.removeEventListener('storeKitResponse', handleStoreKitResponse);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token]);
+
   const fetchTiers = async () => {
     try {
       const res = await axios.get(`${API}/payments/tiers`, {

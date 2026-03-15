@@ -11,6 +11,7 @@ import uuid
 import random
 import asyncio
 import re
+import os
 
 from database import (
     db, logger, manager, create_notification,
@@ -2271,3 +2272,57 @@ async def admin_revenue(admin=Depends(get_current_admin)):
         "churn_data": churn_data,
         "recent_transactions": recent_txns,
     }
+
+
+# ==================== APP STORE SETTINGS ====================
+
+APP_STORE_SETTINGS_KEY = "app_store_settings"
+
+APP_STORE_SETTINGS_FIELDS = [
+    "apple_team_id",
+    "apple_shared_secret",
+    "android_sha256_fingerprint",
+    "app_store_url",
+    "play_store_url",
+]
+
+
+@router.get("/admin/app-store-settings")
+async def get_app_store_settings(admin=Depends(get_current_admin)):
+    """Get app store configuration settings."""
+    doc = await db.site_settings.find_one({"key": APP_STORE_SETTINGS_KEY})
+    settings = doc.get("value", {}) if doc else {}
+    # Mask the shared secret for display
+    if settings.get("apple_shared_secret"):
+        secret = settings["apple_shared_secret"]
+        settings["apple_shared_secret_masked"] = secret[:4] + "*" * (len(secret) - 8) + secret[-4:] if len(secret) > 8 else "****"
+    return {field: settings.get(field, "") for field in APP_STORE_SETTINGS_FIELDS}
+
+
+@router.put("/admin/app-store-settings")
+async def update_app_store_settings(
+    body: dict = Body(...),
+    admin=Depends(get_current_admin),
+):
+    """Update app store configuration settings."""
+    # Only allow known fields
+    updates = {k: v for k, v in body.items() if k in APP_STORE_SETTINGS_FIELDS and v is not None}
+    if not updates:
+        raise HTTPException(status_code=400, detail="No valid settings provided")
+
+    # Merge with existing settings (don't overwrite fields not in the request)
+    doc = await db.site_settings.find_one({"key": APP_STORE_SETTINGS_KEY})
+    current = doc.get("value", {}) if doc else {}
+    current.update(updates)
+
+    await db.site_settings.update_one(
+        {"key": APP_STORE_SETTINGS_KEY},
+        {"$set": {"key": APP_STORE_SETTINGS_KEY, "value": current, "updated_at": datetime.now(timezone.utc)}},
+        upsert=True,
+    )
+
+    # If apple_shared_secret was updated, also update the env-like config for payments
+    if "apple_shared_secret" in updates:
+        os.environ["APPLE_SHARED_SECRET"] = updates["apple_shared_secret"]
+
+    return {"message": "App store settings updated", "settings": {k: current.get(k, "") for k in APP_STORE_SETTINGS_FIELDS}}

@@ -65,3 +65,56 @@ workflows:
         beta_groups:
           - Internal Testers
         submit_to_app_store: false
+
+  android-release:
+    name: Android Release
+    max_build_duration: 30
+    instance_type: linux_x2
+    environment:
+      node: 18
+      java: 17
+      groups:
+        - hireabble_env
+      android_signing:
+        - hireabble_keystore
+      vars:
+        PACKAGE_NAME: com.hireabble.app
+    triggering:
+      events:
+        - push
+      branch_patterns:
+        - pattern: main
+          include: true
+    scripts:
+      - name: Install frontend dependencies
+        script: |
+          cd frontend
+          npm install --legacy-peer-deps
+      - name: Build React app
+        script: |
+          cd frontend
+          npx craco build
+      - name: Sync Capacitor Android
+        script: |
+          cd frontend
+          npx cap sync android
+      - name: Set Android version
+        script: |
+          cd frontend/android
+          LATEST_BUILD=$(google-play get-latest-build-number --package-name "$PACKAGE_NAME" || echo 0)
+          NEW_BUILD=$((LATEST_BUILD + 1))
+          echo "Setting versionCode to $NEW_BUILD"
+          sed -i "s/versionCode [0-9]*/versionCode $NEW_BUILD/" app/build.gradle
+      - name: Build AAB
+        script: |
+          cd frontend/android
+          chmod +x gradlew
+          ./gradlew bundleRelease
+    artifacts:
+      - frontend/android/app/build/outputs/**/*.aab
+      - frontend/android/app/build/outputs/**/mapping.txt
+    publishing:
+      google_play:
+        credentials: $GCLOUD_SERVICE_ACCOUNT_CREDENTIALS
+        track: internal
+        submit_as_draft: true
