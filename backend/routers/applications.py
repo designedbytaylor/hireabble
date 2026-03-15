@@ -972,6 +972,11 @@ async def get_my_applications(current_user: dict = Depends(get_current_user)):
                 "salary_max": job.get("salary_max") if job else None,
                 "company_logo": job.get("company_logo") if job else None,
                 "employment_type": job.get("employment_type", "full-time") if job else "",
+                "experience_level": job.get("experience_level", "") if job else "",
+                "category": job.get("category") if job else None,
+                "description": job.get("description", "") if job else "",
+                "requirements": job.get("requirements", []) if job else [],
+                "benefits": job.get("benefits", []) if job else [],
             },
         }
         # Include read receipt for premium seekers
