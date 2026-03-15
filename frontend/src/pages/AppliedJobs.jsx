@@ -72,7 +72,7 @@ function JobDetailSheet({ job, onClose }) {
     : null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center">
+    <div className="fixed inset-0 z-[60] flex items-end justify-center">
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
       <div className="relative w-full max-w-lg bg-card rounded-t-3xl max-h-[85vh] overflow-y-auto animate-in slide-in-from-bottom duration-300">
         <div className="sticky top-0 bg-card z-10 p-4 border-b border-border flex items-center justify-between">
