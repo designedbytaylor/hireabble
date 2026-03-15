@@ -2012,6 +2012,10 @@ async def admin_revenue(admin=Depends(get_current_admin)):
     now = datetime.now(timezone.utc)
     from routers.payments import SUBSCRIPTION_TIERS
 
+    # Get all existing user IDs to exclude transactions from deleted users
+    existing_user_ids = [u["id"] async for u in db.users.find({}, {"_id": 0, "id": 1})]
+    active_user_filter = {"user_id": {"$in": existing_user_ids}}
+
     # --- Monthly revenue (last 12 months) ---
     monthly_revenue = []
     for i in range(11, -1, -1):
@@ -2026,6 +2030,7 @@ async def admin_revenue(admin=Depends(get_current_admin)):
             {"$match": {
                 "status": "completed",
                 "created_at": {"$gte": month_start.isoformat(), "$lt": next_month.isoformat()},
+                **active_user_filter,
             }},
             {"$group": {
                 "_id": None,
@@ -2043,7 +2048,7 @@ async def admin_revenue(admin=Depends(get_current_admin)):
 
     # --- Revenue by product type ---
     product_pipeline = [
-        {"$match": {"status": "completed"}},
+        {"$match": {"status": "completed", **active_user_filter}},
         {"$group": {
             "_id": "$product_id",
             "total": {"$sum": "$amount"},
@@ -2068,7 +2073,7 @@ async def admin_revenue(admin=Depends(get_current_admin)):
 
     # --- Revenue by source (stripe vs apple) ---
     source_pipeline = [
-        {"$match": {"status": "completed"}},
+        {"$match": {"status": "completed", **active_user_filter}},
         {"$group": {"_id": "$source", "total": {"$sum": "$amount"}, "count": {"$sum": 1}}},
     ]
     source_results = await db.transactions.aggregate(source_pipeline).to_list(None)
@@ -2150,6 +2155,7 @@ async def admin_revenue(admin=Depends(get_current_admin)):
             "status": "completed",
             "product_id": {"$in": list(SUBSCRIPTION_TIERS.keys())},
             "created_at": {"$gte": month_start.isoformat(), "$lt": next_month.isoformat()},
+            **active_user_filter,
         })
 
         churn_data.append({
@@ -2161,7 +2167,7 @@ async def admin_revenue(admin=Depends(get_current_admin)):
 
     # --- Summary stats ---
     total_revenue = await db.transactions.aggregate([
-        {"$match": {"status": "completed"}},
+        {"$match": {"status": "completed", **active_user_filter}},
         {"$group": {"_id": None, "total": {"$sum": "$amount"}, "count": {"$sum": 1}}},
     ]).to_list(1)
     total_rev = total_revenue[0] if total_revenue else {"total": 0, "count": 0}
@@ -2176,13 +2182,13 @@ async def admin_revenue(admin=Depends(get_current_admin)):
     })
     total_users = await db.users.count_documents({})
 
-    # Recent transactions (last 20)
+    # Recent transactions (last 20, excluding deleted users)
     recent_txns = []
-    async for t in db.transactions.find({"status": "completed"}, {"_id": 0}).sort("created_at", -1).limit(20):
+    async for t in db.transactions.find({"status": "completed", **active_user_filter}, {"_id": 0}).sort("created_at", -1).limit(20):
         user = await db.users.find_one({"id": t["user_id"]}, {"_id": 0, "name": 1, "email": 1, "role": 1})
         recent_txns.append({
             **t,
-            "user_name": user.get("name", "Unknown") if user else "Deleted",
+            "user_name": user.get("name", "Unknown") if user else "Unknown",
             "user_email": user.get("email", "") if user else "",
             "user_role": user.get("role", "") if user else "",
         })
