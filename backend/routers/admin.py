@@ -839,6 +839,61 @@ async def review_report(
 
     return {"message": f"Report resolved with action: {action}"}
 
+
+@router.get("/admin/reports/{report_id}/context")
+async def get_report_context(report_id: str, admin: dict = Depends(get_current_admin)):
+    """Get context for a report — message content and surrounding conversation for message reports."""
+    report = await db.reports.find_one({"id": report_id}, {"_id": 0})
+    if not report:
+        raise HTTPException(status_code=404, detail="Report not found")
+
+    reported_type = report.get("reported_type")
+    reported_id = report.get("reported_id")
+    context = {"report_id": report_id, "reported_type": reported_type}
+
+    if reported_type == "message":
+        # Find the reported message
+        message = await db.messages.find_one({"id": reported_id}, {"_id": 0})
+        if not message:
+            context["error"] = "Message not found (may have been deleted)"
+            return context
+
+        context["reported_message"] = message
+
+        # Get sender and receiver info
+        sender = await db.users.find_one({"id": message.get("sender_id")}, {"_id": 0, "id": 1, "name": 1, "photo_url": 1})
+        receiver = await db.users.find_one({"id": message.get("receiver_id")}, {"_id": 0, "id": 1, "name": 1, "photo_url": 1})
+        context["sender"] = sender
+        context["receiver"] = receiver
+
+        # Get surrounding conversation (20 messages around the reported one)
+        match_id = message.get("match_id")
+        if match_id:
+            all_messages = await db.messages.find(
+                {"match_id": match_id}, {"_id": 0}
+            ).sort("created_at", 1).to_list(500)
+
+            # Find index of reported message and get surrounding context
+            idx = next((i for i, m in enumerate(all_messages) if m["id"] == reported_id), -1)
+            if idx >= 0:
+                start = max(0, idx - 10)
+                end = min(len(all_messages), idx + 11)
+                context["conversation"] = all_messages[start:end]
+                context["reported_message_index"] = idx - start
+            else:
+                context["conversation"] = all_messages[-20:]
+
+    elif reported_type == "user":
+        user = await db.users.find_one({"id": reported_id}, {"_id": 0, "id": 1, "name": 1, "email": 1, "photo_url": 1, "bio": 1, "title": 1, "strikes": 1, "status": 1})
+        context["reported_user"] = user
+
+    elif reported_type == "job":
+        job = await db.jobs.find_one({"id": reported_id}, {"_id": 0, "id": 1, "title": 1, "company": 1, "description": 1, "is_active": 1})
+        context["reported_job"] = job
+
+    return context
+
+
 # ==================== CONTENT SETTINGS ====================
 
 @router.get("/admin/banned-words")
