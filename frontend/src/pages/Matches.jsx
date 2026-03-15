@@ -450,9 +450,18 @@ export default function Matches() {
                       onClick={() => handleViewProfile(match.id)}
                     >
                       {user?.role === 'seeker' ? (
-                        <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-primary to-secondary flex items-center justify-center">
-                          <Building2 className="w-7 h-7 text-white" />
-                        </div>
+                        (match.listing_photo || match.company_logo) ? (
+                          <img
+                            src={getPhotoUrl(match.listing_photo || match.company_logo)}
+                            alt={match.company}
+                            className="w-14 h-14 rounded-xl object-cover border-2 border-primary/50"
+                            onError={handleImgError(match.company || match.recruiter_name)}
+                          />
+                        ) : (
+                          <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-primary to-secondary flex items-center justify-center">
+                            <Building2 className="w-7 h-7 text-white" />
+                          </div>
+                        )
                       ) : (
                         <img
                           src={getPhotoUrl(match.seeker_photo || match.seeker_avatar, match.seeker_name || match.seeker_id)}

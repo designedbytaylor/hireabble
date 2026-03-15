@@ -1282,7 +1282,7 @@ function JobFormDialog({ open, onClose, onSuccess, token, company, job = null, i
             <div>
               <Label>Listing Photo</Label>
               <p className="text-xs text-muted-foreground mt-0.5">
-                A great photo can make your job stand out. Post your business logo, team or workspace.
+                A great photo can make all the difference — listings with photos get significantly more applications. We highly recommend adding your company logo, team photo, or workspace image.
               </p>
             </div>
             <div className="flex gap-2">
