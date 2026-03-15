@@ -1160,6 +1160,7 @@ async def remove_media(media_id: str, body: dict = {}, admin: dict = Depends(get
         raise HTTPException(status_code=404, detail="Media not found")
 
     reason = body.get("reason", "Removed by admin")
+    silent = body.get("silent", False)
 
     # Mark as removed in media_uploads
     await db.media_uploads.update_one(
@@ -1177,32 +1178,36 @@ async def remove_media(media_id: str, body: dict = {}, admin: dict = Depends(get
     category = media.get("category")
     url = media.get("url")
 
-    if category == "profile_photo":
-        # Only clear if this is still the current photo
-        user = await db.users.find_one({"id": user_id})
-        if user and user.get("photo_url") == url:
-            await db.users.update_one({"id": user_id}, {"$set": {"photo_url": None}})
-    elif category == "video_intro":
-        user = await db.users.find_one({"id": user_id})
-        if user and user.get("video_url") == url:
-            await db.users.update_one({"id": user_id}, {"$set": {"video_url": None}})
+    # Check if user still exists
+    user_exists = await db.users.find_one({"id": user_id}, {"_id": 0, "id": 1}) if user_id else None
 
-    # Notify the user
-    await create_notification(
-        user_id=user_id,
-        notif_type="moderation",
-        title="Content Removed",
-        message=f"Your uploaded {media.get('media_type', 'content')} was removed for: {reason}",
-        data={"media_id": media_id}
-    )
+    if user_exists:
+        if category == "profile_photo":
+            user = await db.users.find_one({"id": user_id})
+            if user and user.get("photo_url") == url:
+                await db.users.update_one({"id": user_id}, {"$set": {"photo_url": None}})
+        elif category == "video_intro":
+            user = await db.users.find_one({"id": user_id})
+            if user and user.get("video_url") == url:
+                await db.users.update_one({"id": user_id}, {"$set": {"video_url": None}})
 
-    # Issue a strike
-    await db.users.update_one(
-        {"id": user_id},
-        {"$inc": {"strikes": 1}}
-    )
+        if not silent:
+            # Notify the user
+            await create_notification(
+                user_id=user_id,
+                notif_type="moderation",
+                title="Content Removed",
+                message=f"Your uploaded {media.get('media_type', 'content')} was removed for: {reason}",
+                data={"media_id": media_id}
+            )
 
-    logger.info(f"Admin {admin['id']} removed media {media_id} from user {user_id}: {reason}")
+            # Issue a strike
+            await db.users.update_one(
+                {"id": user_id},
+                {"$inc": {"strikes": 1}}
+            )
+
+    logger.info(f"Admin {admin['id']} removed media {media_id} from user {user_id}: {reason} (silent={silent})")
     return {"message": "Media removed", "media_id": media_id}
 
 
