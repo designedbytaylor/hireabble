@@ -2002,3 +2002,206 @@ async def set_active_theme(
     )
 
     return {"message": f"Theme set to {AVAILABLE_THEMES[theme_id]['name']}", "theme": theme_id}
+
+
+# ==================== REVENUE ANALYTICS ====================
+
+@router.get("/admin/revenue")
+async def admin_revenue(admin=Depends(get_current_admin)):
+    """Revenue analytics: monthly revenue, subscriptions, cancellations, churn."""
+    now = datetime.now(timezone.utc)
+    from routers.payments import SUBSCRIPTION_TIERS
+
+    # --- Monthly revenue (last 12 months) ---
+    monthly_revenue = []
+    for i in range(11, -1, -1):
+        month_start = (now.replace(day=1) - timedelta(days=i * 30)).replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        if i > 0:
+            next_month = (month_start + timedelta(days=32)).replace(day=1)
+        else:
+            next_month = now
+        month_label = month_start.strftime("%b %Y")
+
+        pipeline = [
+            {"$match": {
+                "status": "completed",
+                "created_at": {"$gte": month_start.isoformat(), "$lt": next_month.isoformat()},
+            }},
+            {"$group": {
+                "_id": None,
+                "total": {"$sum": "$amount"},
+                "count": {"$sum": 1},
+            }},
+        ]
+        result = await db.transactions.aggregate(pipeline).to_list(1)
+        row = result[0] if result else {"total": 0, "count": 0}
+        monthly_revenue.append({
+            "month": month_label,
+            "revenue": row["total"],  # in cents
+            "transactions": row["count"],
+        })
+
+    # --- Revenue by product type ---
+    product_pipeline = [
+        {"$match": {"status": "completed"}},
+        {"$group": {
+            "_id": "$product_id",
+            "total": {"$sum": "$amount"},
+            "count": {"$sum": 1},
+        }},
+        {"$sort": {"total": -1}},
+    ]
+    product_results = await db.transactions.aggregate(product_pipeline).to_list(None)
+    revenue_by_product = []
+    for r in product_results:
+        pid = r["_id"] or "unknown"
+        tier = SUBSCRIPTION_TIERS.get(pid)
+        name = tier["name"] if tier else pid.replace("_", " ").title()
+        category = "subscription" if pid in SUBSCRIPTION_TIERS else "boost" if "boost" in pid else "purchase"
+        revenue_by_product.append({
+            "product_id": pid,
+            "name": name,
+            "category": category,
+            "total": r["total"],
+            "count": r["count"],
+        })
+
+    # --- Revenue by source (stripe vs apple) ---
+    source_pipeline = [
+        {"$match": {"status": "completed"}},
+        {"$group": {"_id": "$source", "total": {"$sum": "$amount"}, "count": {"$sum": 1}}},
+    ]
+    source_results = await db.transactions.aggregate(source_pipeline).to_list(None)
+    revenue_by_source = [{"source": r["_id"] or "unknown", "total": r["total"], "count": r["count"]} for r in source_results]
+
+    # --- Active subscriptions breakdown ---
+    sub_pipeline = [
+        {"$match": {"subscription.status": "active"}},
+        {"$group": {
+            "_id": "$subscription.tier_id",
+            "count": {"$sum": 1},
+            "total_revenue": {"$sum": "$subscription.price_paid"},
+        }},
+        {"$sort": {"count": -1}},
+    ]
+    active_subs = []
+    async for r in db.users.aggregate(sub_pipeline):
+        tier_id = r["_id"]
+        tier = SUBSCRIPTION_TIERS.get(tier_id, {})
+        active_subs.append({
+            "tier_id": tier_id,
+            "name": tier.get("name", tier_id),
+            "role": tier.get("role", "unknown"),
+            "count": r["count"],
+            "total_revenue": r["total_revenue"] or 0,
+        })
+
+    # --- Expired/cancelled subscriptions (had subscription but it's not active) ---
+    expired_pipeline = [
+        {"$match": {
+            "subscription": {"$exists": True, "$ne": None},
+            "$or": [
+                {"subscription.status": {"$ne": "active"}},
+                {"subscription.period_end": {"$lt": now.isoformat()}},
+            ],
+        }},
+        {"$group": {
+            "_id": "$subscription.tier_id",
+            "count": {"$sum": 1},
+        }},
+        {"$sort": {"count": -1}},
+    ]
+    expired_subs = []
+    async for r in db.users.aggregate(expired_pipeline):
+        tier_id = r["_id"]
+        tier = SUBSCRIPTION_TIERS.get(tier_id, {})
+        expired_subs.append({
+            "tier_id": tier_id,
+            "name": tier.get("name", tier_id),
+            "count": r["count"],
+        })
+
+    # --- Subscription by duration (weekly/monthly/6month) ---
+    duration_pipeline = [
+        {"$match": {"subscription.status": "active"}},
+        {"$group": {"_id": "$subscription.duration", "count": {"$sum": 1}}},
+    ]
+    duration_breakdown = [{"duration": r["_id"] or "unknown", "count": r["count"]} async for r in db.users.aggregate(duration_pipeline)]
+
+    # --- Churn tracking: subscriptions that expired per month (last 6 months) ---
+    churn_data = []
+    for i in range(5, -1, -1):
+        month_start = (now.replace(day=1) - timedelta(days=i * 30)).replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        if i > 0:
+            next_month = (month_start + timedelta(days=32)).replace(day=1)
+        else:
+            next_month = now
+
+        expired_in_month = await db.users.count_documents({
+            "subscription": {"$exists": True, "$ne": None},
+            "subscription.period_end": {"$gte": month_start.isoformat(), "$lt": next_month.isoformat()},
+            "$or": [
+                {"subscription.status": {"$ne": "active"}},
+                {"subscription.period_end": {"$lt": now.isoformat()}},
+            ],
+        })
+
+        new_subs_in_month = await db.transactions.count_documents({
+            "status": "completed",
+            "product_id": {"$in": list(SUBSCRIPTION_TIERS.keys())},
+            "created_at": {"$gte": month_start.isoformat(), "$lt": next_month.isoformat()},
+        })
+
+        churn_data.append({
+            "month": month_start.strftime("%b %Y"),
+            "expired": expired_in_month,
+            "new_subscriptions": new_subs_in_month,
+            "net": new_subs_in_month - expired_in_month,
+        })
+
+    # --- Summary stats ---
+    total_revenue = await db.transactions.aggregate([
+        {"$match": {"status": "completed"}},
+        {"$group": {"_id": None, "total": {"$sum": "$amount"}, "count": {"$sum": 1}}},
+    ]).to_list(1)
+    total_rev = total_revenue[0] if total_revenue else {"total": 0, "count": 0}
+
+    total_active = await db.users.count_documents({"subscription.status": "active"})
+    total_expired = await db.users.count_documents({
+        "subscription": {"$exists": True, "$ne": None},
+        "$or": [
+            {"subscription.status": {"$ne": "active"}},
+            {"subscription.period_end": {"$lt": now.isoformat()}},
+        ],
+    })
+    total_users = await db.users.count_documents({})
+
+    # Recent transactions (last 20)
+    recent_txns = []
+    async for t in db.transactions.find({"status": "completed"}, {"_id": 0}).sort("created_at", -1).limit(20):
+        user = await db.users.find_one({"id": t["user_id"]}, {"_id": 0, "name": 1, "email": 1, "role": 1})
+        recent_txns.append({
+            **t,
+            "user_name": user.get("name", "Unknown") if user else "Deleted",
+            "user_email": user.get("email", "") if user else "",
+            "user_role": user.get("role", "") if user else "",
+        })
+
+    return {
+        "summary": {
+            "total_revenue": total_rev["total"],
+            "total_transactions": total_rev["count"],
+            "active_subscriptions": total_active,
+            "expired_subscriptions": total_expired,
+            "total_users": total_users,
+            "conversion_rate": round(total_active / total_users * 100, 1) if total_users > 0 else 0,
+        },
+        "monthly_revenue": monthly_revenue,
+        "revenue_by_product": revenue_by_product,
+        "revenue_by_source": revenue_by_source,
+        "active_subscriptions": active_subs,
+        "expired_subscriptions": expired_subs,
+        "duration_breakdown": duration_breakdown,
+        "churn_data": churn_data,
+        "recent_transactions": recent_txns,
+    }
