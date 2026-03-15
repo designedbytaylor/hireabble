@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { Mail, Lock, User, Building2, ArrowRight, Eye, EyeOff, MapPin, Search, Users, Zap, Target, Shield, BarChart3 } from 'lucide-react';
+import { Mail, Lock, User, Building2, ArrowRight, Eye, EyeOff, MapPin, Search, Users, Zap, Target, Shield, BarChart3, Tag, ChevronDown } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
@@ -59,6 +59,8 @@ export default function Register() {
   const [loading, setLoading] = useState(false);
   const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [marketingOptIn, setMarketingOptIn] = useState(false);
+  const [promoCode, setPromoCode] = useState('');
+  const [showPromo, setShowPromo] = useState(false);
   const { register } = useAuth();
   const navigate = useNavigate();
 
@@ -89,7 +91,12 @@ export default function Register() {
 
     setLoading(true);
     try {
-      const user = await register({ ...formData, marketing_emails_opt_in: marketingOptIn });
+      const payload = { ...formData, marketing_emails_opt_in: marketingOptIn };
+      if (promoCode.trim()) payload.promo_code = promoCode.trim();
+      const user = await register(payload);
+      if (user._promoApplied) {
+        toast.success(`Promo applied! You have ${user._promoApplied.tier_name} for ${user._promoApplied.duration_days} days.`, { duration: 5000 });
+      }
       toast.success('Welcome to Hireabble! Please verify your email.');
       navigate('/verify-email');
     } catch (error) {
@@ -274,6 +281,33 @@ export default function Register() {
                   I'd like to receive occasional updates, tips, and promotions from Hireabble via email. You can unsubscribe at any time.
                 </span>
               </label>
+
+              <button
+                type="button"
+                onClick={() => setShowPromo(!showPromo)}
+                className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors mt-2"
+              >
+                <Tag className="w-4 h-4" />
+                Have a promo code?
+                <ChevronDown className={`w-4 h-4 transition-transform ${showPromo ? 'rotate-180' : ''}`} />
+              </button>
+
+              {showPromo && (
+                <div className="space-y-2">
+                  <div className="relative">
+                    <Tag className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+                    <Input
+                      name="promo_code"
+                      type="text"
+                      placeholder="Enter promo code"
+                      value={promoCode}
+                      onChange={(e) => setPromoCode(e.target.value.toUpperCase())}
+                      className="pl-12 h-12 rounded-xl bg-background border-border uppercase"
+                      data-testid="register-promo-input"
+                    />
+                  </div>
+                </div>
+              )}
 
               <Button
                 type="submit"

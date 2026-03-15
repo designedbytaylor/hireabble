@@ -109,11 +109,14 @@ export const AuthProvider = ({ children }) => {
 
   const register = useCallback(async (userData) => {
     const response = await axios.post(`${API}/auth/register`, userData);
-    const { token: newToken, user: newUser } = response.data;
+    const { token: newToken, user: newUser, promo } = response.data;
     localStorage.setItem('token', newToken);
     localStorage.setItem('cached_user', JSON.stringify(newUser));
     setToken(newToken);
     setUser(newUser);
+    if (promo) {
+      newUser._promoApplied = promo;
+    }
     return newUser;
   }, []);
 

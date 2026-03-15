@@ -104,18 +104,81 @@ async def register(user: UserCreate, request: Request):
         await db.users.insert_one(user_doc)
         logger.info(f"User created successfully: {user_id}")
 
+        # Apply promo code if provided
+        promo_result = None
+        if user.promo_code:
+            promo_result = await _apply_signup_promo(user_id, user.role, user.promo_code.strip().upper())
+            if promo_result:
+                # Reload user doc to include subscription
+                updated = await db.users.find_one({"id": user_id}, {"_id": 0, "password": 0})
+                if updated:
+                    user_doc = {**user_doc, **updated}
+
         # Send verification email
         asyncio.create_task(_send_verification_email(user_id, user.email, user.name))
 
         token = create_token(user_id, user.role)
         user_response = {k: v for k, v in user_doc.items() if k not in ['_id', 'password']}
 
-        return {"token": token, "user": user_response}
+        result = {"token": token, "user": user_response}
+        if promo_result:
+            result["promo"] = promo_result
+        return result
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Registration failed: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Registration error: {str(e)}")
+
+async def _apply_signup_promo(user_id: str, role: str, code: str):
+    """Apply a promo code during registration. Returns promo info or None."""
+    try:
+        from routers.payments import fulfill_subscription, SUBSCRIPTION_TIERS
+
+        promo = await db.promo_codes.find_one({"code": code})
+        if not promo or not promo.get("active", False):
+            return None
+
+        # Check expiry
+        if promo.get("expires_at") and promo["expires_at"] < datetime.now(timezone.utc).isoformat():
+            return None
+
+        # Check max uses
+        if promo.get("max_uses") is not None and promo.get("uses", 0) >= promo["max_uses"]:
+            return None
+
+        # Check role restriction
+        if promo.get("role_restriction") and promo["role_restriction"] != role:
+            return None
+
+        tier_id = promo["tier_id"]
+        await fulfill_subscription(
+            metadata={"user_id": user_id, "tier_id": tier_id, "duration": "promo", "price": 0},
+            source="promo",
+            promo_code=code,
+            custom_duration_days=promo["duration_days"],
+        )
+
+        # Track redemption
+        await db.promo_redemptions.insert_one({
+            "id": str(uuid.uuid4()),
+            "code_id": promo["id"],
+            "code": code,
+            "user_id": user_id,
+            "redeemed_at": datetime.now(timezone.utc).isoformat(),
+        })
+        await db.promo_codes.update_one({"id": promo["id"]}, {"$inc": {"uses": 1}})
+
+        tier = SUBSCRIPTION_TIERS.get(tier_id, {})
+        logger.info(f"Signup promo redeemed: user={user_id} code={code} tier={tier_id}")
+        return {
+            "tier_name": tier.get("name", tier_id),
+            "duration_days": promo["duration_days"],
+        }
+    except Exception as e:
+        logger.error(f"Failed to apply signup promo code: {e}")
+        return None
+
 
 async def _send_verification_email(user_id: str, email: str, name: str):
     """Send email verification link"""

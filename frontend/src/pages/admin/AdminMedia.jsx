@@ -104,11 +104,12 @@ export default function AdminMedia() {
 
   const getMediaSrc = (item) => {
     if (!item.url) return null;
-    // Handle relative URLs (local uploads)
-    if (item.url.startsWith('/uploads/')) {
-      return `${process.env.REACT_APP_BACKEND_URL}${item.url}`;
-    }
-    return item.url;
+    const url = item.url;
+    // Already a full URL
+    if (url.startsWith('http://') || url.startsWith('https://')) return url;
+    // Relative path — prepend backend URL
+    if (url.startsWith('/')) return `${process.env.REACT_APP_BACKEND_URL}${url}`;
+    return url;
   };
 
   return (
@@ -205,12 +206,25 @@ export default function AdminMedia() {
                 onClick={() => setPreview(item)}
               >
                 {item.media_type === 'image' ? (
-                  <img
-                    src={getMediaSrc(item)}
-                    alt={item.filename}
-                    className="w-full h-full object-cover"
-                    onError={(e) => { e.target.style.display = 'none'; }}
-                  />
+                  <>
+                    <img
+                      src={getMediaSrc(item)}
+                      alt={item.filename}
+                      className="w-full h-full object-cover"
+                      loading="lazy"
+                      onError={(e) => {
+                        e.target.onerror = null;
+                        e.target.style.display = 'none';
+                        e.target.nextElementSibling?.classList.remove('hidden');
+                      }}
+                    />
+                    <div className="hidden w-full h-full flex items-center justify-center text-gray-600">
+                      <div className="text-center">
+                        <Image className="w-8 h-8 mx-auto mb-1" />
+                        <span className="text-xs">Not found</span>
+                      </div>
+                    </div>
+                  </>
                 ) : (
                   <div className="w-full h-full flex items-center justify-center">
                     <Video className="w-10 h-10 text-gray-600" />
