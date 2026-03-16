@@ -342,6 +342,20 @@ export default function Onboarding() {
   };
 
   const handleSkip = async () => {
+    // Require at minimum a photo and name before allowing skip
+    // (App Store Guideline 2.1 - app must be functional, not appear broken)
+    if (!formData.photo_url) {
+      toast.error('Please upload a profile photo before continuing.');
+      const photoIdx = STEPS.findIndex(s => s.id === 'photo');
+      if (photoIdx >= 0) setCurrentStep(photoIdx);
+      return;
+    }
+    if (!formData.title?.trim()) {
+      toast.error('Please add your job title before continuing.');
+      const roleIdx = STEPS.findIndex(s => s.id === 'role');
+      if (roleIdx >= 0) setCurrentStep(roleIdx);
+      return;
+    }
     setLoading(true);
     try {
       await updateProfile({ onboarding_complete: true });

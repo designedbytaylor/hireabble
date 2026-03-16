@@ -268,9 +268,9 @@ export default function Register() {
                 />
                 <span className="text-sm text-muted-foreground">
                   I agree to the{' '}
-                  <Link to="/terms" className="text-primary hover:underline" target="_blank">Terms of Service &amp; EULA</Link>
+                  <Link to="/terms" className="text-primary hover:underline">Terms of Service &amp; EULA</Link>
                   {' '}and{' '}
-                  <Link to="/privacy" className="text-primary hover:underline" target="_blank">Privacy Policy</Link>
+                  <Link to="/privacy" className="text-primary hover:underline">Privacy Policy</Link>
                 </span>
               </label>
 

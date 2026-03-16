@@ -10,7 +10,7 @@ export default function PrivacyPolicy() {
         </Link>
 
         <h1 className="text-3xl font-bold font-['Outfit'] mb-2">Privacy Policy</h1>
-        <p className="text-muted-foreground mb-8">Last updated: March 14, 2026</p>
+        <p className="text-muted-foreground mb-8">Last updated: March 16, 2026</p>
 
         <div className="prose prose-invert max-w-none space-y-6 text-sm leading-relaxed">
           <section>
@@ -85,7 +85,22 @@ export default function PrivacyPolicy() {
           </section>
 
           <section>
-            <h2 className="text-lg font-bold font-['Outfit'] mb-3">6. Tracking, Advertising &amp; App Tracking Transparency</h2>
+            <h2 className="text-lg font-bold font-['Outfit'] mb-3">6. AI-Powered Features &amp; Content Moderation</h2>
+            <p className="text-muted-foreground mb-2">
+              Hireabble uses artificial intelligence to help keep the platform safe and improve your experience:
+            </p>
+            <ul className="list-disc pl-6 text-muted-foreground space-y-1">
+              <li><strong>Content Moderation:</strong> Profile photos, videos, and uploaded media are analyzed by an AI service (Anthropic Claude) to detect prohibited content such as nudity, violence, hate symbols, or other policy violations. This analysis happens automatically when you upload media. The AI returns a safety verdict only; your images are not stored by or used to train third-party AI models</li>
+              <li><strong>Text Filtering:</strong> Messages, job descriptions, and profile text are checked against automated content filters to detect spam, harassment, and prohibited content. This processing occurs on our servers and does not involve third-party AI services</li>
+              <li><strong>Resume Parsing:</strong> When you upload a resume, it may be processed by an AI service to extract structured information (name, skills, work history, education) to pre-fill your profile. This data is used solely to populate your profile and is not shared with third parties for other purposes</li>
+            </ul>
+            <p className="text-muted-foreground mt-2">
+              No personal data processed by AI features is used for advertising, sold to third parties, or used to train AI models. You can contact us at <a href="mailto:privacy@hireabble.com" className="text-primary hover:underline">privacy@hireabble.com</a> to learn more about how AI is used in the app.
+            </p>
+          </section>
+
+          <section>
+            <h2 className="text-lg font-bold font-['Outfit'] mb-3">7. Tracking, Advertising &amp; App Tracking Transparency</h2>
             <p className="text-muted-foreground mb-2">
               <strong>We do not track you across other apps or websites.</strong> Hireabble does not use the Apple IDFA (Identifier for Advertisers), Google Advertising ID, or any cross-app tracking technology. We do not serve third-party advertisements. We do not participate in ad networks, data brokers, or information-sharing programs.
             </p>
@@ -98,7 +113,7 @@ export default function PrivacyPolicy() {
           </section>
 
           <section>
-            <h2 className="text-lg font-bold font-['Outfit'] mb-3">7. Your Rights and Choices</h2>
+            <h2 className="text-lg font-bold font-['Outfit'] mb-3">8. Your Rights and Choices</h2>
             <ul className="list-disc pl-6 text-muted-foreground space-y-1">
               <li><strong>Access:</strong> You can access your profile data at any time through the app</li>
               <li><strong>Update:</strong> You can update your profile information through your account settings</li>
@@ -109,14 +124,14 @@ export default function PrivacyPolicy() {
           </section>
 
           <section>
-            <h2 className="text-lg font-bold font-['Outfit'] mb-3">8. Children's Privacy</h2>
+            <h2 className="text-lg font-bold font-['Outfit'] mb-3">9. Children's Privacy</h2>
             <p className="text-muted-foreground">
               Hireabble is not intended for anyone under the age of 16. We do not knowingly collect personal information from children under 16. If we learn we have collected data from a user under 16, we will promptly delete that information.
             </p>
           </section>
 
           <section>
-            <h2 className="text-lg font-bold font-['Outfit'] mb-3">9. California Privacy Rights (CCPA/CPRA)</h2>
+            <h2 className="text-lg font-bold font-['Outfit'] mb-3">10. California Privacy Rights (CCPA/CPRA)</h2>
             <p className="text-muted-foreground mb-2">
               If you are a California resident, you have the following rights under the California Consumer Privacy Act (CCPA) and the California Privacy Rights Act (CPRA):
             </p>
@@ -136,21 +151,21 @@ export default function PrivacyPolicy() {
           </section>
 
           <section>
-            <h2 className="text-lg font-bold font-['Outfit'] mb-3">10. International Users (GDPR)</h2>
+            <h2 className="text-lg font-bold font-['Outfit'] mb-3">11. International Users (GDPR)</h2>
             <p className="text-muted-foreground">
               If you are in the European Economic Area (EEA), you have rights under GDPR including the right to access, rectify, port, and erase your data, and the right to restrict or object to processing. Our legal basis for processing is contract performance (to provide the Service), legitimate interest (to improve and secure the Service), and consent (for marketing communications).
             </p>
           </section>
 
           <section>
-            <h2 className="text-lg font-bold font-['Outfit'] mb-3">11. Changes to This Policy</h2>
+            <h2 className="text-lg font-bold font-['Outfit'] mb-3">12. Changes to This Policy</h2>
             <p className="text-muted-foreground">
               We may update this Privacy Policy periodically. We will notify you of material changes by posting the new policy on the app and updating the "Last updated" date. Your continued use of the Service after changes constitutes acceptance of the updated policy.
             </p>
           </section>
 
           <section>
-            <h2 className="text-lg font-bold font-['Outfit'] mb-3">12. Contact Us</h2>
+            <h2 className="text-lg font-bold font-['Outfit'] mb-3">13. Contact Us</h2>
             <p className="text-muted-foreground mb-2">
               For privacy-related questions, data access requests, or to exercise your data rights:
             </p>
