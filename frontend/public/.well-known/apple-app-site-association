@@ -3,7 +3,7 @@
     "apps": [],
     "details": [
       {
-        "appID": "TEAM_ID.com.hireabble.app",
+        "appID": "XXXXXXXXXX.com.hireabble.app",
         "paths": [
           "/download/*",
           "/company/*",
@@ -16,6 +16,6 @@
     ]
   },
   "webcredentials": {
-    "apps": ["TEAM_ID.com.hireabble.app"]
+    "apps": ["XXXXXXXXXX.com.hireabble.app"]
   }
 }

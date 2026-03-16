@@ -25,6 +25,11 @@ STRIPE_WEBHOOK_SECRET = os.getenv("STRIPE_WEBHOOK_SECRET", "")
 # Apple IAP Config
 APPLE_SHARED_SECRET = os.getenv("APPLE_SHARED_SECRET", "")  # From App Store Connect
 APPLE_BUNDLE_ID = os.getenv("APPLE_BUNDLE_ID", "com.hireabble.app")
+
+# Google Play Billing Config
+GOOGLE_PLAY_PACKAGE_NAME = os.getenv("GOOGLE_PLAY_PACKAGE_NAME", "com.hireabble.app")
+# Path to the Google Play service account JSON key file (for server-side verification)
+GOOGLE_PLAY_SERVICE_ACCOUNT_KEY = os.getenv("GOOGLE_PLAY_SERVICE_ACCOUNT_KEY", "")
 # Set to True for production, False for sandbox testing
 APPLE_PRODUCTION = os.getenv("APPLE_ENVIRONMENT", "sandbox") == "production"
 APPLE_VERIFY_URL_PRODUCTION = "https://buy.itunes.apple.com/verifyReceipt"
@@ -44,25 +49,34 @@ except ImportError:
 PRODUCTS = {
     # Recruiter Boosts (Consumable IAP)
     "boost_1day": {"name": "Job Boost - 1 Day", "price": 499, "days": 1,
-                   "apple_product_id": "com.hireabble.boost.1day"},
+                   "apple_product_id": "com.hireabble.boost.1day",
+                   "google_product_id": "com.hireabble.boost.1day"},
     "boost_3day": {"name": "Job Boost - 3 Days", "price": 1199, "days": 3,
-                   "apple_product_id": "com.hireabble.boost.3day"},
+                   "apple_product_id": "com.hireabble.boost.3day",
+                   "google_product_id": "com.hireabble.boost.3day"},
     "boost_7day": {"name": "Job Boost - 7 Days", "price": 1999, "days": 7,
-                   "apple_product_id": "com.hireabble.boost.7day"},
+                   "apple_product_id": "com.hireabble.boost.7day",
+                   "google_product_id": "com.hireabble.boost.7day"},
     # Recruiter Super Swipes (Consumable IAP)
     "super_swipes_5": {"name": "5 Recruiter Super Swipes", "price": 999, "count": 5,
-                       "apple_product_id": "com.hireabble.recruiter.superswipes.5"},
+                       "apple_product_id": "com.hireabble.recruiter.superswipes.5",
+                       "google_product_id": "com.hireabble.recruiter.superswipes.5"},
     "super_swipes_15": {"name": "15 Recruiter Super Swipes", "price": 1999, "count": 15,
-                        "apple_product_id": "com.hireabble.recruiter.superswipes.15"},
+                        "apple_product_id": "com.hireabble.recruiter.superswipes.15",
+                        "google_product_id": "com.hireabble.recruiter.superswipes.15"},
     "super_swipes_30": {"name": "30 Recruiter Super Swipes", "price": 2999, "count": 30,
-                        "apple_product_id": "com.hireabble.recruiter.superswipes.30"},
+                        "apple_product_id": "com.hireabble.recruiter.superswipes.30",
+                        "google_product_id": "com.hireabble.recruiter.superswipes.30"},
     # Seeker Super Likes (Consumable IAP)
     "seeker_superlikes_5": {"name": "5 Super Likes", "price": 499, "count": 5,
-                            "apple_product_id": "com.hireabble.seeker.superlikes.5"},
+                            "apple_product_id": "com.hireabble.seeker.superlikes.5",
+                            "google_product_id": "com.hireabble.seeker.superlikes.5"},
     "seeker_superlikes_15": {"name": "15 Super Likes", "price": 999, "count": 15,
-                             "apple_product_id": "com.hireabble.seeker.superlikes.15"},
+                             "apple_product_id": "com.hireabble.seeker.superlikes.15",
+                             "google_product_id": "com.hireabble.seeker.superlikes.15"},
     "seeker_superlikes_30": {"name": "30 Super Likes", "price": 1499, "count": 30,
-                             "apple_product_id": "com.hireabble.seeker.superlikes.30"},
+                             "apple_product_id": "com.hireabble.seeker.superlikes.30",
+                             "google_product_id": "com.hireabble.seeker.superlikes.30"},
 }
 
 # ==================== SUBSCRIPTION TIER DEFINITIONS ====================
@@ -79,6 +93,11 @@ SUBSCRIPTION_TIERS = {
             "6month": 5999,   # $9.99/month billed as $59.99
         },
         "apple_product_ids": {
+            "weekly": "com.hireabble.seeker.plus.weekly",
+            "monthly": "com.hireabble.seeker.plus.monthly",
+            "6month": "com.hireabble.seeker.plus.6month",
+        },
+        "google_product_ids": {
             "weekly": "com.hireabble.seeker.plus.weekly",
             "monthly": "com.hireabble.seeker.plus.monthly",
             "6month": "com.hireabble.seeker.plus.6month",
@@ -104,6 +123,11 @@ SUBSCRIPTION_TIERS = {
             "6month": 11999,  # $19.99/month billed as $119.99
         },
         "apple_product_ids": {
+            "weekly": "com.hireabble.seeker.premium.weekly",
+            "monthly": "com.hireabble.seeker.premium.monthly",
+            "6month": "com.hireabble.seeker.premium.6month",
+        },
+        "google_product_ids": {
             "weekly": "com.hireabble.seeker.premium.weekly",
             "monthly": "com.hireabble.seeker.premium.monthly",
             "6month": "com.hireabble.seeker.premium.6month",
@@ -137,6 +161,11 @@ SUBSCRIPTION_TIERS = {
             "monthly": "com.hireabble.recruiter.pro.monthly",
             "6month": "com.hireabble.recruiter.pro.6month",
         },
+        "google_product_ids": {
+            "weekly": "com.hireabble.recruiter.pro.weekly",
+            "monthly": "com.hireabble.recruiter.pro.monthly",
+            "6month": "com.hireabble.recruiter.pro.6month",
+        },
         "features": [
             "10 Super Swipes per day (vs 3)",
             "See full applicant list (unblurred)",
@@ -162,6 +191,11 @@ SUBSCRIPTION_TIERS = {
             "monthly": "com.hireabble.recruiter.enterprise.monthly",
             "6month": "com.hireabble.recruiter.enterprise.6month",
         },
+        "google_product_ids": {
+            "weekly": "com.hireabble.recruiter.enterprise.weekly",
+            "monthly": "com.hireabble.recruiter.enterprise.monthly",
+            "6month": "com.hireabble.recruiter.enterprise.6month",
+        },
         "features": [
             "Unlimited Super Swipes",
             "See full applicant list (unblurred)",
@@ -178,8 +212,9 @@ SUBSCRIPTION_TIERS = {
     },
 }
 
-# Reverse lookup: Apple product ID -> our product ID
+# Reverse lookup: Apple/Google product ID -> our product ID
 APPLE_TO_PRODUCT = {v["apple_product_id"]: k for k, v in PRODUCTS.items() if "apple_product_id" in v}
+GOOGLE_TO_PRODUCT = {v["google_product_id"]: k for k, v in PRODUCTS.items() if "google_product_id" in v}
 
 
 # ==================== MODELS ====================
@@ -203,6 +238,14 @@ class AppleReceiptValidation(BaseModel):
     product_id: str    # Our product ID (e.g., "boost_1day")
     job_id: Optional[str] = None  # For boosts
     transaction_id: Optional[str] = None  # StoreKit transaction ID
+
+class GooglePlayPurchaseValidation(BaseModel):
+    purchase_token: str  # Token from Google Play BillingClient
+    product_id: str      # Google Play product ID
+    order_id: Optional[str] = None  # Google Play order ID
+    tier_id: Optional[str] = None   # Our tier ID for subscriptions
+    duration: Optional[str] = None  # weekly, monthly, 6month
+    job_id: Optional[str] = None    # For boosts
 
 
 # ==================== PRODUCTS & PRICING ====================
@@ -553,6 +596,206 @@ async def apple_server_notification(request: Request):
     return {"status": "ok"}
 
 
+# ==================== GOOGLE PLAY BILLING ====================
+
+def _get_google_play_service():
+    """Lazily build the Google Play Developer API client using a service account."""
+    from google.oauth2 import service_account
+    from googleapiclient.discovery import build
+
+    key_path = GOOGLE_PLAY_SERVICE_ACCOUNT_KEY
+    if not key_path:
+        return None
+
+    # Support both file path and inline JSON
+    if key_path.startswith("{"):
+        import json as _json
+        info = _json.loads(key_path)
+        credentials = service_account.Credentials.from_service_account_info(
+            info, scopes=["https://www.googleapis.com/auth/androidpublisher"]
+        )
+    else:
+        credentials = service_account.Credentials.from_service_account_file(
+            key_path, scopes=["https://www.googleapis.com/auth/androidpublisher"]
+        )
+
+    return build("androidpublisher", "v3", credentials=credentials)
+
+
+@router.post("/google/verify-purchase")
+async def verify_google_purchase(
+    data: GooglePlayPurchaseValidation,
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Verify a Google Play purchase and fulfill it.
+
+    The Android app sends the purchase token after a successful BillingClient purchase.
+    We verify it with Google Play Developer API, then grant the product.
+    """
+    # Check for duplicate order
+    if data.order_id:
+        existing = await db.transactions.find_one({"google_order_id": data.order_id})
+        if existing:
+            return {"status": "already_fulfilled", "message": "This purchase has already been processed"}
+
+    # Determine if this is a subscription or one-time product
+    is_subscription = data.tier_id and data.tier_id in SUBSCRIPTION_TIERS
+
+    try:
+        service = _get_google_play_service()
+        if not service:
+            raise HTTPException(
+                status_code=503,
+                detail="Google Play verification not configured. Set GOOGLE_PLAY_SERVICE_ACCOUNT_KEY."
+            )
+
+        if is_subscription:
+            result = service.purchases().subscriptions().get(
+                packageName=GOOGLE_PLAY_PACKAGE_NAME,
+                subscriptionId=data.product_id,
+                token=data.purchase_token
+            ).execute()
+
+            # Check subscription is active
+            # paymentState: 0=pending, 1=received, 2=free trial, 3=deferred
+            payment_state = result.get("paymentState")
+            if payment_state not in (1, 2):
+                raise HTTPException(status_code=400, detail="Subscription payment not completed")
+
+        else:
+            result = service.purchases().products().get(
+                packageName=GOOGLE_PLAY_PACKAGE_NAME,
+                productId=data.product_id,
+                token=data.purchase_token
+            ).execute()
+
+            # purchaseState: 0=purchased, 1=canceled, 2=pending
+            if result.get("purchaseState") != 0:
+                raise HTTPException(status_code=400, detail="Purchase not completed")
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Google Play verification failed: {e}")
+        raise HTTPException(status_code=502, detail="Failed to verify purchase with Google Play")
+
+    # Prevent duplicate fulfillment with atomic lock
+    from pymongo.errors import DuplicateKeyError
+    order_id = data.order_id or data.purchase_token[:64]
+    lock_doc = {
+        "google_order_id": order_id,
+        "user_id": current_user["id"],
+        "product_id": data.product_id,
+        "status": "processing",
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+    try:
+        await db.google_txn_locks.insert_one(lock_doc)
+    except DuplicateKeyError:
+        return {"status": "already_fulfilled", "message": "This purchase has already been processed"}
+
+    # Fulfill the purchase
+    if is_subscription:
+        metadata = {
+            "user_id": current_user["id"],
+            "tier_id": data.tier_id,
+            "duration": data.duration or "monthly",
+            "price": SUBSCRIPTION_TIERS[data.tier_id]["prices"].get(data.duration or "monthly", 0),
+        }
+        await fulfill_subscription(metadata, source="google_play", google_order_id=order_id)
+    else:
+        # Map Google product ID to our internal product ID
+        our_product_id = GOOGLE_TO_PRODUCT.get(data.product_id, data.product_id)
+        metadata = {
+            "user_id": current_user["id"],
+            "product_id": our_product_id,
+            "job_id": data.job_id or "",
+        }
+        await fulfill_purchase(metadata, source="google_play", google_order_id=order_id)
+
+    product_name = data.product_id
+    if is_subscription:
+        product_name = SUBSCRIPTION_TIERS[data.tier_id]["name"]
+    elif data.product_id in GOOGLE_TO_PRODUCT:
+        our_id = GOOGLE_TO_PRODUCT[data.product_id]
+        product_name = PRODUCTS.get(our_id, {}).get("name", data.product_id)
+
+    return {
+        "status": "success",
+        "message": f"Purchase fulfilled: {product_name}",
+        "product_id": data.product_id,
+    }
+
+
+@router.post("/google/play-notification")
+async def google_play_notification(request: Request):
+    """
+    Handle Google Play Real-time Developer Notifications (RTDN).
+
+    Configure Pub/Sub push subscription to point to:
+    https://your-api-domain.com/api/payments/google/play-notification
+    """
+    try:
+        body = await request.json()
+        message = body.get("message", {})
+        import base64
+        notification_data = message.get("data", "")
+        if notification_data:
+            decoded = base64.b64decode(notification_data).decode("utf-8")
+            notification = json.loads(decoded)
+        else:
+            return {"status": "ok"}
+
+        sub_notification = notification.get("subscriptionNotification")
+        if sub_notification:
+            notification_type = sub_notification.get("notificationType")
+            purchase_token = sub_notification.get("purchaseToken")
+            subscription_id = sub_notification.get("subscriptionId")
+
+            # Types: 1=RECOVERED, 2=RENEWED, 3=CANCELED, 4=PURCHASED,
+            #        5=ON_HOLD, 6=IN_GRACE_PERIOD, 7=RESTARTED,
+            #        12=REVOKED, 13=EXPIRED
+            if notification_type in (3, 12, 13) and purchase_token:
+                # Canceled, revoked, or expired
+                txn = await db.transactions.find_one({"google_order_id": {"$exists": True}, "source": "google_play"})
+                if txn and txn.get("user_id"):
+                    await db.users.update_one(
+                        {"id": txn["user_id"]},
+                        {"$set": {"subscription.status": "expired"}}
+                    )
+                    logger.info(f"Google Play subscription expired/canceled for user {txn['user_id']}")
+
+            elif notification_type in (1, 2, 7) and purchase_token:
+                # Recovered, renewed, or restarted
+                txn = await db.transactions.find_one({"google_order_id": {"$exists": True}, "source": "google_play"})
+                if txn and txn.get("user_id"):
+                    try:
+                        service = _get_google_play_service()
+                        if service:
+                            result = service.purchases().subscriptions().get(
+                                packageName=GOOGLE_PLAY_PACKAGE_NAME,
+                                subscriptionId=subscription_id,
+                                token=purchase_token
+                            ).execute()
+                            expiry_ms = int(result.get("expiryTimeMillis", 0))
+                            if expiry_ms:
+                                from datetime import datetime as dt
+                                expiry = dt.fromtimestamp(expiry_ms / 1000, tz=timezone.utc).isoformat()
+                                await db.users.update_one(
+                                    {"id": txn["user_id"]},
+                                    {"$set": {"subscription.period_end": expiry, "subscription.status": "active"}}
+                                )
+                                logger.info(f"Google Play subscription renewed for user {txn['user_id']}")
+                    except Exception as e:
+                        logger.error(f"Failed to refresh Google subscription: {e}")
+
+    except Exception as e:
+        logger.error(f"Google Play notification error: {e}")
+
+    return {"status": "ok"}
+
+
 # ==================== STRIPE CHECKOUT (Web Fallback) ====================
 
 @router.post("/create-checkout-session")
@@ -737,7 +980,7 @@ async def stripe_webhook(request: Request):
     return {"status": "ok"}
 
 
-async def fulfill_subscription(metadata: dict, source: str = "stripe", promo_code: str = None, custom_duration_days: int = None, stripe_session_id: str = None):
+async def fulfill_subscription(metadata: dict, source: str = "stripe", promo_code: str = None, custom_duration_days: int = None, stripe_session_id: str = None, google_order_id: str = None):
     """Activate a subscription after successful payment or promo redemption"""
     user_id = metadata.get("user_id")
     tier_id = metadata.get("tier_id")
@@ -790,6 +1033,8 @@ async def fulfill_subscription(metadata: dict, source: str = "stripe", promo_cod
         transaction["promo_code"] = promo_code
     if stripe_session_id:
         transaction["stripe_session_id"] = stripe_session_id
+    if google_order_id:
+        transaction["google_order_id"] = google_order_id
     await db.transactions.insert_one(transaction)
 
     await create_notification(
@@ -909,8 +1154,8 @@ async def validate_promo(code: str, current_user: dict = Depends(get_current_use
 
 # ==================== FULFILLMENT ====================
 
-async def fulfill_purchase(metadata: dict, source: str = "unknown", apple_transaction_id: str = None, stripe_session_id: str = None):
-    """Fulfill a purchase after successful payment (works for both Stripe and Apple IAP)"""
+async def fulfill_purchase(metadata: dict, source: str = "unknown", apple_transaction_id: str = None, stripe_session_id: str = None, google_order_id: str = None):
+    """Fulfill a purchase after successful payment (works for Stripe, Apple IAP, and Google Play)"""
     user_id = metadata.get("user_id")
     product_id = metadata.get("product_id")
     job_id = metadata.get("job_id")
@@ -937,6 +1182,8 @@ async def fulfill_purchase(metadata: dict, source: str = "unknown", apple_transa
         transaction["apple_transaction_id"] = apple_transaction_id
     if stripe_session_id:
         transaction["stripe_session_id"] = stripe_session_id
+    if google_order_id:
+        transaction["google_order_id"] = google_order_id
 
     await db.transactions.insert_one(transaction)
 
