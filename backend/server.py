@@ -360,5 +360,8 @@ async def startup():
     # Apple IAP transaction lock (prevents duplicate fulfillment)
     await ensure_index(db.apple_txn_locks, "apple_transaction_id", unique=True)
 
+    # Google Play transaction lock (prevents duplicate fulfillment)
+    await ensure_index(db.google_txn_locks, "google_order_id", unique=True)
+
     logger.info("Database indexes created")
     logger.info("Hireabble API started successfully!")

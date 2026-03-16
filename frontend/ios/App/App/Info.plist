@@ -53,5 +53,12 @@
 	<string>Hireabble accesses your photo library to select a profile photo</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>Hireabble uses your location to show relevant jobs near you</string>
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsLocalNetworking</key>
+		<true/>
+	</dict>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 </dict>
 </plist>

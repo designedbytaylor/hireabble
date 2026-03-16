@@ -137,6 +137,57 @@ export default function Upgrade() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
 
+  // Handle native Google Play Billing responses from Android
+  useEffect(() => {
+    const handleGooglePlayResponse = async (e) => {
+      const data = e.detail;
+      if (!data) return;
+
+      switch (data.type) {
+        case 'purchaseSuccess':
+        case 'restoreSuccess': {
+          try {
+            const res = await axios.post(
+              `${API}/payments/google/verify-purchase`,
+              {
+                purchase_token: data.purchase_token,
+                product_id: data.product_id,
+                order_id: data.order_id || null,
+                tier_id: data.tier_id || null,
+                duration: data.duration || null,
+                job_id: data.job_id || null,
+              },
+              { headers: { Authorization: `Bearer ${token}` } }
+            );
+            toast.success(res.data.message || 'Purchase successful!');
+            fetchTiers();
+          } catch (err) {
+            toast.error(err.response?.data?.detail || 'Failed to verify purchase. Please try restoring purchases.');
+          }
+          break;
+        }
+        case 'purchaseCancelled':
+          break;
+        case 'purchasePending':
+          toast('Purchase is pending approval.', { duration: 4000 });
+          break;
+        case 'purchaseError':
+          toast.error(data.error || 'Purchase failed. Please try again.');
+          break;
+        case 'restoreEmpty':
+          toast('No purchases to restore.', { duration: 4000 });
+          break;
+        default:
+          break;
+      }
+      setPurchasing(null);
+    };
+
+    window.addEventListener('googlePlayResponse', handleGooglePlayResponse);
+    return () => window.removeEventListener('googlePlayResponse', handleGooglePlayResponse);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token]);
+
   const fetchTiers = async () => {
     try {
       const res = await axios.get(`${API}/payments/tiers`, {
