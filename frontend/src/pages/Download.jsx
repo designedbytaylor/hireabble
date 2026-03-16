@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useSearchParams, useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { MapPin, Briefcase, Smartphone } from 'lucide-react';
+import { isNative } from '../utils/capacitor';
 import axios from 'axios';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
@@ -27,6 +28,13 @@ export default function Download() {
   const [job, setJob] = useState(null);
   const [loading, setLoading] = useState(!!jobId);
   const platform = getPlatform();
+
+  // If running inside the native app, redirect to dashboard (don't show "download" page)
+  useEffect(() => {
+    if (isNative || window.matchMedia?.('(display-mode: standalone)').matches) {
+      navigate(user ? '/dashboard' : '/login', { replace: true });
+    }
+  }, [navigate, user]);
 
   // If logged in, redirect straight to the job
   useEffect(() => {
