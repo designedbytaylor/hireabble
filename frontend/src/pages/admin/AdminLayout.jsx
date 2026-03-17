@@ -16,6 +16,7 @@ const allNavItems = [
   { icon: Tag, label: 'Promos', path: '/admin/promos', roles: ['admin'] },
   { icon: BarChart3, label: 'Stats', path: '/admin/stats', roles: ['admin'] },
   { icon: DollarSign, label: 'Revenue', path: '/admin/revenue', roles: ['admin'] },
+  { icon: DollarSign, label: 'Pricing', path: '/admin/pricing', roles: ['admin'] },
   { icon: Megaphone, label: 'Marketing', path: '/admin/marketing', roles: ['admin'] },
   { icon: Beaker, label: 'Testing', path: '/admin/testing', roles: ['admin'] },
   { icon: Palette, label: 'Themes', path: '/admin/themes', roles: ['admin'] },

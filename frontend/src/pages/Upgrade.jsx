@@ -75,6 +75,7 @@ export default function Upgrade() {
   const [currentDuration, setCurrentDuration] = useState(null);
   const [selectedDuration, setSelectedDuration] = useState('monthly');
   const [purchasing, setPurchasing] = useState(null);
+  const [addOns, setAddOns] = useState([]);
   const [loading, setLoading] = useState(true);
 
   const isSeeker = user?.role === 'seeker';
@@ -85,6 +86,7 @@ export default function Upgrade() {
 
   useEffect(() => {
     fetchTiers();
+    fetchAddOns();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -200,6 +202,22 @@ export default function Upgrade() {
       console.error('Failed to fetch tiers:', err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchAddOns = async () => {
+    try {
+      const res = await axios.get(`${API}/payments/products`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = res.data;
+      if (isSeeker) {
+        setAddOns(data.super_likes || []);
+      } else {
+        setAddOns([...(data.super_swipes || []), ...(data.boosts || [])]);
+      }
+    } catch (err) {
+      console.error('Failed to fetch add-ons:', err);
     }
   };
 
@@ -451,39 +469,41 @@ export default function Upgrade() {
         })}
 
         {/* Consumable add-ons section */}
-        <div className="pt-4">
-          <h3 className="text-lg font-bold font-['Outfit'] mb-3">Add-ons</h3>
-          <p className="text-sm text-muted-foreground mb-4">
-            Need more? Purchase additional packs anytime.
-          </p>
-          <div className="grid grid-cols-3 gap-2">
-            {isSeeker ? (
-              <>
-                <AddOnCard title="5 Super Likes" price="$4.99" icon={Star} color="from-blue-500 to-cyan-400" />
-                <AddOnCard title="15 Super Likes" price="$9.99" icon={Star} color="from-blue-500 to-cyan-400" badge="Popular" />
-                <AddOnCard title="30 Super Likes" price="$14.99" icon={Star} color="from-blue-500 to-cyan-400" badge="Best Value" />
-              </>
-            ) : (
-              <>
-                <AddOnCard title="5 Swipes" price="$9.99" icon={Zap} color="from-purple-500 to-pink-400" />
-                <AddOnCard title="15 Swipes" price="$19.99" icon={Zap} color="from-purple-500 to-pink-400" badge="Popular" />
-                <AddOnCard title="30 Swipes" price="$29.99" icon={Zap} color="from-purple-500 to-pink-400" badge="Best Value" />
-              </>
-            )}
+        {addOns.length > 0 && (
+          <div className="pt-4">
+            <h3 className="text-lg font-bold font-['Outfit'] mb-3">Add-ons</h3>
+            <p className="text-sm text-muted-foreground mb-4">
+              Need more? Purchase additional packs anytime.
+            </p>
+            <div className="grid grid-cols-3 gap-2">
+              {addOns.map((addon, idx) => (
+                <AddOnCard
+                  key={addon.id}
+                  title={addon.name}
+                  price={formatPrice(addon.price)}
+                  icon={isSeeker ? Star : Zap}
+                  color={isSeeker ? 'from-blue-500 to-cyan-400' : 'from-purple-500 to-pink-400'}
+                  badge={idx === addOns.length - 1 ? 'Best Value' : idx === 1 ? 'Popular' : undefined}
+                />
+              ))}
+            </div>
           </div>
-        </div>
+        )}
 
-        <div className="text-center py-4">
-          <button
-            onClick={handleRestorePurchases}
-            className="text-xs text-primary hover:underline mb-4 inline-block"
-          >
-            Restore Purchases
-          </button>
-        </div>
+        {/* Restore Purchases — prominent on native platforms */}
+        {isNativeStore && (
+          <div className="text-center py-4">
+            <button
+              onClick={handleRestorePurchases}
+              className="w-full max-w-xs mx-auto py-3 px-6 rounded-2xl border-2 border-primary/30 bg-primary/5 text-primary font-medium text-sm hover:bg-primary/10 transition-all"
+            >
+              Restore Purchases
+            </button>
+          </div>
+        )}
 
-        {/* Promo Code */}
-        <PromoCodeSection token={token} onRedeemed={() => window.location.reload()} />
+        {/* Promo Code — hidden on iOS (Apple requires offers through App Store) */}
+        {!isIOS && <PromoCodeSection token={token} onRedeemed={() => window.location.reload()} />}
 
         <div className="text-xs text-muted-foreground text-center py-4 space-y-2">
           <p>

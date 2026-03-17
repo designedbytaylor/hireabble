@@ -217,6 +217,35 @@ APPLE_TO_PRODUCT = {v["apple_product_id"]: k for k, v in PRODUCTS.items() if "ap
 GOOGLE_TO_PRODUCT = {v["google_product_id"]: k for k, v in PRODUCTS.items() if "google_product_id" in v}
 
 
+async def _get_pricing_overrides():
+    """Load admin-configured pricing overrides from the database."""
+    doc = await db.site_settings.find_one({"key": "pricing_overrides"})
+    return doc.get("value", {}) if doc else {}
+
+
+def _apply_tier_overrides(tier_id, tier_data, overrides):
+    """Apply admin pricing overrides to a tier definition (returns a copy)."""
+    tier_overrides = overrides.get("tiers", {}).get(tier_id)
+    if not tier_overrides:
+        return tier_data
+    result = {**tier_data, "prices": {**tier_data["prices"]}}
+    for duration in ("weekly", "monthly", "6month"):
+        if duration in (tier_overrides.get("prices") or {}):
+            result["prices"][duration] = tier_overrides["prices"][duration]
+    return result
+
+
+def _apply_product_overrides(product_id, product_data, overrides):
+    """Apply admin pricing overrides to a product definition (returns a copy)."""
+    prod_overrides = overrides.get("products", {}).get(product_id)
+    if not prod_overrides:
+        return product_data
+    result = {**product_data}
+    if "price" in prod_overrides:
+        result["price"] = prod_overrides["price"]
+    return result
+
+
 # ==================== MODELS ====================
 
 class BoostCreate(BaseModel):
@@ -254,18 +283,22 @@ class GooglePlayPurchaseValidation(BaseModel):
 async def get_products(current_user: dict = Depends(get_current_user)):
     """Get available products and pricing, including Apple IAP product IDs"""
     role = current_user.get("role", "seeker")
+    overrides = await _get_pricing_overrides()
     result = {}
 
     if role == "recruiter":
         result["boosts"] = [
-            {"id": k, **{kk: vv for kk, vv in v.items()}} for k, v in PRODUCTS.items() if k.startswith("boost_")
+            {"id": k, **{kk: vv for kk, vv in _apply_product_overrides(k, v, overrides).items()}}
+            for k, v in PRODUCTS.items() if k.startswith("boost_")
         ]
         result["super_swipes"] = [
-            {"id": k, **{kk: vv for kk, vv in v.items()}} for k, v in PRODUCTS.items() if k.startswith("super_swipes_")
+            {"id": k, **{kk: vv for kk, vv in _apply_product_overrides(k, v, overrides).items()}}
+            for k, v in PRODUCTS.items() if k.startswith("super_swipes_")
         ]
     else:
         result["super_likes"] = [
-            {"id": k, **{kk: vv for kk, vv in v.items()}} for k, v in PRODUCTS.items() if k.startswith("seeker_superlikes_")
+            {"id": k, **{kk: vv for kk, vv in _apply_product_overrides(k, v, overrides).items()}}
+            for k, v in PRODUCTS.items() if k.startswith("seeker_superlikes_")
         ]
 
     return result
@@ -279,17 +312,19 @@ async def get_subscription_tiers(current_user: dict = Depends(get_current_user))
     role = current_user.get("role", "seeker")
     user = await db.users.find_one({"id": current_user["id"]}, {"_id": 0, "subscription": 1})
     current_sub = (user or {}).get("subscription", {})
+    overrides = await _get_pricing_overrides()
 
     tiers = []
     for tier_id, tier in SUBSCRIPTION_TIERS.items():
         if tier["role"] == role:
+            effective = _apply_tier_overrides(tier_id, tier, overrides)
             tiers.append({
                 "id": tier_id,
-                "name": tier["name"],
-                "tier_level": tier["tier_level"],
-                "prices": tier["prices"],
-                "features": tier["features"],
-                "apple_product_ids": tier.get("apple_product_ids", {}),
+                "name": effective["name"],
+                "tier_level": effective["tier_level"],
+                "prices": effective["prices"],
+                "features": effective["features"],
+                "apple_product_ids": effective.get("apple_product_ids", {}),
             })
 
     return {
