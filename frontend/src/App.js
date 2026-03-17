@@ -37,6 +37,7 @@ const Upgrade = React.lazy(() => import("./pages/Upgrade"));
 const ProfileViewers = React.lazy(() => import("./pages/ProfileViewers"));
 const CompanyJobs = React.lazy(() => import("./pages/CompanyJobs"));
 const Impersonate = React.lazy(() => import("./pages/Impersonate"));
+const BrowseJobs = React.lazy(() => import("./pages/BrowseJobs"));
 const TermsOfService = React.lazy(() => import("./pages/TermsOfService"));
 const PrivacyPolicy = React.lazy(() => import("./pages/PrivacyPolicy"));
 const CookiePolicy = React.lazy(() => import("./pages/CookiePolicy"));
@@ -394,6 +395,9 @@ function AppRoutes() {
           </ProtectedRoute>
         }
       />
+
+      {/* Public browse — no auth required */}
+      <Route path="/browse" element={<BrowseJobs />} />
 
       {/* Legal pages — always accessible */}
       <Route path="/terms" element={<TermsOfService />} />

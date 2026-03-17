@@ -25,6 +25,11 @@ export async function subscribeToPush(token) {
     return false;
   }
 
+  if (!VAPID_PUBLIC_KEY || VAPID_PUBLIC_KEY.length < 20) {
+    console.warn('Push notifications: VAPID public key is missing or invalid');
+    return false;
+  }
+
   try {
     const permission = await Notification.requestPermission();
     if (permission !== 'granted') {
@@ -36,7 +41,7 @@ export async function subscribeToPush(token) {
     // Check for existing subscription
     let subscription = await registration.pushManager.getSubscription();
 
-    if (!subscription && VAPID_PUBLIC_KEY) {
+    if (!subscription) {
       // Create new subscription
       subscription = await registration.pushManager.subscribe({
         userVisibleOnly: true,

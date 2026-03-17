@@ -342,7 +342,7 @@ export default function RecruiterSwipe() {
       <header className="relative z-20 px-4 pt-3 pb-2 shrink-0">
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-2.5">
-            <img src="/logo-white.png" alt="Hireabble" className="w-8 h-8" />
+            <img src="/logo-white.svg" alt="Hireabble" className="w-8 h-8" />
             <h1 className="text-lg font-bold font-['Outfit']">hireabble</h1>
           </div>
           <div className="flex items-center gap-1">

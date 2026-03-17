@@ -30,6 +30,7 @@ export default function Chat() {
   const [videoPreview, setVideoPreview] = useState(null);
   const [isRecording, setIsRecording] = useState(false);
   const [uploadingVideo, setUploadingVideo] = useState(false);
+  const [wsReconnectCount, setWsReconnectCount] = useState(0);
   const messagesEndRef = useRef(null);
   const wsRef = useRef(null);
   const reconnectTimeoutRef = useRef(null);
@@ -64,10 +65,18 @@ export default function Chat() {
 
       wsRef.current.onopen = () => {
         setWsConnected(true);
+        setWsReconnectCount(0);
       };
 
       wsRef.current.onclose = () => {
         setWsConnected(false);
+        setWsReconnectCount(prev => {
+          const next = prev + 1;
+          if (next >= 5) {
+            toast.error('Connection lost. Check your internet and try refreshing.', { id: 'ws-error' });
+          }
+          return next;
+        });
         reconnectTimeoutRef.current = setTimeout(connectWebSocket, 3000);
       };
 

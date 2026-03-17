@@ -201,6 +201,38 @@ async def get_recruiter_jobs(current_user: dict = Depends(get_current_user)):
     ).sort("created_at", -1).to_list(100)
     return jobs
 
+@router.get("/browse")
+async def browse_jobs_public(
+    job_type: Optional[str] = None,
+    experience_level: Optional[str] = None,
+    category: Optional[str] = None,
+    location: Optional[str] = None,
+    skip: int = 0,
+    limit: int = 20
+):
+    """Browse active jobs without authentication — limited fields for App Store compliance."""
+    query = {"is_active": True}
+    if job_type:
+        query["job_type"] = job_type
+    if experience_level:
+        query["experience_level"] = experience_level
+    if category:
+        query["category"] = category
+    if location:
+        query["location"] = {"$regex": location, "$options": "i"}
+
+    clamped_limit = min(limit, 50)
+    jobs = await db.jobs.find(
+        query,
+        {
+            "_id": 0, "id": 1, "title": 1, "company": 1, "location": 1,
+            "job_type": 1, "experience_level": 1, "category": 1,
+            "employment_type": 1, "salary_min": 1, "salary_max": 1,
+            "created_at": 1
+        }
+    ).sort("created_at", -1).skip(skip).to_list(clamped_limit)
+    return jobs
+
 @router.get("", response_model=List[JobResponse])
 async def get_jobs(
     current_user: dict = Depends(get_current_user),
