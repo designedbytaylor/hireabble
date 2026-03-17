@@ -2335,7 +2335,7 @@ MARKETING_SETTINGS_KEY = "marketing_dashboard"
 
 @router.get("/admin/marketing")
 async def get_marketing_data(admin=Depends(get_current_admin)):
-    """Get marketing dashboard data (checklist, emails, notes, metrics)."""
+    """Get marketing dashboard data (checklist, emails, notes, metrics, contacts)."""
     doc = await db.site_settings.find_one({"key": MARKETING_SETTINGS_KEY})
     data = doc.get("value", {}) if doc else {}
     return {
@@ -2343,6 +2343,7 @@ async def get_marketing_data(admin=Depends(get_current_admin)):
         "emails": data.get("emails"),
         "notes": data.get("notes", ""),
         "metrics": data.get("metrics", {"employers": 0, "seekers": 0, "matches": 0, "emailsSent": 0}),
+        "contacts": data.get("contacts", []),
     }
 
 
@@ -2351,8 +2352,8 @@ async def update_marketing_data(
     body: dict = Body(...),
     admin=Depends(get_current_admin),
 ):
-    """Update marketing dashboard data. Accepts any subset of: checklist, emails, notes, metrics."""
-    allowed_keys = {"checklist", "emails", "notes", "metrics"}
+    """Update marketing dashboard data. Accepts any subset of: checklist, emails, notes, metrics, contacts."""
+    allowed_keys = {"checklist", "emails", "notes", "metrics", "contacts"}
     updates = {k: v for k, v in body.items() if k in allowed_keys}
     if not updates:
         raise HTTPException(status_code=400, detail="No valid fields provided")
