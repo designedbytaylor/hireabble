@@ -1157,6 +1157,11 @@
   resolved "https://registry.npmjs.org/@capacitor/keyboard/-/keyboard-8.0.1.tgz"
   integrity sha512-HDf4qrvvhLRMsgBoqeqIld6hP8JMK/WPbCYMvz8ajhY6TaibYt6B+NQyky4oIPCOfHTz5OcVsuHkbb8fQvGDAg==
 
+"@capacitor/preferences@^8.0.1":
+  version "8.0.1"
+  resolved "https://registry.npmjs.org/@capacitor/preferences/-/preferences-8.0.1.tgz"
+  integrity sha512-T6no3ebi79XJCk91U3Jp/liJUwgBdvHR+s6vhvPkPxSuch7z3zx5Rv1bdWM6sWruNx+pViuEGqZvbfCdyBvcHQ==
+
 "@capacitor/push-notifications@^8.0.2":
   version "8.0.2"
   resolved "https://registry.npmjs.org/@capacitor/push-notifications/-/push-notifications-8.0.2.tgz"
