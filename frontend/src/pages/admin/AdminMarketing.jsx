@@ -217,6 +217,16 @@ export default function AdminMarketing() {
       return updated;
     });
   };
+  const importItems = (group, texts) => {
+    if (!texts.length) return;
+    setChecklist(prev => {
+      const newItems = texts.map(t => ({ id: uid(), text: t.trim(), done: false }));
+      const updated = { ...prev, [group]: [...prev[group], ...newItems] };
+      debouncedSave({ checklist: updated });
+      return updated;
+    });
+    toast.success(`Imported ${texts.length} tasks`);
+  };
 
   // Email helpers
   const saveEmail = (id, subject, body) => {
@@ -296,7 +306,7 @@ export default function AdminMarketing() {
 
       {activeTab==="Overview" && <OverviewTab checklist={checklist} metrics={metrics} setMetrics={setMetrics} metricsEditing={metricsEditing} setMetricsEditing={setMetricsEditing} pct={pct} doneItems={doneItems} totalItems={totalItems} contacts={contacts} saveToApi={saveToApi}/>}
       {activeTab==="CRM" && <CRMTab contacts={contacts} onAdd={addContact} onUpdate={updateContact} onDelete={deleteContact}/>}
-      {activeTab==="Checklist" && <ChecklistTab checklist={checklist} toggleItem={toggleItem} doneItems={doneItems} totalItems={totalItems} pct={pct} addPhase={addPhase} renamePhase={renamePhase} deletePhase={deletePhase} addItem={addItem} editItem={editItem} deleteItem={deleteItem}/>}
+      {activeTab==="Checklist" && <ChecklistTab checklist={checklist} toggleItem={toggleItem} doneItems={doneItems} totalItems={totalItems} pct={pct} addPhase={addPhase} renamePhase={renamePhase} deletePhase={deletePhase} addItem={addItem} editItem={editItem} deleteItem={deleteItem} importItems={importItems}/>}
       {activeTab==="Emails" && <EmailsTab emails={emails} editingEmail={editingEmail} setEditingEmail={setEditingEmail} saveEmail={saveEmail} aiPrompt={aiPrompt} setAiPrompt={setAiPrompt} aiLoading={aiLoading} aiResult={aiResult} aiTarget={aiTarget} onGenerate={generateEmail} onApply={()=>{setEmails(prev=>{const updated=prev.map(e=>e.id===aiTarget?{...e,body:aiResult}:e);debouncedSave({emails:updated});return updated;});setAiResult("");setAiTarget(null);setAiPrompt("");}} onDiscardAi={()=>{setAiResult("");setAiTarget(null);}}/>}
       {activeTab==="Notes" && <NotesTab notes={notes} onChange={handleNotesChange} saved={notesSaved}/>}
     </div>
@@ -589,7 +599,7 @@ function phaseColor(group, index) {
   return fixed[group] || PHASE_COLORS[index % PHASE_COLORS.length];
 }
 
-function ChecklistTab({checklist,toggleItem,doneItems,totalItems,pct,addPhase,renamePhase,deletePhase,addItem,editItem,deleteItem}) {
+function ChecklistTab({checklist,toggleItem,doneItems,totalItems,pct,addPhase,renamePhase,deletePhase,addItem,editItem,deleteItem,importItems}) {
   const [editMode, setEditMode] = useState(false);
   const [newPhaseName, setNewPhaseName] = useState("");
   const [showAddPhase, setShowAddPhase] = useState(false);
@@ -601,14 +611,44 @@ function ChecklistTab({checklist,toggleItem,doneItems,totalItems,pct,addPhase,re
   const [editingItem, setEditingItem] = useState(null);
   const [editItemText, setEditItemText] = useState("");
   const [confirmDeleteItem, setConfirmDeleteItem] = useState(null);
+  const [importTarget, setImportTarget] = useState(null);
+  const fileInputRef = useRef(null);
 
   const handleAddPhase = () => { if (!newPhaseName.trim()) return; addPhase(newPhaseName.trim()); setNewPhaseName(""); setShowAddPhase(false); };
   const handleRenamePhase = () => { if (!renameVal.trim()) return; renamePhase(renamingPhase, renameVal.trim()); setRenamingPhase(null); setRenameVal(""); };
   const handleAddItem = (group) => { addItem(group, newItemText); setNewItemText(""); setAddingItemTo(null); };
   const handleEditItem = () => { editItem(editingItem.group, editingItem.id, editItemText); setEditingItem(null); setEditItemText(""); };
 
+  const handleImportClick = (group) => {
+    setImportTarget(group);
+    fileInputRef.current.value = "";
+    fileInputRef.current.click();
+  };
+  const handleFileChange = (e) => {
+    const file = e.target.files?.[0];
+    if (!file || !importTarget) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const text = ev.target.result;
+      const lines = text.split(/\r?\n/).map(line => {
+        // Strip surrounding quotes and trim
+        let val = line.trim();
+        if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
+          val = val.slice(1, -1).trim();
+        }
+        return val;
+      }).filter(Boolean);
+      if (lines.length > 0) importItems(importTarget, lines);
+      setImportTarget(null);
+    };
+    reader.readAsText(file);
+  };
+
   return(
     <div>
+      {/* Hidden file input for CSV import */}
+      <input ref={fileInputRef} type="file" accept=".csv,.txt" onChange={handleFileChange} style={{display:"none"}}/>
+
       {/* Header */}
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:18}}>
         <SectionTitle style={{margin:0}}>Marketing Checklist</SectionTitle>
@@ -644,6 +684,7 @@ function ChecklistTab({checklist,toggleItem,doneItems,totalItems,pct,addPhase,re
                   <span style={{fontSize:12,color:TEXT_DIM}}>{done}/{items.length}</span>
                   {editMode && (
                     <div style={{display:"flex",gap:5,marginLeft:"auto"}}>
+                      <button onClick={()=>handleImportClick(group)} title="Import CSV" style={{background:"#1A2035",border:`1px solid ${BORDER}`,borderRadius:6,padding:"3px 9px",cursor:"pointer",color:"#60A5FA",fontSize:11}}>📥 Import CSV</button>
                       <button onClick={()=>{setRenamingPhase(group);setRenameVal(group);}} title="Rename phase" style={{background:"#1A2035",border:`1px solid ${BORDER}`,borderRadius:6,padding:"3px 9px",cursor:"pointer",color:TEXT_MID,fontSize:11}}>✏️ Rename</button>
                       <button onClick={()=>setConfirmDeletePhase(group)} title="Delete phase" style={{background:"#1A2035",border:`1px solid ${BORDER}`,borderRadius:6,padding:"3px 9px",cursor:"pointer",color:"#EF4444",fontSize:11}}>🗑 Delete</button>
                     </div>
