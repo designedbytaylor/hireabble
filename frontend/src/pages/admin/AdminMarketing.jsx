@@ -28,6 +28,11 @@ const STATUS_OPTIONS = [
 
 const INDUSTRY_OPTIONS = ["Tech","Retail","Healthcare","Construction","Finance","Hospitality","Education","Logistics","Marketing","Legal","Real Estate","Other"];
 
+const CONTACT_GROUPS = [
+  { value: "employers", label: "Employers", color: TEAL, icon: "🏢" },
+  { value: "outreach", label: "Outreach", color: "#FF6B6B", icon: "🎓" },
+];
+
 const INITIAL_CHECKLIST = {
   "Phase 1 — Employer Outreach": [
     { id:"p1_1", text:"Set up SPF, DKIM, DMARC records on hireabble.ca (GoDaddy DNS)", done:false },
@@ -86,7 +91,7 @@ const EMAIL_TEMPLATES = [
   { id:"reddit_1", tag:"Community", label:"r/Edmonton Post", subject:"I built a job matching app for Edmonton — here's what I learned", body:"Hey r/Edmonton,\n\nI spent the last year building Hireabble — basically Tinder for jobs, built specifically for the Edmonton market.\n\nJob seekers build a short profile and swipe through matched local roles. Employers review candidates who swiped right. No cover letters, no resume black holes.\n\nA few things I learned:\n- Edmonton has an active hiring market not well-served by big national job boards\n- Most job seekers under 30 hate applying through Indeed\n- Employers waste huge time sifting unqualified applicants\n\nWe're in early stages and I'd love feedback. What's broken about your current job search or hiring experience?\n\nApp is free. Employers launching now get 1 year Enterprise free.\n\nAMA.\n\nTaylor" },
 ];
 
-const EMPTY_CONTACT = { id:"", company:"", contactName:"", title:"", email:"", phone:"", industry:"Other", source:"", status:"not_contacted", linkedIn:"", notes:"", dateAdded:"", lastContact:"" };
+const EMPTY_CONTACT = { id:"", company:"", contactName:"", title:"", email:"", phone:"", industry:"Other", source:"", status:"not_contacted", linkedIn:"", notes:"", dateAdded:"", lastContact:"", group:"employers", firstLine:"" };
 
 function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2); }
 
@@ -279,6 +284,14 @@ export default function AdminMarketing() {
     });
     toast.success("Contact deleted");
   };
+  const bulkAddContacts = (newContacts) => {
+    setContacts(prev => {
+      const withIds = newContacts.map(c => ({ ...c, id: uid(), dateAdded: new Date().toLocaleDateString("en-CA") }));
+      const updated = [...withIds, ...prev];
+      debouncedSave({ contacts: updated });
+      return updated;
+    });
+  };
 
   if (!loaded) return (
     <div style={{display:"flex",alignItems:"center",justifyContent:"center",minHeight:400}}>
@@ -305,7 +318,7 @@ export default function AdminMarketing() {
       </div>
 
       {activeTab==="Overview" && <OverviewTab checklist={checklist} metrics={metrics} setMetrics={setMetrics} metricsEditing={metricsEditing} setMetricsEditing={setMetricsEditing} pct={pct} doneItems={doneItems} totalItems={totalItems} contacts={contacts} saveToApi={saveToApi}/>}
-      {activeTab==="CRM" && <CRMTab contacts={contacts} onAdd={addContact} onUpdate={updateContact} onDelete={deleteContact}/>}
+      {activeTab==="CRM" && <CRMTab contacts={contacts} onAdd={addContact} onUpdate={updateContact} onDelete={deleteContact} onBulkAdd={bulkAddContacts}/>}
       {activeTab==="Checklist" && <ChecklistTab checklist={checklist} toggleItem={toggleItem} doneItems={doneItems} totalItems={totalItems} pct={pct} addPhase={addPhase} renamePhase={renamePhase} deletePhase={deletePhase} addItem={addItem} editItem={editItem} deleteItem={deleteItem} importItems={importItems}/>}
       {activeTab==="Emails" && <EmailsTab emails={emails} editingEmail={editingEmail} setEditingEmail={setEditingEmail} saveEmail={saveEmail} aiPrompt={aiPrompt} setAiPrompt={setAiPrompt} aiLoading={aiLoading} aiResult={aiResult} aiTarget={aiTarget} onGenerate={generateEmail} onApply={()=>{setEmails(prev=>{const updated=prev.map(e=>e.id===aiTarget?{...e,body:aiResult}:e);debouncedSave({emails:updated});return updated;});setAiResult("");setAiTarget(null);setAiPrompt("");}} onDiscardAi={()=>{setAiResult("");setAiTarget(null);}}/>}
       {activeTab==="Notes" && <NotesTab notes={notes} onChange={handleNotesChange} saved={notesSaved}/>}
@@ -315,9 +328,10 @@ export default function AdminMarketing() {
 
 // ─── OVERVIEW ─────────────────────────────────────────────────────────────────
 function OverviewTab({checklist,metrics,setMetrics,metricsEditing,setMetricsEditing,pct,doneItems,totalItems,contacts,saveToApi}) {
-  const onboarded = contacts.filter(c=>c.status==="onboarded").length;
+  const employers = contacts.filter(c=>(c.group||"employers")==="employers");
+  const outreach = contacts.filter(c=>c.group==="outreach");
+  const onboarded = employers.filter(c=>c.status==="onboarded").length;
   const engaged = contacts.filter(c=>["replied","call_booked"].includes(c.status)).length;
-  const inProgress = contacts.filter(c=>["contacted_1","contacted_2","contacted_3"].includes(c.status)).length;
   return (
     <div>
       <SectionTitle>Launch Overview</SectionTitle>
@@ -346,8 +360,8 @@ function OverviewTab({checklist,metrics,setMetrics,metricsEditing,setMetricsEdit
         </Card>
         <Card>
           <div style={{fontWeight:700,fontSize:14,marginBottom:10}}>CRM Pipeline</div>
-          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8}}>
-            {[{label:"In Outreach",val:inProgress,color:"#60A5FA"},{label:"Engaged",val:engaged,color:"#FBBF24"},{label:"Onboarded",val:onboarded,color:"#22C55E"}].map(s=>(
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",gap:8}}>
+            {[{label:"Employers",val:employers.length,color:TEAL},{label:"Outreach",val:outreach.length,color:"#FF6B6B"},{label:"Engaged",val:engaged,color:"#FBBF24"},{label:"Onboarded",val:onboarded,color:"#22C55E"}].map(s=>(
               <div key={s.label} style={{textAlign:"center"}}><div style={{fontSize:22,fontWeight:800,color:s.color}}>{s.val}</div><div style={{fontSize:11,color:TEXT_DIM}}>{s.label}</div></div>
             ))}
           </div>
@@ -386,45 +400,197 @@ function OverviewTab({checklist,metrics,setMetrics,metricsEditing,setMetricsEdit
 }
 
 // ─── CRM ──────────────────────────────────────────────────────────────────────
-function CRMTab({contacts,onAdd,onUpdate,onDelete}) {
+function CRMTab({contacts,onAdd,onUpdate,onDelete,onBulkAdd}) {
   const [view,setView]=useState("table");
   const [showForm,setShowForm]=useState(false);
   const [editingId,setEditingId]=useState(null);
   const [expandedId,setExpandedId]=useState(null);
   const [filterStatus,setFilterStatus]=useState("all");
   const [filterIndustry,setFilterIndustry]=useState("all");
+  const [activeGroup,setActiveGroup]=useState("employers");
   const [search,setSearch]=useState("");
   const [form,setForm]=useState({...EMPTY_CONTACT});
   const [confirmDelete,setConfirmDelete]=useState(null);
+  const importRef = useRef(null);
 
-  const filtered=contacts.filter(c=>{
+  const groupContacts = contacts.filter(c => (c.group || "employers") === activeGroup);
+  const filtered=groupContacts.filter(c=>{
     if(filterStatus!=="all"&&c.status!==filterStatus)return false;
     if(filterIndustry!=="all"&&c.industry!==filterIndustry)return false;
     if(search&&!`${c.company} ${c.contactName} ${c.email}`.toLowerCase().includes(search.toLowerCase()))return false;
     return true;
   });
   const statusInfo=(val)=>STATUS_OPTIONS.find(s=>s.value===val)||STATUS_OPTIONS[0];
-  const openAdd=()=>{setForm({...EMPTY_CONTACT});setEditingId(null);setShowForm(true);};
+  const openAdd=()=>{setForm({...EMPTY_CONTACT,group:activeGroup});setEditingId(null);setShowForm(true);};
   const openEdit=(c)=>{setForm({...c});setEditingId(c.id);setShowForm(true);};
   const handleSubmit=()=>{
     if(!form.company.trim())return;
     if(editingId){onUpdate(editingId,form);}else{onAdd(form);}
     setShowForm(false);setEditingId(null);setForm({...EMPTY_CONTACT});
   };
-  const kanbanGroups=STATUS_OPTIONS.map(s=>({...s,items:contacts.filter(c=>c.status===s.value)}));
+  const kanbanGroups=STATUS_OPTIONS.map(s=>({...s,items:groupContacts.filter(c=>c.status===s.value)}));
+  const activeGroupInfo = CONTACT_GROUPS.find(g=>g.value===activeGroup);
+
+  // CSV Export for Instantly.ai
+  const exportCSV = () => {
+    const rows = filtered.length > 0 ? filtered : groupContacts;
+    if (rows.length === 0) { toast.error("No contacts to export"); return; }
+    const headers = ["email","first_name","last_name","company_name","phone","personalization","website","linkedin_url","status","industry","source","notes"];
+    const csvRows = [headers.join(",")];
+    rows.forEach(c => {
+      const nameParts = (c.contactName || "").split(" ");
+      const firstName = nameParts[0] || "";
+      const lastName = nameParts.slice(1).join(" ") || "";
+      const row = [
+        c.email || "",
+        firstName,
+        lastName,
+        c.company || "",
+        c.phone || "",
+        c.firstLine || "",
+        "",
+        c.linkedIn || "",
+        statusInfo(c.status).label,
+        c.industry || "",
+        c.source || "",
+        (c.notes || "").replace(/[\n\r]+/g, " "),
+      ].map(v => `"${String(v).replace(/"/g, '""')}"`);
+      csvRows.push(row.join(","));
+    });
+    const blob = new Blob([csvRows.join("\n")], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `hireabble-${activeGroup}-contacts-${new Date().toISOString().slice(0,10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success(`Exported ${rows.length} contacts`);
+  };
+
+  // CSV Import
+  const handleImportCSV = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const text = ev.target.result;
+      const lines = text.split(/\r?\n/).filter(l => l.trim());
+      if (lines.length < 2) { toast.error("CSV file is empty or has no data rows"); return; }
+      // Parse header
+      const parseCSVLine = (line) => {
+        const result = [];
+        let current = "";
+        let inQuotes = false;
+        for (let i = 0; i < line.length; i++) {
+          const ch = line[i];
+          if (ch === '"') {
+            if (inQuotes && line[i+1] === '"') { current += '"'; i++; }
+            else { inQuotes = !inQuotes; }
+          } else if (ch === ',' && !inQuotes) {
+            result.push(current.trim());
+            current = "";
+          } else {
+            current += ch;
+          }
+        }
+        result.push(current.trim());
+        return result;
+      };
+      const headerRow = parseCSVLine(lines[0]).map(h => h.toLowerCase().replace(/[^a-z0-9_]/g, ""));
+      const colMap = {};
+      // Map common CSV header names to our fields
+      const fieldAliases = {
+        email: ["email","emailaddress","email_address"],
+        contactName: ["first_name","firstname","first","name","contact","contactname","contact_name","full_name","fullname"],
+        lastName: ["last_name","lastname","last","surname"],
+        company: ["company","company_name","companyname","organization","org"],
+        phone: ["phone","phonenumber","phone_number","tel","telephone"],
+        firstLine: ["personalization","firstline","first_line","personalized","icebreaker","ice_breaker","custom_line"],
+        linkedIn: ["linkedin","linkedin_url","linkedinurl","linkedin_profile"],
+        title: ["title","jobtitle","job_title","position","role"],
+        industry: ["industry","sector","vertical"],
+        source: ["source","leadsource","lead_source","origin"],
+        notes: ["notes","note","comments","comment"],
+      };
+      headerRow.forEach((h, idx) => {
+        for (const [field, aliases] of Object.entries(fieldAliases)) {
+          if (aliases.includes(h)) { colMap[field] = idx; break; }
+        }
+      });
+      if (colMap.email === undefined && colMap.company === undefined) {
+        toast.error("CSV must have at least an 'email' or 'company' column");
+        return;
+      }
+      const imported = [];
+      for (let i = 1; i < lines.length; i++) {
+        const vals = parseCSVLine(lines[i]);
+        if (vals.every(v => !v.trim())) continue;
+        const get = (field) => (colMap[field] !== undefined ? vals[colMap[field]] || "" : "");
+        // Combine first_name + last_name if both exist
+        let contactName = get("contactName");
+        const lastName = get("lastName");
+        if (lastName && contactName) contactName = `${contactName} ${lastName}`;
+        imported.push({
+          company: get("company"),
+          contactName,
+          email: get("email"),
+          phone: get("phone"),
+          firstLine: get("firstLine"),
+          linkedIn: get("linkedIn"),
+          title: get("title"),
+          industry: get("industry") || "Other",
+          source: get("source"),
+          notes: get("notes"),
+          group: activeGroup,
+          status: "not_contacted",
+        });
+      }
+      if (imported.length > 0) {
+        onBulkAdd(imported);
+        toast.success(`Imported ${imported.length} contacts into ${activeGroupInfo.label}`);
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = "";
+  };
 
   return(
     <div>
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:18}}>
-        <SectionTitle style={{margin:0}}>Employer CRM <span style={{fontSize:13,color:TEXT_DIM,fontWeight:500,marginLeft:6}}>{contacts.length} contacts</span></SectionTitle>
+      {/* Hidden file input for CSV import */}
+      <input ref={importRef} type="file" accept=".csv" onChange={handleImportCSV} style={{display:"none"}}/>
+
+      {/* Header with group tabs */}
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
+        <SectionTitle style={{margin:0}}>Contact CRM <span style={{fontSize:13,color:TEXT_DIM,fontWeight:500,marginLeft:6}}>{contacts.length} total</span></SectionTitle>
         <div style={{display:"flex",gap:8}}>
           <div style={{display:"flex",background:"#0A0C12",border:`1px solid ${BORDER}`,borderRadius:8,overflow:"hidden"}}>
             {["table","kanban"].map(v=><button key={v} onClick={()=>setView(v)} style={{background:view===v?`${TEAL}22`:"none",border:"none",padding:"6px 13px",cursor:"pointer",color:view===v?TEAL:TEXT_DIM,fontSize:12,fontWeight:view===v?700:500}}>
               {v==="table"?"☰ Table":"⬛ Kanban"}
             </button>)}
           </div>
+          <Btn secondary onClick={()=>importRef.current?.click()}>📥 Import CSV</Btn>
+          <Btn secondary onClick={exportCSV}>📤 Export CSV</Btn>
           <Btn onClick={openAdd}>+ Add Contact</Btn>
         </div>
+      </div>
+
+      {/* Group tabs */}
+      <div style={{display:"flex",gap:8,marginBottom:16}}>
+        {CONTACT_GROUPS.map(g=>{
+          const count = contacts.filter(c=>(c.group||"employers")===g.value).length;
+          return(
+            <button key={g.value} onClick={()=>setActiveGroup(g.value)} style={{
+              background:activeGroup===g.value?`${g.color}18`:"#0A0C12",
+              border:`1px solid ${activeGroup===g.value?g.color+"55":BORDER}`,
+              borderRadius:9,padding:"8px 18px",cursor:"pointer",
+              display:"flex",alignItems:"center",gap:8,transition:"all 0.15s"
+            }}>
+              <span style={{fontSize:15}}>{g.icon}</span>
+              <span style={{fontSize:13,fontWeight:activeGroup===g.value?700:500,color:activeGroup===g.value?g.color:TEXT_DIM}}>{g.label}</span>
+              <span style={{fontSize:11,fontWeight:700,color:activeGroup===g.value?g.color:TEXT_DIM,background:activeGroup===g.value?`${g.color}22`:"#1A2035",borderRadius:99,padding:"1px 7px"}}>{count}</span>
+            </button>
+          );
+        })}
       </div>
 
       {/* Filters */}
@@ -442,7 +608,7 @@ function CRMTab({contacts,onAdd,onUpdate,onDelete}) {
 
       {/* Status pills */}
       <div style={{display:"flex",gap:6,marginBottom:18,flexWrap:"wrap"}}>
-        {STATUS_OPTIONS.map(s=>{const count=contacts.filter(c=>c.status===s.value).length;return count>0?(
+        {STATUS_OPTIONS.map(s=>{const count=groupContacts.filter(c=>c.status===s.value).length;return count>0?(
           <div key={s.value} onClick={()=>setFilterStatus(filterStatus===s.value?"all":s.value)} style={{background:filterStatus===s.value?`${s.color}22`:CARD_BG,border:`1px solid ${filterStatus===s.value?s.color+"66":BORDER}`,borderRadius:99,padding:"3px 11px",cursor:"pointer",display:"flex",alignItems:"center",gap:5}}>
             <div style={{width:6,height:6,borderRadius:"50%",background:s.color}}/>
             <span style={{fontSize:11,color:TEXT_MID}}>{s.label}</span>
@@ -456,10 +622,13 @@ function CRMTab({contacts,onAdd,onUpdate,onDelete}) {
         <div>
           {filtered.length===0?(
             <Card style={{textAlign:"center",padding:"44px 24px",color:TEXT_DIM}}>
-              <div style={{fontSize:32,marginBottom:10}}>🏢</div>
-              <div style={{fontSize:14,marginBottom:6}}>No contacts yet</div>
-              <div style={{fontSize:13,marginBottom:18}}>Add your first Edmonton employer to start tracking outreach</div>
-              <Btn onClick={openAdd}>+ Add First Contact</Btn>
+              <div style={{fontSize:32,marginBottom:10}}>{activeGroupInfo.icon}</div>
+              <div style={{fontSize:14,marginBottom:6}}>No {activeGroupInfo.label.toLowerCase()} contacts yet</div>
+              <div style={{fontSize:13,marginBottom:18}}>Add contacts manually or import a CSV file</div>
+              <div style={{display:"flex",gap:8,justifyContent:"center"}}>
+                <Btn onClick={openAdd}>+ Add Contact</Btn>
+                <Btn secondary onClick={()=>importRef.current?.click()}>📥 Import CSV</Btn>
+              </div>
             </Card>
           ):(
             <div style={{display:"flex",flexDirection:"column",gap:5}}>
@@ -490,6 +659,10 @@ function CRMTab({contacts,onAdd,onUpdate,onDelete}) {
                       <div><Label>Date Added</Label><div style={{fontSize:13,color:TEXT_MID}}>{c.dateAdded||"—"}</div></div>
                       <div><Label>Last Contact</Label><div style={{fontSize:13,color:TEXT_MID}}>{c.lastContact||"—"}</div></div>
                       <div style={{gridColumn:"1 / -1"}}>
+                        <Label>Personalized First Line</Label>
+                        <textarea defaultValue={c.firstLine||""} onBlur={e=>onUpdate(c.id,{firstLine:e.target.value})} rows={2} style={{width:"100%",background:"#131820",border:`1px solid ${TEAL}33`,borderRadius:8,padding:"9px 11px",color:TEAL,fontSize:13,lineHeight:1.6,resize:"vertical",outline:"none",boxSizing:"border-box",fontStyle:c.firstLine?"normal":"italic"}} placeholder="e.g. I saw you're hiring a Senior Dev — love that your team uses React…"/>
+                      </div>
+                      <div style={{gridColumn:"1 / -1"}}>
                         <Label>Notes</Label>
                         <textarea defaultValue={c.notes} onBlur={e=>onUpdate(c.id,{notes:e.target.value})} rows={3} style={{width:"100%",background:"#131820",border:`1px solid ${BORDER}`,borderRadius:8,padding:"9px 11px",color:TEXT_BRIGHT,fontSize:13,lineHeight:1.6,resize:"vertical",outline:"none",boxSizing:"border-box"}} placeholder="Notes about this contact…"/>
                       </div>
@@ -517,6 +690,7 @@ function CRMTab({contacts,onAdd,onUpdate,onDelete}) {
                   <div key={c.id} style={{background:CARD_BG,border:`1px solid ${BORDER}`,borderRadius:9,padding:"11px 13px",cursor:"pointer"}} onClick={()=>openEdit(c)}>
                     <div style={{fontWeight:700,fontSize:13,marginBottom:2}}>{c.company}</div>
                     {c.contactName&&<div style={{fontSize:11,color:TEXT_DIM}}>{c.contactName}</div>}
+                    {c.firstLine&&<div style={{fontSize:10,color:TEAL,marginTop:4,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:180}} title={c.firstLine}>✦ {c.firstLine.slice(0,60)}{c.firstLine.length>60?"…":""}</div>}
                     {c.industry&&<div style={{fontSize:10,background:"#1A2035",borderRadius:4,padding:"2px 6px",display:"inline-block",marginTop:5,color:TEXT_DIM}}>{c.industry}</div>}
                   </div>
                 ))}
@@ -547,13 +721,30 @@ function CRMTab({contacts,onAdd,onUpdate,onDelete}) {
           <div style={{background:"#161B28",border:`1px solid ${BORDER}`,borderRadius:16,padding:"26px 26px 22px",width:"100%",maxWidth:540,maxHeight:"90vh",overflowY:"auto"}}>
             <div style={{fontWeight:800,fontSize:16,marginBottom:20}}>{editingId?"Edit Contact":"Add New Contact"}</div>
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
+              {/* Group selector */}
+              <div style={{gridColumn:"1 / -1"}}>
+                <Label>Contact Group</Label>
+                <div style={{display:"flex",gap:8}}>
+                  {CONTACT_GROUPS.map(g=>(
+                    <button key={g.value} onClick={()=>setForm(p=>({...p,group:g.value}))} style={{
+                      flex:1,background:(form.group||"employers")===g.value?`${g.color}18`:"#0D1020",
+                      border:`1px solid ${(form.group||"employers")===g.value?g.color+"55":BORDER}`,
+                      borderRadius:8,padding:"8px 12px",cursor:"pointer",
+                      display:"flex",alignItems:"center",justifyContent:"center",gap:6,transition:"all 0.15s"
+                    }}>
+                      <span style={{fontSize:14}}>{g.icon}</span>
+                      <span style={{fontSize:13,fontWeight:(form.group||"employers")===g.value?700:500,color:(form.group||"employers")===g.value?g.color:TEXT_DIM}}>{g.label}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
               {[
-                {label:"Company Name *",key:"company",placeholder:"Acme Corp"},
+                {label:"Company / Organization *",key:"company",placeholder:"Acme Corp / MacEwan University"},
                 {label:"Contact Name",key:"contactName",placeholder:"Jane Smith"},
-                {label:"Job Title",key:"title",placeholder:"HR Manager"},
+                {label:"Job Title",key:"title",placeholder:"HR Manager / Career Advisor"},
                 {label:"Email",key:"email",placeholder:"jane@acme.com"},
                 {label:"Phone",key:"phone",placeholder:"780-555-0000"},
-                {label:"Source",key:"source",placeholder:"Indeed, LinkedIn, Referral…"},
+                {label:"Source",key:"source",placeholder:"Indeed, LinkedIn, Apollo, Referral…"},
               ].map(f=>(
                 <div key={f.key}>
                   <Label>{f.label}</Label>
@@ -575,6 +766,10 @@ function CRMTab({contacts,onAdd,onUpdate,onDelete}) {
                 <select value={form.status} onChange={e=>setForm(p=>({...p,status:e.target.value}))} style={{width:"100%",background:"#0D1020",border:`1px solid ${BORDER}`,borderRadius:8,padding:"8px 11px",color:TEXT_MID,fontSize:13,outline:"none"}}>
                   {STATUS_OPTIONS.map(s=><option key={s.value} value={s.value}>{s.label}</option>)}
                 </select>
+              </div>
+              <div style={{gridColumn:"1 / -1"}}>
+                <Label>Personalized First Line <span style={{color:TEAL,fontWeight:500,textTransform:"none",letterSpacing:0,fontSize:10}}>(exported as "personalization" for Instantly.ai)</span></Label>
+                <textarea value={form.firstLine||""} onChange={e=>setForm(p=>({...p,firstLine:e.target.value}))} rows={2} placeholder="e.g. I saw you're hiring a Senior Dev — love that your team uses React…" style={{width:"100%",background:"#0D1020",border:`1px solid ${TEAL}33`,borderRadius:8,padding:"8px 11px",color:TEXT_BRIGHT,fontSize:13,resize:"vertical",outline:"none",boxSizing:"border-box"}}/>
               </div>
               <div style={{gridColumn:"1 / -1"}}>
                 <Label>Notes</Label>
