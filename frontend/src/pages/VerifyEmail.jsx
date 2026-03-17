@@ -76,7 +76,7 @@ export default function VerifyEmail() {
 
       <div className="w-full max-w-md relative z-10">
         <Link to="/" className="flex items-center gap-2 mb-8 justify-center">
-          <img src="/logo.png" alt="Hireabble" className="w-10 h-10 rounded-xl" />
+          <img src="/logo.svg" alt="Hireabble" className="w-10 h-10 rounded-xl" />
           <span className="text-xl font-bold font-['Outfit']">Hireabble</span>
         </Link>
 

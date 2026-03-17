@@ -26,3 +26,67 @@ export function getPaymentMethod() {
   if (isAndroid) return 'google_play';
   return 'stripe';
 }
+
+/**
+ * Secure token storage abstraction.
+ * Uses Capacitor Preferences (encrypted on native) when available,
+ * falls back to localStorage on web.
+ */
+let _Preferences = null;
+const _preferencesReady = isNative
+  ? import('@capacitor/preferences').then(m => { _Preferences = m.Preferences; }).catch(() => {})
+  : Promise.resolve();
+
+export const secureStorage = {
+  async get(key) {
+    if (isNative) {
+      await _preferencesReady;
+      if (_Preferences) {
+        const { value } = await _Preferences.get({ key });
+        return value;
+      }
+    }
+    return localStorage.getItem(key);
+  },
+
+  async set(key, value) {
+    if (isNative) {
+      await _preferencesReady;
+      if (_Preferences) {
+        await _Preferences.set({ key, value });
+        return;
+      }
+    }
+    localStorage.setItem(key, value);
+  },
+
+  async remove(key) {
+    if (isNative) {
+      await _preferencesReady;
+      if (_Preferences) {
+        await _Preferences.remove({ key });
+        return;
+      }
+    }
+    localStorage.removeItem(key);
+  },
+
+  async clear() {
+    if (isNative) {
+      await _preferencesReady;
+      if (_Preferences) {
+        await _Preferences.clear();
+        return;
+      }
+    }
+    // Only clear hireabble-specific keys
+    const keysToRemove = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k && (k === 'token' || k === 'cached_user' || k.startsWith('hireabble_'))) {
+        keysToRemove.push(k);
+      }
+    }
+    keysToRemove.forEach(k => localStorage.removeItem(k));
+  }
+};

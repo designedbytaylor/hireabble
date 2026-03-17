@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import axios from 'axios';
+import { isNative, secureStorage } from '../utils/capacitor';
 
 const AuthContext = createContext(null);
 
@@ -52,12 +53,14 @@ export const AuthProvider = ({ children }) => {
           if (!controller.signal.aborted) {
             setUser(response.data);
             localStorage.setItem('cached_user', JSON.stringify(response.data));
+            if (isNative) secureStorage.set('cached_user', JSON.stringify(response.data));
           }
         } catch (error) {
           if (controller.signal.aborted) return;
           console.error('Auth initialization failed:', error);
           localStorage.removeItem('token');
           localStorage.removeItem('cached_user');
+          if (isNative) { secureStorage.remove('token'); secureStorage.remove('cached_user'); }
           setToken(null);
         }
       }
@@ -80,6 +83,7 @@ export const AuthProvider = ({ children }) => {
         if (status === 401 && detail && !error.config?.url?.includes('/auth/login')) {
           localStorage.removeItem('token');
           localStorage.removeItem('cached_user');
+          if (isNative) { secureStorage.remove('token'); secureStorage.remove('cached_user'); }
           setToken(null);
           setUser(null);
           window.location.href = '/login';
@@ -87,6 +91,7 @@ export const AuthProvider = ({ children }) => {
         if (status === 403 && detail?.includes('banned')) {
           localStorage.removeItem('token');
           localStorage.removeItem('cached_user');
+          if (isNative) { secureStorage.remove('token'); secureStorage.remove('cached_user'); }
           setToken(null);
           setUser(null);
           window.location.href = '/login?reason=banned';
@@ -97,28 +102,44 @@ export const AuthProvider = ({ children }) => {
     return () => axios.interceptors.response.eject(interceptor);
   }, []);
 
+  const persistToken = useCallback((newToken, userData) => {
+    localStorage.setItem('token', newToken);
+    localStorage.setItem('cached_user', JSON.stringify(userData));
+    if (isNative) {
+      secureStorage.set('token', newToken);
+      secureStorage.set('cached_user', JSON.stringify(userData));
+    }
+  }, []);
+
+  const clearPersistedToken = useCallback(() => {
+    localStorage.removeItem('token');
+    localStorage.removeItem('cached_user');
+    if (isNative) {
+      secureStorage.remove('token');
+      secureStorage.remove('cached_user');
+    }
+  }, []);
+
   const login = useCallback(async (email, password) => {
     const response = await axios.post(`${API}/auth/login`, { email, password });
     const { token: newToken, user: userData } = response.data;
-    localStorage.setItem('token', newToken);
-    localStorage.setItem('cached_user', JSON.stringify(userData));
+    persistToken(newToken, userData);
     setToken(newToken);
     setUser(userData);
     return userData;
-  }, []);
+  }, [persistToken]);
 
   const register = useCallback(async (userData) => {
     const response = await axios.post(`${API}/auth/register`, userData);
     const { token: newToken, user: newUser, promo } = response.data;
-    localStorage.setItem('token', newToken);
-    localStorage.setItem('cached_user', JSON.stringify(newUser));
+    persistToken(newToken, newUser);
     setToken(newToken);
     setUser(newUser);
     if (promo) {
       newUser._promoApplied = promo;
     }
     return newUser;
-  }, []);
+  }, [persistToken]);
 
   const loginWithToken = useCallback(async (impersonateToken) => {
     // Abort any in-flight auth initialization to prevent it from overwriting
@@ -130,9 +151,8 @@ export const AuthProvider = ({ children }) => {
     // Clear stale cached user to prevent flash of wrong identity
     setUser(null);
 
-    // Clear ALL user data from localStorage
-    localStorage.removeItem('token');
-    localStorage.removeItem('cached_user');
+    // Clear ALL user data from localStorage and secure storage
+    clearPersistedToken();
     const keysToRemove = [];
     for (let i = 0; i < localStorage.length; i++) {
       const key = localStorage.key(i);
@@ -150,30 +170,33 @@ export const AuthProvider = ({ children }) => {
     // Skip the useEffect auth init that setToken will trigger —
     // we handle the /auth/me fetch directly below.
     skipNextAuthInit.current = true;
-    localStorage.setItem('token', impersonateToken);
+    persistToken(impersonateToken, {});
     setToken(impersonateToken);
     try {
       const response = await axios.get(`${API}/auth/me?_=${Date.now()}`, {
         headers: { Authorization: `Bearer ${impersonateToken}` }
       });
       setUser(response.data);
-      localStorage.setItem('cached_user', JSON.stringify(response.data));
+      persistToken(impersonateToken, response.data);
       return response.data;
     } catch {
-      localStorage.removeItem('token');
-      localStorage.removeItem('cached_user');
+      clearPersistedToken();
       setToken(null);
       return null;
     }
-  }, []);
+  }, [persistToken, clearPersistedToken]);
 
   const logout = useCallback(() => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('cached_user');
+    clearPersistedToken();
     setToken(null);
     setUser(null);
     // Purge all SW caches so next login doesn't see stale user data
     try { caches.keys().then(names => names.forEach(n => caches.delete(n))); } catch (_) { /* ok */ }
+  }, [clearPersistedToken]);
+
+  const cacheUser = useCallback((userData) => {
+    localStorage.setItem('cached_user', JSON.stringify(userData));
+    if (isNative) secureStorage.set('cached_user', JSON.stringify(userData));
   }, []);
 
   const updateProfile = useCallback(async (updates) => {
@@ -181,9 +204,9 @@ export const AuthProvider = ({ children }) => {
       headers: { Authorization: `Bearer ${token}` }
     });
     setUser(response.data);
-    localStorage.setItem('cached_user', JSON.stringify(response.data));
+    cacheUser(response.data);
     return response.data;
-  }, [token]);
+  }, [token, cacheUser]);
 
   const refreshUser = useCallback(async () => {
     if (!token) return null;
@@ -191,17 +214,17 @@ export const AuthProvider = ({ children }) => {
       headers: { Authorization: `Bearer ${token}` }
     });
     setUser(response.data);
-    localStorage.setItem('cached_user', JSON.stringify(response.data));
+    cacheUser(response.data);
     return response.data;
-  }, [token]);
+  }, [token, cacheUser]);
 
   const patchUser = useCallback((updates) => {
     setUser(prev => {
       const next = { ...prev, ...updates };
-      localStorage.setItem('cached_user', JSON.stringify(next));
+      cacheUser(next);
       return next;
     });
-  }, []);
+  }, [cacheUser]);
 
   const value = useMemo(() => ({
     user, token, loading, login, loginWithToken, register, logout, updateProfile, refreshUser, patchUser

@@ -8,6 +8,11 @@
           "/download/*",
           "/company/*",
           "/jobs/*",
+          "/chat/*",
+          "/matches",
+          "/matches/*",
+          "/messages",
+          "/messages/*",
           "/reset-password*",
           "/verify-email*",
           "/"

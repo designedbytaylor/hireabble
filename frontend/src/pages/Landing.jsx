@@ -20,7 +20,7 @@ export default function Landing() {
         {/* Center: Logo + Tagline */}
         <div className="text-center space-y-6">
           <div className="flex items-center justify-center gap-3 mb-2">
-            <img src="/logo-white.png" alt="Hireabble" className="w-16 h-16 drop-shadow-lg" />
+            <img src="/logo-white.svg" alt="Hireabble" className="w-16 h-16 drop-shadow-lg" />
           </div>
           <h1 className="text-5xl md:text-7xl font-bold font-['Outfit'] text-white tracking-tight">
             hireabble
@@ -46,6 +46,14 @@ export default function Landing() {
               data-testid="hero-recruiter-btn"
             >
               I'm Hiring
+            </button>
+          </Link>
+          <Link to="/browse" className="block">
+            <button
+              className="w-full py-3 rounded-full text-white/80 font-medium text-base hover:text-white active:scale-[0.98] transition-all border border-white/15"
+              data-testid="browse-jobs-btn"
+            >
+              Browse Jobs
             </button>
           </Link>
           <Link to="/login" className="block">

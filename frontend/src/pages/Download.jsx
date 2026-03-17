@@ -83,7 +83,7 @@ export default function Download() {
         {/* Logo + branding */}
         <div className="text-center mb-8">
           <div className="flex items-center justify-center gap-3 mb-3">
-            <img src="/logo-white.png" alt="Hireabble" className="w-14 h-14 drop-shadow-lg" />
+            <img src="/logo-white.svg" alt="Hireabble" className="w-14 h-14 drop-shadow-lg" />
           </div>
           <h1 className="text-4xl font-bold font-['Outfit'] text-white tracking-tight">
             hireabble

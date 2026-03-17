@@ -906,7 +906,7 @@ export default function SeekerDashboard() {
       {/* Slim Header */}
       <header className="relative z-20 px-4 pt-4 pb-3 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-2.5">
-          <img src="/logo-white.png" alt="Hireabble" className="w-8 h-8" />
+          <img src="/logo-white.svg" alt="Hireabble" className="w-8 h-8" />
           <h1 className="text-lg font-bold font-['Outfit']">hireabble</h1>
         </div>
         <div className="flex items-center gap-1">
