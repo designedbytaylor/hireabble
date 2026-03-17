@@ -2326,3 +2326,46 @@ async def update_app_store_settings(
         os.environ["APPLE_SHARED_SECRET"] = updates["apple_shared_secret"]
 
     return {"message": "App store settings updated", "settings": {k: current.get(k, "") for k in APP_STORE_SETTINGS_FIELDS}}
+
+
+# ==================== MARKETING DASHBOARD ====================
+
+MARKETING_SETTINGS_KEY = "marketing_dashboard"
+
+
+@router.get("/admin/marketing")
+async def get_marketing_data(admin=Depends(get_current_admin)):
+    """Get marketing dashboard data (checklist, emails, notes, metrics)."""
+    doc = await db.site_settings.find_one({"key": MARKETING_SETTINGS_KEY})
+    data = doc.get("value", {}) if doc else {}
+    return {
+        "checklist": data.get("checklist"),
+        "emails": data.get("emails"),
+        "notes": data.get("notes", ""),
+        "metrics": data.get("metrics", {"employers": 0, "seekers": 0, "matches": 0, "emailsSent": 0}),
+    }
+
+
+@router.put("/admin/marketing")
+async def update_marketing_data(
+    body: dict = Body(...),
+    admin=Depends(get_current_admin),
+):
+    """Update marketing dashboard data. Accepts any subset of: checklist, emails, notes, metrics."""
+    allowed_keys = {"checklist", "emails", "notes", "metrics"}
+    updates = {k: v for k, v in body.items() if k in allowed_keys}
+    if not updates:
+        raise HTTPException(status_code=400, detail="No valid fields provided")
+
+    # Merge with existing data
+    doc = await db.site_settings.find_one({"key": MARKETING_SETTINGS_KEY})
+    current = doc.get("value", {}) if doc else {}
+    current.update(updates)
+
+    await db.site_settings.update_one(
+        {"key": MARKETING_SETTINGS_KEY},
+        {"$set": {"key": MARKETING_SETTINGS_KEY, "value": current, "updated_at": datetime.now(timezone.utc)}},
+        upsert=True,
+    )
+
+    return {"message": "Marketing data saved"}

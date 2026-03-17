@@ -1,4 +1,9 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
+import axios from "axios";
+import { useAdminAuth } from "../../context/AdminAuthContext";
+import { toast } from "sonner";
+
+const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
 // ─── CONSTANTS ────────────────────────────────────────────────────────────────
 const TEAL = "#00BFA6";
@@ -183,24 +188,9 @@ Taylor`,
   },
 ];
 
-// ─── STORAGE HELPERS ─────────────────────────────────────────────────────────
-function loadStorage(key, fallback) {
-  try {
-    const raw = localStorage.getItem(key);
-    return raw ? JSON.parse(raw) : fallback;
-  } catch {
-    return fallback;
-  }
-}
-
-function saveStorage(key, value) {
-  try {
-    localStorage.setItem(key, JSON.stringify(value));
-  } catch {}
-}
-
 // ─── MAIN COMPONENT ──────────────────────────────────────────────────────────
 export default function AdminMarketing() {
+  const { token } = useAdminAuth();
   const [activeTab, setActiveTab] = useState("Overview");
   const [checklist, setChecklist] = useState(INITIAL_CHECKLIST);
   const [emails, setEmails] = useState(EMAIL_TEMPLATES);
@@ -215,32 +205,47 @@ export default function AdminMarketing() {
   const [metricsEditing, setMetricsEditing] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const notesTimer = useRef(null);
+  const saveTimer = useRef(null);
 
-  // Load from storage
+  // Save a subset of fields to the API (debounced by caller)
+  const saveToApi = useCallback(async (fields) => {
+    try {
+      await axios.put(`${API}/admin/marketing`, fields, { headers: { Authorization: `Bearer ${token}` } });
+    } catch {
+      // Silent fail — data will be retried on next change
+    }
+  }, [token]);
+
+  // Load from API
   useEffect(() => {
-    const cl = loadStorage("mkdash_checklist", INITIAL_CHECKLIST);
-    const em = loadStorage("mkdash_emails", EMAIL_TEMPLATES);
-    const nt = loadStorage("mkdash_notes", "");
-    const mt = loadStorage("mkdash_metrics", { employers: 0, seekers: 0, matches: 0, emailsSent: 0 });
-    setChecklist(cl);
-    setEmails(em);
-    setNotes(nt);
-    setMetrics(mt);
-    setLoaded(true);
-  }, []);
+    (async () => {
+      try {
+        const res = await axios.get(`${API}/admin/marketing`, { headers: { Authorization: `Bearer ${token}` } });
+        const data = res.data;
+        if (data.checklist) setChecklist(data.checklist);
+        if (data.emails) setEmails(data.emails);
+        if (data.notes !== undefined) setNotes(data.notes);
+        if (data.metrics) setMetrics(data.metrics);
+      } catch {
+        // First load — no data yet, use defaults
+      }
+      setLoaded(true);
+    })();
+  }, [token]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Persist
-  useEffect(() => { if (loaded) saveStorage("mkdash_checklist", checklist); }, [checklist, loaded]);
-  useEffect(() => { if (loaded) saveStorage("mkdash_emails", emails); }, [emails, loaded]);
-  useEffect(() => { if (loaded) saveStorage("mkdash_metrics", metrics); }, [metrics, loaded]);
+  // Debounced save for checklist, emails, metrics
+  const debouncedSave = useCallback((fields) => {
+    clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(() => saveToApi(fields), 800);
+  }, [saveToApi]);
 
   // Notes autosave
   const handleNotesChange = (val) => {
     setNotes(val);
     setNotesSaved(false);
     clearTimeout(notesTimer.current);
-    notesTimer.current = setTimeout(() => {
-      saveStorage("mkdash_notes", val);
+    notesTimer.current = setTimeout(async () => {
+      await saveToApi({ notes: val });
       setNotesSaved(true);
       setTimeout(() => setNotesSaved(false), 2000);
     }, 1000);
@@ -248,10 +253,14 @@ export default function AdminMarketing() {
 
   // Checklist helpers
   const toggleItem = (group, id) => {
-    setChecklist(prev => ({
-      ...prev,
-      [group]: prev[group].map(item => item.id === id ? { ...item, done: !item.done } : item)
-    }));
+    setChecklist(prev => {
+      const updated = {
+        ...prev,
+        [group]: prev[group].map(item => item.id === id ? { ...item, done: !item.done } : item)
+      };
+      debouncedSave({ checklist: updated });
+      return updated;
+    });
   };
 
   const totalItems = Object.values(checklist).flat().length;
@@ -260,8 +269,13 @@ export default function AdminMarketing() {
 
   // Email helpers
   const saveEmail = (id, subject, body) => {
-    setEmails(prev => prev.map(e => e.id === id ? { ...e, subject, body } : e));
+    setEmails(prev => {
+      const updated = prev.map(e => e.id === id ? { ...e, subject, body } : e);
+      debouncedSave({ emails: updated });
+      return updated;
+    });
     setEditingEmail(null);
+    toast.success("Email template saved");
   };
 
   // AI email generation
@@ -298,7 +312,11 @@ export default function AdminMarketing() {
 
   const applyAiResult = () => {
     if (!aiTarget || !aiResult) return;
-    setEmails(prev => prev.map(e => e.id === aiTarget ? { ...e, body: aiResult } : e));
+    setEmails(prev => {
+      const updated = prev.map(e => e.id === aiTarget ? { ...e, body: aiResult } : e);
+      debouncedSave({ emails: updated });
+      return updated;
+    });
     setAiResult("");
     setAiTarget(null);
     setAiPrompt("");
@@ -361,7 +379,13 @@ export default function AdminMarketing() {
             ))}
           </div>
           <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 28 }}>
-            <Btn onClick={() => setMetricsEditing(v => !v)} secondary>{metricsEditing ? "Save Metrics" : "Update Metrics"}</Btn>
+            <Btn onClick={() => {
+              if (metricsEditing) {
+                saveToApi({ metrics });
+                toast.success("Metrics saved");
+              }
+              setMetricsEditing(v => !v);
+            }} secondary>{metricsEditing ? "Save Metrics" : "Update Metrics"}</Btn>
           </div>
 
           {/* Progress Bar */}
