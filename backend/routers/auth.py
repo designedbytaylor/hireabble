@@ -56,6 +56,17 @@ async def register(user: UserCreate, request: Request):
             except ValueError:
                 raise HTTPException(status_code=400, detail="Invalid date of birth format")
 
+        # Password strength validation
+        if len(user.password) < 8:
+            raise HTTPException(status_code=400, detail="Password must be at least 8 characters")
+        import re as _re
+        if not _re.search(r'[A-Z]', user.password):
+            raise HTTPException(status_code=400, detail="Password must contain at least one uppercase letter")
+        if not _re.search(r'[0-9]', user.password):
+            raise HTTPException(status_code=400, detail="Password must contain at least one number")
+        if not _re.search(r'[^A-Za-z0-9]', user.password):
+            raise HTTPException(status_code=400, detail="Password must contain at least one special character")
+
         # Content moderation on registration fields
         is_clean, violations = check_fields({"name": user.name, "company": user.company or ""})
         if not is_clean and is_severe(violations):
@@ -406,8 +417,15 @@ async def change_password(request: ChangePasswordRequest, current_user: dict = D
         raise HTTPException(status_code=400, detail="Current password is incorrect")
     
     # Validate new password
-    if len(request.new_password) < 6:
-        raise HTTPException(status_code=400, detail="New password must be at least 6 characters")
+    if len(request.new_password) < 8:
+        raise HTTPException(status_code=400, detail="New password must be at least 8 characters")
+    import re as _re
+    if not _re.search(r'[A-Z]', request.new_password):
+        raise HTTPException(status_code=400, detail="Password must contain at least one uppercase letter")
+    if not _re.search(r'[0-9]', request.new_password):
+        raise HTTPException(status_code=400, detail="Password must contain at least one number")
+    if not _re.search(r'[^A-Za-z0-9]', request.new_password):
+        raise HTTPException(status_code=400, detail="Password must contain at least one special character")
     
     # Update password
     hashed_password = hash_password(request.new_password)

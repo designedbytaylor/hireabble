@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { Mail, Lock, ArrowRight, Eye, EyeOff } from 'lucide-react';
 import { Button } from '../components/ui/button';
@@ -13,27 +13,10 @@ export default function Login() {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
-  const { login, loginWithToken } = useAuth();
+  const { login } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const role = searchParams.get('role') === 'recruiter' ? 'recruiter' : 'seeker';
-
-  // Handle impersonation from admin test links
-  useEffect(() => {
-    const impersonateToken = searchParams.get('impersonate');
-    const redirect = searchParams.get('redirect') || '/dashboard';
-    if (impersonateToken) {
-      loginWithToken(impersonateToken).then(user => {
-        if (user) {
-          toast.success(`Logged in as ${user.name}`);
-          navigate(redirect, { replace: true });
-        } else {
-          toast.error('Impersonation failed');
-        }
-      });
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   const handleSubmit = async (e) => {
     e.preventDefault();

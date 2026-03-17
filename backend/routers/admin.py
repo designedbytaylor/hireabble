@@ -83,8 +83,15 @@ async def admin_me(admin: dict = Depends(get_current_admin)):
 async def admin_change_password(payload: dict, admin: dict = Depends(get_current_admin)):
     """Change the current admin's password."""
     new_password = payload.get("new_password", "")
-    if len(new_password) < 6:
-        raise HTTPException(status_code=400, detail="Password must be at least 6 characters")
+    if len(new_password) < 8:
+        raise HTTPException(status_code=400, detail="Password must be at least 8 characters")
+    import re as _re
+    if not _re.search(r'[A-Z]', new_password):
+        raise HTTPException(status_code=400, detail="Password must contain at least one uppercase letter")
+    if not _re.search(r'[0-9]', new_password):
+        raise HTTPException(status_code=400, detail="Password must contain at least one number")
+    if not _re.search(r'[^A-Za-z0-9]', new_password):
+        raise HTTPException(status_code=400, detail="Password must contain at least one special character")
     await db.admin_users.update_one(
         {"id": admin["id"]},
         {"$set": {"password": hash_password(new_password)}}
@@ -118,8 +125,8 @@ async def create_staff(payload: dict, admin: dict = Depends(get_current_admin)):
         raise HTTPException(status_code=400, detail="Email, password, and name are required")
     if role not in ("admin", "support"):
         raise HTTPException(status_code=400, detail="Role must be 'admin' or 'support'")
-    if len(password) < 6:
-        raise HTTPException(status_code=400, detail="Password must be at least 6 characters")
+    if len(password) < 8:
+        raise HTTPException(status_code=400, detail="Password must be at least 8 characters")
 
     existing = await db.admin_users.find_one({"email": email})
     if existing:
@@ -2326,6 +2333,103 @@ async def update_app_store_settings(
         os.environ["APPLE_SHARED_SECRET"] = updates["apple_shared_secret"]
 
     return {"message": "App store settings updated", "settings": {k: current.get(k, "") for k in APP_STORE_SETTINGS_FIELDS}}
+
+
+# ==================== PRICING MANAGEMENT ====================
+
+PRICING_OVERRIDES_KEY = "pricing_overrides"
+
+
+@router.get("/admin/pricing")
+async def get_pricing(admin=Depends(get_current_admin)):
+    """Get all pricing: default definitions + any admin overrides."""
+    from routers.payments import SUBSCRIPTION_TIERS, PRODUCTS
+
+    doc = await db.site_settings.find_one({"key": PRICING_OVERRIDES_KEY})
+    overrides = doc.get("value", {}) if doc else {}
+
+    # Build tiers response with effective prices
+    tiers = {}
+    for tier_id, tier in SUBSCRIPTION_TIERS.items():
+        tier_overrides = overrides.get("tiers", {}).get(tier_id, {})
+        effective_prices = {**tier["prices"]}
+        for dur in ("weekly", "monthly", "6month"):
+            if dur in (tier_overrides.get("prices") or {}):
+                effective_prices[dur] = tier_overrides["prices"][dur]
+        tiers[tier_id] = {
+            "name": tier["name"],
+            "role": tier["role"],
+            "tier_level": tier["tier_level"],
+            "default_prices": tier["prices"],
+            "prices": effective_prices,
+            "apple_product_ids": tier.get("apple_product_ids", {}),
+            "google_product_ids": tier.get("google_product_ids", {}),
+        }
+
+    # Build products response with effective prices
+    products = {}
+    for prod_id, prod in PRODUCTS.items():
+        prod_overrides = overrides.get("products", {}).get(prod_id, {})
+        products[prod_id] = {
+            "name": prod["name"],
+            "default_price": prod["price"],
+            "price": prod_overrides.get("price", prod["price"]),
+            "apple_product_id": prod.get("apple_product_id", ""),
+            "google_product_id": prod.get("google_product_id", ""),
+        }
+
+    return {"tiers": tiers, "products": products}
+
+
+@router.put("/admin/pricing")
+async def update_pricing(
+    body: dict = Body(...),
+    admin=Depends(get_current_admin),
+):
+    """Update pricing overrides. Body: {tiers: {tier_id: {prices: {weekly, monthly, 6month}}}, products: {prod_id: {price}}}."""
+    doc = await db.site_settings.find_one({"key": PRICING_OVERRIDES_KEY})
+    current = doc.get("value", {}) if doc else {}
+
+    # Merge tier overrides
+    if "tiers" in body and isinstance(body["tiers"], dict):
+        if "tiers" not in current:
+            current["tiers"] = {}
+        for tier_id, tier_data in body["tiers"].items():
+            if tier_id not in current["tiers"]:
+                current["tiers"][tier_id] = {}
+            if "prices" in tier_data and isinstance(tier_data["prices"], dict):
+                if "prices" not in current["tiers"][tier_id]:
+                    current["tiers"][tier_id]["prices"] = {}
+                for dur, price in tier_data["prices"].items():
+                    if dur in ("weekly", "monthly", "6month") and isinstance(price, (int, float)):
+                        current["tiers"][tier_id]["prices"][dur] = int(price)
+
+    # Merge product overrides
+    if "products" in body and isinstance(body["products"], dict):
+        if "products" not in current:
+            current["products"] = {}
+        for prod_id, prod_data in body["products"].items():
+            if prod_id not in current["products"]:
+                current["products"][prod_id] = {}
+            if "price" in prod_data and isinstance(prod_data["price"], (int, float)):
+                current["products"][prod_id]["price"] = int(prod_data["price"])
+
+    await db.site_settings.update_one(
+        {"key": PRICING_OVERRIDES_KEY},
+        {"$set": {"key": PRICING_OVERRIDES_KEY, "value": current, "updated_at": datetime.now(timezone.utc)}},
+        upsert=True,
+    )
+
+    logger.info(f"Admin {admin['id']} updated pricing overrides")
+    return {"message": "Pricing updated successfully"}
+
+
+@router.delete("/admin/pricing/reset")
+async def reset_pricing(admin=Depends(get_current_admin)):
+    """Reset all pricing back to defaults (removes all overrides)."""
+    await db.site_settings.delete_one({"key": PRICING_OVERRIDES_KEY})
+    logger.info(f"Admin {admin['id']} reset pricing to defaults")
+    return {"message": "Pricing reset to defaults"}
 
 
 # ==================== MARKETING DASHBOARD ====================
