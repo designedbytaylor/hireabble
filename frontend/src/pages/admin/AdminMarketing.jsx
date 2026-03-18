@@ -247,16 +247,13 @@ export default function AdminMarketing() {
     setAiLoading(true); setAiResult(""); setAiTarget(emailId);
     const targetEmail = emails.find(e => e.id === emailId);
     try {
-      const res = await fetch("https://api.anthropic.com/v1/messages", {
-        method:"POST", headers:{"Content-Type":"application/json"},
-        body: JSON.stringify({ model:"claude-sonnet-4-20250514", max_tokens:1000,
-          system:"You are an expert cold email copywriter. Write concise, human, non-spammy emails. Plain text only, under 150 words. Return ONLY the email body, no subject line, no preamble.",
-          messages:[{ role:"user", content: customPrompt ? `Rewrite this email based on: "${customPrompt}"\n\nCurrent email:\n${targetEmail?.body||""}` : `Write a cold email for Hireabble (swipe-based job matching app, Edmonton launch). Target audience: ${targetEmail?.label}. Under 120 words.` }]
-        })
-      });
-      const data = await res.json();
-      setAiResult(data.content?.map(b=>b.text||"").join("") || "Error generating.");
-    } catch { setAiResult("Error connecting to Claude API."); }
+      const res = await axios.post(`${API}/admin/marketing/ai-generate`, {
+        system: "You are an expert cold email copywriter. Write concise, human, non-spammy emails. Plain text only, under 150 words. Return ONLY the email body, no subject line, no preamble.",
+        message: customPrompt ? `Rewrite this email based on: "${customPrompt}"\n\nCurrent email:\n${targetEmail?.body||""}` : `Write a cold email for Hireabble (swipe-based job matching app, Edmonton launch). Target audience: ${targetEmail?.label}. Under 120 words.`,
+        max_tokens: 1000,
+      }, { headers: { Authorization: `Bearer ${token}` } });
+      setAiResult(res.data.text || "Error generating.");
+    } catch { setAiResult("Error connecting to AI. Check that ANTHROPIC_API_KEY is set."); }
     setAiLoading(false);
   };
 
@@ -318,7 +315,7 @@ export default function AdminMarketing() {
       </div>
 
       {activeTab==="Overview" && <OverviewTab checklist={checklist} metrics={metrics} setMetrics={setMetrics} metricsEditing={metricsEditing} setMetricsEditing={setMetricsEditing} pct={pct} doneItems={doneItems} totalItems={totalItems} contacts={contacts} saveToApi={saveToApi}/>}
-      {activeTab==="CRM" && <CRMTab contacts={contacts} onAdd={addContact} onUpdate={updateContact} onDelete={deleteContact} onBulkAdd={bulkAddContacts}/>}
+      {activeTab==="CRM" && <CRMTab contacts={contacts} onAdd={addContact} onUpdate={updateContact} onDelete={deleteContact} onBulkAdd={bulkAddContacts} token={token}/>}
       {activeTab==="Checklist" && <ChecklistTab checklist={checklist} toggleItem={toggleItem} doneItems={doneItems} totalItems={totalItems} pct={pct} addPhase={addPhase} renamePhase={renamePhase} deletePhase={deletePhase} addItem={addItem} editItem={editItem} deleteItem={deleteItem} importItems={importItems}/>}
       {activeTab==="Emails" && <EmailsTab emails={emails} editingEmail={editingEmail} setEditingEmail={setEditingEmail} saveEmail={saveEmail} aiPrompt={aiPrompt} setAiPrompt={setAiPrompt} aiLoading={aiLoading} aiResult={aiResult} aiTarget={aiTarget} onGenerate={generateEmail} onApply={()=>{setEmails(prev=>{const updated=prev.map(e=>e.id===aiTarget?{...e,body:aiResult}:e);debouncedSave({emails:updated});return updated;});setAiResult("");setAiTarget(null);setAiPrompt("");}} onDiscardAi={()=>{setAiResult("");setAiTarget(null);}}/>}
       {activeTab==="Notes" && <NotesTab notes={notes} onChange={handleNotesChange} saved={notesSaved}/>}
@@ -400,7 +397,7 @@ function OverviewTab({checklist,metrics,setMetrics,metricsEditing,setMetricsEdit
 }
 
 // ─── CRM ──────────────────────────────────────────────────────────────────────
-function CRMTab({contacts,onAdd,onUpdate,onDelete,onBulkAdd}) {
+function CRMTab({contacts,onAdd,onUpdate,onDelete,onBulkAdd,token}) {
   const [view,setView]=useState("table");
   const [showForm,setShowForm]=useState(false);
   const [editingId,setEditingId]=useState(null);
@@ -572,28 +569,21 @@ function CRMTab({contacts,onAdd,onUpdate,onDelete,onBulkAdd}) {
       form.jobDescription && `Job posting/description:\n${form.jobDescription}`,
     ].filter(Boolean).join("\n");
     try {
-      const res = await fetch("https://api.anthropic.com/v1/messages", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          model: "claude-sonnet-4-20250514",
-          max_tokens: 600,
-          system: `You generate personalized cold email opening lines for Hireabble, a swipe-based job matching app launching in Edmonton. Generate exactly 4 different first lines, each a different angle. Each line should be 1-2 sentences max, warm but professional, and naturally lead into a pitch. Return ONLY a JSON array of objects with "angle" (2-3 word label) and "line" (the actual text). No markdown, no explanation.`,
-          messages: [{ role: "user", content: `Generate 4 personalized cold email first lines for this prospect:\n\n${context}` }],
-        }),
-      });
-      const data = await res.json();
-      const text = data.content?.map(b => b.text || "").join("") || "";
+      const res = await axios.post(`${API}/admin/marketing/ai-generate`, {
+        system: `You generate personalized cold email opening lines for Hireabble, a swipe-based job matching app launching in Edmonton. Generate exactly 4 different first lines, each a different angle. Each line should be 1-2 sentences max, warm but professional, and naturally lead into a pitch. Return ONLY a JSON array of objects with "angle" (2-3 word label) and "line" (the actual text). No markdown, no explanation.`,
+        message: `Generate 4 personalized cold email first lines for this prospect:\n\n${context}`,
+        max_tokens: 600,
+      }, { headers: { Authorization: `Bearer ${token}` } });
       try {
-        const parsed = JSON.parse(text);
+        const parsed = JSON.parse(res.data.text);
         if (Array.isArray(parsed)) setAiFirstLines(parsed);
         else setAiFirstLines([]);
       } catch {
         setAiFirstLines([]);
         toast.error("Failed to parse AI response");
       }
-    } catch {
-      toast.error("Error connecting to Claude API");
+    } catch (err) {
+      toast.error(err.response?.data?.detail || "Error connecting to AI");
     }
     setAiFirstLineLoading(false);
   };
