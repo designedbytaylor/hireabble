@@ -77,6 +77,16 @@ const AdminPricing = React.lazy(() => import("./pages/admin/AdminPricing"));
 const AdminMarketing = React.lazy(() => import("./pages/admin/AdminMarketing"));
 const Support = React.lazy(() => import("./pages/Support"));
 
+const NotFound = () => (
+  <div className="min-h-screen bg-background flex flex-col items-center justify-center p-8 text-center">
+    <h1 className="text-6xl font-bold mb-4">404</h1>
+    <p className="text-xl text-muted-foreground mb-6">Page not found</p>
+    <a href="/" className="px-6 py-3 rounded-full bg-primary text-white font-medium hover:opacity-90 transition-opacity">
+      Go Home
+    </a>
+  </div>
+);
+
 const PageSpinner = () => (
   <div className="min-h-screen bg-background flex items-center justify-center">
     <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
@@ -429,6 +439,9 @@ function AppRoutes() {
         <Route path="marketing" element={<AdminMarketing />} />
         <Route path="settings" element={<AdminSettings />} />
       </Route>
+
+      {/* 404 catch-all */}
+      <Route path="*" element={<NotFound />} />
     </Routes>
     </Suspense>
     </>
@@ -447,6 +460,11 @@ class ErrorBoundary extends React.Component {
 
   componentDidCatch(error, info) {
     console.error('App error:', error, info);
+    try {
+      import('@sentry/react').then(Sentry => {
+        Sentry.captureException(error, { extra: { componentStack: info?.componentStack } });
+      });
+    } catch { /* Sentry not available */ }
   }
 
   render() {

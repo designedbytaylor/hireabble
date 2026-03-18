@@ -1,0 +1,20 @@
+User-agent: *
+Allow: /
+Allow: /browse
+Allow: /terms
+Allow: /privacy
+Allow: /cookie-policy
+
+Disallow: /admin
+Disallow: /api
+Disallow: /dashboard
+Disallow: /recruiter
+Disallow: /onboarding
+Disallow: /profile
+Disallow: /matches
+Disallow: /messages
+Disallow: /chat
+Disallow: /impersonate
+Disallow: /upgrade
+
+Sitemap: https://hireabble.com/sitemap.xml
