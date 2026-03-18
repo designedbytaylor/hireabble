@@ -91,7 +91,7 @@ const EMAIL_TEMPLATES = [
   { id:"reddit_1", tag:"Community", label:"r/Edmonton Post", subject:"I built a job matching app for Edmonton — here's what I learned", body:"Hey r/Edmonton,\n\nI spent the last year building Hireabble — basically Tinder for jobs, built specifically for the Edmonton market.\n\nJob seekers build a short profile and swipe through matched local roles. Employers review candidates who swiped right. No cover letters, no resume black holes.\n\nA few things I learned:\n- Edmonton has an active hiring market not well-served by big national job boards\n- Most job seekers under 30 hate applying through Indeed\n- Employers waste huge time sifting unqualified applicants\n\nWe're in early stages and I'd love feedback. What's broken about your current job search or hiring experience?\n\nApp is free. Employers launching now get 1 year Enterprise free.\n\nAMA.\n\nTaylor" },
 ];
 
-const EMPTY_CONTACT = { id:"", company:"", contactName:"", title:"", email:"", phone:"", industry:"Other", source:"", status:"not_contacted", linkedIn:"", notes:"", dateAdded:"", lastContact:"", group:"employers", firstLine:"" };
+const EMPTY_CONTACT = { id:"", company:"", contactName:"", title:"", email:"", phone:"", industry:"Other", source:"", status:"not_contacted", linkedIn:"", notes:"", dateAdded:"", lastContact:"", group:"employers", firstLine:"", jobDescription:"" };
 
 function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2); }
 
@@ -411,6 +411,8 @@ function CRMTab({contacts,onAdd,onUpdate,onDelete,onBulkAdd}) {
   const [search,setSearch]=useState("");
   const [form,setForm]=useState({...EMPTY_CONTACT});
   const [confirmDelete,setConfirmDelete]=useState(null);
+  const [aiFirstLines,setAiFirstLines]=useState([]); // generated options
+  const [aiFirstLineLoading,setAiFirstLineLoading]=useState(false);
   const importRef = useRef(null);
 
   const groupContacts = contacts.filter(c => (c.group || "employers") === activeGroup);
@@ -421,8 +423,8 @@ function CRMTab({contacts,onAdd,onUpdate,onDelete,onBulkAdd}) {
     return true;
   });
   const statusInfo=(val)=>STATUS_OPTIONS.find(s=>s.value===val)||STATUS_OPTIONS[0];
-  const openAdd=()=>{setForm({...EMPTY_CONTACT,group:activeGroup});setEditingId(null);setShowForm(true);};
-  const openEdit=(c)=>{setForm({...c});setEditingId(c.id);setShowForm(true);};
+  const openAdd=()=>{setForm({...EMPTY_CONTACT,group:activeGroup});setEditingId(null);setAiFirstLines([]);setShowForm(true);};
+  const openEdit=(c)=>{setForm({...c});setEditingId(c.id);setAiFirstLines([]);setShowForm(true);};
   const handleSubmit=()=>{
     if(!form.company.trim())return;
     if(editingId){onUpdate(editingId,form);}else{onAdd(form);}
@@ -435,7 +437,7 @@ function CRMTab({contacts,onAdd,onUpdate,onDelete,onBulkAdd}) {
   const exportCSV = () => {
     const rows = filtered.length > 0 ? filtered : groupContacts;
     if (rows.length === 0) { toast.error("No contacts to export"); return; }
-    const headers = ["email","first_name","last_name","company_name","phone","personalization","website","linkedin_url","status","industry","source","notes"];
+    const headers = ["email","first_name","last_name","company_name","phone","personalization","website","linkedin_url","status","industry","source","job_description","notes"];
     const csvRows = [headers.join(",")];
     rows.forEach(c => {
       const nameParts = (c.contactName || "").split(" ");
@@ -453,6 +455,7 @@ function CRMTab({contacts,onAdd,onUpdate,onDelete,onBulkAdd}) {
         statusInfo(c.status).label,
         c.industry || "",
         c.source || "",
+        (c.jobDescription || "").replace(/[\n\r]+/g, " "),
         (c.notes || "").replace(/[\n\r]+/g, " "),
       ].map(v => `"${String(v).replace(/"/g, '""')}"`);
       csvRows.push(row.join(","));
@@ -511,6 +514,7 @@ function CRMTab({contacts,onAdd,onUpdate,onDelete,onBulkAdd}) {
         industry: ["industry","sector","vertical"],
         source: ["source","leadsource","lead_source","origin"],
         notes: ["notes","note","comments","comment"],
+        jobDescription: ["job_description","jobdescription","description","job_desc","jobdesc","posting"],
       };
       headerRow.forEach((h, idx) => {
         for (const [field, aliases] of Object.entries(fieldAliases)) {
@@ -541,6 +545,7 @@ function CRMTab({contacts,onAdd,onUpdate,onDelete,onBulkAdd}) {
           industry: get("industry") || "Other",
           source: get("source"),
           notes: get("notes"),
+          jobDescription: get("jobDescription"),
           group: activeGroup,
           status: "not_contacted",
         });
@@ -552,6 +557,45 @@ function CRMTab({contacts,onAdd,onUpdate,onDelete,onBulkAdd}) {
     };
     reader.readAsText(file);
     e.target.value = "";
+  };
+
+  // AI first line generation
+  const generateFirstLines = async () => {
+    if (!form.company && !form.jobDescription) { toast.error("Add a company name or job description first"); return; }
+    setAiFirstLineLoading(true);
+    setAiFirstLines([]);
+    const context = [
+      form.company && `Company: ${form.company}`,
+      form.contactName && `Contact: ${form.contactName}`,
+      form.title && `Their title: ${form.title}`,
+      form.industry && `Industry: ${form.industry}`,
+      form.jobDescription && `Job posting/description:\n${form.jobDescription}`,
+    ].filter(Boolean).join("\n");
+    try {
+      const res = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: "claude-sonnet-4-20250514",
+          max_tokens: 600,
+          system: `You generate personalized cold email opening lines for Hireabble, a swipe-based job matching app launching in Edmonton. Generate exactly 4 different first lines, each a different angle. Each line should be 1-2 sentences max, warm but professional, and naturally lead into a pitch. Return ONLY a JSON array of objects with "angle" (2-3 word label) and "line" (the actual text). No markdown, no explanation.`,
+          messages: [{ role: "user", content: `Generate 4 personalized cold email first lines for this prospect:\n\n${context}` }],
+        }),
+      });
+      const data = await res.json();
+      const text = data.content?.map(b => b.text || "").join("") || "";
+      try {
+        const parsed = JSON.parse(text);
+        if (Array.isArray(parsed)) setAiFirstLines(parsed);
+        else setAiFirstLines([]);
+      } catch {
+        setAiFirstLines([]);
+        toast.error("Failed to parse AI response");
+      }
+    } catch {
+      toast.error("Error connecting to Claude API");
+    }
+    setAiFirstLineLoading(false);
   };
 
   return(
@@ -658,6 +702,10 @@ function CRMTab({contacts,onAdd,onUpdate,onDelete,onBulkAdd}) {
                       <div><Label>LinkedIn</Label>{c.linkedIn?<a href={c.linkedIn} target="_blank" rel="noreferrer" style={{fontSize:13,color:"#60A5FA"}}>View Profile</a>:<div style={{fontSize:13,color:TEXT_DIM}}>—</div>}</div>
                       <div><Label>Date Added</Label><div style={{fontSize:13,color:TEXT_MID}}>{c.dateAdded||"—"}</div></div>
                       <div><Label>Last Contact</Label><div style={{fontSize:13,color:TEXT_MID}}>{c.lastContact||"—"}</div></div>
+                      {c.jobDescription&&<div style={{gridColumn:"1 / -1"}}>
+                        <Label>Job Description</Label>
+                        <div style={{fontSize:12,color:TEXT_MID,background:"#131820",border:`1px solid ${BORDER}`,borderRadius:8,padding:"9px 11px",lineHeight:1.6,maxHeight:120,overflowY:"auto",whiteSpace:"pre-wrap"}}>{c.jobDescription}</div>
+                      </div>}
                       <div style={{gridColumn:"1 / -1"}}>
                         <Label>Personalized First Line</Label>
                         <textarea defaultValue={c.firstLine||""} onBlur={e=>onUpdate(c.id,{firstLine:e.target.value})} rows={2} style={{width:"100%",background:"#131820",border:`1px solid ${TEAL}33`,borderRadius:8,padding:"9px 11px",color:TEAL,fontSize:13,lineHeight:1.6,resize:"vertical",outline:"none",boxSizing:"border-box",fontStyle:c.firstLine?"normal":"italic"}} placeholder="e.g. I saw you're hiring a Senior Dev — love that your team uses React…"/>
@@ -768,8 +816,30 @@ function CRMTab({contacts,onAdd,onUpdate,onDelete,onBulkAdd}) {
                 </select>
               </div>
               <div style={{gridColumn:"1 / -1"}}>
-                <Label>Personalized First Line <span style={{color:TEAL,fontWeight:500,textTransform:"none",letterSpacing:0,fontSize:10}}>(exported as "personalization" for Instantly.ai)</span></Label>
-                <textarea value={form.firstLine||""} onChange={e=>setForm(p=>({...p,firstLine:e.target.value}))} rows={2} placeholder="e.g. I saw you're hiring a Senior Dev — love that your team uses React…" style={{width:"100%",background:"#0D1020",border:`1px solid ${TEAL}33`,borderRadius:8,padding:"8px 11px",color:TEXT_BRIGHT,fontSize:13,resize:"vertical",outline:"none",boxSizing:"border-box"}}/>
+                <Label>Job Description <span style={{color:TEXT_DIM,fontWeight:500,textTransform:"none",letterSpacing:0,fontSize:10}}>(paste from Indeed/LinkedIn — used for AI first line generation)</span></Label>
+                <textarea value={form.jobDescription||""} onChange={e=>setForm(p=>({...p,jobDescription:e.target.value}))} rows={4} placeholder="Paste the job posting or description here…" style={{width:"100%",background:"#0D1020",border:`1px solid ${BORDER}`,borderRadius:8,padding:"8px 11px",color:TEXT_BRIGHT,fontSize:13,lineHeight:1.6,resize:"vertical",outline:"none",boxSizing:"border-box"}}/>
+              </div>
+              <div style={{gridColumn:"1 / -1",background:`${TEAL}08`,border:`1px solid ${TEAL}22`,borderRadius:10,padding:"14px"}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+                  <Label>Personalized First Line <span style={{color:TEAL,fontWeight:500,textTransform:"none",letterSpacing:0,fontSize:10}}>(exported as "personalization" for Instantly.ai)</span></Label>
+                  <button onClick={generateFirstLines} disabled={aiFirstLineLoading} style={{background:`${TEAL}22`,border:`1px solid ${TEAL}44`,borderRadius:6,padding:"4px 11px",cursor:aiFirstLineLoading?"not-allowed":"pointer",color:TEAL,fontSize:11,fontWeight:700,display:"flex",alignItems:"center",gap:5}}>
+                    <span style={{fontSize:12}}>✦</span> {aiFirstLineLoading?"Generating…":"Generate with AI"}
+                  </button>
+                </div>
+                <textarea value={form.firstLine||""} onChange={e=>setForm(p=>({...p,firstLine:e.target.value}))} rows={2} placeholder="e.g. I saw you're hiring a Senior Dev — love that your team uses React…" style={{width:"100%",background:"#0D1020",border:`1px solid ${TEAL}33`,borderRadius:8,padding:"8px 11px",color:TEXT_BRIGHT,fontSize:13,resize:"vertical",outline:"none",boxSizing:"border-box",marginBottom:aiFirstLines.length>0?10:0}}/>
+                {aiFirstLines.length>0&&(
+                  <div>
+                    <div style={{fontSize:10,fontWeight:700,color:TEXT_DIM,textTransform:"uppercase",letterSpacing:1.2,marginBottom:6}}>Pick an angle:</div>
+                    <div style={{display:"flex",flexDirection:"column",gap:6}}>
+                      {aiFirstLines.map((opt,i)=>(
+                        <div key={i} onClick={()=>{setForm(p=>({...p,firstLine:opt.line}));setAiFirstLines([]);}} style={{background:"#0D1020",border:`1px solid ${BORDER}`,borderRadius:8,padding:"9px 12px",cursor:"pointer",transition:"all 0.15s",display:"flex",gap:10,alignItems:"flex-start"}} onMouseOver={e=>{e.currentTarget.style.borderColor=TEAL+"66";e.currentTarget.style.background=`${TEAL}0A`;}} onMouseOut={e=>{e.currentTarget.style.borderColor=BORDER;e.currentTarget.style.background="#0D1020";}}>
+                          <span style={{fontSize:9,fontWeight:700,color:TEAL,background:`${TEAL}22`,borderRadius:4,padding:"2px 6px",flexShrink:0,marginTop:2,textTransform:"uppercase",letterSpacing:0.8}}>{opt.angle}</span>
+                          <span style={{fontSize:12.5,color:TEXT_MID,lineHeight:1.5}}>{opt.line}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
               <div style={{gridColumn:"1 / -1"}}>
                 <Label>Notes</Label>
