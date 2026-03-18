@@ -12,6 +12,9 @@ import random
 import asyncio
 import re
 import os
+import platform
+import psutil
+import time
 
 from database import (
     db, logger, manager, create_notification,
@@ -2516,3 +2519,328 @@ async def ai_generate_text(
         raise HTTPException(status_code=500, detail="anthropic package not installed")
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# ==================== APP HEALTH MONITORING ====================
+
+# Server start time for uptime tracking
+_server_start_time = time.time()
+
+# Default infrastructure config
+_DEFAULT_INFRA_CONFIG = {
+    "railway": {
+        "plan": "hobby",
+        "max_ram_gb": 8,
+        "max_vcpu": 8,
+        "max_replicas": 1,
+        "cost_mo": 5,
+    },
+    "mongodb": {
+        "tier": "M0",
+        "max_storage_mb": 512,
+        "max_connections": 100,
+        "cost_mo": 0,
+    },
+    "vercel": {
+        "plan": "hobby",
+        "max_bandwidth_gb": 100,
+        "cost_mo": 0,
+    },
+}
+
+# Tier specs for upgrade recommendations
+_TIER_SPECS = {
+    "railway": {
+        "hobby": {"max_ram_gb": 8, "max_vcpu": 8, "max_replicas": 1, "cost_mo": 5},
+        "pro": {"max_ram_gb": 32, "max_vcpu": 32, "max_replicas": 50, "cost_mo": 20},
+    },
+    "mongodb": {
+        "M0": {"max_storage_mb": 512, "max_connections": 100, "cost_mo": 0},
+        "M10": {"max_storage_mb": 10240, "max_connections": 1500, "cost_mo": 57},
+        "M20": {"max_storage_mb": 20480, "max_connections": 1500, "cost_mo": 140},
+        "M30": {"max_storage_mb": 40960, "max_connections": 3000, "cost_mo": 200},
+    },
+    "vercel": {
+        "hobby": {"max_bandwidth_gb": 100, "cost_mo": 0},
+        "pro": {"max_bandwidth_gb": 1000, "cost_mo": 20},
+    },
+}
+
+
+def _generate_recommendations(server, database, infra):
+    """Generate upgrade recommendations based on current usage vs tier limits."""
+    recs = []
+
+    # Memory check
+    mem_pct = server.get("memory", {}).get("percent", 0)
+    if mem_pct > 85:
+        recs.append({"severity": "critical", "service": "railway", "message": f"Server memory at {mem_pct:.0f}%. Risk of OOM crashes. Upgrade Railway plan or optimize memory usage."})
+    elif mem_pct > 70:
+        recs.append({"severity": "warning", "service": "railway", "message": f"Server memory at {mem_pct:.0f}%. Consider upgrading to Railway Pro ($20/mo) for up to 32GB RAM."})
+
+    # CPU check
+    cpu_pct = server.get("cpu", {}).get("percent", 0)
+    if cpu_pct > 85:
+        recs.append({"severity": "critical", "service": "railway", "message": f"CPU at {cpu_pct:.0f}%. Requests may be slow or timing out. Upgrade to Railway Pro with multiple replicas."})
+    elif cpu_pct > 70:
+        recs.append({"severity": "warning", "service": "railway", "message": f"CPU at {cpu_pct:.0f}%. Consider upgrading Railway plan for more headroom."})
+
+    # DB storage check
+    db_storage = database.get("storage", {})
+    used_mb = db_storage.get("used_mb", 0)
+    max_mb = infra.get("mongodb", {}).get("max_storage_mb", 512)
+    if max_mb > 0:
+        storage_pct = (used_mb / max_mb) * 100
+        if storage_pct > 80:
+            next_tier = _get_next_tier("mongodb", infra.get("mongodb", {}).get("tier", "M0"))
+            msg = f"Database storage at {storage_pct:.0f}% ({used_mb:.0f}MB / {max_mb}MB)."
+            if next_tier:
+                msg += f" Upgrade to {next_tier['name']} (${next_tier['cost_mo']}/mo) for {next_tier['max_storage_mb'] / 1024:.0f}GB storage."
+            recs.append({"severity": "critical", "service": "mongodb", "message": msg})
+        elif storage_pct > 60:
+            recs.append({"severity": "warning", "service": "mongodb", "message": f"Database storage at {storage_pct:.0f}%. Plan ahead for growth."})
+
+    # DB connections check
+    db_conns = database.get("connections", {})
+    current_conns = db_conns.get("current", 0)
+    max_conns = infra.get("mongodb", {}).get("max_connections", 100)
+    if max_conns > 0:
+        conn_pct = (current_conns / max_conns) * 100
+        if conn_pct > 80:
+            recs.append({"severity": "critical", "service": "mongodb", "message": f"Database connections at {conn_pct:.0f}% ({current_conns}/{max_conns}). Risk of connection failures."})
+        elif conn_pct > 60:
+            recs.append({"severity": "warning", "service": "mongodb", "message": f"Database connections at {conn_pct:.0f}%. Monitor closely."})
+
+    # Vercel commercial use warning
+    vercel_plan = infra.get("vercel", {}).get("plan", "hobby")
+    if vercel_plan == "hobby":
+        recs.append({"severity": "critical", "service": "vercel", "message": "Vercel Hobby plan is for non-commercial use only. A production app with payments requires Vercel Pro ($20/mo)."})
+
+    return recs
+
+
+def _get_next_tier(service, current_tier):
+    """Get the next tier up for a service."""
+    tiers = list(_TIER_SPECS.get(service, {}).keys())
+    if current_tier in tiers:
+        idx = tiers.index(current_tier)
+        if idx + 1 < len(tiers):
+            next_name = tiers[idx + 1]
+            return {"name": next_name, **_TIER_SPECS[service][next_name]}
+    return None
+
+
+def _generate_scale_readiness(infra):
+    """Assess readiness for 100K users."""
+    bottlenecks = []
+    can_handle = True
+
+    # MongoDB assessment
+    mongo_tier = infra.get("mongodb", {}).get("tier", "M0")
+    if mongo_tier in ("M0", "M10", "M20"):
+        can_handle = False
+        bottlenecks.append({
+            "service": "MongoDB Atlas",
+            "issue": f"{mongo_tier} has limited connections and shared/burstable CPU",
+            "recommendation": "Upgrade to M30+ ($200+/mo) for 3,000 connections and dedicated vCPUs",
+            "status": "fail",
+        })
+    else:
+        bottlenecks.append({
+            "service": "MongoDB Atlas",
+            "issue": f"{mongo_tier} provides dedicated resources",
+            "recommendation": "Monitor connection count and consider sharding for 100K+ concurrent users",
+            "status": "pass",
+        })
+
+    # Railway assessment
+    railway_plan = infra.get("railway", {}).get("plan", "hobby")
+    max_replicas = infra.get("railway", {}).get("max_replicas", 1)
+    if railway_plan == "hobby" or max_replicas < 3:
+        can_handle = False
+        bottlenecks.append({
+            "service": "Railway (Backend)",
+            "issue": f"{railway_plan.title()} plan with {max_replicas} replica(s) — insufficient for 100K users",
+            "recommendation": "Upgrade to Pro ($20/mo) with 3-5 replicas for load distribution",
+            "status": "fail",
+        })
+    else:
+        bottlenecks.append({
+            "service": "Railway (Backend)",
+            "issue": f"Pro plan with {max_replicas} replicas available",
+            "recommendation": "Scale to 3-5 active replicas during peak traffic",
+            "status": "pass",
+        })
+
+    # Vercel assessment
+    vercel_plan = infra.get("vercel", {}).get("plan", "hobby")
+    if vercel_plan == "hobby":
+        can_handle = False
+        bottlenecks.append({
+            "service": "Vercel (Frontend)",
+            "issue": "Hobby plan: 100GB bandwidth, non-commercial use only",
+            "recommendation": "Upgrade to Pro ($20/mo) for 1TB bandwidth and commercial license",
+            "status": "fail",
+        })
+    else:
+        bottlenecks.append({
+            "service": "Vercel (Frontend)",
+            "issue": "Pro plan with 1TB bandwidth",
+            "recommendation": "Should handle 100K users. Monitor bandwidth usage.",
+            "status": "pass",
+        })
+
+    # Estimate cost
+    estimated_cost = "$277+/mo"
+    if not can_handle:
+        estimated_cost = "Minimum ~$277/mo (MongoDB M30 $200 + Railway Pro $20+usage ~$57 + Vercel Pro $20)"
+
+    return {
+        "can_handle_100k": can_handle,
+        "bottlenecks": bottlenecks,
+        "estimated_monthly_cost": estimated_cost,
+    }
+
+
+@router.get("/admin/health")
+async def admin_health(admin: dict = Depends(get_current_admin)):
+    """Comprehensive app health check with infrastructure metrics."""
+    # --- Server metrics ---
+    process = psutil.Process()
+    with process.oneshot():
+        mem_info = process.memory_info()
+        cpu_pct = process.cpu_percent(interval=0.1)
+
+    sys_mem = psutil.virtual_memory()
+    uptime = time.time() - _server_start_time
+
+    server = {
+        "status": "healthy",
+        "uptime_seconds": int(uptime),
+        "memory": {
+            "used_mb": round(mem_info.rss / 1024 / 1024, 1),
+            "total_mb": round(sys_mem.total / 1024 / 1024, 1),
+            "percent": round(mem_info.rss / sys_mem.total * 100, 1),
+        },
+        "cpu": {
+            "percent": round(cpu_pct, 1),
+            "system_percent": round(psutil.cpu_percent(interval=0.1), 1),
+        },
+        "workers": 4,
+        "websocket_connections": sum(len(conns) for conns in manager.active_connections.values()),
+        "python_version": platform.python_version(),
+        "platform": platform.platform(),
+    }
+
+    # --- Database metrics ---
+    database = {"status": "unknown", "storage": {}, "connections": {}, "ops": {}, "collections": 0, "documents": 0}
+    try:
+        db_stats = await db.command("dbStats")
+        database["storage"] = {
+            "used_mb": round(db_stats.get("storageSize", 0) / 1024 / 1024, 1),
+            "data_mb": round(db_stats.get("dataSize", 0) / 1024 / 1024, 1),
+            "index_mb": round(db_stats.get("indexSize", 0) / 1024 / 1024, 1),
+        }
+        database["collections"] = db_stats.get("collections", 0)
+        database["documents"] = db_stats.get("objects", 0)
+        database["status"] = "healthy"
+    except Exception as e:
+        logger.warning(f"Could not get dbStats: {e}")
+        database["status"] = "error"
+
+    try:
+        server_status = await db.command("serverStatus")
+        conns = server_status.get("connections", {})
+        database["connections"] = {
+            "current": conns.get("current", 0),
+            "available": conns.get("available", 0),
+            "total_created": conns.get("totalCreated", 0),
+        }
+        ops = server_status.get("opcounters", {})
+        database["ops"] = {
+            "insert": ops.get("insert", 0),
+            "query": ops.get("query", 0),
+            "update": ops.get("update", 0),
+            "delete": ops.get("delete", 0),
+            "command": ops.get("command", 0),
+        }
+    except Exception as e:
+        logger.warning(f"Could not get serverStatus (may be restricted on M0): {e}")
+
+    # --- App metrics ---
+    now = datetime.now(timezone.utc)
+    thirty_days_ago = now - timedelta(days=30)
+
+    total_users, active_users, total_jobs, active_jobs, total_matches, total_applications = await asyncio.gather(
+        db.users.count_documents({}),
+        db.users.count_documents({"last_active": {"$gte": thirty_days_ago.isoformat()}}),
+        db.jobs.count_documents({}),
+        db.jobs.count_documents({"is_active": True}),
+        db.matches.count_documents({}),
+        db.applications.count_documents({}),
+    )
+
+    app_metrics = {
+        "total_users": total_users,
+        "active_users_30d": active_users,
+        "total_jobs": total_jobs,
+        "active_jobs": active_jobs,
+        "total_matches": total_matches,
+        "total_applications": total_applications,
+    }
+
+    # --- Infrastructure config ---
+    config = await db.health_config.find_one({"_id": "infra"})
+    if config:
+        infra = {k: config[k] for k in ("railway", "mongodb", "vercel") if k in config}
+    else:
+        infra = _DEFAULT_INFRA_CONFIG
+
+    # --- Recommendations ---
+    recommendations = _generate_recommendations(server, database, infra)
+
+    # --- Scale readiness ---
+    scale_readiness = _generate_scale_readiness(infra)
+
+    return {
+        "server": server,
+        "database": database,
+        "app": app_metrics,
+        "infrastructure": infra,
+        "recommendations": recommendations,
+        "scale_readiness": scale_readiness,
+    }
+
+
+@router.put("/admin/health/config")
+async def update_health_config(body: dict = Body(...), admin: dict = Depends(get_current_admin)):
+    """Update infrastructure tier configuration."""
+    allowed_fields = {"railway", "mongodb", "vercel"}
+    update = {}
+
+    for field in allowed_fields:
+        if field in body:
+            data = body[field]
+            if field == "railway":
+                plan = data.get("plan", "hobby")
+                specs = _TIER_SPECS["railway"].get(plan, _TIER_SPECS["railway"]["hobby"])
+                update["railway"] = {"plan": plan, **specs}
+            elif field == "mongodb":
+                tier = data.get("tier", "M0")
+                specs = _TIER_SPECS["mongodb"].get(tier, _TIER_SPECS["mongodb"]["M0"])
+                update["mongodb"] = {"tier": tier, **specs}
+            elif field == "vercel":
+                plan = data.get("plan", "hobby")
+                specs = _TIER_SPECS["vercel"].get(plan, _TIER_SPECS["vercel"]["hobby"])
+                update["vercel"] = {"plan": plan, **specs}
+
+    if not update:
+        raise HTTPException(status_code=400, detail="No valid fields to update")
+
+    await db.health_config.update_one(
+        {"_id": "infra"},
+        {"$set": update},
+        upsert=True,
+    )
+
+    return {"status": "updated", "config": update}
