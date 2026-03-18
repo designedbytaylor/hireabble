@@ -17,6 +17,20 @@ from datetime import datetime, timezone
 import json
 import uuid
 import jwt as pyjwt
+import os as _os_sentry
+
+# Sentry error tracking
+_sentry_dsn = _os_sentry.getenv("SENTRY_DSN")
+if _sentry_dsn:
+    import sentry_sdk
+    from sentry_sdk.integrations.fastapi import FastApiIntegration
+    from sentry_sdk.integrations.starlette import StarletteIntegration
+    sentry_sdk.init(
+        dsn=_sentry_dsn,
+        traces_sample_rate=0.1,
+        environment=_os_sentry.getenv("ENVIRONMENT", "production"),
+        integrations=[StarletteIntegration(), FastApiIntegration()],
+    )
 
 # Import database and shared utilities
 from database import db, manager, UPLOADS_DIR, logger, JWT_SECRET, JWT_ALGORITHM, create_notification

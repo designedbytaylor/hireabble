@@ -89,3 +89,30 @@ This has been fixed MULTIPLE times. The root causes are always cache-related.
 - `frontend/src/components/ImpersonationBanner.jsx` — "Back to Admin" banner + cleanup
 - `frontend/src/pages/admin/AdminTesting.jsx` — Admin panel test user impersonation
 - `frontend/public/service-worker.js` — PWA service worker with caching strategies
+
+## Operations & Backup
+
+### Error Tracking
+- **Frontend**: Sentry (`@sentry/react`) — set `REACT_APP_SENTRY_DSN` env var
+- **Backend**: Sentry (`sentry-sdk[fastapi]`) — set `SENTRY_DSN` env var
+- Both auto-disable if DSN is not set (no-op in dev)
+
+### Uptime Monitoring
+- Backend health endpoint: `GET /api/health` (returns `{"status": "healthy"}`)
+- Railway health check configured in `railway.toml` (30s timeout)
+- **Recommended**: Set up external monitoring (UptimeRobot, Pingdom, or BetterUptime) pointing at `https://your-backend.up.railway.app/api/health`
+
+### MongoDB Backup Strategy
+- **Atlas M0 (Free)**: No automated backups. Must use `mongodump` manually or upgrade to M2+.
+- **Atlas M2+**: Daily automated snapshots included. PITR (Point-in-Time Recovery) on M10+.
+- **Manual backup**: `mongodump --uri="$MONGO_URL" --out=./backup-$(date +%Y%m%d)`
+- **Restore**: `mongorestore --uri="$MONGO_URL" --drop ./backup-YYYYMMDD/`
+- **Recovery targets**: RPO (Recovery Point Objective) < 24h, RTO (Recovery Time Objective) < 1h
+- **Critical collections**: `users`, `jobs`, `applications`, `matches`, `messages`
+
+### Disaster Recovery Checklist
+1. MongoDB: Restore from Atlas snapshot or `mongodump` backup
+2. Supabase (file storage): Supabase handles its own backups; uploaded files are durable
+3. Backend: Redeploy from git on Railway (`railway up` or push to main)
+4. Frontend: Redeploy from git on Vercel (auto-deploys on push)
+5. Environment variables: Stored in Railway/Vercel dashboards — keep an encrypted copy offline
