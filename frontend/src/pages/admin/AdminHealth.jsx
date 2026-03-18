@@ -5,6 +5,7 @@ import {
   Activity, Server, Database, Globe, AlertTriangle, CheckCircle,
   XCircle, RefreshCw, Settings, Users, Briefcase, Heart,
   Zap, HardDrive, Cpu, MemoryStick, Wifi, TrendingUp, ChevronRight,
+  ChevronDown, DollarSign, Layers, Plus, Wrench,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -174,7 +175,9 @@ export default function AdminHealth() {
     );
   }
 
-  const { server = {}, database = {}, app = {}, infrastructure = {}, recommendations = [], scale_readiness = {} } = data || {};
+  const [expandedProjection, setExpandedProjection] = useState(null);
+
+  const { server = {}, database = {}, app = {}, infrastructure = {}, recommendations = [], scale_readiness = {}, scale_projections = [] } = data || {};
 
   const serverStatus = server.memory?.percent > 85 || server.cpu?.percent > 85 ? 'warning' : server.status || 'healthy';
   const dbStatus = database.status || 'unknown';
@@ -435,6 +438,161 @@ export default function AdminHealth() {
           </div>
         )}
       </div>
+
+      {/* Scale Projections: 250K – 1M */}
+      {scale_projections.length > 0 && (
+        <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6 mb-8">
+          <div className="flex items-center gap-3 mb-2">
+            <TrendingUp className="w-5 h-5 text-purple-400" />
+            <h2 className="text-lg font-semibold text-white">Scale Projections: 250K – 1M Users</h2>
+          </div>
+          <p className="text-sm text-gray-500 mb-6">Infrastructure requirements and estimated costs at each growth milestone. Based on your current plans.</p>
+
+          <div className="space-y-3">
+            {scale_projections.map((proj) => {
+              const isExpanded = expandedProjection === proj.target_users;
+              const passCount = proj.items.filter(i => i.status === 'pass').length;
+              const totalCount = proj.items.length;
+              const allPass = passCount === totalCount;
+
+              return (
+                <div key={proj.target_users} className={`rounded-xl border transition-colors ${
+                  allPass ? 'border-green-500/20 bg-green-500/5' : 'border-gray-700 bg-gray-800/30'
+                }`}>
+                  {/* Projection header — always visible */}
+                  <button
+                    onClick={() => setExpandedProjection(isExpanded ? null : proj.target_users)}
+                    className="w-full flex items-center justify-between p-4 text-left"
+                  >
+                    <div className="flex items-center gap-4">
+                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-sm font-bold ${
+                        allPass ? 'bg-green-500/20 text-green-400' : 'bg-gray-700 text-gray-300'
+                      }`}>
+                        {proj.label.replace(' Users', '')}
+                      </div>
+                      <div>
+                        <h3 className="text-white font-medium">{proj.label}</h3>
+                        <div className="flex items-center gap-3 mt-0.5">
+                          <span className="text-xs text-gray-500 flex items-center gap-1">
+                            <DollarSign className="w-3 h-3" />
+                            {proj.estimated_cost}
+                          </span>
+                          <span className={`text-xs ${allPass ? 'text-green-400' : 'text-gray-500'}`}>
+                            {passCount}/{totalCount} ready
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <div className={`px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                        allPass
+                          ? 'bg-green-500/20 text-green-400 border border-green-500/30'
+                          : 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30'
+                      }`}>
+                        {allPass ? 'Ready' : 'Upgrades Needed'}
+                      </div>
+                      <ChevronDown className={`w-4 h-4 text-gray-500 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+                    </div>
+                  </button>
+
+                  {/* Expanded details */}
+                  {isExpanded && (
+                    <div className="px-4 pb-4 space-y-4">
+                      {/* Infrastructure requirements */}
+                      <div>
+                        <h4 className="text-sm font-medium text-gray-300 mb-3 flex items-center gap-2">
+                          <Server className="w-4 h-4 text-gray-500" />
+                          Infrastructure Requirements
+                        </h4>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                          {proj.items.map((item) => (
+                            <div key={item.service} className={`rounded-lg p-3 border ${
+                              item.status === 'pass'
+                                ? 'bg-green-500/10 border-green-500/20'
+                                : 'bg-gray-800/50 border-gray-700'
+                            }`}>
+                              <div className="flex items-center gap-2 mb-2">
+                                {item.status === 'pass'
+                                  ? <CheckCircle className="w-4 h-4 text-green-400 flex-shrink-0" />
+                                  : <XCircle className="w-4 h-4 text-red-400 flex-shrink-0" />}
+                                <span className="text-sm font-medium text-white">{item.service}</span>
+                              </div>
+                              <p className="text-xs text-gray-400 mb-1">
+                                <span className="text-gray-500">Plan:</span> {item.required}
+                              </p>
+                              <p className="text-xs text-gray-400 mb-2">
+                                <span className="text-gray-500">Cost:</span> {item.cost}
+                              </p>
+                              <p className="text-xs text-gray-500 leading-relaxed">{item.notes}</p>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Additional services */}
+                      {proj.additional_services?.length > 0 && (
+                        <div>
+                          <h4 className="text-sm font-medium text-gray-300 mb-3 flex items-center gap-2">
+                            <Plus className="w-4 h-4 text-gray-500" />
+                            Additional Services
+                          </h4>
+                          <div className="space-y-2">
+                            {proj.additional_services.map((svc) => (
+                              <div key={svc.service} className="flex items-start gap-3 bg-gray-800/40 rounded-lg p-3">
+                                <Layers className={`w-4 h-4 mt-0.5 flex-shrink-0 ${svc.required ? 'text-amber-400' : 'text-gray-500'}`} />
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    <span className="text-sm text-white font-medium">{svc.service}</span>
+                                    <span className="text-xs text-gray-500">{svc.cost}</span>
+                                    {svc.required ? (
+                                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-400 border border-amber-500/30">Required</span>
+                                    ) : (
+                                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-gray-700 text-gray-400 border border-gray-600">Recommended</span>
+                                    )}
+                                  </div>
+                                  <p className="text-xs text-gray-500 mt-1 leading-relaxed">{svc.reason}</p>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Architecture changes */}
+                      {proj.architecture_changes?.length > 0 && (
+                        <div>
+                          <h4 className="text-sm font-medium text-gray-300 mb-3 flex items-center gap-2">
+                            <Wrench className="w-4 h-4 text-gray-500" />
+                            Architecture Changes Required
+                          </h4>
+                          <div className="bg-gray-800/40 rounded-lg p-3">
+                            <ul className="space-y-1.5">
+                              {proj.architecture_changes.map((change, idx) => (
+                                <li key={idx} className="text-xs text-gray-400 flex items-start gap-2">
+                                  <ChevronRight className="w-3 h-3 text-gray-600 mt-0.5 flex-shrink-0" />
+                                  <span>{change}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Total estimated cost summary */}
+                      <div className="bg-gray-800/50 rounded-lg p-3 border border-gray-700">
+                        <p className="text-sm text-gray-400">
+                          Total estimated infrastructure cost at {proj.label.toLowerCase()}:{' '}
+                          <span className="text-white font-medium">{proj.estimated_cost}</span>
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Configure Modal */}
       {showConfig && (
