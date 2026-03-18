@@ -2702,6 +2702,302 @@ def _generate_scale_readiness(infra):
     }
 
 
+# Scale projection definitions for higher user counts
+_SCALE_PROJECTIONS = [
+    {
+        "target_users": 250_000,
+        "label": "250K Users",
+        "estimated_cost": "$490 – $665/mo",
+        "infrastructure": {
+            "mongodb": {
+                "tier": "M30 or M40",
+                "cost": "$200 – $455/mo",
+                "notes": "M30 minimum for dedicated vCPUs and 3K connections. M40 recommended for headroom with connection pooling across multiple backend replicas.",
+            },
+            "railway": {
+                "plan": "Pro — 5 to 8 replicas",
+                "cost": "$100 – $160/mo",
+                "notes": "Each replica handles ~30K–50K registered users. Use Railway's autoscaling to add replicas during peak hours.",
+            },
+            "vercel": {
+                "plan": "Pro",
+                "cost": "$20/mo",
+                "notes": "1TB bandwidth handles 250K users comfortably. Enable Vercel Edge caching for static assets.",
+            },
+        },
+        "additional_services": [
+            {
+                "service": "Redis (Caching)",
+                "required": True,
+                "cost": "$15 – $30/mo",
+                "reason": "In-memory cache won't scale across replicas. Add Redis (Railway Redis or Upstash) for shared session/rate-limit/stats caching.",
+            },
+        ],
+        "architecture_changes": [
+            "Add Redis for distributed caching across replicas",
+            "Enable MongoDB connection pooling (maxPoolSize 50–100 per replica)",
+            "Set up proper health-check-based autoscaling on Railway",
+            "Add database indexes on frequently queried fields (last_active, is_active, created_at)",
+        ],
+    },
+    {
+        "target_users": 500_000,
+        "label": "500K Users",
+        "estimated_cost": "$835 – $1,215/mo",
+        "infrastructure": {
+            "mongodb": {
+                "tier": "M40 or M50",
+                "cost": "$455 – $700/mo",
+                "notes": "M40 minimum. M50 provides dedicated cluster with higher IOPS and 5K+ connection limit. Consider read replicas for analytics queries.",
+            },
+            "railway": {
+                "plan": "Pro — 10 to 15 replicas",
+                "cost": "$200 – $300/mo",
+                "notes": "10+ replicas with load balancing. Consider separating API and WebSocket servers into distinct Railway services.",
+            },
+            "vercel": {
+                "plan": "Pro or Enterprise",
+                "cost": "$20 – $150/mo",
+                "notes": "Pro may suffice if you optimize with aggressive CDN caching. Enterprise needed if bandwidth exceeds 1TB/mo.",
+            },
+        },
+        "additional_services": [
+            {
+                "service": "Redis (Caching)",
+                "required": True,
+                "cost": "$30 – $60/mo",
+                "reason": "Dedicated Redis instance with 1GB+ memory for sessions, rate limiting, real-time features, and job queue.",
+            },
+            {
+                "service": "CDN / Asset Storage",
+                "required": True,
+                "cost": "$10 – $30/mo",
+                "reason": "Offload resume PDFs, profile images, and static assets to a CDN (CloudFront or Cloudflare R2) to reduce backend load.",
+            },
+            {
+                "service": "Background Job Queue",
+                "required": False,
+                "cost": "$0 (BullMQ + Redis)",
+                "reason": "Move email notifications, match processing, and analytics aggregation to background workers to keep API response times fast.",
+            },
+        ],
+        "architecture_changes": [
+            "Separate WebSocket service from API service on Railway",
+            "Add MongoDB read replicas for dashboard/analytics queries",
+            "Implement background job processing (BullMQ or Celery) for emails and notifications",
+            "Add CDN for file storage (resumes, images) — move off direct Supabase serving",
+            "Implement database query optimization and add compound indexes",
+            "Set up APM monitoring (Datadog or New Relic) for performance tracking",
+        ],
+    },
+    {
+        "target_users": 750_000,
+        "label": "750K Users",
+        "estimated_cost": "$1,310 – $1,850/mo",
+        "infrastructure": {
+            "mongodb": {
+                "tier": "M50 or M60",
+                "cost": "$700 – $1,000/mo",
+                "notes": "M50 minimum with read replicas. M60 for write-heavy workloads. Begin planning for sharding if write throughput exceeds single-node capacity.",
+            },
+            "railway": {
+                "plan": "Pro — 15 to 20 replicas",
+                "cost": "$300 – $400/mo",
+                "notes": "Dedicated API replicas (12–15) plus separate WebSocket replicas (3–5). Use Railway's private networking between services.",
+            },
+            "vercel": {
+                "plan": "Enterprise",
+                "cost": "$150/mo",
+                "notes": "Enterprise plan for higher bandwidth limits, SLA guarantees, and advanced caching rules.",
+            },
+        },
+        "additional_services": [
+            {
+                "service": "Redis Cluster",
+                "required": True,
+                "cost": "$60 – $100/mo",
+                "reason": "Redis cluster with 2GB+ memory and replication for high availability. Handles sessions, caching, pub/sub for WebSockets, and job queues.",
+            },
+            {
+                "service": "CDN (CloudFront/Cloudflare)",
+                "required": True,
+                "cost": "$20 – $50/mo",
+                "reason": "Essential for offloading static assets and API responses for public endpoints.",
+            },
+            {
+                "service": "Search Engine (Elasticsearch/Meilisearch)",
+                "required": False,
+                "cost": "$50 – $100/mo",
+                "reason": "MongoDB text search becomes slow at this scale. Dedicated search engine for job search, user search, and skill matching.",
+            },
+            {
+                "service": "APM / Monitoring",
+                "required": True,
+                "cost": "$30 – $50/mo",
+                "reason": "Datadog, New Relic, or Grafana Cloud for distributed tracing, error tracking, and performance monitoring across replicas.",
+            },
+        ],
+        "architecture_changes": [
+            "Implement MongoDB sharding strategy (shard key: user region or user_id hash)",
+            "Add dedicated search service (Meilisearch or Elasticsearch) for job/user search",
+            "Implement Redis pub/sub for cross-replica WebSocket message broadcasting",
+            "Add rate limiting per user tier (free vs premium) at the load balancer level",
+            "Set up multi-region deployment consideration for latency optimization",
+            "Implement database connection pooling service (e.g., MongoDB Atlas connection pooling or PgBouncer equivalent)",
+            "Add structured logging with centralized log aggregation",
+        ],
+    },
+    {
+        "target_users": 1_000_000,
+        "label": "1M Users",
+        "estimated_cost": "$1,950 – $3,000/mo",
+        "infrastructure": {
+            "mongodb": {
+                "tier": "M60+ (Sharded Cluster)",
+                "cost": "$1,000 – $1,500/mo",
+                "notes": "Sharded M60 cluster with 2–3 shards. Separate collections for hot data (matches, swipes, messages) and cold data (old applications, archived jobs). Use Atlas Data Lake for analytics.",
+            },
+            "railway": {
+                "plan": "Pro — 20 to 30 replicas (or dedicated infrastructure)",
+                "cost": "$400 – $600/mo",
+                "notes": "At 1M users, evaluate migrating to AWS ECS/EKS or GCP Cloud Run for finer autoscaling control and cost optimization. Railway Pro still works but dedicated infra offers better price-performance at this scale.",
+            },
+            "vercel": {
+                "plan": "Enterprise",
+                "cost": "$150 – $300/mo",
+                "notes": "Enterprise with custom bandwidth allocation. Consider self-hosting frontend on CDN (CloudFront + S3) for cost savings at this scale.",
+            },
+        },
+        "additional_services": [
+            {
+                "service": "Redis Cluster (HA)",
+                "required": True,
+                "cost": "$100 – $200/mo",
+                "reason": "High-availability Redis cluster with 4GB+ memory, automatic failover, and read replicas. Powers caching, sessions, real-time features, and message queues.",
+            },
+            {
+                "service": "CDN (Multi-region)",
+                "required": True,
+                "cost": "$50 – $100/mo",
+                "reason": "Multi-region CDN with edge caching for global user base. Serves all static assets, images, and cacheable API responses.",
+            },
+            {
+                "service": "Search Engine (Dedicated)",
+                "required": True,
+                "cost": "$100 – $200/mo",
+                "reason": "Dedicated Elasticsearch or Meilisearch cluster for sub-100ms job search, autocomplete, and recommendation engine queries.",
+            },
+            {
+                "service": "Message Queue (SQS/RabbitMQ)",
+                "required": True,
+                "cost": "$20 – $50/mo",
+                "reason": "Dedicated message queue for decoupling services: email delivery, push notifications, match processing, analytics events.",
+            },
+            {
+                "service": "APM + Log Aggregation",
+                "required": True,
+                "cost": "$80 – $150/mo",
+                "reason": "Full observability stack: distributed tracing, custom metrics, alerting, and centralized logging across all services.",
+            },
+        ],
+        "architecture_changes": [
+            "Implement MongoDB sharding across 2–3 shards with zone-based or hash-based sharding",
+            "Evaluate migration from Railway to AWS ECS/EKS or GCP Cloud Run for cost efficiency",
+            "Implement microservice architecture: separate Auth, Matching, Messaging, and Notification services",
+            "Add dedicated message queue (SQS, RabbitMQ, or Kafka) for async event processing",
+            "Implement read/write splitting — route reads to MongoDB secondaries",
+            "Add global CDN with edge functions for personalized caching",
+            "Set up multi-region deployment for disaster recovery and latency optimization",
+            "Implement database archival strategy — move data older than 12 months to cold storage",
+            "Add load testing infrastructure (k6 or Locust) for ongoing capacity planning",
+            "Consider implementing a data warehouse (BigQuery/Redshift) for analytics separate from production DB",
+        ],
+    },
+]
+
+
+def _generate_scale_projections(infra):
+    """Generate scale readiness projections for 250K to 1M users."""
+    mongo_tier = infra.get("mongodb", {}).get("tier", "M0")
+    railway_plan = infra.get("railway", {}).get("plan", "hobby")
+    max_replicas = infra.get("railway", {}).get("max_replicas", 1)
+    vercel_plan = infra.get("vercel", {}).get("plan", "hobby")
+
+    # Ordered tier levels for comparison
+    mongo_levels = {"M0": 0, "M10": 1, "M20": 2, "M30": 3, "M40": 4, "M50": 5, "M60": 6}
+    current_mongo_level = mongo_levels.get(mongo_tier, 0)
+
+    projections = []
+    for proj in _SCALE_PROJECTIONS:
+        target = proj["target_users"]
+        items = []
+
+        # MongoDB readiness
+        if target <= 250_000:
+            req_level = 3  # M30
+        elif target <= 500_000:
+            req_level = 4  # M40
+        elif target <= 750_000:
+            req_level = 5  # M50
+        else:
+            req_level = 6  # M60
+
+        mongo_ready = current_mongo_level >= req_level
+        items.append({
+            "service": "MongoDB Atlas",
+            "required": proj["infrastructure"]["mongodb"]["tier"],
+            "cost": proj["infrastructure"]["mongodb"]["cost"],
+            "notes": proj["infrastructure"]["mongodb"]["notes"],
+            "status": "pass" if mongo_ready else "fail",
+        })
+
+        # Railway readiness
+        if target <= 250_000:
+            req_replicas = 5
+        elif target <= 500_000:
+            req_replicas = 10
+        elif target <= 750_000:
+            req_replicas = 15
+        else:
+            req_replicas = 20
+
+        railway_ready = railway_plan == "pro" and max_replicas >= req_replicas
+        items.append({
+            "service": "Railway (Backend)",
+            "required": proj["infrastructure"]["railway"]["plan"],
+            "cost": proj["infrastructure"]["railway"]["cost"],
+            "notes": proj["infrastructure"]["railway"]["notes"],
+            "status": "pass" if railway_ready else "fail",
+        })
+
+        # Vercel readiness
+        if target <= 500_000:
+            vercel_ready = vercel_plan == "pro"
+        else:
+            vercel_ready = False  # Enterprise needed, not configurable currently
+        items.append({
+            "service": "Vercel (Frontend)",
+            "required": proj["infrastructure"]["vercel"]["plan"],
+            "cost": proj["infrastructure"]["vercel"]["cost"],
+            "notes": proj["infrastructure"]["vercel"]["notes"],
+            "status": "pass" if vercel_ready else "fail",
+        })
+
+        can_handle = all(item["status"] == "pass" for item in items)
+
+        projections.append({
+            "target_users": target,
+            "label": proj["label"],
+            "can_handle": can_handle,
+            "estimated_cost": proj["estimated_cost"],
+            "items": items,
+            "additional_services": proj["additional_services"],
+            "architecture_changes": proj["architecture_changes"],
+        })
+
+    return projections
+
+
 @router.get("/admin/health")
 async def admin_health(admin: dict = Depends(get_current_admin)):
     """Comprehensive app health check with infrastructure metrics."""
@@ -2802,6 +3098,9 @@ async def admin_health(admin: dict = Depends(get_current_admin)):
     # --- Scale readiness ---
     scale_readiness = _generate_scale_readiness(infra)
 
+    # --- Scale projections (250K–1M) ---
+    scale_projections = _generate_scale_projections(infra)
+
     return {
         "server": server,
         "database": database,
@@ -2809,6 +3108,7 @@ async def admin_health(admin: dict = Depends(get_current_admin)):
         "infrastructure": infra,
         "recommendations": recommendations,
         "scale_readiness": scale_readiness,
+        "scale_projections": scale_projections,
     }
 
 
