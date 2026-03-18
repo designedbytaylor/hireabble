@@ -2474,3 +2474,45 @@ async def update_marketing_data(
     )
 
     return {"message": "Marketing data saved"}
+
+
+@router.post("/admin/marketing/ai-generate")
+async def ai_generate_text(
+    body: dict = Body(...),
+    admin=Depends(get_current_admin),
+):
+    """Proxy AI text generation for marketing dashboard (first lines, email drafts)."""
+    api_key = os.environ.get("ANTHROPIC_API_KEY")
+    if not api_key:
+        raise HTTPException(status_code=500, detail="ANTHROPIC_API_KEY not configured")
+
+    system_prompt = body.get("system", "")
+    user_message = body.get("message", "")
+    max_tokens = min(body.get("max_tokens", 600), 2000)
+
+    if not user_message:
+        raise HTTPException(status_code=400, detail="message is required")
+
+    try:
+        import anthropic
+        client = anthropic.Anthropic(api_key=api_key)
+        # Try models in order of preference
+        for model_id in ["claude-sonnet-4-20250514", "claude-3-5-sonnet-20241022", "claude-3-haiku-20240307"]:
+            try:
+                response = client.messages.create(
+                    model=model_id,
+                    max_tokens=max_tokens,
+                    system=system_prompt,
+                    messages=[{"role": "user", "content": user_message}],
+                )
+                text = "".join(b.text for b in response.content if hasattr(b, "text"))
+                return {"text": text, "model": model_id}
+            except anthropic.NotFoundError:
+                continue
+            except anthropic.BadRequestError:
+                continue
+        raise HTTPException(status_code=500, detail="No available AI model")
+    except ImportError:
+        raise HTTPException(status_code=500, detail="anthropic package not installed")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
