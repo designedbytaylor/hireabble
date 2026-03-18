@@ -115,6 +115,7 @@ export default function AdminHealth() {
     vercel: 'hobby',
   });
   const [savingConfig, setSavingConfig] = useState(false);
+  const [expandedProjection, setExpandedProjection] = useState(null);
 
   const fetchHealth = useCallback(async (showRefresh = false) => {
     if (showRefresh) setRefreshing(true);
@@ -174,8 +175,6 @@ export default function AdminHealth() {
       </div>
     );
   }
-
-  const [expandedProjection, setExpandedProjection] = useState(null);
 
   const { server = {}, database = {}, app = {}, infrastructure = {}, recommendations = [], scale_readiness = {}, scale_projections = [] } = data || {};
 
