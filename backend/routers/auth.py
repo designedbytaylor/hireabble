@@ -19,12 +19,47 @@ from database import (
 )
 from cachetools import TTLCache
 from content_filter import check_fields, is_severe
-from cache import invalidate_user
+from cache import invalidate_user, _get_redis
 
-# Track failed login attempts per email - auto-expires after 15 minutes
-_login_attempts = TTLCache(maxsize=10000, ttl=900)  # 15 min TTL
-_LOCKOUT_THRESHOLD = 10  # Lock after 10 failed attempts
-_LOCKOUT_DURATION = 900  # 15 minutes in seconds
+# Track failed login attempts — Redis-backed for multi-worker consistency
+_login_attempts_local = TTLCache(maxsize=10000, ttl=900)
+_LOCKOUT_THRESHOLD = 10
+_LOCKOUT_DURATION = 900  # seconds
+
+def _get_login_attempts(email_key: str) -> int:
+    """Get failed login attempt count, using Redis if available."""
+    r = _get_redis()
+    if r:
+        try:
+            val = r.get(f"login_attempts:{email_key}")
+            return int(val) if val else 0
+        except Exception:
+            pass
+    return _login_attempts_local.get(email_key, 0)
+
+def _incr_login_attempts(email_key: str):
+    """Increment failed login attempt count."""
+    r = _get_redis()
+    if r:
+        try:
+            pipe = r.pipeline()
+            pipe.incr(f"login_attempts:{email_key}")
+            pipe.expire(f"login_attempts:{email_key}", _LOCKOUT_DURATION)
+            pipe.execute()
+            return
+        except Exception:
+            pass
+    _login_attempts_local[email_key] = _login_attempts_local.get(email_key, 0) + 1
+
+def _clear_login_attempts(email_key: str):
+    """Clear failed login attempts on successful login."""
+    r = _get_redis()
+    if r:
+        try:
+            r.delete(f"login_attempts:{email_key}")
+        except Exception:
+            pass
+    _login_attempts_local.pop(email_key, None)
 
 # OAuth Configuration
 GOOGLE_CLIENT_ID = os.environ.get('GOOGLE_CLIENT_ID', '')
@@ -200,12 +235,14 @@ async def _apply_signup_promo(user_id: str, role: str, code: str):
 
 async def _send_verification_email(user_id: str, email: str, name: str):
     """Send email verification link"""
+    import hashlib
     verification_token = str(uuid.uuid4())
+    token_hash = hashlib.sha256(verification_token.encode()).hexdigest()
     expires_at = datetime.now(timezone.utc) + timedelta(hours=24)
 
     await db.email_verification_tokens.delete_many({"user_id": user_id})
     await db.email_verification_tokens.insert_one({
-        "token": verification_token,
+        "token": token_hash,
         "user_id": user_id,
         "email": email,
         "expires_at": expires_at.isoformat(),
@@ -225,17 +262,19 @@ async def _send_verification_email(user_id: str, email: str, name: str):
 @router.post("/verify-email")
 async def verify_email(body: dict):
     """Verify email using token from email link"""
+    import hashlib
     token_str = body.get("token")
     if not token_str:
         raise HTTPException(status_code=400, detail="Missing verification token")
 
-    token_doc = await db.email_verification_tokens.find_one({"token": token_str})
+    token_hash = hashlib.sha256(token_str.encode()).hexdigest()
+    token_doc = await db.email_verification_tokens.find_one({"token": token_hash})
     if not token_doc:
         raise HTTPException(status_code=400, detail="Invalid or expired verification token")
 
     expires_at = datetime.fromisoformat(token_doc["expires_at"].replace('Z', '+00:00'))
     if datetime.now(timezone.utc) > expires_at:
-        await db.email_verification_tokens.delete_one({"token": token_str})
+        await db.email_verification_tokens.delete_one({"token": token_hash})
         raise HTTPException(status_code=400, detail="Verification token has expired")
 
     await db.users.update_one(
@@ -261,13 +300,25 @@ async def resend_verification(request: Request, current_user: dict = Depends(get
     return {"message": "Verification email sent"}
 
 
+def _create_2fa_token(user_id: str) -> str:
+    """Create a short-lived token for 2FA verification (5 min TTL)."""
+    import jwt as _jwt
+    payload = {
+        "user_id": user_id,
+        "role": "__2fa_pending",
+        "exp": datetime.now(timezone.utc) + timedelta(minutes=5),
+        "jti": str(uuid.uuid4()),  # unique ID to prevent reuse
+    }
+    return _jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
+
+
 @router.post("/login")
 @limiter.limit("15/minute")
 async def login(credentials: UserLogin, request: Request):
     email_key = credentials.email.lower()
 
     # Check if account is locked out
-    attempts = _login_attempts.get(email_key, 0)
+    attempts = _get_login_attempts(email_key)
     if attempts >= _LOCKOUT_THRESHOLD:
         raise HTTPException(
             status_code=429,
@@ -277,15 +328,15 @@ async def login(credentials: UserLogin, request: Request):
     user = await db.users.find_one({"email": credentials.email})
     if not user:
         # Increment failed attempts even for non-existent accounts (prevents enumeration)
-        _login_attempts[email_key] = attempts + 1
+        _incr_login_attempts(email_key)
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
     if not verify_password(credentials.password, user["password"]):
-        _login_attempts[email_key] = attempts + 1
+        _incr_login_attempts(email_key)
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
     # Successful login - clear failed attempts
-    _login_attempts.pop(email_key, None)
+    _clear_login_attempts(email_key)
 
     # Check if 2FA is enabled
     if user.get("totp_enabled") and user.get("totp_secret"):
@@ -297,7 +348,7 @@ async def login(credentials: UserLogin, request: Request):
             return {
                 "requires_2fa": True,
                 "message": "Two-factor authentication code required",
-                "temp_token": create_token(user["id"], "__2fa_pending")
+                "temp_token": _create_2fa_token(user["id"])
             }
 
         import pyotp
@@ -381,11 +432,14 @@ async def forgot_password(body: ForgotPasswordRequest, request: Request):
     # Generate unique reset token
     reset_token = str(uuid.uuid4())
     expires_at = datetime.now(timezone.utc) + timedelta(hours=1)
-    
+
+    import hashlib
+    token_hash = hashlib.sha256(reset_token.encode()).hexdigest()
+
     # Store token in database (delete any existing tokens for this user first)
     await db.password_reset_tokens.delete_many({"user_id": user["id"]})
     await db.password_reset_tokens.insert_one({
-        "token": reset_token,
+        "token": token_hash,
         "user_id": user["id"],
         "email": body.email,
         "expires_at": expires_at.isoformat(),
@@ -436,16 +490,18 @@ async def forgot_password(body: ForgotPasswordRequest, request: Request):
 @limiter.limit("5/minute")
 async def reset_password(body: ResetPasswordRequest, request: Request):
     """Reset password using token"""
-    # Find token
-    token_doc = await db.password_reset_tokens.find_one({"token": body.token})
-    
+    # Hash the incoming token before lookup
+    import hashlib
+    token_hash = hashlib.sha256(body.token.encode()).hexdigest()
+    token_doc = await db.password_reset_tokens.find_one({"token": token_hash})
+
     if not token_doc:
         raise HTTPException(status_code=400, detail="Invalid or expired reset token")
-    
+
     # Check expiration
     expires_at = datetime.fromisoformat(token_doc["expires_at"].replace('Z', '+00:00'))
     if datetime.now(timezone.utc) > expires_at:
-        await db.password_reset_tokens.delete_one({"token": body.token})
+        await db.password_reset_tokens.delete_one({"token": token_hash})
         raise HTTPException(status_code=400, detail="Reset token has expired")
 
     # Update password
@@ -456,7 +512,7 @@ async def reset_password(body: ResetPasswordRequest, request: Request):
     )
 
     # Delete used token
-    await db.password_reset_tokens.delete_one({"token": body.token})
+    await db.password_reset_tokens.delete_one({"token": token_hash})
     
     return {"message": "Password has been reset successfully"}
 

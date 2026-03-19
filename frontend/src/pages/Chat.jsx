@@ -63,7 +63,7 @@ export default function Chat() {
     if (!token || wsRef.current?.readyState === WebSocket.OPEN) return;
 
     try {
-      wsRef.current = new WebSocket(`${WS_URL}/ws/${token}`);
+      wsRef.current = new WebSocket(`${WS_URL}/ws`, [`access_token.${token}`]);
 
       wsRef.current.onopen = () => {
         setWsConnected(true);
