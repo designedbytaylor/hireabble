@@ -69,6 +69,61 @@ def _public_url(bucket: str, path: str) -> str:
     return f"{SUPABASE_URL}/storage/v1/object/public/{bucket}/{path}"
 
 
+MAX_PHOTO_DIMENSION = 1600  # Max width or height in pixels
+PHOTO_JPEG_QUALITY = 85     # JPEG quality (1-100)
+
+
+def _optimize_image(contents: bytes, max_dim: int = MAX_PHOTO_DIMENSION, quality: int = PHOTO_JPEG_QUALITY) -> tuple[bytes, str]:
+    """Resize and compress an image. Returns (optimized_bytes, content_type)."""
+    try:
+        from PIL import Image, ExifTags
+        img = Image.open(io.BytesIO(contents))
+
+        # Auto-rotate based on EXIF orientation
+        try:
+            for orientation in ExifTags.TAGS:
+                if ExifTags.TAGS[orientation] == 'Orientation':
+                    break
+            exif = img._getexif()
+            if exif and orientation in exif:
+                if exif[orientation] == 3:
+                    img = img.rotate(180, expand=True)
+                elif exif[orientation] == 6:
+                    img = img.rotate(270, expand=True)
+                elif exif[orientation] == 8:
+                    img = img.rotate(90, expand=True)
+        except (AttributeError, KeyError, TypeError):
+            pass
+
+        # Resize if exceeds max dimension
+        w, h = img.size
+        if w > max_dim or h > max_dim:
+            ratio = min(max_dim / w, max_dim / h)
+            new_w, new_h = int(w * ratio), int(h * ratio)
+            img = img.resize((new_w, new_h), Image.LANCZOS)
+            logger.info(f"Image resized from {w}x{h} to {new_w}x{new_h}")
+
+        # Convert RGBA/palette to RGB for JPEG output
+        if img.mode in ("RGBA", "P"):
+            background = Image.new("RGB", img.size, (255, 255, 255))
+            if img.mode == "P":
+                img = img.convert("RGBA")
+            background.paste(img, mask=img.split()[3])
+            img = background
+        elif img.mode != "RGB":
+            img = img.convert("RGB")
+
+        # Save as JPEG with optimization
+        buf = io.BytesIO()
+        img.save(buf, format="JPEG", quality=quality, optimize=True)
+        optimized = buf.getvalue()
+        logger.info(f"Image optimized: {len(contents)} -> {len(optimized)} bytes ({len(optimized)/len(contents):.0%})")
+        return optimized, "image/jpeg"
+    except Exception as e:
+        logger.warning(f"Image optimization failed, using original: {e}")
+        return contents, "image/jpeg"
+
+
 def _save_local(subdir: str, filename: str, contents: bytes) -> str:
     """Save file to local uploads directory, return relative URL path."""
     target_dir = UPLOADS_DIR / subdir
@@ -471,8 +526,9 @@ async def upload_file(
     analysis["analysis"] = analysis.get("analysis", {})
     analysis["analysis"]["ai_moderation"] = ai_check
 
-    ext = file.filename.split('.')[-1] if '.' in file.filename else 'jpg'
-    filename = f"{current_user['id']}_{uuid.uuid4().hex[:8]}.{ext}"
+    # Optimize image: resize to max 1600px and compress as JPEG
+    contents, content_type = _optimize_image(contents)
+    filename = f"{current_user['id']}_{uuid.uuid4().hex[:8]}.jpg"
 
     if _USE_SUPABASE:
         supabase = _get_supabase()
@@ -490,7 +546,7 @@ async def upload_file(
             supabase.storage.from_(PHOTO_BUCKET).upload(
                 filename,
                 contents,
-                file_options={"content-type": file.content_type}
+                file_options={"content-type": content_type}
             )
         except Exception as e:
             logger.error(f"Supabase upload failed: {e}")
@@ -674,8 +730,9 @@ async def upload_chat_image(
     analysis["analysis"] = analysis.get("analysis", {})
     analysis["analysis"]["ai_moderation"] = ai_check
 
-    ext = file.filename.split('.')[-1] if '.' in file.filename else 'jpg'
-    filename = f"chat_{current_user['id']}_{uuid.uuid4().hex[:8]}.{ext}"
+    # Optimize image: resize to max 1600px and compress as JPEG
+    contents, content_type = _optimize_image(contents)
+    filename = f"chat_{current_user['id']}_{uuid.uuid4().hex[:8]}.jpg"
 
     if _USE_SUPABASE:
         supabase = _get_supabase()
@@ -683,7 +740,7 @@ async def upload_chat_image(
             supabase.storage.from_(PHOTO_BUCKET).upload(
                 filename,
                 contents,
-                file_options={"content-type": file.content_type}
+                file_options={"content-type": content_type}
             )
         except Exception as e:
             logger.error(f"Supabase chat image upload failed: {e}")

@@ -3,6 +3,7 @@ import axios from 'axios';
 import { useAdminAuth } from '../../context/AdminAuthContext';
 import { Button } from '../../components/ui/button';
 import { Badge } from '../../components/ui/badge';
+import { getPhotoUrl } from '../../utils/helpers';
 import {
   Database, Users, Trash2, Play,
   LogIn, ExternalLink, RefreshCw, CheckCircle,
@@ -290,7 +291,7 @@ export default function AdminTesting() {
             {users.map(u => (
               <div key={u.id} className="flex items-center gap-2 sm:gap-3 p-2 sm:p-3 rounded-xl bg-gray-800/50 hover:bg-gray-800 transition-colors">
                 <img
-                  src={u.photo_url || u.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${u.id}`}
+                  src={getPhotoUrl(u.photo_url || u.avatar, u.id)}
                   alt={u.name}
                   className="w-8 h-8 sm:w-10 sm:h-10 rounded-full object-cover flex-shrink-0"
                 />
