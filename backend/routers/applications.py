@@ -1366,7 +1366,7 @@ async def get_applicant_resume(seeker_id: str, current_user: dict = Depends(get_
         for ref in references
     ]
 
-    return {
+    result = {
         "name": seeker.get("name"),
         "title": seeker.get("title"),
         "location": seeker.get("location"),
@@ -1385,6 +1385,12 @@ async def get_applicant_resume(seeker_id: str, current_user: dict = Depends(get_
         "references_available": bool(seeker.get("references")) and seeker.get("references_hidden", True) and not ref_request,
         "references_approved": bool(ref_request),
     }
+
+    # Include contact info only if seeker has opted in
+    if seeker.get("show_contact_on_resume"):
+        result["email"] = seeker.get("email")
+
+    return result
 
 
 # ==================== PROFILE VIEW TRACKING ====================

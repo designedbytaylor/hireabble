@@ -866,11 +866,17 @@ async def download_applicant_resume_pdf(seeker_id: str, current_user: dict = Dep
     if user.get('title'):
         elements.append(Paragraph(user['title'], title_style))
 
-    # Contact line — hide email/phone/address; only show location and Hireabble contact note
+    # Contact line — show full contact info only if seeker opted in, otherwise generic
     contact_parts = []
-    if user.get('location'):
-        contact_parts.append(user['location'])
-    contact_parts.append("Contact via Hireabble")
+    if user.get('show_contact_on_resume'):
+        if user.get('email'):
+            contact_parts.append(user['email'])
+        if user.get('location'):
+            contact_parts.append(user['location'])
+    else:
+        if user.get('location'):
+            contact_parts.append(user['location'])
+        contact_parts.append("Contact via Hireabble")
     elements.append(Paragraph("  |  ".join(contact_parts), contact_style))
 
     elements.append(Spacer(1, 4))
