@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback, memo } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo, memo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence, useMotionValue, useTransform } from 'framer-motion';
 import { X, Heart, Star, Briefcase, MapPin, DollarSign, Building2, Clock, ChevronDown, Filter, SlidersHorizontal, Zap, CheckCircle, Globe, Wifi, Navigation2, Info, Calendar, Undo2, Eye, EyeOff, Rocket, Crown, Sparkles, Lock, Bookmark } from 'lucide-react';
@@ -200,6 +200,10 @@ export default function SeekerDashboard() {
   });
   const [activeFiltersCount, setActiveFiltersCount] = useState(0);
   const [detectingLocation, setDetectingLocation] = useState(false);
+
+  const handleFilterChange = useCallback((key, value) => {
+    setFilters(prev => ({ ...prev, [key]: value }));
+  }, []);
 
   // ─── Retry queue: flush any swipes that failed on a previous page load ───
   const flushSwipeQueue = useCallback(async () => {
@@ -412,32 +416,46 @@ export default function SeekerDashboard() {
     const WS_URL = process.env.REACT_APP_BACKEND_URL?.replace('https://', 'wss://').replace('http://', 'ws://');
     if (!WS_URL) return;
     let ws;
-    try {
-      ws = new WebSocket(`${WS_URL}/ws`, [`access_token.${token}`]);
-      ws.onmessage = (event) => {
-        try {
-          const data = JSON.parse(event.data);
-          if (data.type === 'new_match' && data.match) {
-            // Skip if a swipe API call is in-flight — the API response
-            // will set the correct match data (avoids stale WS data flash)
-            if (swipeInFlightRef.current) return;
-            // Only show modal if not already showing one
-            setShowMatch(prev => {
-              if (prev) return prev; // already showing a match modal
-              setStats(s => {
-                const next = { ...s, matches: s.matches + 1 };
-                saveCachedStats(next, uidRef.current);
-                return next;
+    let reconnectTimeout;
+    let reconnectCount = 0;
+    let unmounted = false;
+    const connect = () => {
+      if (unmounted) return;
+      try {
+        ws = new WebSocket(`${WS_URL}/ws`, [`access_token.${token}`]);
+        ws.onopen = () => { reconnectCount = 0; };
+        ws.onmessage = (event) => {
+          try {
+            const data = JSON.parse(event.data);
+            if (data.type === 'new_match' && data.match) {
+              // Skip if a swipe API call is in-flight — the API response
+              // will set the correct match data (avoids stale WS data flash)
+              if (swipeInFlightRef.current) return;
+              // Only show modal if not already showing one
+              setShowMatch(prev => {
+                if (prev) return prev; // already showing a match modal
+                setStats(s => {
+                  const next = { ...s, matches: s.matches + 1 };
+                  saveCachedStats(next, uidRef.current);
+                  return next;
+                });
+                setMatchData(data.match);
+                return true;
               });
-              setMatchData(data.match);
-              return true;
-            });
-          }
-        } catch { /* ignore parse errors */ }
-      };
-      ws.onerror = () => {};
-    } catch { /* ignore connection errors */ }
-    return () => { if (ws) ws.close(); };
+            }
+          } catch { /* ignore parse errors */ }
+        };
+        ws.onclose = () => {
+          if (unmounted) return;
+          const delay = Math.min(3000 * Math.pow(1.5, reconnectCount), 30000);
+          reconnectCount++;
+          reconnectTimeout = setTimeout(connect, delay);
+        };
+        ws.onerror = () => {};
+      } catch { /* ignore connection errors */ }
+    };
+    connect();
+    return () => { unmounted = true; clearTimeout(reconnectTimeout); if (ws) ws.close(); };
   }, [token]);
 
   // Refresh stats when user returns to this page (e.g. after applying from
@@ -1146,7 +1164,7 @@ export default function SeekerDashboard() {
               <Input
                 placeholder="e.g. React, Product Manager, Startup..."
                 value={filters.keyword || ''}
-                onChange={(e) => setFilters({ ...filters, keyword: e.target.value })}
+                onChange={(e) => handleFilterChange('keyword', e.target.value)}
                 className="h-11 rounded-xl bg-background"
                 data-testid="filter-keyword"
               />
@@ -1156,7 +1174,7 @@ export default function SeekerDashboard() {
             {/* Remote Jobs Toggle */}
             <button
               type="button"
-              onClick={() => setFilters({ ...filters, remote_only: !filters.remote_only, job_type: '' })}
+              onClick={() => setFilters(prev => ({ ...prev, remote_only: !prev.remote_only, job_type: '' }))}
               className={`w-full flex items-center gap-3 p-4 rounded-xl border transition-all ${
                 filters.remote_only
                   ? 'bg-primary/10 border-primary/40 text-primary'
@@ -1182,7 +1200,7 @@ export default function SeekerDashboard() {
               </Label>
               <LocationAutocomplete
                 value={filters.location}
-                onChange={(val) => setFilters({ ...filters, location: val })}
+                onChange={(val) => handleFilterChange('location', val)}
                 placeholder="Search for a city..."
                 showDetectButton
                 data-testid="filter-location-custom"
@@ -1194,7 +1212,7 @@ export default function SeekerDashboard() {
                 <Label>Job Type</Label>
                 <Select
                   value={filters.job_type || "all"}
-                  onValueChange={(v) => setFilters({ ...filters, job_type: v === "all" ? "" : v })}
+                  onValueChange={(v) => handleFilterChange('job_type', v === "all" ? "" : v)}
                 >
                   <SelectTrigger className="h-11 rounded-xl bg-background" data-testid="filter-job-type">
                     <SelectValue placeholder="All types" />
@@ -1213,7 +1231,7 @@ export default function SeekerDashboard() {
               <Label>Experience Level</Label>
               <Select
                 value={filters.experience_level || "all"}
-                onValueChange={(v) => setFilters({ ...filters, experience_level: v === "all" ? "" : v })}
+                onValueChange={(v) => handleFilterChange('experience_level', v === "all" ? "" : v)}
               >
                 <SelectTrigger className="h-11 rounded-xl bg-background" data-testid="filter-experience">
                   <SelectValue placeholder="All levels" />
@@ -1234,7 +1252,7 @@ export default function SeekerDashboard() {
                   <Label>Category</Label>
                   <Select
                     value={filters.category || "all"}
-                    onValueChange={(v) => setFilters({ ...filters, category: v === "all" ? "" : v })}
+                    onValueChange={(v) => handleFilterChange('category', v === "all" ? "" : v)}
                   >
                     <SelectTrigger className="h-11 rounded-xl bg-background">
                       <SelectValue placeholder="All categories" />
@@ -1258,7 +1276,7 @@ export default function SeekerDashboard() {
                   <Label>Employment Type</Label>
                   <Select
                     value={filters.employment_type || "all"}
-                    onValueChange={(v) => setFilters({ ...filters, employment_type: v === "all" ? "" : v })}
+                    onValueChange={(v) => handleFilterChange('employment_type', v === "all" ? "" : v)}
                   >
                     <SelectTrigger className="h-11 rounded-xl bg-background">
                       <SelectValue placeholder="All types" />
@@ -1279,7 +1297,7 @@ export default function SeekerDashboard() {
                     type="number"
                     placeholder="e.g., 50000"
                     value={filters.salary_min}
-                    onChange={(e) => setFilters({ ...filters, salary_min: e.target.value })}
+                    onChange={(e) => handleFilterChange('salary_min', e.target.value)}
                     className="h-11 rounded-xl bg-background"
                     data-testid="filter-salary"
                   />

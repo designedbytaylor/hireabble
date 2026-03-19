@@ -79,7 +79,8 @@ export default function Chat() {
           }
           return next;
         });
-        reconnectTimeoutRef.current = setTimeout(connectWebSocket, 3000);
+        const delay = Math.min(3000 * Math.pow(1.5, next), 30000);
+        reconnectTimeoutRef.current = setTimeout(connectWebSocket, delay);
       };
 
       wsRef.current.onerror = () => {};
