@@ -1412,11 +1412,11 @@ function ExitingRecruiterCard({ card }) {
       className="absolute inset-0 z-10 pointer-events-none"
       initial={{ x: startX, y: startY, rotate: startRotate }}
       animate={{
-        x: exitDirection.x,
-        y: exitDirection.y,
+        x: exitDirection.x > 0 ? Math.min(exitDirection.x, window.innerWidth + 100) : Math.max(exitDirection.x, -(window.innerWidth + 100)),
+        y: exitDirection.y > 0 ? Math.min(exitDirection.y, window.innerHeight + 100) : Math.max(exitDirection.y, -(window.innerHeight + 100)),
         rotate: exitDirection.x > 0 ? 20 : exitDirection.x < 0 ? -20 : 0,
       }}
-      transition={{ duration: 0.25, ease: 'easeIn' }}
+      transition={{ duration: window.innerWidth < 640 ? 0.15 : 0.25, ease: 'easeIn' }}
     >
       <div className="w-full h-full rounded-3xl overflow-hidden relative gradient-border">
         <img src={photoUrl} alt={name} className="absolute inset-0 w-full h-full object-cover object-top" />

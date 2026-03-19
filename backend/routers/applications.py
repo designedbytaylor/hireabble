@@ -962,8 +962,15 @@ async def get_my_applications(current_user: dict = Depends(get_current_user)):
     ).sort("created_at", -1).to_list(200)
 
     # Batch-fetch all referenced jobs in one query instead of N+1
+    _JOB_LIST_PROJECTION = {
+        "_id": 0, "id": 1, "title": 1, "company": 1, "location": 1,
+        "job_type": 1, "experience_level": 1, "salary_min": 1, "salary_max": 1,
+        "company_logo": 1, "listing_photo": 1, "background_image": 1,
+        "is_active": 1, "created_at": 1, "category": 1, "employment_type": 1,
+        "description": 1, "requirements": 1, "benefits": 1,
+    }
     job_ids = list(set(app.get("job_id") for app in applications if app.get("job_id")))
-    jobs_list = await db.jobs.find({"id": {"$in": job_ids}}, {"_id": 0}).to_list(len(job_ids)) if job_ids else []
+    jobs_list = await db.jobs.find({"id": {"$in": job_ids}}, _JOB_LIST_PROJECTION).to_list(len(job_ids)) if job_ids else []
     jobs_map = {j["id"]: j for j in jobs_list}
 
     result = []
