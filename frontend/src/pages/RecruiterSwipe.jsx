@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, memo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence, useMotionValue, useTransform } from 'framer-motion';
 import {
@@ -1427,7 +1427,7 @@ function ExitingRecruiterCard({ card }) {
 }
 
 // Static background cards — show real content so next card is instantly visible
-function StaticApplicantCard({ app }) {
+const StaticApplicantCard = memo(function StaticApplicantCard({ app }) {
   return (
     <div className="w-full h-full rounded-3xl overflow-hidden relative gradient-border">
       <img
@@ -1467,9 +1467,9 @@ function StaticApplicantCard({ app }) {
       </div>
     </div>
   );
-}
+});
 
-function StaticCandidateCard({ candidate }) {
+const StaticCandidateCard = memo(function StaticCandidateCard({ candidate }) {
   return (
     <div className="w-full h-full rounded-3xl overflow-hidden relative gradient-border">
       <img
