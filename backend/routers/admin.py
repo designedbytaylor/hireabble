@@ -29,6 +29,7 @@ from slowapi.util import get_remote_address
 from fastapi import Request
 import secrets
 import hashlib
+import secrets
 import jwt as pyjwt
 
 limiter = Limiter(key_func=get_remote_address)
@@ -44,7 +45,7 @@ async def admin_setup(admin: AdminCreate, request: Request, setup_token: str = "
     expected_token = os.environ.get("ADMIN_SETUP_TOKEN")
     if not expected_token:
         raise HTTPException(status_code=403, detail="ADMIN_SETUP_TOKEN not configured. Set it as an environment variable.")
-    if setup_token != expected_token:
+    if not secrets.compare_digest(setup_token, expected_token):
         raise HTTPException(status_code=403, detail="Invalid or missing setup token")
 
     count = await db.admin_users.count_documents({})
@@ -199,9 +200,9 @@ async def admin_2fa_verify(payload: dict, request: Request):
         await db.admin_2fa_codes.delete_many({"admin_id": admin_id})
         raise HTTPException(status_code=401, detail="Verification code expired. Please log in again.")
 
-    # Verify code (constant-time comparison via hash)
+    # Verify code (constant-time comparison to prevent timing attacks)
     code_hash = hashlib.sha256(code.encode()).hexdigest()
-    if code_hash != stored["code_hash"]:
+    if not secrets.compare_digest(code_hash, stored["code_hash"]):
         raise HTTPException(status_code=401, detail="Invalid verification code")
 
     # Clean up used code

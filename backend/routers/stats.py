@@ -801,12 +801,14 @@ async def download_resume(current_user: dict = Depends(get_current_user)):
     doc.build(elements)
     buffer.seek(0)
 
-    filename = f"{user.get('name', 'resume').replace(' ', '_')}_Resume.pdf"
+    import re as _re
+    safe_name = _re.sub(r'[^\w\s-]', '', user.get('name', 'resume')).strip().replace(' ', '_') or 'resume'
+    filename = f"{safe_name}_Resume.pdf"
 
     return StreamingResponse(
         buffer,
         media_type="application/pdf",
-        headers={"Content-Disposition": f"attachment; filename={filename}"}
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'}
     )
 
 @router.get("/applicant/{seeker_id}/resume/pdf")
@@ -951,11 +953,12 @@ async def download_applicant_resume_pdf(seeker_id: str, current_user: dict = Dep
     doc.build(elements)
     buffer.seek(0)
 
-    filename = f"{user.get('name', 'resume').replace(' ', '_')}_Resume.pdf"
+    safe_name2 = _re.sub(r'[^\w\s-]', '', user.get('name', 'resume')).strip().replace(' ', '_') or 'resume'
+    filename = f"{safe_name2}_Resume.pdf"
     return StreamingResponse(
         buffer,
         media_type="application/pdf",
-        headers={"Content-Disposition": f"attachment; filename={filename}"}
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'}
     )
 
 

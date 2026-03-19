@@ -704,9 +704,10 @@ function MessageContent({ content }) {
           onError={(e) => {
             e.target.onerror = null;
             e.target.style.display = 'none';
-            e.target.insertAdjacentHTML('afterend',
-              '<div class="rounded-lg bg-accent/50 border border-border p-4 text-xs text-muted-foreground flex items-center gap-2 mb-1">Image could not be loaded</div>'
-            );
+            const errDiv = document.createElement('div');
+            errDiv.className = 'rounded-lg bg-accent/50 border border-border p-4 text-xs text-muted-foreground flex items-center gap-2 mb-1';
+            errDiv.textContent = 'Image could not be loaded';
+            e.target.parentNode.insertBefore(errDiv, e.target.nextSibling);
           }}
         />
         {rest && <p className="text-sm">{rest}</p>}

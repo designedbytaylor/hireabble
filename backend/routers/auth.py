@@ -381,11 +381,10 @@ async def login(credentials: UserLogin, request: Request):
                 for i, hashed_code in enumerate(user["totp_backup_codes"]):
                     if verify_password(totp_code, hashed_code):
                         backup_valid = True
-                        # Remove used backup code
-                        remaining = user["totp_backup_codes"][:i] + user["totp_backup_codes"][i+1:]
+                        # Atomically remove used backup code to prevent reuse in race conditions
                         await db.users.update_one(
                             {"id": user["id"]},
-                            {"$set": {"totp_backup_codes": remaining}}
+                            {"$pull": {"totp_backup_codes": hashed_code}}
                         )
                         break
 
@@ -737,10 +736,10 @@ async def complete_2fa_login(body: dict, request: Request):
         for i, hashed_code in enumerate(user["totp_backup_codes"]):
             if verify_password(totp_code, hashed_code):
                 code_valid = True
-                remaining = user["totp_backup_codes"][:i] + user["totp_backup_codes"][i+1:]
+                # Atomically remove used backup code to prevent reuse in race conditions
                 await db.users.update_one(
                     {"id": user["id"]},
-                    {"$set": {"totp_backup_codes": remaining}}
+                    {"$pull": {"totp_backup_codes": hashed_code}}
                 )
                 break
 
@@ -926,17 +925,19 @@ async def confirm_email_change(body: dict):
         await db.email_change_tokens.delete_one({"token": token_hash})
         raise HTTPException(status_code=400, detail="Token has expired")
 
-    # Check new email isn't taken (race condition check)
-    existing = await db.users.find_one({"email": token_doc["new_email"]})
-    if existing:
+    # Atomically update email only if no other user has claimed it.
+    # The unique index on 'email' prevents race conditions.
+    from pymongo.errors import DuplicateKeyError
+    try:
+        result = await db.users.update_one(
+            {"id": token_doc["user_id"]},
+            {"$set": {"email": token_doc["new_email"], "email_verified": True}}
+        )
+        if result.modified_count == 0:
+            raise HTTPException(status_code=400, detail="Email change failed")
+    except DuplicateKeyError:
         await db.email_change_tokens.delete_one({"token": token_hash})
         raise HTTPException(status_code=400, detail="This email is already registered")
-
-    # Update email
-    await db.users.update_one(
-        {"id": token_doc["user_id"]},
-        {"$set": {"email": token_doc["new_email"], "email_verified": True}}
-    )
 
     # Clean up
     await db.email_change_tokens.delete_many({"user_id": token_doc["user_id"]})
@@ -1000,6 +1001,9 @@ async def update_profile(updates: dict, current_user: dict = Depends(get_current
     for key, val in list(update_data.items()):
         if isinstance(val, dict) and key not in ("push_subscription",):
             del update_data[key]
+        # Also reject dicts inside arrays (e.g. skills: [{"$gt": ""}])
+        if isinstance(val, list):
+            update_data[key] = [item for item in val if not isinstance(item, dict)]
 
     # Validate push_subscription structure
     if "push_subscription" in update_data and update_data["push_subscription"] is not None:
