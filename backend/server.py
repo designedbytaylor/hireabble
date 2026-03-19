@@ -52,6 +52,8 @@ app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 # Mount static files for uploads
+# Note: Security headers for uploads (Content-Disposition, X-Content-Type-Options)
+# are set in the add_security_headers middleware below
 app.mount("/uploads", StaticFiles(directory=str(UPLOADS_DIR)), name="uploads")
 
 # Brotli compression first (15-20% smaller than gzip), GZip as fallback
@@ -155,6 +157,10 @@ async def add_security_headers(request: Request, call_next):
     )
     response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=(), payment=()"
     response.headers["X-Permitted-Cross-Domain-Policies"] = "none"
+    # Force uploaded files to download (prevents inline rendering of malicious SVG/HTML)
+    if request.url.path.startswith("/uploads/"):
+        response.headers["Content-Disposition"] = "attachment"
+        response.headers["X-Content-Type-Options"] = "nosniff"
     if request.url.scheme == "https":
         response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
     return response

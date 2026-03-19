@@ -87,6 +87,8 @@ def _analyze_image(contents: bytes) -> dict:
 
     try:
         from PIL import Image
+        # Prevent decompression bombs (malicious images that expand to huge sizes in memory)
+        Image.MAX_IMAGE_PIXELS = 20_000_000  # ~20 megapixels max
         img = Image.open(io.BytesIO(contents))
         result["analysis"]["width"] = img.width
         result["analysis"]["height"] = img.height
@@ -1478,6 +1480,7 @@ async def upload_resume(
 
     # Extract text based on file type
     text = ""
+    MAX_EXTRACTED_TEXT = 500_000  # 500KB text limit to prevent decompression bombs
     if file.content_type == "application/pdf":
         try:
             from PyPDF2 import PdfReader
@@ -1486,6 +1489,9 @@ async def upload_resume(
                 page_text = page.extract_text()
                 if page_text:
                     text += page_text + "\n"
+                if len(text) > MAX_EXTRACTED_TEXT:
+                    text = text[:MAX_EXTRACTED_TEXT]
+                    break
         except Exception as e:
             logger.error(f"PDF parsing failed: {e}")
             raise HTTPException(status_code=400, detail="Could not read PDF. Please ensure it is a valid, text-based PDF.")

@@ -404,6 +404,9 @@ async def get_job(job_id: str, current_user: dict = Depends(get_current_user)):
     job = await db.jobs.find_one({"id": job_id}, {"_id": 0})
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
+    # Non-owners can only see active jobs (prevents viewing draft/archived listings)
+    if not job.get("is_active", True) and job.get("recruiter_id") != current_user.get("id"):
+        raise HTTPException(status_code=404, detail="Job not found")
     return job
 
 @router.put("/{job_id}", response_model=JobResponse)

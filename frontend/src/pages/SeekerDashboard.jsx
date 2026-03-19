@@ -501,9 +501,9 @@ export default function SeekerDashboard() {
       if (queue.length > 0 && navigator.sendBeacon) {
         for (const item of queue) {
           try {
-            const payload = JSON.stringify({ job_id: item.job_id, action: item.action });
+            const payload = JSON.stringify({ job_id: item.job_id, action: item.action, token: tokenRef.current });
             navigator.sendBeacon(
-              `${API}/swipe/beacon?token=${encodeURIComponent(tokenRef.current)}`,
+              `${API}/swipe/beacon`,
               new Blob([payload], { type: 'application/json' })
             );
           } catch { /* best effort */ }
