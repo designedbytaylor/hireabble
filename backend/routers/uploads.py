@@ -2,8 +2,12 @@
 File uploads routes for Hireabble API — Supabase Storage
 Includes media tracking and automatic content moderation.
 """
-from fastapi import APIRouter, HTTPException, Depends, UploadFile, File
+from fastapi import APIRouter, HTTPException, Depends, UploadFile, File, Request
 from fastapi.responses import RedirectResponse
+from slowapi import Limiter
+from slowapi.util import get_remote_address
+
+limiter = Limiter(key_func=get_remote_address)
 from supabase import create_client
 from datetime import datetime, timezone
 import uuid
@@ -429,7 +433,9 @@ async def _track_upload(user_id: str, user_name: str, media_type: str, category:
 
 @router.post("/upload/photo")
 @router.post("/upload")
+@limiter.limit("30/minute")
 async def upload_file(
+    request: Request,
     file: UploadFile = File(...),
     current_user: dict = Depends(get_current_user)
 ):
@@ -515,7 +521,9 @@ async def upload_file(
 
 
 @router.post("/upload/video")
+@limiter.limit("30/minute")
 async def upload_video(
+    request: Request,
     file: UploadFile = File(...),
     current_user: dict = Depends(get_current_user)
 ):
@@ -1451,7 +1459,9 @@ def _parse_resume_basic(text: str) -> dict:
 
 
 @router.post("/upload/resume")
+@limiter.limit("30/minute")
 async def upload_resume(
+    request: Request,
     file: UploadFile = File(...),
     current_user: dict = Depends(get_current_user)
 ):

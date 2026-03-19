@@ -12,6 +12,7 @@ import os
 import base64
 import logging
 import io
+import re
 import qrcode
 from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import letter
@@ -219,7 +220,7 @@ async def browse_jobs_public(
     if category:
         query["category"] = category
     if location:
-        query["location"] = {"$regex": location, "$options": "i"}
+        query["location"] = {"$regex": re.escape(location), "$options": "i"}
 
     clamped_limit = min(limit, 50)
     jobs = await db.jobs.find(
@@ -271,7 +272,6 @@ async def get_jobs(
 
         # Text search across title, company, description
         if search:
-            import re
             safe_search = re.escape(search)
             and_clauses = query.setdefault("$and", [])
             and_clauses.append({"$or": [
@@ -288,7 +288,7 @@ async def get_jobs(
         if salary_min:
             query["salary_min"] = {"$gte": salary_min}
         if location:
-            query["location"] = {"$regex": location, "$options": "i"}
+            query["location"] = {"$regex": re.escape(location), "$options": "i"}
         if category:
             query["category"] = category
         if employment_type:
@@ -302,7 +302,7 @@ async def get_jobs(
                 {"location_restriction": None},
                 {"location_restriction": "any"},
                 {"location_restriction": {"$exists": False}},
-                {"location": {"$regex": seeker_location.split(",")[0].strip(), "$options": "i"}},
+                {"location": {"$regex": re.escape(seeker_location.split(",")[0].strip()), "$options": "i"}},
             ]})
 
         clamped_limit = min(limit, 200)

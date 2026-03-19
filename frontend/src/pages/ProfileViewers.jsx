@@ -7,6 +7,7 @@ import { useAuth } from '../context/AuthContext';
 import Navigation from '../components/Navigation';
 import { getPhotoUrl, handleImgError } from '../utils/helpers';
 import { SkeletonPageBackground, SkeletonListItem } from '../components/skeletons';
+import useDocumentTitle from '../hooks/useDocumentTitle';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -22,6 +23,7 @@ function timeAgo(dateStr) {
 }
 
 export default function ProfileViewers() {
+  useDocumentTitle('Profile Viewers');
   const navigate = useNavigate();
   const { token } = useAuth();
   const [viewers, setViewers] = useState([]);

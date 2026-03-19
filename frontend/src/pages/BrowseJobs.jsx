@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { MapPin, Briefcase, Clock, ArrowRight, Search, Building2, DollarSign } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import axios from 'axios';
+import useDocumentTitle from '../hooks/useDocumentTitle';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -44,6 +45,7 @@ function timeAgo(dateStr) {
 }
 
 export default function BrowseJobs() {
+  useDocumentTitle('Browse Jobs');
   const [jobs, setJobs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [category, setCategory] = useState('');
@@ -67,6 +69,63 @@ export default function BrowseJobs() {
     };
     fetchJobs();
   }, [category, jobType]);
+
+  // Add JSON-LD structured data for SEO
+  useEffect(() => {
+    if (!jobs || jobs.length === 0) return;
+
+    const jsonLd = {
+      "@context": "https://schema.org",
+      "@type": "ItemList",
+      "itemListElement": jobs.slice(0, 20).map((job, index) => ({
+        "@type": "ListItem",
+        "position": index + 1,
+        "item": {
+          "@type": "JobPosting",
+          "title": job.title,
+          "description": `${job.title} at ${job.company}`,
+          "datePosted": job.created_at,
+          "hiringOrganization": {
+            "@type": "Organization",
+            "name": job.company
+          },
+          "jobLocation": {
+            "@type": "Place",
+            "address": job.location || "Remote"
+          },
+          "employmentType": (job.employment_type || "full-time").toUpperCase().replace("-", "_"),
+          ...(job.salary_min && {
+            "baseSalary": {
+              "@type": "MonetaryAmount",
+              "currency": "USD",
+              "value": {
+                "@type": "QuantitativeValue",
+                "minValue": job.salary_min,
+                ...(job.salary_max && { "maxValue": job.salary_max }),
+                "unitText": "YEAR"
+              }
+            }
+          })
+        }
+      }))
+    };
+
+    const script = document.createElement('script');
+    script.type = 'application/ld+json';
+    script.textContent = JSON.stringify(jsonLd);
+    script.id = 'jobs-jsonld';
+
+    // Remove existing one if any
+    const existing = document.getElementById('jobs-jsonld');
+    if (existing) existing.remove();
+
+    document.head.appendChild(script);
+
+    return () => {
+      const el = document.getElementById('jobs-jsonld');
+      if (el) el.remove();
+    };
+  }, [jobs]);
 
   return (
     <div className="min-h-screen bg-background">

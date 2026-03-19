@@ -1,5 +1,7 @@
 import { Link } from 'react-router-dom';
+import useDocumentTitle from '../hooks/useDocumentTitle';
 export default function Landing() {
+  useDocumentTitle('Home');
   return (
     <div className="min-h-screen relative overflow-hidden flex flex-col">
       {/* Full-screen gradient background */}

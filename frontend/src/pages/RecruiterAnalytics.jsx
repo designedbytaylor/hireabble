@@ -8,10 +8,12 @@ import {
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import Navigation from '../components/Navigation';
+import useDocumentTitle from '../hooks/useDocumentTitle';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
 export default function RecruiterAnalytics() {
+  useDocumentTitle('Analytics');
   const navigate = useNavigate();
   const { user, token } = useAuth();
   const [stats, setStats] = useState(null);

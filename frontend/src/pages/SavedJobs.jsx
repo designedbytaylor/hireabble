@@ -5,6 +5,7 @@ import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import { toast } from 'sonner';
 import Navigation from '../components/Navigation';
+import useDocumentTitle from '../hooks/useDocumentTitle';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -104,6 +105,7 @@ function JobDetailSheet({ job, onClose }) {
 }
 
 export default function SavedJobs() {
+  useDocumentTitle('Saved Jobs');
   const { token } = useAuth();
   const navigate = useNavigate();
   const [jobs, setJobs] = useState([]);

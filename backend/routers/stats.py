@@ -5,6 +5,7 @@ from fastapi import APIRouter, HTTPException, Depends
 from fastapi.responses import StreamingResponse
 from datetime import datetime, timezone, timedelta
 import io
+import re
 import asyncio
 
 # PDF Generation
@@ -89,7 +90,7 @@ async def get_seeker_dashboard(current_user: dict = Depends(get_current_user)):
             {"location_restriction": None},
             {"location_restriction": "any"},
             {"location_restriction": {"$exists": False}},
-            {"location": {"$regex": seeker_location.split(",")[0].strip(), "$options": "i"}},
+            {"location": {"$regex": re.escape(seeker_location.split(",")[0].strip()), "$options": "i"}},
         ]
 
     jobs = await db.jobs.find(job_query, {"_id": 0}).sort("created_at", -1).to_list(100)
@@ -449,6 +450,110 @@ async def get_recruiter_stats(current_user: dict = Depends(get_current_user)):
     }
     set_cached(stats_cache, key, result)
     return result
+
+
+@router.get("/analytics/insights")
+async def get_user_insights(current_user: dict = Depends(get_current_user)):
+    """Get detailed analytics insights for the current user."""
+    user_id = current_user["id"]
+    role = current_user.get("role", "seeker")
+    now = datetime.now(timezone.utc)
+
+    if role == "seeker":
+        # Application stats
+        total_apps = await db.applications.count_documents({"seeker_id": user_id})
+        liked_apps = await db.applications.count_documents({"seeker_id": user_id, "action": "like"})
+        superliked_apps = await db.applications.count_documents({"seeker_id": user_id, "action": "superlike"})
+        total_matches = await db.matches.count_documents({"seeker_id": user_id})
+
+        # Match rate
+        match_rate = round((total_matches / max(liked_apps + superliked_apps, 1)) * 100, 1)
+
+        # Applications by week (last 4 weeks)
+        four_weeks_ago = (now - timedelta(weeks=4)).isoformat()
+        recent_apps = await db.applications.find(
+            {"seeker_id": user_id, "created_at": {"$gte": four_weeks_ago}},
+            {"_id": 0, "created_at": 1, "action": 1}
+        ).to_list(500)
+
+        weekly_apps = {}
+        for app in recent_apps:
+            week = app["created_at"][:10]  # YYYY-MM-DD
+            weekly_apps[week] = weekly_apps.get(week, 0) + 1
+
+        # Profile views (last 30 days)
+        thirty_days_ago = (now - timedelta(days=30)).isoformat()
+        profile_views = await db.profile_views.count_documents({
+            "viewed_id": user_id,
+            "created_at": {"$gte": thirty_days_ago}
+        })
+
+        # Response rate (how many of user's apps got recruiter action)
+        responded_apps = await db.applications.count_documents({
+            "seeker_id": user_id,
+            "recruiter_action": {"$in": ["accept", "reject"]}
+        })
+        response_rate = round((responded_apps / max(total_apps, 1)) * 100, 1)
+
+        # Top categories applied to
+        pipeline = [
+            {"$match": {"seeker_id": user_id}},
+            {"$lookup": {"from": "jobs", "localField": "job_id", "foreignField": "id", "as": "job"}},
+            {"$unwind": {"path": "$job", "preserveNullAndEmptyCount": True}},
+            {"$group": {"_id": "$job.category", "count": {"$sum": 1}}},
+            {"$sort": {"count": -1}},
+            {"$limit": 5}
+        ]
+        category_stats = []
+        async for doc in db.applications.aggregate(pipeline):
+            if doc["_id"]:
+                category_stats.append({"category": doc["_id"], "count": doc["count"]})
+
+        return {
+            "total_applications": total_apps,
+            "total_matches": total_matches,
+            "match_rate": match_rate,
+            "response_rate": response_rate,
+            "profile_views_30d": profile_views,
+            "superlike_count": superliked_apps,
+            "activity_by_day": dict(sorted(weekly_apps.items())),
+            "top_categories": category_stats,
+        }
+
+    else:  # recruiter
+        total_jobs = await db.jobs.count_documents({"recruiter_id": user_id})
+        active_jobs = await db.jobs.count_documents({"recruiter_id": user_id, "is_active": True})
+        total_apps_received = await db.applications.count_documents({"recruiter_id": user_id})
+        total_matches = await db.matches.count_documents({"recruiter_id": user_id})
+
+        # Apps per job
+        apps_per_job = round(total_apps_received / max(total_jobs, 1), 1)
+
+        # Match rate
+        total_swipes = await db.recruiter_swipes.count_documents({"recruiter_id": user_id, "action": "like"})
+        match_rate = round((total_matches / max(total_swipes, 1)) * 100, 1)
+
+        # Activity by day (last 4 weeks)
+        four_weeks_ago = (now - timedelta(weeks=4)).isoformat()
+        recent_apps = await db.applications.find(
+            {"recruiter_id": user_id, "created_at": {"$gte": four_weeks_ago}},
+            {"_id": 0, "created_at": 1}
+        ).to_list(500)
+
+        daily_apps = {}
+        for app in recent_apps:
+            day = app["created_at"][:10]
+            daily_apps[day] = daily_apps.get(day, 0) + 1
+
+        return {
+            "total_jobs": total_jobs,
+            "active_jobs": active_jobs,
+            "total_applications_received": total_apps_received,
+            "total_matches": total_matches,
+            "apps_per_job": apps_per_job,
+            "match_rate": match_rate,
+            "activity_by_day": dict(sorted(daily_apps.items())),
+        }
 
 
 @router.get("/profile/completeness")

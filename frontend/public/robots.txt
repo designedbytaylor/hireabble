@@ -4,17 +4,22 @@ Allow: /browse
 Allow: /terms
 Allow: /privacy
 Allow: /cookie-policy
+Allow: /download
 
-Disallow: /admin
-Disallow: /api
 Disallow: /dashboard
 Disallow: /recruiter
-Disallow: /onboarding
 Disallow: /profile
 Disallow: /matches
 Disallow: /messages
-Disallow: /chat
-Disallow: /impersonate
+Disallow: /chat/
+Disallow: /applied
+Disallow: /saved
+Disallow: /interviews
 Disallow: /upgrade
+Disallow: /support
+Disallow: /admin/
+Disallow: /onboarding
+Disallow: /impersonate
+Disallow: /api/
 
 Sitemap: https://hireabble.com/sitemap.xml

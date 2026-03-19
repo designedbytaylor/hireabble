@@ -5,10 +5,12 @@ import { Button } from '../components/ui/button';
 import { toast } from 'sonner';
 import { useAuth } from '../context/AuthContext';
 import axios from 'axios';
+import useDocumentTitle from '../hooks/useDocumentTitle';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
 export default function VerifyEmail() {
+  useDocumentTitle('Verify Email');
   const [searchParams] = useSearchParams();
   const tokenParam = searchParams.get('token');
   const { user, token, updateProfile } = useAuth();

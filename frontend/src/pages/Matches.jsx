@@ -13,10 +13,12 @@ import { getPhotoUrl, handleImgError } from '../utils/helpers';
 import { toast } from 'sonner';
 import { SkeletonPageBackground, SkeletonListItem } from '../components/skeletons';
 import { Skeleton } from '../components/ui/skeleton';
+import useDocumentTitle from '../hooks/useDocumentTitle';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
 export default function Matches() {
+  useDocumentTitle('Matches');
   const navigate = useNavigate();
   const { user, token } = useAuth();
   const [matches, setMatches] = useState([]);

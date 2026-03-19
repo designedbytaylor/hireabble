@@ -21,6 +21,7 @@ import { getPhotoUrl } from '../utils/helpers';
 import { SkeletonPageBackground, SkeletonListItem, SkeletonFilterTabs } from '../components/skeletons';
 import CandidateNotes from '../components/CandidateNotes';
 import { Skeleton } from '../components/ui/skeleton';
+import useDocumentTitle from '../hooks/useDocumentTitle';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -37,6 +38,7 @@ const PIPELINE_STAGES = [
 const STAGE_MAP = Object.fromEntries(PIPELINE_STAGES.map(s => [s.key, s]));
 
 export default function RecruiterApplications() {
+  useDocumentTitle('Applications');
   const navigate = useNavigate();
   const { token } = useAuth();
   const [applications, setApplications] = useState([]);
