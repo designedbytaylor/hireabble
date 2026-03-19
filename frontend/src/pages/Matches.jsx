@@ -67,22 +67,36 @@ export default function Matches() {
     const WS_URL = process.env.REACT_APP_BACKEND_URL?.replace('https://', 'wss://').replace('http://', 'ws://');
     if (!WS_URL) return;
     let ws;
-    try {
-      ws = new WebSocket(`${WS_URL}/ws`, [`access_token.${token}`]);
-      ws.onmessage = (event) => {
-        try {
-          const data = JSON.parse(event.data);
-          if (data.type === 'new_match' && data.match) {
-            // Prepend new match immediately so the user sees it without refresh
-            setMatches(prev => {
-              if (prev.some(m => m.id === data.match.id)) return prev;
-              return [data.match, ...prev];
-            });
-          }
-        } catch { /* ignore */ }
-      };
-    } catch { /* ignore */ }
-    return () => { if (ws) ws.close(); };
+    let reconnectTimeout;
+    let reconnectCount = 0;
+    let unmounted = false;
+    const connect = () => {
+      if (unmounted) return;
+      try {
+        ws = new WebSocket(`${WS_URL}/ws`, [`access_token.${token}`]);
+        ws.onopen = () => { reconnectCount = 0; };
+        ws.onmessage = (event) => {
+          try {
+            const data = JSON.parse(event.data);
+            if (data.type === 'new_match' && data.match) {
+              // Prepend new match immediately so the user sees it without refresh
+              setMatches(prev => {
+                if (prev.some(m => m.id === data.match.id)) return prev;
+                return [data.match, ...prev];
+              });
+            }
+          } catch { /* ignore */ }
+        };
+        ws.onclose = () => {
+          if (unmounted) return;
+          const delay = Math.min(3000 * Math.pow(1.5, reconnectCount), 30000);
+          reconnectCount++;
+          reconnectTimeout = setTimeout(connect, delay);
+        };
+      } catch { /* ignore */ }
+    };
+    connect();
+    return () => { unmounted = true; clearTimeout(reconnectTimeout); if (ws) ws.close(); };
   }, [token]);
 
   const handleOpenChat = (matchId) => {
