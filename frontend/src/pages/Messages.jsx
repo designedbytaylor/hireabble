@@ -51,6 +51,11 @@ export default function Messages() {
     return d.toLocaleDateString();
   };
 
+  const { withMessages, withoutMessages } = useMemo(() => ({
+    withMessages: matches.filter(m => m.last_message),
+    withoutMessages: matches.filter(m => !m.last_message),
+  }), [matches]);
+
   if (loading) {
     return (
       <div className="min-h-screen bg-background pb-24">
@@ -87,10 +92,6 @@ export default function Messages() {
       <main className="relative z-10 px-6 md:px-8">
         <div className="max-w-lg mx-auto">
           {(() => {
-            // Only show matches that have actual messages (not empty "No messages yet")
-            const withMessages = matches.filter(m => m.last_message);
-            const withoutMessages = matches.filter(m => !m.last_message);
-
             return (
               <>
                 {withMessages.length > 0 ? (

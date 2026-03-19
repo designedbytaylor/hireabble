@@ -143,6 +143,14 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
         if user.get("status") == "suspended":
             raise HTTPException(status_code=403, detail="Your account is temporarily suspended. Contact support for more info.")
 
+        # Precompute subscription tier for fast access
+        sub = user.get("subscription") or {}
+        now_str = datetime.now(timezone.utc).isoformat()
+        if sub.get("status") == "active" and sub.get("period_end", "") >= now_str:
+            user["_active_tier"] = sub.get("tier_id", "")
+        else:
+            user["_active_tier"] = ""
+
         return user
     except jwt.ExpiredSignatureError:
         raise HTTPException(status_code=401, detail="Token expired")
