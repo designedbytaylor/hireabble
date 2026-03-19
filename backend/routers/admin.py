@@ -1188,6 +1188,9 @@ async def list_media_uploads(
     query = {}
     if status:
         query["status"] = status
+    else:
+        # Default "All" view excludes removed items; use status=removed to see them
+        query["status"] = {"$ne": "removed"}
     if media_type:
         query["media_type"] = media_type
     if category:
