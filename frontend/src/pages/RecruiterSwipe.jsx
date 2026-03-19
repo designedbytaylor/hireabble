@@ -128,7 +128,7 @@ export default function RecruiterSwipe() {
     if (!WS_URL) return;
     let ws;
     try {
-      ws = new WebSocket(`${WS_URL}/ws/${token}`);
+      ws = new WebSocket(`${WS_URL}/ws`, [`access_token.${token}`]);
       ws.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data);

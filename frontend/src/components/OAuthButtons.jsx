@@ -43,6 +43,13 @@ export default function OAuthButtons({ role = 'seeker' }) {
   const [oauthConfig, setOauthConfig] = useState(null);
   const [loading, setLoading] = useState({ google: false, github: false, apple: false, linkedin: false, facebook: false });
 
+  const generateState = useCallback((role, extra = {}) => {
+    const nonce = (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : Math.random().toString(36).slice(2);
+    const state = JSON.stringify({ role, nonce, ...extra });
+    sessionStorage.setItem('oauth_state_nonce', nonce);
+    return state;
+  }, []);
+
   useEffect(() => {
     axios.get(`${API}/auth/oauth/config`).then(res => {
       setOauthConfig(res.data);
@@ -62,11 +69,11 @@ export default function OAuthButtons({ role = 'seeker' }) {
       scope: 'openid email profile',
       access_type: 'offline',
       prompt: 'consent',
-      state: JSON.stringify({ role }),
+      state: generateState(role),
     });
 
     window.location.href = `https://accounts.google.com/o/oauth2/v2/auth?${params}`;
-  }, [oauthConfig, role]);
+  }, [oauthConfig, role, generateState]);
 
   const handleGithubLogin = useCallback(() => {
     if (!oauthConfig?.github?.enabled) return;
@@ -74,11 +81,11 @@ export default function OAuthButtons({ role = 'seeker' }) {
     const params = new URLSearchParams({
       client_id: oauthConfig.github.client_id,
       scope: 'user:email',
-      state: JSON.stringify({ role }),
+      state: generateState(role),
     });
 
     window.location.href = `https://github.com/login/oauth/authorize?${params}`;
-  }, [oauthConfig, role]);
+  }, [oauthConfig, role, generateState]);
 
   const handleAppleLogin = useCallback(() => {
     if (!oauthConfig?.apple?.enabled) return;
@@ -90,11 +97,11 @@ export default function OAuthButtons({ role = 'seeker' }) {
       response_type: 'code id_token',
       scope: 'name email',
       response_mode: 'fragment',
-      state: JSON.stringify({ role, provider: 'apple' }),
+      state: generateState(role, { provider: 'apple' }),
     });
 
     window.location.href = `https://appleid.apple.com/auth/authorize?${params}`;
-  }, [oauthConfig, role]);
+  }, [oauthConfig, role, generateState]);
 
   const handleLinkedInLogin = useCallback(() => {
     if (!oauthConfig?.linkedin?.enabled) return;
@@ -105,11 +112,11 @@ export default function OAuthButtons({ role = 'seeker' }) {
       client_id: oauthConfig.linkedin.client_id,
       redirect_uri: redirectUri,
       scope: 'openid profile email',
-      state: JSON.stringify({ role, provider: 'linkedin' }),
+      state: generateState(role, { provider: 'linkedin' }),
     });
 
     window.location.href = `https://www.linkedin.com/oauth/v2/authorization?${params}`;
-  }, [oauthConfig, role]);
+  }, [oauthConfig, role, generateState]);
 
   const handleFacebookLogin = useCallback(() => {
     if (!oauthConfig?.facebook?.enabled) return;
@@ -120,11 +127,11 @@ export default function OAuthButtons({ role = 'seeker' }) {
       redirect_uri: redirectUri,
       scope: 'email,public_profile',
       response_type: 'code',
-      state: JSON.stringify({ role, provider: 'facebook' }),
+      state: generateState(role, { provider: 'facebook' }),
     });
 
     window.location.href = `https://www.facebook.com/v19.0/dialog/oauth?${params}`;
-  }, [oauthConfig, role]);
+  }, [oauthConfig, role, generateState]);
 
   // Handle OAuth callback
   useEffect(() => {
@@ -142,6 +149,13 @@ export default function OAuthButtons({ role = 'seeker' }) {
     let parsedProvider = null;
     try {
       const parsed = JSON.parse(state || '{}');
+      // Validate CSRF nonce
+      const storedNonce = sessionStorage.getItem('oauth_state_nonce');
+      if (!storedNonce || parsed.nonce !== storedNonce) {
+        toast.error('Invalid OAuth state. Please try again.');
+        return;
+      }
+      sessionStorage.removeItem('oauth_state_nonce');
       parsedRole = parsed.role || role;
       parsedProvider = parsed.provider || null;
     } catch {}
