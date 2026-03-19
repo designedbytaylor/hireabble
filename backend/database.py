@@ -43,10 +43,15 @@ if not JWT_SECRET:
 JWT_ALGORITHM = "HS256"
 JWT_EXPIRATION_HOURS = 24
 
-# Encryption key for sensitive data at rest (derived from JWT_SECRET)
+# Encryption key for sensitive data at rest — use dedicated key, fallback to JWT_SECRET-derived key
 import hashlib as _hashlib
 import base64 as _base64
-_ENCRYPTION_KEY = _base64.urlsafe_b64encode(_hashlib.sha256(JWT_SECRET.encode()).digest())
+_ENCRYPTION_KEY_RAW = os.environ.get('ENCRYPTION_KEY', '')
+if _ENCRYPTION_KEY_RAW:
+    _ENCRYPTION_KEY = _base64.urlsafe_b64encode(_hashlib.sha256(_ENCRYPTION_KEY_RAW.encode()).digest())
+else:
+    logger.warning("ENCRYPTION_KEY not set — falling back to JWT_SECRET-derived key. Set a separate ENCRYPTION_KEY in production.")
+    _ENCRYPTION_KEY = _base64.urlsafe_b64encode(_hashlib.sha256(JWT_SECRET.encode()).digest())
 
 def encrypt_value(plaintext: str) -> str:
     """Encrypt a string value for storage at rest using Fernet (AES-128-CBC)."""
@@ -116,6 +121,7 @@ def create_token(user_id: str, role: str) -> str:
     payload = {
         "user_id": user_id,
         "role": role,
+        "jti": str(uuid.uuid4()),  # Unique token ID for future revocation
         "exp": datetime.now(timezone.utc) + timedelta(hours=JWT_EXPIRATION_HOURS)
     }
     return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
