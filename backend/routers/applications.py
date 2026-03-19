@@ -1348,11 +1348,15 @@ async def get_applicant_resume(seeker_id: str, current_user: dict = Depends(get_
     references = seeker.get("references", [])
     if seeker.get("references_hidden", True) and not ref_request:
         references = []
+    # Strip contact info (email/phone) from references — contact through Hireabble only
+    references = [
+        {k: v for k, v in ref.items() if k not in ("email", "phone")}
+        for ref in references
+    ]
 
     return {
         "name": seeker.get("name"),
         "title": seeker.get("title"),
-        "email": seeker.get("email"),
         "location": seeker.get("location"),
         "bio": seeker.get("bio"),
         "skills": seeker.get("skills", []),

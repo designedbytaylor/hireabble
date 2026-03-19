@@ -866,13 +866,12 @@ async def download_applicant_resume_pdf(seeker_id: str, current_user: dict = Dep
     if user.get('title'):
         elements.append(Paragraph(user['title'], title_style))
 
+    # Contact line — hide email/phone/address; only show location and Hireabble contact note
     contact_parts = []
-    if user.get('email'):
-        contact_parts.append(user['email'])
     if user.get('location'):
         contact_parts.append(user['location'])
-    if contact_parts:
-        elements.append(Paragraph("  |  ".join(contact_parts), contact_style))
+    contact_parts.append("Contact via Hireabble")
+    elements.append(Paragraph("  |  ".join(contact_parts), contact_style))
 
     elements.append(Spacer(1, 4))
     elements.append(HRFlowable(width="100%", thickness=1, color=colors.HexColor('#e0e0e0'), spaceAfter=8))
@@ -941,6 +940,7 @@ async def download_applicant_resume_pdf(seeker_id: str, current_user: dict = Dep
             if isinstance(cert, str) and cert.strip():
                 elements.append(Paragraph(f"• {cert}", bullet_style))
 
+    # No references section on recruiter-downloaded resumes — contact through Hireabble only
     elements.append(Spacer(1, 20))
     doc.build(elements)
     buffer.seek(0)
