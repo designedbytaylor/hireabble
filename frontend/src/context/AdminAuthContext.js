@@ -31,6 +31,21 @@ export const AdminAuthProvider = ({ children }) => {
 
   const login = async (email, password) => {
     const response = await axios.post(`${API}/admin/login`, { email, password });
+    if (response.data.requires_2fa) {
+      return { requires_2fa: true, temp_token: response.data.temp_token };
+    }
+    const { token: newToken, admin: adminData } = response.data;
+    localStorage.setItem('admin_token', newToken);
+    setToken(newToken);
+    setAdmin(adminData);
+    return adminData;
+  };
+
+  const verify2FA = async (tempToken, code) => {
+    const response = await axios.post(`${API}/admin/2fa/verify`, {
+      temp_token: tempToken,
+      code,
+    });
     const { token: newToken, admin: adminData } = response.data;
     localStorage.setItem('admin_token', newToken);
     setToken(newToken);
@@ -45,7 +60,7 @@ export const AdminAuthProvider = ({ children }) => {
   };
 
   return (
-    <AdminAuthContext.Provider value={{ admin, token, loading, login, logout }}>
+    <AdminAuthContext.Provider value={{ admin, token, loading, login, logout, verify2FA }}>
       {children}
     </AdminAuthContext.Provider>
   );
