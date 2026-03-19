@@ -47,6 +47,7 @@ TTL_COMPLETENESS = 60
 TTL_PLAN = 60
 TTL_SUPERLIKES = 15
 TTL_USER_AUTH = 30  # cache authenticated user lookups
+TTL_RECRUITER_JOBS = 300  # 5 min TTL for recruiter's active job listings
 
 # ==================== FALLBACK IN-MEMORY CACHES ====================
 
@@ -55,6 +56,7 @@ completeness_cache = TTLCache(maxsize=512, ttl=TTL_COMPLETENESS)
 plan_cache = TTLCache(maxsize=512, ttl=TTL_PLAN)
 superlikes_cache = TTLCache(maxsize=512, ttl=TTL_SUPERLIKES)
 user_auth_cache = TTLCache(maxsize=1024, ttl=TTL_USER_AUTH)
+recruiter_jobs_cache = TTLCache(maxsize=256, ttl=TTL_RECRUITER_JOBS)
 
 # Map cache object -> (redis key prefix, ttl)
 _CACHE_META = {
@@ -63,6 +65,7 @@ _CACHE_META = {
     id(plan_cache): ("c:plan", TTL_PLAN),
     id(superlikes_cache): ("c:sl", TTL_SUPERLIKES),
     id(user_auth_cache): ("c:auth", TTL_USER_AUTH),
+    id(recruiter_jobs_cache): ("c:rjobs", TTL_RECRUITER_JOBS),
 }
 
 # ==================== PUBLIC API ====================
