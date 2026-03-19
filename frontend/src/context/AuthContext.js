@@ -122,6 +122,25 @@ export const AuthProvider = ({ children }) => {
 
   const login = useCallback(async (email, password) => {
     const response = await axios.post(`${API}/auth/login`, { email, password });
+    if (response.data.requires_2fa) {
+      return {
+        requires_2fa: true,
+        two_fa_type: response.data.two_fa_type || 'totp',
+        temp_token: response.data.temp_token,
+      };
+    }
+    const { token: newToken, user: userData } = response.data;
+    persistToken(newToken, userData);
+    setToken(newToken);
+    setUser(userData);
+    return userData;
+  }, [persistToken]);
+
+  const verifyEmail2FA = useCallback(async (tempToken, code) => {
+    const response = await axios.post(`${API}/auth/email-2fa/verify`, {
+      temp_token: tempToken,
+      code,
+    });
     const { token: newToken, user: userData } = response.data;
     persistToken(newToken, userData);
     setToken(newToken);
@@ -227,8 +246,8 @@ export const AuthProvider = ({ children }) => {
   }, [cacheUser]);
 
   const value = useMemo(() => ({
-    user, token, loading, login, loginWithToken, register, logout, updateProfile, refreshUser, patchUser
-  }), [user, token, loading, login, loginWithToken, register, logout, updateProfile, refreshUser, patchUser]);
+    user, token, loading, login, verifyEmail2FA, loginWithToken, register, logout, updateProfile, refreshUser, patchUser
+  }), [user, token, loading, login, verifyEmail2FA, loginWithToken, register, logout, updateProfile, refreshUser, patchUser]);
 
   return (
     <AuthContext.Provider value={value}>

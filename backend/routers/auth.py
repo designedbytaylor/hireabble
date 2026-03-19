@@ -9,6 +9,9 @@ import asyncio
 import os
 import httpx
 
+import secrets
+import hashlib
+
 from database import (
     db, security, logger, RESEND_API_KEY, FRONTEND_URL,
     JWT_SECRET, JWT_ALGORITHM,
@@ -381,6 +384,35 @@ async def login(credentials: UserLogin, request: Request):
             if not backup_valid:
                 raise HTTPException(status_code=401, detail="Invalid 2FA code")
 
+    # Check email-based 2FA (separate from TOTP)
+    if user.get("email_2fa_enabled") and not user.get("totp_enabled"):
+        code = f"{secrets.randbelow(1000000):06d}"
+        code_hash = hashlib.sha256(code.encode()).hexdigest()
+        expires_at = datetime.now(timezone.utc) + timedelta(minutes=10)
+
+        await db.user_2fa_codes.delete_many({"user_id": user["id"]})
+        await db.user_2fa_codes.insert_one({
+            "user_id": user["id"],
+            "code_hash": code_hash,
+            "expires_at": expires_at.isoformat(),
+            "created_at": datetime.now(timezone.utc).isoformat(),
+        })
+
+        html = get_email_template(
+            "Login Verification",
+            f"<p>Your login verification code is:</p>"
+            f"<p style='font-size: 32px; font-weight: bold; letter-spacing: 8px; color: #6366f1;'>{code}</p>"
+            f"<p style='color: #999;'>This code expires in 10 minutes. If you didn't attempt to log in, please secure your account immediately.</p>",
+        )
+        await send_email_notification(user["email"], "Hireabble - Login Verification Code", html)
+
+        return {
+            "requires_2fa": True,
+            "two_fa_type": "email",
+            "message": "Verification code sent to your email",
+            "temp_token": _create_2fa_token(user["id"]),
+        }
+
     # Block banned/suspended users from logging in
     user_status = user.get("status", "active")
     if user_status == "banned":
@@ -704,6 +736,90 @@ async def complete_2fa_login(body: dict, request: Request):
     user_response = {k: v for k, v in user.items() if k not in ['_id', 'password', 'totp_secret', 'totp_backup_codes']}
 
     return {"token": token, "user": user_response}
+
+
+# ==================== EMAIL-BASED 2FA (user toggle) ====================
+
+@router.post("/email-2fa/verify")
+@limiter.limit("10/minute")
+async def verify_email_2fa_login(body: dict, request: Request):
+    """Verify email 2FA code during login."""
+    import jwt as pyjwt
+
+    temp_token = body.get("temp_token", "")
+    code = body.get("code", "").strip()
+
+    if not temp_token or not code:
+        raise HTTPException(status_code=400, detail="Token and code are required")
+
+    try:
+        payload = pyjwt.decode(temp_token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+        if payload.get("role") != "__2fa_pending":
+            raise HTTPException(status_code=401, detail="Invalid token")
+        user_id = payload.get("user_id")
+    except pyjwt.ExpiredSignatureError:
+        raise HTTPException(status_code=401, detail="Verification expired. Please log in again.")
+    except pyjwt.InvalidTokenError:
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+    stored = await db.user_2fa_codes.find_one({"user_id": user_id})
+    if not stored:
+        raise HTTPException(status_code=401, detail="No verification code found. Please log in again.")
+
+    if stored["expires_at"] < datetime.now(timezone.utc).isoformat():
+        await db.user_2fa_codes.delete_many({"user_id": user_id})
+        raise HTTPException(status_code=401, detail="Verification code expired. Please log in again.")
+
+    code_hash = hashlib.sha256(code.encode()).hexdigest()
+    if code_hash != stored["code_hash"]:
+        raise HTTPException(status_code=401, detail="Invalid verification code")
+
+    await db.user_2fa_codes.delete_many({"user_id": user_id})
+
+    user = await db.users.find_one({"id": user_id})
+    if not user:
+        raise HTTPException(status_code=401, detail="User not found")
+
+    if user.get("status") == "banned":
+        raise HTTPException(status_code=403, detail="Your account has been banned.")
+    if user.get("status") == "suspended":
+        raise HTTPException(status_code=403, detail="Your account is temporarily suspended.")
+
+    token = create_token(user["id"], user["role"])
+    user_response = {k: v for k, v in user.items() if k not in ['_id', 'password', 'totp_secret', 'totp_backup_codes']}
+
+    return {"token": token, "user": user_response}
+
+
+@router.get("/email-2fa/status")
+async def get_email_2fa_status(current_user: dict = Depends(get_current_user)):
+    """Get whether email 2FA is enabled for the current user."""
+    user = await db.users.find_one({"id": current_user["id"]}, {"_id": 0, "email_2fa_enabled": 1})
+    return {"enabled": bool(user.get("email_2fa_enabled", False)) if user else False}
+
+
+@router.put("/email-2fa/toggle")
+async def toggle_email_2fa(body: dict, current_user: dict = Depends(get_current_user)):
+    """Enable or disable email-based 2FA for the current user."""
+    enabled = bool(body.get("enabled", False))
+
+    # If user has TOTP enabled, don't allow email 2FA (they already have stronger 2FA)
+    if enabled and current_user.get("totp_enabled"):
+        raise HTTPException(
+            status_code=400,
+            detail="You already have authenticator app 2FA enabled. Disable it first to use email verification instead."
+        )
+
+    await db.users.update_one(
+        {"id": current_user["id"]},
+        {"$set": {"email_2fa_enabled": enabled}}
+    )
+    invalidate_user(current_user["id"])
+
+    return {
+        "enabled": enabled,
+        "message": f"Email two-factor authentication {'enabled' if enabled else 'disabled'}",
+    }
 
 
 # ==================== EMAIL CHANGE ====================
