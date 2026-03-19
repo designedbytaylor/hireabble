@@ -1,7 +1,7 @@
 """
 Matches and Messages routes for Hireabble API
 """
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, Request
 from typing import List
 from datetime import datetime, timezone
 import uuid
@@ -16,6 +16,10 @@ from database import (
 )
 from content_filter import check_text, is_severe
 from routers.users import get_all_blocked_ids
+from slowapi import Limiter
+from slowapi.util import get_remote_address
+
+limiter = Limiter(key_func=get_remote_address)
 
 router = APIRouter(tags=["Matches & Messages"])
 
@@ -185,7 +189,8 @@ def calculate_match_score(viewer: dict, other: dict, job: dict = None) -> int:
 # ==================== MESSAGES ====================
 
 @router.post("/messages", response_model=MessageResponse)
-async def send_message(message: MessageCreate, current_user: dict = Depends(get_current_user)):
+@limiter.limit("30/minute")
+async def send_message(message: MessageCreate, request: Request, current_user: dict = Depends(get_current_user)):
     """Send a message in a match"""
     # Verify match exists and user is part of it
     match = await db.matches.find_one({"id": message.match_id}, {"_id": 0})
@@ -194,6 +199,10 @@ async def send_message(message: MessageCreate, current_user: dict = Depends(get_
     
     if match["seeker_id"] != current_user["id"] and match["recruiter_id"] != current_user["id"]:
         raise HTTPException(status_code=403, detail="Not authorized to message in this match")
+
+    # Enforce message length limit to prevent DoS via massive payloads
+    if len(message.content) > 5000:
+        raise HTTPException(status_code=400, detail="Message too long (max 5000 characters)")
 
     # Check if either user has blocked the other
     other_id = match["recruiter_id"] if current_user["id"] == match["seeker_id"] else match["seeker_id"]

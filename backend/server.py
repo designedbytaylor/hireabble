@@ -149,7 +149,7 @@ async def add_security_headers(request: Request, call_next):
         "script-src 'self' https://fonts.googleapis.com https://apis.google.com; "
         "style-src 'self' https://fonts.googleapis.com; "
         "font-src 'self' https://fonts.gstatic.com; "
-        "img-src 'self' data: blob: https: http:; "
+        "img-src 'self' data: blob: https:; "
         "connect-src 'self' https: wss:; "
         "frame-src 'self' https://accounts.google.com https://appleid.apple.com; "
         "object-src 'none'; "
@@ -215,10 +215,25 @@ app.include_router(users.router, prefix="/api")
 
 async def _ws_message_loop(websocket: WebSocket, user_id: str):
     """Shared WebSocket message-handling loop for both /ws and /ws/{token} endpoints."""
+    # Per-user message rate limiting (max 30 messages per 60 seconds)
+    _ws_msg_times: list = []
+    _WS_RATE_LIMIT = 30
+    _WS_RATE_WINDOW = 60  # seconds
+
     try:
         while True:
             data = await websocket.receive_text()
             message_data = json.loads(data)
+
+            # Rate limit check for chat messages (skip pings/typing)
+            import time as _time
+            if message_data.get("type") == "message":
+                now = _time.monotonic()
+                _ws_msg_times = [t for t in _ws_msg_times if now - t < _WS_RATE_WINDOW]
+                if len(_ws_msg_times) >= _WS_RATE_LIMIT:
+                    await websocket.send_json({"type": "error", "message": "Too many messages. Please slow down."})
+                    continue
+                _ws_msg_times.append(now)
 
             # Handle ping/pong for connection keep-alive
             if message_data.get("type") == "ping":

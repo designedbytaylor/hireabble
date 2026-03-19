@@ -59,6 +59,11 @@ let webpackConfig = {
     },
     configure: (webpackConfig) => {
 
+      // Disable source maps in production to prevent source code exposure
+      if (process.env.NODE_ENV === 'production') {
+        webpackConfig.devtool = false;
+      }
+
       // Add ignored patterns to reduce watched directories
         webpackConfig.watchOptions = {
           ...webpackConfig.watchOptions,

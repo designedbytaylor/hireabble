@@ -502,7 +502,7 @@ class MatchResponse(BaseModel):
 
 class MessageCreate(BaseModel):
     match_id: str
-    content: str
+    content: str  # Max 5000 chars enforced in endpoint; Pydantic allows flexible validation
 
 class MessageResponse(BaseModel):
     model_config = ConfigDict(extra="ignore")
