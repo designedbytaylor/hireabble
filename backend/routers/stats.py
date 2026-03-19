@@ -183,6 +183,28 @@ async def get_seeker_dashboard(current_user: dict = Depends(get_current_user)):
         "top_picks": is_premium,
     }
 
+    # Batch top picks into dashboard response (saves a separate API round-trip)
+    top_picks = []
+    if is_premium:
+        today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        cached_picks = await db.top_picks.find_one({"seeker_id": uid, "date": today})
+        if cached_picks:
+            pick_ids = cached_picks.get("job_ids", [])
+            pick_jobs = await db.jobs.find({"id": {"$in": pick_ids}, "is_active": True}, {"_id": 0}).to_list(3)
+            for pj in pick_jobs:
+                pj["match_score"] = calculate_job_match_score(current_user, pj)
+            top_picks = pick_jobs
+        else:
+            # Generate from already-scored result_jobs (top 3 by match score)
+            sorted_by_score = sorted(result_jobs, key=lambda j: j.get("match_score", 0), reverse=True)
+            top_picks = sorted_by_score[:3]
+            if top_picks:
+                await db.top_picks.update_one(
+                    {"seeker_id": uid, "date": today},
+                    {"$set": {"seeker_id": uid, "date": today, "job_ids": [j["id"] for j in top_picks]}},
+                    upsert=True,
+                )
+
     return {
         "jobs": result_jobs,
         "swiped_job_ids": swiped_job_ids,
@@ -210,6 +232,7 @@ async def get_seeker_dashboard(current_user: dict = Depends(get_current_user)):
         },
         "unread_messages": unread_messages,
         "unread_notifications": unread_notifications,
+        "top_picks": top_picks,
     }
 
 

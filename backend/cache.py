@@ -42,7 +42,7 @@ def _get_redis():
 
 # ==================== TTL PRESETS (seconds) ====================
 
-TTL_STATS = 30
+TTL_STATS = 120
 TTL_COMPLETENESS = 60
 TTL_PLAN = 60
 TTL_SUPERLIKES = 15

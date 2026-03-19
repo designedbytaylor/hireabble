@@ -123,6 +123,8 @@ async def browse_candidates(
     degree: str = None,
     work_preference: str = None,
     min_experience: int = None,
+    skip: int = 0,
+    limit: int = 50,
 ):
     """Browse seekers for recruiters to discover potential candidates.
     Advanced filters (degree, work_preference, min_experience) require Pro+ subscription."""
@@ -196,9 +198,10 @@ async def browse_candidates(
         "education": 1, "created_at": 1, "subscription": 1,
         "profile_boost_until": 1, "incognito_mode": 1,
     }
+    limit = min(limit, 100)
     seekers = await db.users.find(
         query, _CANDIDATE_PROJECTION
-    ).sort("created_at", -1).to_list(50)
+    ).sort("created_at", -1).skip(skip).to_list(limit)
 
     # Get recruiter's jobs for match scoring (cached 5 min)
     cache_key_rj = f"rjobs:{current_user['id']}"
@@ -863,11 +866,15 @@ async def swipe_beacon(request: Request, token: Optional[str] = Query(None)):
 @router.get("/applications", response_model=List[ApplicationResponse])
 async def get_applications(
     current_user: dict = Depends(get_current_user),
-    job_id: str = None
+    job_id: str = None,
+    skip: int = 0,
+    limit: int = 50,
 ):
     """Get applications for recruiter's jobs"""
     if current_user["role"] != "recruiter":
         raise HTTPException(status_code=403, detail="Only recruiters can view applications")
+
+    limit = min(limit, 100)  # Cap at 100
 
     query = {
         "recruiter_id": current_user["id"],
@@ -876,7 +883,7 @@ async def get_applications(
     if job_id:
         query["job_id"] = job_id
 
-    applications = await db.applications.find(query, {"_id": 0}).sort("created_at", -1).to_list(100)
+    applications = await db.applications.find(query, {"_id": 0}).sort("created_at", -1).skip(skip).to_list(limit)
 
     # Check seeker subscription status for priority sorting
     now = datetime.now(timezone.utc).isoformat()
@@ -1342,19 +1349,20 @@ async def get_applicant_resume(seeker_id: str, current_user: dict = Depends(get_
     if not app:
         raise HTTPException(status_code=403, detail="No application from this seeker")
 
-    seeker = await db.users.find_one({"id": seeker_id}, {"_id": 0, "password": 0})
+    # Fetch seeker profile and reference status in parallel
+    seeker, ref_request = await asyncio.gather(
+        db.users.find_one({"id": seeker_id}, {"_id": 0, "password": 0}),
+        db.reference_requests.find_one({
+            "seeker_id": seeker_id,
+            "recruiter_id": current_user["id"],
+            "status": "approved"
+        }),
+    )
     if not seeker:
         raise HTTPException(status_code=404, detail="Seeker not found")
 
     # Track profile view (fire-and-forget)
     asyncio.create_task(_record_profile_view(current_user["id"], seeker_id))
-
-    # Check if references are shared
-    ref_request = await db.reference_requests.find_one({
-        "seeker_id": seeker_id,
-        "recruiter_id": current_user["id"],
-        "status": "approved"
-    })
 
     # Only include references if approved or not hidden
     references = seeker.get("references", [])

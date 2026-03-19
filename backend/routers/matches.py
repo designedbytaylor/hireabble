@@ -112,16 +112,17 @@ async def get_match_profile(match_id: str, current_user: dict = Depends(get_curr
     if match["seeker_id"] != current_user["id"] and match["recruiter_id"] != current_user["id"]:
         raise HTTPException(status_code=403, detail="Not authorized")
 
-    # Get the other person's profile
+    # Fetch profile and job in parallel (both depend on match, not each other)
     other_id = match["seeker_id"] if current_user["id"] == match["recruiter_id"] else match["recruiter_id"]
-    profile = await db.users.find_one({"id": other_id}, {"_id": 0, "password": 0})
+    import asyncio
+    coros = [db.users.find_one({"id": other_id}, {"_id": 0, "password": 0})]
+    if match.get("job_id"):
+        coros.append(db.jobs.find_one({"id": match["job_id"]}, {"_id": 0}))
+    results = await asyncio.gather(*coros)
+    profile = results[0]
+    job = results[1] if len(results) > 1 else None
     if not profile:
         raise HTTPException(status_code=404, detail="User not found")
-
-    # Get job details
-    job = None
-    if match.get("job_id"):
-        job = await db.jobs.find_one({"id": match["job_id"]}, {"_id": 0})
 
     # Calculate match score
     match_score = calculate_match_score(current_user, profile, job)

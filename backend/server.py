@@ -88,6 +88,12 @@ app.add_middleware(
 )
 
 
+# Compiled once at module load — used in CSRF middleware below
+import re as _re
+_CSRF_ORIGIN_RE = _re.compile(
+    r"https://(hireabble[a-z0-9-]*\.vercel\.app|hireabble[a-z0-9-]*\.up\.railway\.app|(www\.)?hireabble\.com)"
+)
+
 # CSRF protection — verify Origin header on state-changing requests
 @app.middleware("http")
 async def csrf_protection(request: Request, call_next):
@@ -123,11 +129,7 @@ async def csrf_protection(request: Request, call_next):
                 break
 
         # Also allow Vercel/Railway preview deployments and hireabble.com
-        import re as _csrf_re
-        if not origin_valid and _csrf_re.match(
-            r"https://(hireabble[a-z0-9-]*\.vercel\.app|hireabble[a-z0-9-]*\.up\.railway\.app|(www\.)?hireabble\.com)",
-            check_value
-        ):
+        if not origin_valid and _CSRF_ORIGIN_RE.match(check_value):
             origin_valid = True
 
         if not origin_valid:
@@ -523,6 +525,30 @@ async def startup():
         await db.token_blacklist.create_index("blacklisted_at", expireAfterSeconds=86400)
     except Exception:
         pass  # Index may already exist
+
+    # ==================== PERFORMANCE INDEXES ====================
+
+    # Sorting indexes (used on every list page load)
+    await ensure_index(db.notifications, [("user_id", 1), ("created_at", -1)])
+    await ensure_index(db.matches, "created_at")
+
+    # Filter indexes for common query patterns
+    await ensure_index(db.users, "status")
+    await ensure_index(db.applications, [("seeker_id", 1), ("action", 1)])
+    await ensure_index(db.applications, [("recruiter_id", 1), ("recruiter_action", 1)])
+
+    # Profile views (previously unindexed)
+    await ensure_index(db.profile_views, "seeker_id")
+    await ensure_index(db.profile_views, [("viewer_id", 1), ("seeker_id", 1), ("date", 1)])
+
+    # ==================== TTL INDEXES (auto-cleanup) ====================
+    try:
+        await db.user_2fa_codes.create_index("created_at", expireAfterSeconds=900)
+        await db.admin_2fa_codes.create_index("created_at", expireAfterSeconds=900)
+        await db.profile_views.create_index("created_at", expireAfterSeconds=7776000)  # 90 days
+        await db.email_verification_tokens.create_index("created_at", expireAfterSeconds=86400)
+    except Exception:
+        pass  # TTL indexes may already exist
 
     logger.info("Database indexes created")
     logger.info("Hireabble API started successfully!")
