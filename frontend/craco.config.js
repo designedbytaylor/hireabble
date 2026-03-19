@@ -39,7 +39,7 @@ let webpackConfig = {
       // react-router v7 ships ESM (.mjs) that Jest 27 can't parse;
       // allow Babel to transform the CJS entry points too
       jestConfig.transformIgnorePatterns = [
-        '/node_modules/(?!(react-router|react-router-dom)/)',
+        '/node_modules/(?!(react-router|react-router-dom|axios)/)',
       ];
       return jestConfig;
     },
