@@ -25,11 +25,16 @@ let webpackConfig = {
       jestConfig.moduleNameMapper = {
         ...jestConfig.moduleNameMapper,
         '^@/(.*)$': '<rootDir>/src/$1',
-        // react-router v7: main field points to non-existent dist/main.js;
-        // map to the actual CJS entry point
+        // react-router v7: Jest 27 can't resolve exports maps; point to CJS entries
         '^react-router-dom$': '<rootDir>/node_modules/react-router-dom/dist/index.js',
-        '^react-router$': '<rootDir>/node_modules/react-router/dist/index.js',
-        '^react-router/dom$': '<rootDir>/node_modules/react-router/dist/dom.js',
+        '^react-router$': '<rootDir>/node_modules/react-router/dist/development/index.js',
+        '^react-router/dom$': '<rootDir>/node_modules/react-router/dist/development/dom-export.js',
+      };
+      // Polyfill TextEncoder/TextDecoder before any modules load (react-router v7 needs them)
+      jestConfig.globals = {
+        ...jestConfig.globals,
+        TextEncoder: require('util').TextEncoder,
+        TextDecoder: require('util').TextDecoder,
       };
       // react-router v7 ships ESM (.mjs) that Jest 27 can't parse;
       // allow Babel to transform the CJS entry points too
