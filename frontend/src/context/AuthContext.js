@@ -265,7 +265,7 @@ export const AuthProvider = ({ children }) => {
 
   const value = useMemo(() => ({
     user, token, loading, login, verifyEmail2FA, verifyTotp2FA, loginWithToken, register, logout, updateProfile, refreshUser, patchUser
-  }), [user, token, loading, login, verifyEmail2FA, loginWithToken, register, logout, updateProfile, refreshUser, patchUser]);
+  }), [user, token, loading, login, verifyEmail2FA, verifyTotp2FA, loginWithToken, register, logout, updateProfile, refreshUser, patchUser]);
 
   return (
     <AuthContext.Provider value={value}>
