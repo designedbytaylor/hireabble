@@ -515,8 +515,11 @@ async def startup():
     # Google Play transaction lock (prevents duplicate fulfillment)
     await ensure_index(db.google_txn_locks, "google_order_id", unique=True)
 
-    # Admin 2FA codes (auto-expire after 15 minutes)
+    # Admin 2FA codes
     await ensure_index(db.admin_2fa_codes, "admin_id")
+
+    # User email 2FA codes
+    await ensure_index(db.user_2fa_codes, "user_id")
 
     logger.info("Database indexes created")
     logger.info("Hireabble API started successfully!")

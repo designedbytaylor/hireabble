@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { User, Mail, Briefcase, MapPin, Save, LogOut, Building2, Download, Upload, CheckCircle, AlertCircle, Lock, Eye, EyeOff, ChevronDown, Plus, Trash2, GraduationCap, Award, Clock, Navigation2, Bell, BellOff, CreditCard, Crown, ExternalLink, FileText, Loader2, HelpCircle } from 'lucide-react';
+import { User, Mail, Briefcase, MapPin, Save, LogOut, Building2, Download, Upload, CheckCircle, AlertCircle, Lock, Eye, EyeOff, ChevronDown, Plus, Trash2, GraduationCap, Award, Clock, Navigation2, Bell, BellOff, CreditCard, Crown, ExternalLink, FileText, Loader2, HelpCircle, Shield } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -144,6 +144,8 @@ export default function Profile() {
   const [parsingResume, setParsingResume] = useState(false);
   const [cropImageSrc, setCropImageSrc] = useState(null);
   const resumeInputRef = useRef(null);
+  const [email2FAEnabled, setEmail2FAEnabled] = useState(false);
+  const [toggling2FA, setToggling2FA] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -168,6 +170,7 @@ export default function Profile() {
       fetchCompleteness();
       fetchReferenceRequests();
       fetchSubscription();
+      fetchEmail2FAStatus();
     }
     // Check push notification status - auto-enable on first visit
     if (pushSupported) {
@@ -222,6 +225,32 @@ export default function Profile() {
     } catch (error) {
       // Subscription endpoint may not exist for all users
       setSubscription(null);
+    }
+  };
+
+  const fetchEmail2FAStatus = async () => {
+    try {
+      const res = await axios.get(`${API}/auth/email-2fa/status`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setEmail2FAEnabled(res.data.enabled);
+    } catch {
+      // Endpoint may not exist yet
+    }
+  };
+
+  const toggleEmail2FA = async () => {
+    setToggling2FA(true);
+    try {
+      const res = await axios.put(`${API}/auth/email-2fa/toggle`, { enabled: !email2FAEnabled }, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setEmail2FAEnabled(res.data.enabled);
+      toast.success(res.data.message);
+    } catch (e) {
+      toast.error(e.response?.data?.detail || 'Failed to update 2FA setting');
+    } finally {
+      setToggling2FA(false);
     }
   };
 
@@ -1294,6 +1323,39 @@ export default function Profile() {
                 </Button>
               </form>
             )}
+          </div>
+
+          {/* Email Two-Factor Authentication */}
+          <div className="glass-card rounded-2xl p-5 mt-6">
+            <h3 className="text-lg font-bold font-['Outfit'] mb-3 flex items-center gap-2">
+              <Shield className="w-5 h-5" /> Two-Factor Authentication
+            </h3>
+            <button
+              type="button"
+              onClick={toggleEmail2FA}
+              disabled={toggling2FA}
+              className={`w-full flex items-center gap-3 p-4 rounded-xl border transition-all ${
+                email2FAEnabled
+                  ? 'bg-primary/10 border-primary/40 text-primary'
+                  : 'bg-background border-border text-muted-foreground hover:border-primary/20'
+              }`}
+            >
+              <Mail className="w-5 h-5" />
+              <div className="flex-1 text-left">
+                <div className="font-medium text-sm">Email Verification</div>
+                <div className="text-xs opacity-70">
+                  {email2FAEnabled
+                    ? 'A code will be sent to your email each time you log in'
+                    : 'Add an extra layer of security to your account'}
+                </div>
+              </div>
+              <div className={`w-10 h-6 rounded-full transition-colors ${email2FAEnabled ? 'bg-primary' : 'bg-muted'}`}>
+                <div className={`w-5 h-5 rounded-full bg-white mt-0.5 transition-transform ${email2FAEnabled ? 'translate-x-[18px]' : 'translate-x-0.5'}`} />
+              </div>
+            </button>
+            <p className="text-xs text-muted-foreground mt-2">
+              When enabled, you'll receive a 6-digit verification code via email each time you sign in.
+            </p>
           </div>
 
           {/* Private Profile */}
