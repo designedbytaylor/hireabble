@@ -4,7 +4,7 @@ import { useAdminAuth } from '../../context/AdminAuthContext';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import { Badge } from '../../components/ui/badge';
-import { Plus, X, Settings, Lock, Eye, EyeOff, Smartphone, Apple, Save } from 'lucide-react';
+import { Plus, X, Settings, Lock, Eye, EyeOff, Smartphone, Apple, Save, Mail, Shield } from 'lucide-react';
 import { toast } from 'sonner';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
@@ -28,6 +28,8 @@ export default function AdminSettings() {
   });
   const [savingAppStore, setSavingAppStore] = useState(false);
   const [showSecret, setShowSecret] = useState(false);
+  const [twoFactorEnabled, setTwoFactorEnabled] = useState(false);
+  const [toggling2FA, setToggling2FA] = useState(false);
 
   const fetchAppStoreSettings = useCallback(async () => {
     try {
@@ -71,7 +73,33 @@ export default function AdminSettings() {
     }
   }, [token]);
 
-  useEffect(() => { fetchWords(); fetchAppStoreSettings(); }, [fetchWords, fetchAppStoreSettings]);
+  const fetch2FASettings = useCallback(async () => {
+    try {
+      const res = await axios.get(`${API}/admin/2fa/settings`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setTwoFactorEnabled(res.data.enabled);
+    } catch (e) {
+      // Setting may not exist yet
+    }
+  }, [token]);
+
+  const toggle2FA = async () => {
+    setToggling2FA(true);
+    try {
+      const res = await axios.put(`${API}/admin/2fa/settings`, { enabled: !twoFactorEnabled }, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setTwoFactorEnabled(res.data.enabled);
+      toast.success(res.data.message);
+    } catch (e) {
+      toast.error(e.response?.data?.detail || 'Failed to update 2FA setting');
+    } finally {
+      setToggling2FA(false);
+    }
+  };
+
+  useEffect(() => { fetchWords(); fetchAppStoreSettings(); fetch2FASettings(); }, [fetchWords, fetchAppStoreSettings, fetch2FASettings]);
 
   const addWord = async () => {
     if (!newWord.trim()) return;
@@ -159,6 +187,34 @@ export default function AdminSettings() {
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-white">Content Settings</h1>
         <p className="text-gray-400 mt-1">Manage banned words and content filtering rules</p>
+      </div>
+
+      {/* Email 2FA */}
+      <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6 mb-8">
+        <div className="flex items-center gap-2 mb-4">
+          <Shield className="w-5 h-5 text-emerald-400" />
+          <h2 className="text-lg font-semibold text-white">Two-Factor Authentication</h2>
+        </div>
+        <p className="text-gray-400 text-sm mb-4">
+          When enabled, admin logins will require a verification code sent to the admin's email address.
+        </p>
+        <div className="flex items-center gap-4">
+          <button
+            onClick={toggle2FA}
+            disabled={toggling2FA}
+            className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/40 ${twoFactorEnabled ? 'bg-emerald-600' : 'bg-gray-600'}`}
+          >
+            <span
+              className={`inline-block h-5 w-5 transform rounded-full bg-white transition-transform duration-200 ${twoFactorEnabled ? 'translate-x-6' : 'translate-x-1'}`}
+            />
+          </button>
+          <div className="flex items-center gap-2">
+            <Mail className="w-4 h-4 text-gray-400" />
+            <span className="text-sm text-gray-300">
+              Email verification is {twoFactorEnabled ? <span className="text-emerald-400 font-medium">enabled</span> : <span className="text-gray-500">disabled</span>}
+            </span>
+          </div>
+        </div>
       </div>
 
       {/* App Store Settings */}

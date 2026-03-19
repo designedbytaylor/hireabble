@@ -20,12 +20,16 @@ from database import (
     db, logger, manager, create_notification,
     hash_password, verify_password, create_token, get_current_admin,
     AdminLogin, AdminCreate, ReportCreate, get_current_user, JobCreate,
+    send_email_notification, get_email_template, JWT_SECRET, JWT_ALGORITHM,
 )
 from content_filter import check_text, BANNED_WORDS
 from cache import invalidate_user, invalidate_users_batch
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 from fastapi import Request
+import secrets
+import hashlib
+import jwt as pyjwt
 
 limiter = Limiter(key_func=get_remote_address)
 
@@ -77,6 +81,51 @@ async def admin_login(credentials: AdminLogin, request: Request):
     if not admin.get("is_active", True):
         raise HTTPException(status_code=403, detail="Account deactivated")
 
+    # Check if email 2FA is enabled globally
+    tfa_setting = await db.site_settings.find_one({"key": "admin_email_2fa"})
+    tfa_enabled = tfa_setting.get("value", {}).get("enabled", False) if tfa_setting else False
+
+    if tfa_enabled:
+        # Generate 6-digit code
+        code = f"{secrets.randbelow(1000000):06d}"
+        code_hash = hashlib.sha256(code.encode()).hexdigest()
+        expires_at = datetime.now(timezone.utc) + timedelta(minutes=10)
+
+        # Store hashed code in DB
+        await db.admin_2fa_codes.delete_many({"admin_id": admin["id"]})
+        await db.admin_2fa_codes.insert_one({
+            "admin_id": admin["id"],
+            "code_hash": code_hash,
+            "expires_at": expires_at.isoformat(),
+            "created_at": datetime.now(timezone.utc).isoformat(),
+        })
+
+        # Send code via email
+        html = get_email_template(
+            "Admin Login Verification",
+            f"<p>Your admin login verification code is:</p>"
+            f"<p style='font-size: 32px; font-weight: bold; letter-spacing: 8px; color: #6366f1;'>{code}</p>"
+            f"<p style='color: #999;'>This code expires in 10 minutes. If you didn't attempt to log in, please secure your account immediately.</p>",
+        )
+        await send_email_notification(admin["email"], "Hireabble Admin - Login Verification Code", html)
+
+        # Return a temporary 2FA-pending token (5 min expiry)
+        pending_token = pyjwt.encode(
+            {
+                "user_id": admin["id"],
+                "role": "__admin_2fa_pending",
+                "exp": datetime.now(timezone.utc) + timedelta(minutes=5),
+            },
+            JWT_SECRET,
+            algorithm=JWT_ALGORITHM,
+        )
+
+        return {
+            "requires_2fa": True,
+            "temp_token": pending_token,
+            "message": "Verification code sent to your email",
+        }
+
     token = create_token(admin["id"], "admin")
     return {
         "token": token,
@@ -111,6 +160,90 @@ async def admin_change_password(payload: dict, admin: dict = Depends(get_current
         {"$set": {"password": hash_password(new_password)}}
     )
     return {"message": "Password updated successfully"}
+
+
+# ==================== ADMIN EMAIL 2FA ====================
+
+@router.post("/admin/2fa/verify")
+@limiter.limit("10/minute")
+async def admin_2fa_verify(payload: dict, request: Request):
+    """Verify a 2FA code during admin login."""
+    temp_token = payload.get("temp_token", "")
+    code = payload.get("code", "").strip()
+
+    if not temp_token or not code:
+        raise HTTPException(status_code=400, detail="Token and code are required")
+
+    # Decode the pending token
+    try:
+        token_data = pyjwt.decode(temp_token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+    except pyjwt.ExpiredSignatureError:
+        raise HTTPException(status_code=401, detail="Verification expired. Please log in again.")
+    except pyjwt.InvalidTokenError:
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+    if token_data.get("role") != "__admin_2fa_pending":
+        raise HTTPException(status_code=401, detail="Invalid token type")
+
+    admin_id = token_data["user_id"]
+
+    # Look up the stored code
+    stored = await db.admin_2fa_codes.find_one({"admin_id": admin_id})
+    if not stored:
+        raise HTTPException(status_code=401, detail="No verification code found. Please log in again.")
+
+    # Check expiry
+    if stored["expires_at"] < datetime.now(timezone.utc).isoformat():
+        await db.admin_2fa_codes.delete_many({"admin_id": admin_id})
+        raise HTTPException(status_code=401, detail="Verification code expired. Please log in again.")
+
+    # Verify code (constant-time comparison via hash)
+    code_hash = hashlib.sha256(code.encode()).hexdigest()
+    if code_hash != stored["code_hash"]:
+        raise HTTPException(status_code=401, detail="Invalid verification code")
+
+    # Clean up used code
+    await db.admin_2fa_codes.delete_many({"admin_id": admin_id})
+
+    # Fetch admin and issue real token
+    admin = await db.admin_users.find_one({"id": admin_id})
+    if not admin or not admin.get("is_active", True):
+        raise HTTPException(status_code=403, detail="Account not found or deactivated")
+
+    token = create_token(admin["id"], "admin")
+    return {
+        "token": token,
+        "admin": {
+            "id": admin["id"],
+            "email": admin["email"],
+            "name": admin["name"],
+            "role": admin.get("role", "admin"),
+        },
+    }
+
+
+@router.get("/admin/2fa/settings")
+async def get_admin_2fa_settings(admin: dict = Depends(get_current_admin)):
+    """Get admin email 2FA setting."""
+    doc = await db.site_settings.find_one({"key": "admin_email_2fa"})
+    enabled = doc.get("value", {}).get("enabled", False) if doc else False
+    return {"enabled": enabled}
+
+
+@router.put("/admin/2fa/settings")
+async def update_admin_2fa_settings(payload: dict, admin: dict = Depends(get_current_admin)):
+    """Toggle admin email 2FA on/off (admin only)."""
+    if admin.get("role", "admin") != "admin":
+        raise HTTPException(status_code=403, detail="Only admins can change 2FA settings")
+
+    enabled = bool(payload.get("enabled", False))
+    await db.site_settings.update_one(
+        {"key": "admin_email_2fa"},
+        {"$set": {"key": "admin_email_2fa", "value": {"enabled": enabled}, "updated_at": datetime.now(timezone.utc).isoformat()}},
+        upsert=True,
+    )
+    logger.info(f"Admin {admin['id']} {'enabled' if enabled else 'disabled'} email 2FA")
+    return {"enabled": enabled, "message": f"Email 2FA {'enabled' if enabled else 'disabled'}"}
 
 
 # ==================== STAFF MANAGEMENT ====================
