@@ -29,8 +29,12 @@ router = APIRouter(tags=["Admin"])
 # ==================== ADMIN AUTH (separate flow) ====================
 
 @router.post("/admin/setup")
-async def admin_setup(admin: AdminCreate):
+async def admin_setup(admin: AdminCreate, setup_token: str = ""):
     """One-time bootstrap: create the first admin. Only works when no admins exist."""
+    expected_token = os.environ.get("ADMIN_SETUP_TOKEN")
+    if expected_token and setup_token != expected_token:
+        raise HTTPException(status_code=403, detail="Invalid or missing setup token")
+
     count = await db.admin_users.count_documents({})
     if count > 0:
         raise HTTPException(status_code=403, detail="Admin already exists. Use /admin/login.")
@@ -2518,7 +2522,8 @@ async def ai_generate_text(
     except ImportError:
         raise HTTPException(status_code=500, detail="anthropic package not installed")
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Admin AI operation failed: {e}")
+        raise HTTPException(status_code=500, detail="An internal error occurred. Please try again.")
 
 
 # ==================== APP HEALTH MONITORING ====================
