@@ -200,10 +200,29 @@ export default function SeekerDashboard() {
   });
   const [activeFiltersCount, setActiveFiltersCount] = useState(0);
   const [detectingLocation, setDetectingLocation] = useState(false);
+  const [filterKeyword, setFilterKeyword] = useState(() => {
+    try {
+      const saved = localStorage.getItem(storageKey(uid, 'job_filters'));
+      return saved ? JSON.parse(saved).keyword || '' : '';
+    } catch { return ''; }
+  });
 
   const handleFilterChange = useCallback((key, value) => {
     setFilters(prev => ({ ...prev, [key]: value }));
   }, []);
+
+  const debouncedSetKeyword = useCallback(
+    (() => {
+      let timer;
+      return (value) => {
+        clearTimeout(timer);
+        timer = setTimeout(() => {
+          setFilters(prev => ({ ...prev, keyword: value }));
+        }, 300);
+      };
+    })(),
+    []
+  );
 
   // ─── Retry queue: flush any swipes that failed on a previous page load ───
   const flushSwipeQueue = useCallback(async () => {
@@ -566,17 +585,17 @@ export default function SeekerDashboard() {
   }, [filters]);
 
   // Preload images for the next few cards so swipes feel instant
+  const preloadedUrls = useRef(new Set());
   useEffect(() => {
     const upcoming = jobs.slice(currentIndex, currentIndex + 5);
     upcoming.forEach((job) => {
-      if (job.background_image) {
-        const img = new Image();
-        img.src = job.background_image;
-      }
-      if (job.company_logo) {
-        const img = new Image();
-        img.src = job.company_logo;
-      }
+      [job.background_image, job.company_logo, job.listing_photo].filter(Boolean).forEach(url => {
+        if (!preloadedUrls.current.has(url)) {
+          preloadedUrls.current.add(url);
+          const img = new Image();
+          img.src = url;
+        }
+      });
     });
   }, [currentIndex, jobs]);
 
@@ -853,6 +872,7 @@ export default function SeekerDashboard() {
   const handleClearFilters = () => {
     const clearedFilters = { job_type: '', experience_level: '', salary_min: '', location: '', remote_only: false, category: '', employment_type: '', keyword: '' };
     setFilters(clearedFilters);
+    setFilterKeyword('');
     try { localStorage.removeItem(storageKey(uidRef.current, 'job_filters')); } catch { /* quota */ }
     fetchJobs(clearedFilters);
     setShowFilters(false);
@@ -1163,8 +1183,11 @@ export default function SeekerDashboard() {
               </Label>
               <Input
                 placeholder="e.g. React, Product Manager, Startup..."
-                value={filters.keyword || ''}
-                onChange={(e) => handleFilterChange('keyword', e.target.value)}
+                value={filterKeyword}
+                onChange={(e) => {
+                  setFilterKeyword(e.target.value);
+                  debouncedSetKeyword(e.target.value);
+                }}
                 className="h-11 rounded-xl bg-background"
                 data-testid="filter-keyword"
               />

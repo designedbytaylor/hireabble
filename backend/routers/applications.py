@@ -188,8 +188,16 @@ async def browse_candidates(
         {"status": None},
     ]
 
+    _CANDIDATE_PROJECTION = {
+        "_id": 0, "id": 1, "name": 1, "title": 1, "photo_url": 1, "avatar": 1,
+        "video_url": 1, "skills": 1, "experience_years": 1, "location": 1,
+        "school": 1, "degree": 1, "current_employer": 1, "bio": 1,
+        "work_preference": 1, "certifications": 1, "work_history": 1,
+        "education": 1, "created_at": 1, "subscription": 1,
+        "profile_boost_until": 1, "incognito_mode": 1,
+    }
     seekers = await db.users.find(
-        query, {"_id": 0, "password": 0}
+        query, _CANDIDATE_PROJECTION
     ).sort("created_at", -1).to_list(50)
 
     # Get recruiter's jobs for match scoring (cached 5 min)
