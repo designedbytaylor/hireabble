@@ -377,7 +377,7 @@ class UserLogin(BaseModel):
     totp_code: Optional[str] = None
 
 class UserResponse(BaseModel):
-    model_config = ConfigDict(extra="ignore")
+    model_config = ConfigDict(extra="allow")
     id: str
     email: str
     name: str
@@ -397,6 +397,7 @@ class UserResponse(BaseModel):
     degree: Optional[str] = None
     certifications: List[str] = []
     work_preference: Optional[str] = None
+    job_type_preference: Optional[str] = None
     desired_salary: Optional[int] = None
     available_immediately: bool = True
     onboarding_complete: bool = False
@@ -404,6 +405,15 @@ class UserResponse(BaseModel):
     push_subscription: Optional[dict] = None
     incognito_mode: bool = False
     subscription: Optional[dict] = None
+    work_history: List[dict] = []
+    education: List[dict] = []
+    references: List[dict] = []
+    references_hidden: bool = True
+    show_contact_on_resume: bool = False
+    email_notifications: Optional[dict] = None
+    marketing_emails_opt_in: bool = False
+    status: Optional[str] = None
+    profile_boost_until: Optional[str] = None
     created_at: str
 
 class JobCreate(BaseModel):

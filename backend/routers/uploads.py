@@ -20,6 +20,7 @@ import asyncio
 from database import (
     db, get_current_user, SUPABASE_URL, SUPABASE_KEY, UPLOADS_DIR, logger
 )
+from cache import invalidate_user
 
 router = APIRouter(tags=["Uploads"])
 
@@ -504,6 +505,7 @@ async def upload_file(
         {"id": current_user["id"]},
         {"$set": {"photo_url": photo_url}}
     )
+    invalidate_user(current_user["id"])
 
     # Track upload
     await _track_upload(
@@ -588,6 +590,7 @@ async def upload_video(
         {"id": current_user["id"]},
         {"$set": {"video_url": video_url}}
     )
+    invalidate_user(current_user["id"])
 
     # Track upload with AI moderation analysis
     await _track_upload(
@@ -627,6 +630,7 @@ async def delete_video(current_user: dict = Depends(get_current_user)):
             {"id": current_user["id"]},
             {"$set": {"video_url": None}}
         )
+        invalidate_user(current_user["id"])
 
         # Mark in media_uploads as removed
         await db.media_uploads.update_many(
