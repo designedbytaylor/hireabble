@@ -20,9 +20,9 @@ import asyncio
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
 
-# Create uploads directory
-UPLOADS_DIR = ROOT_DIR / "uploads"
-UPLOADS_DIR.mkdir(exist_ok=True)
+# Create uploads directory — use UPLOADS_PATH env var for persistent storage (e.g. Railway Volume)
+UPLOADS_DIR = Path(os.environ.get("UPLOADS_PATH", str(ROOT_DIR / "uploads")))
+UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
 
 # MongoDB connection with connection pool tuning
 mongo_url = os.environ['MONGO_URL']
