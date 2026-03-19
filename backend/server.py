@@ -394,14 +394,6 @@ async def websocket_endpoint_secure(websocket: WebSocket):
     await _ws_validate_and_connect(websocket, token, accept_subprotocol=f"access_token.{token}")
 
 
-@app.websocket("/ws/{token}")
-async def websocket_endpoint(websocket: WebSocket, token: str):
-    """Legacy WebSocket endpoint with token in URL path — DEPRECATED.
-    Tokens in URLs leak via logs, browser history, and referrer headers.
-    Use /ws with Sec-WebSocket-Protocol header instead."""
-    logger.warning("Deprecated /ws/{token} endpoint used — migrate to /ws with subprotocol auth")
-    await _ws_validate_and_connect(websocket, token)
-
 # ==================== HEALTH CHECK ====================
 
 @app.get("/api/health")
@@ -520,6 +512,13 @@ async def startup():
 
     # User email 2FA codes
     await ensure_index(db.user_2fa_codes, "user_id")
+
+    # Token blacklist with TTL (auto-expire entries after 24h to match JWT expiration)
+    await ensure_index(db.token_blacklist, "jti")
+    try:
+        await db.token_blacklist.create_index("blacklisted_at", expireAfterSeconds=86400)
+    except Exception:
+        pass  # Index may already exist
 
     logger.info("Database indexes created")
     logger.info("Hireabble API started successfully!")

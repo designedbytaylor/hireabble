@@ -206,12 +206,18 @@ export const AuthProvider = ({ children }) => {
   }, [persistToken, clearPersistedToken]);
 
   const logout = useCallback(() => {
+    // Server-side token revocation (fire-and-forget)
+    if (token) {
+      axios.post(`${API}/auth/logout`, {}, {
+        headers: { Authorization: `Bearer ${token}` },
+      }).catch(() => {});
+    }
     clearPersistedToken();
     setToken(null);
     setUser(null);
     // Purge all SW caches so next login doesn't see stale user data
     try { caches.keys().then(names => names.forEach(n => caches.delete(n))); } catch (_) { /* ok */ }
-  }, [clearPersistedToken]);
+  }, [clearPersistedToken, token]);
 
   const cacheUser = useCallback((userData) => {
     localStorage.setItem('cached_user', JSON.stringify(userData));
