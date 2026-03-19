@@ -1212,12 +1212,12 @@ async def apple_oauth(body: dict):
 
     try:
         import jwt as pyjwt
-        import requests as http_requests
 
         if id_token:
             # Fetch Apple's public keys and verify the JWT signature
             try:
-                apple_keys_response = http_requests.get("https://appleid.apple.com/auth/keys", timeout=10)
+                async with httpx.AsyncClient(timeout=10) as client:
+                    apple_keys_response = await client.get("https://appleid.apple.com/auth/keys")
                 apple_keys = apple_keys_response.json()
 
                 # Decode the JWT header to find the key ID
@@ -1265,17 +1265,17 @@ async def apple_oauth(body: dict):
         if code and APPLE_PRIVATE_KEY and APPLE_TEAM_ID and APPLE_KEY_ID:
             try:
                 client_secret = _generate_apple_client_secret()
-                token_resp = http_requests.post(
-                    "https://appleid.apple.com/auth/token",
-                    data={
-                        "client_id": APPLE_CLIENT_ID,
-                        "client_secret": client_secret,
-                        "code": code,
-                        "grant_type": "authorization_code",
-                        "redirect_uri": body.get("redirect_uri", ""),
-                    },
-                    timeout=10,
-                )
+                async with httpx.AsyncClient(timeout=10) as client:
+                    token_resp = await client.post(
+                        "https://appleid.apple.com/auth/token",
+                        data={
+                            "client_id": APPLE_CLIENT_ID,
+                            "client_secret": client_secret,
+                            "code": code,
+                            "grant_type": "authorization_code",
+                            "redirect_uri": body.get("redirect_uri", ""),
+                        },
+                    )
                 if token_resp.status_code == 200:
                     token_data = token_resp.json()
                     apple_refresh_token = token_data.get("refresh_token")
@@ -1321,18 +1321,17 @@ async def delete_account(current_user: dict = Depends(get_current_user)):
                         apple_refresh_token = decrypt_value(encrypted_token)
                     except Exception:
                         apple_refresh_token = encrypted_token  # fallback for unencrypted legacy tokens
-                    import requests as http_requests
                     client_secret = _generate_apple_client_secret()
-                    revoke_resp = http_requests.post(
-                        "https://appleid.apple.com/auth/revoke",
-                        data={
-                            "client_id": APPLE_CLIENT_ID,
-                            "client_secret": client_secret,
-                            "token": apple_refresh_token,
-                            "token_type_hint": "refresh_token",
-                        },
-                        timeout=10,
-                    )
+                    async with httpx.AsyncClient(timeout=10) as client:
+                        revoke_resp = await client.post(
+                            "https://appleid.apple.com/auth/revoke",
+                            data={
+                                "client_id": APPLE_CLIENT_ID,
+                                "client_secret": client_secret,
+                                "token": apple_refresh_token,
+                                "token_type_hint": "refresh_token",
+                            },
+                        )
                     if revoke_resp.status_code == 200:
                         logger.info(f"Revoked Apple token for user {user_id}")
                     else:

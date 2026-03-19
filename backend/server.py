@@ -461,6 +461,9 @@ async def startup():
     await ensure_index(db.matches, "job_id")
     await ensure_index(db.notifications, "user_id")
 
+    # User blocked_users index (for block-list lookups)
+    await ensure_index(db.users, "blocked_users")
+
     # Support ticket indexes
     await ensure_index(db.support_tickets, "id", unique=True)
     await ensure_index(db.support_tickets, [("user_id", 1), ("updated_at", -1)])

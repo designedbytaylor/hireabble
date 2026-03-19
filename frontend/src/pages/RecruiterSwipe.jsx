@@ -127,25 +127,39 @@ export default function RecruiterSwipe() {
     const WS_URL = process.env.REACT_APP_BACKEND_URL?.replace('https://', 'wss://').replace('http://', 'ws://');
     if (!WS_URL) return;
     let ws;
-    try {
-      ws = new WebSocket(`${WS_URL}/ws`, [`access_token.${token}`]);
-      ws.onmessage = (event) => {
-        try {
-          const data = JSON.parse(event.data);
-          if (data.type === 'new_match' && data.match) {
-            setMatchData({
-              seeker_name: data.match.seeker_name,
-              job_title: data.match.job_title,
-              company: data.match.company || user?.company,
-            });
-            setShowMatch(true);
-            setStats(prev => ({ ...prev, matches: (prev.matches || 0) + 1 }));
-          }
-        } catch { /* ignore parse errors */ }
-      };
-      ws.onerror = () => {};
-    } catch { /* ignore connection errors */ }
-    return () => { if (ws) ws.close(); };
+    let reconnectTimeout;
+    let reconnectCount = 0;
+    let unmounted = false;
+    const connect = () => {
+      if (unmounted) return;
+      try {
+        ws = new WebSocket(`${WS_URL}/ws`, [`access_token.${token}`]);
+        ws.onopen = () => { reconnectCount = 0; };
+        ws.onmessage = (event) => {
+          try {
+            const data = JSON.parse(event.data);
+            if (data.type === 'new_match' && data.match) {
+              setMatchData({
+                seeker_name: data.match.seeker_name,
+                job_title: data.match.job_title,
+                company: data.match.company || user?.company,
+              });
+              setShowMatch(true);
+              setStats(prev => ({ ...prev, matches: (prev.matches || 0) + 1 }));
+            }
+          } catch { /* ignore parse errors */ }
+        };
+        ws.onclose = () => {
+          if (unmounted) return;
+          const delay = Math.min(3000 * Math.pow(1.5, reconnectCount), 30000);
+          reconnectCount++;
+          reconnectTimeout = setTimeout(connect, delay);
+        };
+        ws.onerror = () => {};
+      } catch { /* ignore connection errors */ }
+    };
+    connect();
+    return () => { unmounted = true; clearTimeout(reconnectTimeout); if (ws) ws.close(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
 
@@ -1499,4 +1513,4 @@ const StaticCandidateCard = memo(function StaticCandidateCard({ candidate }) {
       </div>
     </div>
   );
-}
+});
