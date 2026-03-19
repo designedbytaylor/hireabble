@@ -19,6 +19,26 @@ if (config.enableHealthCheck) {
 }
 
 let webpackConfig = {
+  jest: {
+    configure: (jestConfig) => {
+      // Add @/ alias for tests (mirrors webpack alias)
+      jestConfig.moduleNameMapper = {
+        ...jestConfig.moduleNameMapper,
+        '^@/(.*)$': '<rootDir>/src/$1',
+        // react-router v7: main field points to non-existent dist/main.js;
+        // map to the actual CJS entry point
+        '^react-router-dom$': '<rootDir>/node_modules/react-router-dom/dist/index.js',
+        '^react-router$': '<rootDir>/node_modules/react-router/dist/index.js',
+        '^react-router/dom$': '<rootDir>/node_modules/react-router/dist/dom.js',
+      };
+      // react-router v7 ships ESM (.mjs) that Jest 27 can't parse;
+      // allow Babel to transform the CJS entry points too
+      jestConfig.transformIgnorePatterns = [
+        '/node_modules/(?!(react-router|react-router-dom)/)',
+      ];
+      return jestConfig;
+    },
+  },
   eslint: {
     configure: {
       extends: ["plugin:react-hooks/recommended"],
