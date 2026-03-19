@@ -42,11 +42,15 @@ from routers import auth, jobs, applications, matches, notifications, uploads, s
 # Rate limiter — uses remote IP address by default
 limiter = Limiter(key_func=get_remote_address, default_limits=["120/minute"])
 
-# Create the main app
+# Create the main app — disable docs/OpenAPI in production to reduce attack surface
+_is_production = os.getenv("ENVIRONMENT", "production") != "development"
 app = FastAPI(
     title="Hireabble API",
     description="A Tinder-style job matching platform API",
-    version="2.0.0"
+    version="2.0.0",
+    docs_url=None if _is_production else "/docs",
+    redoc_url=None if _is_production else "/redoc",
+    openapi_url=None if _is_production else "/openapi.json",
 )
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
