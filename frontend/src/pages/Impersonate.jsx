@@ -19,7 +19,11 @@ export default function Impersonate() {
     handled.current = true;
 
     const impersonateToken = searchParams.get('token');
-    const redirect = searchParams.get('redirect') || '/dashboard';
+    const rawRedirect = searchParams.get('redirect') || '/dashboard';
+    // Prevent open redirect - only allow relative paths
+    const redirect = rawRedirect.startsWith('/') && !rawRedirect.startsWith('//') && !rawRedirect.includes('://')
+      ? rawRedirect
+      : '/dashboard';
 
     if (!impersonateToken) {
       toast.error('Invalid impersonation link');

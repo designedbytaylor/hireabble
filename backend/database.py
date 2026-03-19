@@ -126,6 +126,20 @@ def create_token(user_id: str, role: str) -> str:
     }
     return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
 
+async def blacklist_token(jti: str, exp_seconds: int = 86400):
+    """Add a token JTI to the blacklist. Auto-expires via TTL index."""
+    try:
+        await db.token_blacklist.insert_one({
+            "jti": jti,
+            "blacklisted_at": datetime.now(timezone.utc),
+        })
+    except Exception:
+        pass  # Duplicate or DB error - non-critical
+
+async def is_token_blacklisted(jti: str) -> bool:
+    """Check if a token JTI has been revoked."""
+    return bool(await db.token_blacklist.find_one({"jti": jti}))
+
 async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
     from cache import get_cached_user, set_cached_user
     try:
@@ -134,6 +148,11 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
         user_id = payload.get("user_id")
         if not user_id:
             raise HTTPException(status_code=401, detail="Invalid token")
+
+        # Check if token has been revoked (logout, password change, etc.)
+        jti = payload.get("jti")
+        if jti and await is_token_blacklisted(jti):
+            raise HTTPException(status_code=401, detail="Token has been revoked")
 
         # Check cache first to avoid DB hit on every request
         user = get_cached_user(user_id)

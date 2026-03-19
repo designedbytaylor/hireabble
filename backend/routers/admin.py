@@ -42,7 +42,9 @@ router = APIRouter(tags=["Admin"])
 async def admin_setup(admin: AdminCreate, request: Request, setup_token: str = ""):
     """One-time bootstrap: create the first admin. Only works when no admins exist."""
     expected_token = os.environ.get("ADMIN_SETUP_TOKEN")
-    if expected_token and setup_token != expected_token:
+    if not expected_token:
+        raise HTTPException(status_code=403, detail="ADMIN_SETUP_TOKEN not configured. Set it as an environment variable.")
+    if setup_token != expected_token:
         raise HTTPException(status_code=403, detail="Invalid or missing setup token")
 
     count = await db.admin_users.count_documents({})
@@ -302,6 +304,9 @@ async def update_staff(staff_id: str, payload: dict, admin: dict = Depends(get_c
     """Update staff role or active status (admin only)."""
     if admin.get("role", "admin") != "admin":
         raise HTTPException(status_code=403, detail="Only admins can manage staff")
+
+    if staff_id == admin["id"]:
+        raise HTTPException(status_code=400, detail="Cannot modify your own account")
 
     staff = await db.admin_users.find_one({"id": staff_id})
     if not staff:

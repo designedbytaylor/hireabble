@@ -16,6 +16,7 @@ from database import (
     db, security, logger, RESEND_API_KEY, FRONTEND_URL,
     JWT_SECRET, JWT_ALGORITHM,
     hash_password, verify_password, create_token, get_current_user,
+    blacklist_token,
     send_email_notification, get_email_template, escape_html, manager,
     encrypt_value, decrypt_value,
     UserCreate, UserLogin, UserResponse, ForgotPasswordRequest,
@@ -90,6 +91,13 @@ limiter = Limiter(key_func=get_remote_address)
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
+# Fields to always exclude from user API responses
+_SENSITIVE_USER_FIELDS = {'_id', 'password', 'totp_secret', 'totp_backup_codes', 'apple_refresh_token'}
+
+def _safe_user_response(user: dict) -> dict:
+    """Return user dict with sensitive fields stripped."""
+    return {k: v for k, v in user.items() if k not in _SENSITIVE_USER_FIELDS}
+
 # ==================== REGISTRATION & LOGIN ====================
 
 @router.post("/register")
@@ -126,10 +134,10 @@ async def register(user: UserCreate, request: Request):
         if not is_clean and is_severe(violations):
             raise HTTPException(status_code=400, detail="Registration contains prohibited content.")
 
-        # Check if user exists
+        # Check if user exists - use generic message to prevent email enumeration
         existing = await db.users.find_one({"email": user.email})
         if existing:
-            raise HTTPException(status_code=409, detail="Unable to create account with this email. It may already be registered.")
+            raise HTTPException(status_code=409, detail="Unable to create account. Please try again or use a different email.")
 
         user_id = str(uuid.uuid4())
         avatar = f"https://api.dicebear.com/7.x/initials/svg?seed={user_id}"
@@ -183,7 +191,7 @@ async def register(user: UserCreate, request: Request):
         asyncio.create_task(_send_verification_email(user_id, user.email, user.name))
 
         token = create_token(user_id, user.role)
-        user_response = {k: v for k, v in user_doc.items() if k not in ['_id', 'password']}
+        user_response = _safe_user_response(user_doc)
 
         result = {"token": token, "user": user_response}
         if promo_result:
@@ -421,13 +429,26 @@ async def login(credentials: UserLogin, request: Request):
         raise HTTPException(status_code=403, detail="Your account is temporarily suspended. Contact support for more info.")
 
     token = create_token(user["id"], user["role"])
-    user_response = {k: v for k, v in user.items() if k not in ['_id', 'password', 'totp_secret', 'totp_backup_codes']}
+    user_response = _safe_user_response(user)
 
     return {"token": token, "user": user_response}
 
 @router.get("/me", response_model=UserResponse)
 async def get_me(current_user: dict = Depends(get_current_user)):
     return current_user
+
+@router.post("/logout")
+async def logout(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    """Server-side logout — blacklists the current JWT so it cannot be reused."""
+    try:
+        import jwt as pyjwt
+        payload = pyjwt.decode(credentials.credentials, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+        jti = payload.get("jti")
+        if jti:
+            await blacklist_token(jti)
+    except Exception:
+        pass  # Token may be expired/invalid — still return success
+    return {"message": "Logged out"}
 
 # ==================== PROMO CODE CHECK (PUBLIC) ====================
 
@@ -470,7 +491,7 @@ async def forgot_password(body: ForgotPasswordRequest, request: Request):
         return {"message": "If an account exists with this email, a reset link has been sent."}
     
     # Generate unique reset token
-    reset_token = str(uuid.uuid4())
+    reset_token = secrets.token_urlsafe(32)
     expires_at = datetime.now(timezone.utc) + timedelta(hours=1)
 
     import hashlib
@@ -684,7 +705,7 @@ async def disable_2fa(body: dict, request: Request, current_user: dict = Depends
 
 
 @router.post("/2fa/login")
-@limiter.limit("10/minute")
+@limiter.limit("3/minute")
 async def complete_2fa_login(body: dict, request: Request):
     """Complete login with 2FA code after receiving requires_2fa response."""
     import pyotp
@@ -733,7 +754,7 @@ async def complete_2fa_login(body: dict, request: Request):
         raise HTTPException(status_code=403, detail="Your account is temporarily suspended.")
 
     token = create_token(user["id"], user["role"])
-    user_response = {k: v for k, v in user.items() if k not in ['_id', 'password', 'totp_secret', 'totp_backup_codes']}
+    user_response = _safe_user_response(user)
 
     return {"token": token, "user": user_response}
 
@@ -741,7 +762,7 @@ async def complete_2fa_login(body: dict, request: Request):
 # ==================== EMAIL-BASED 2FA (user toggle) ====================
 
 @router.post("/email-2fa/verify")
-@limiter.limit("10/minute")
+@limiter.limit("3/minute")
 async def verify_email_2fa_login(body: dict, request: Request):
     """Verify email 2FA code during login."""
     import jwt as pyjwt
@@ -771,7 +792,7 @@ async def verify_email_2fa_login(body: dict, request: Request):
         raise HTTPException(status_code=401, detail="Verification code expired. Please log in again.")
 
     code_hash = hashlib.sha256(code.encode()).hexdigest()
-    if code_hash != stored["code_hash"]:
+    if not secrets.compare_digest(code_hash, stored["code_hash"]):
         raise HTTPException(status_code=401, detail="Invalid verification code")
 
     await db.user_2fa_codes.delete_many({"user_id": user_id})
@@ -786,7 +807,7 @@ async def verify_email_2fa_login(body: dict, request: Request):
         raise HTTPException(status_code=403, detail="Your account is temporarily suspended.")
 
     token = create_token(user["id"], user["role"])
-    user_response = {k: v for k, v in user.items() if k not in ['_id', 'password', 'totp_secret', 'totp_backup_codes']}
+    user_response = _safe_user_response(user)
 
     return {"token": token, "user": user_response}
 
@@ -1038,7 +1059,7 @@ async def _find_or_create_oauth_user(email: str, name: str, provider: str, role:
             await db.users.update_one({"email": email}, {"$set": updates})
             existing.update(updates)
         token = create_token(existing["id"], existing["role"])
-        user_response = {k: v for k, v in existing.items() if k not in ['_id', 'password']}
+        user_response = _safe_user_response(existing)
         return {"token": token, "user": user_response}
 
     # Create new user
@@ -1076,7 +1097,7 @@ async def _find_or_create_oauth_user(email: str, name: str, provider: str, role:
     }
     await db.users.insert_one(user_doc)
     token = create_token(user_id, role)
-    user_response = {k: v for k, v in user_doc.items() if k not in ['_id', 'password']}
+    user_response = _safe_user_response(user_doc)
     return {"token": token, "user": user_response}
 
 

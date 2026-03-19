@@ -462,9 +462,9 @@ async def subscribe(data: SubscriptionCheckout, current_user: dict = Depends(get
     if not price:
         raise HTTPException(status_code=400, detail="Invalid duration")
 
-    # In production, subscriptions must go through a payment provider
-    # Direct activation is only allowed in development for testing
-    _env = os.getenv("ENVIRONMENT", "development")
+    # Direct activation is only allowed in local development for testing.
+    # Requires ENVIRONMENT to be explicitly set to "development".
+    _env = os.getenv("ENVIRONMENT", "production")
     if _env != "development":
         raise HTTPException(
             status_code=400,
