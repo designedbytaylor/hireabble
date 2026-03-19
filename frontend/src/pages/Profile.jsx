@@ -138,6 +138,7 @@ export default function Profile() {
   const [certifications, setCertifications] = useState([]);
   const [references, setReferences] = useState([]);
   const [referencesHidden, setReferencesHidden] = useState(true);
+  const [showContactOnResume, setShowContactOnResume] = useState(false);
   const [referenceRequests, setReferenceRequests] = useState([]);
   const [subscription, setSubscription] = useState(undefined); // undefined = loading, null = no subscription
   const [parsingResume, setParsingResume] = useState(false);
@@ -163,6 +164,7 @@ export default function Profile() {
       setCertifications(user.certifications || []);
       setReferences(user.references || []);
       setReferencesHidden(user.references_hidden !== false);
+      setShowContactOnResume(user.show_contact_on_resume === true);
       fetchCompleteness();
       fetchReferenceRequests();
       fetchSubscription();
@@ -346,6 +348,7 @@ export default function Profile() {
           certifications: newCertifications.filter(Boolean),
           references: references.filter(r => r.name),
           references_hidden: referencesHidden,
+          show_contact_on_resume: showContactOnResume,
         };
         await updateProfile(updates);
         const partsFound = [
@@ -386,6 +389,7 @@ export default function Profile() {
         certifications: certifications.filter(Boolean),
         references: references.filter(r => r.name),
         references_hidden: referencesHidden,
+        show_contact_on_resume: showContactOnResume,
       };
       await updateProfile(updates);
       toast.success('Profile updated!');
@@ -953,6 +957,36 @@ export default function Profile() {
                   {certifications.length === 0 && (
                     <p className="text-sm text-muted-foreground text-center py-2">No certifications added yet</p>
                   )}
+                </div>
+
+                {/* Resume Contact Info Toggle */}
+                <div className="pt-4 border-t border-border space-y-3">
+                  <Label className="text-base font-semibold flex items-center gap-2"><Mail className="w-4 h-4" /> Resume Contact Info</Label>
+                  <button
+                    type="button"
+                    onClick={() => setShowContactOnResume(!showContactOnResume)}
+                    className={`w-full flex items-center gap-3 p-3 rounded-xl border transition-all ${
+                      showContactOnResume
+                        ? 'bg-primary/10 border-primary/40'
+                        : 'bg-background border-border'
+                    }`}
+                  >
+                    {showContactOnResume ? <Eye className="w-4 h-4 text-primary" /> : <EyeOff className="w-4 h-4 text-muted-foreground" />}
+                    <div className="flex-1 text-left">
+                      <div className="text-sm font-medium">{showContactOnResume ? 'Contact Info Visible' : 'Contact Info Hidden'}</div>
+                      <div className="text-xs text-muted-foreground">
+                        {showContactOnResume
+                          ? 'Your email is shown on resumes downloaded by matched recruiters'
+                          : 'Recruiters see "Contact via Hireabble" instead of your email'}
+                      </div>
+                    </div>
+                    <div className={`w-10 h-6 rounded-full transition-colors ${showContactOnResume ? 'bg-primary' : 'bg-muted'}`}>
+                      <div className={`w-5 h-5 rounded-full bg-white mt-0.5 transition-transform ${showContactOnResume ? 'translate-x-[18px]' : 'translate-x-0.5'}`} />
+                    </div>
+                  </button>
+                  <p className="text-xs text-muted-foreground px-1">
+                    Turning this on will allow recruiters you have matched with to see your contact details on your downloaded resume.
+                  </p>
                 </div>
 
                 {/* References */}
