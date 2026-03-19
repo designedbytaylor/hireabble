@@ -282,6 +282,7 @@ export default function SeekerDashboard() {
       saveCachedSuperLikes(data.superlikes.remaining, uidRef.current);
       if (data.can_undo != null) setCanUndo(data.can_undo);
       if (data.premium_features) setPremiumFeatures(data.premium_features);
+      if (data.top_picks) setTopPicks(data.top_picks);
       if (data.incognito_active != null) setIncognitoActive(data.incognito_active);
       if (data.boost_active_until != null) setBoostActiveUntil(data.boost_active_until);
     } catch (error) {
@@ -414,15 +415,6 @@ export default function SeekerDashboard() {
       });
     }
   }, [savedJobIds]);
-
-  // Fetch top picks for premium subscribers
-  useEffect(() => {
-    if (premiumFeatures.top_picks) {
-      axios.get(`${API}/top-picks`, {
-        headers: { Authorization: `Bearer ${tokenRef.current}` },
-      }).then(res => setTopPicks(res.data.picks || [])).catch(() => {});
-    }
-  }, [premiumFeatures.top_picks]);
 
   // WebSocket listener for async match notifications (matches are detected in background)
   useEffect(() => {
@@ -1457,7 +1449,7 @@ function JobDetailSheet({ job, onClose }) {
           {/* Header */}
           <div className="flex items-center gap-3 mb-4">
             {job.company_logo && (
-              <img src={job.company_logo} alt={job.company} className="w-12 h-12 rounded-xl object-cover border border-border" />
+              <img src={job.company_logo} alt={job.company} className="w-12 h-12 rounded-xl object-cover border border-border" loading="lazy" />
             )}
             <div>
               <div className="text-sm text-muted-foreground">{job.company}</div>
@@ -1563,7 +1555,7 @@ const StaticJobCard = memo(function StaticJobCard({ job }) {
   return (
     <div className="w-full h-full rounded-3xl overflow-hidden relative gradient-border">
       <div className="absolute inset-0">
-        <img src={job.background_image} alt="" className="w-full h-full object-cover" onError={handleBgImgError} />
+        <img src={job.background_image} alt="" className="w-full h-full object-cover" loading="lazy" onError={handleBgImgError} />
         <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/60 to-black/30" />
       </div>
       {job.is_boosted && (
