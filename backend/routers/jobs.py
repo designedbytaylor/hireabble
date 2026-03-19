@@ -479,6 +479,8 @@ async def duplicate_job(job_id: str, current_user: dict = Depends(get_current_us
     new_job["background_image"] = backgrounds[hash(new_id) % len(backgrounds)]
 
     await db.jobs.insert_one(new_job)
+    # Invalidate recruiter jobs cache
+    invalidate(recruiter_jobs_cache, f"rjobs:{current_user['id']}")
     return {k: v for k, v in new_job.items() if k != '_id'}
 
 
@@ -491,7 +493,10 @@ async def delete_job(job_id: str, current_user: dict = Depends(get_current_user)
     result = await db.jobs.delete_one({"id": job_id, "recruiter_id": current_user["id"]})
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Job not found or not authorized")
-    
+
+    # Invalidate recruiter jobs cache
+    invalidate(recruiter_jobs_cache, f"rjobs:{current_user['id']}")
+
     return {"message": "Job deleted successfully"}
 
 
