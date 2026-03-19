@@ -211,18 +211,13 @@ export default function SeekerDashboard() {
     setFilters(prev => ({ ...prev, [key]: value }));
   }, []);
 
-  const debouncedSetKeyword = useCallback(
-    (() => {
-      let timer;
-      return (value) => {
-        clearTimeout(timer);
-        timer = setTimeout(() => {
-          setFilters(prev => ({ ...prev, keyword: value }));
-        }, 300);
-      };
-    })(),
-    []
-  );
+  const debounceTimerRef = useRef(null);
+  const debouncedSetKeyword = useCallback((value) => {
+    clearTimeout(debounceTimerRef.current);
+    debounceTimerRef.current = setTimeout(() => {
+      setFilters(prev => ({ ...prev, keyword: value }));
+    }, 300);
+  }, []);
 
   // ─── Retry queue: flush any swipes that failed on a previous page load ───
   const flushSwipeQueue = useCallback(async () => {
