@@ -82,7 +82,7 @@ async def register(user: UserCreate, request: Request):
         # Check if user exists
         existing = await db.users.find_one({"email": user.email})
         if existing:
-            raise HTTPException(status_code=400, detail="Email already registered")
+            raise HTTPException(status_code=409, detail="Unable to create account with this email. It may already be registered.")
 
         user_id = str(uuid.uuid4())
         avatar = f"https://api.dicebear.com/7.x/initials/svg?seed={user_id}"
@@ -146,7 +146,7 @@ async def register(user: UserCreate, request: Request):
         raise
     except Exception as e:
         logger.error(f"Registration failed: {str(e)}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Registration error: {str(e)}")
+        raise HTTPException(status_code=500, detail="Registration failed. Please try again.")
 
 async def _apply_signup_promo(user_id: str, role: str, code: str):
     """Apply a promo code during registration. Returns promo info or None."""
@@ -754,6 +754,38 @@ async def update_profile(updates: dict, current_user: dict = Depends(get_current
     
     update_data = {k: v for k, v in updates.items() if k in allowed_fields}
 
+    # Type validation for profile fields
+    _FIELD_TYPES = {
+        "name": str, "title": str, "bio": str, "location": str,
+        "company": str, "avatar": str, "photo_url": str, "video_url": str,
+        "current_employer": str, "school": str, "degree": str,
+        "work_preference": str, "job_type_preference": str,
+        "experience_years": (int, type(None)),
+        "desired_salary": (int, type(None)),
+        "available_immediately": bool, "onboarding_complete": bool,
+        "references_hidden": bool,
+        "skills": list, "previous_employers": list, "certifications": list,
+    }
+    for field, expected_type in _FIELD_TYPES.items():
+        if field in update_data and update_data[field] is not None:
+            if not isinstance(update_data[field], expected_type):
+                del update_data[field]
+
+    # Validate URL fields to prevent injection
+    for url_field in ("photo_url", "video_url", "avatar"):
+        if url_field in update_data and update_data[url_field]:
+            url_val = str(update_data[url_field])
+            if not (url_val.startswith("https://") or url_val.startswith("http://")):
+                del update_data[url_field]
+
+    # Validate push_subscription structure
+    if "push_subscription" in update_data and update_data["push_subscription"] is not None:
+        ps = update_data["push_subscription"]
+        if not isinstance(ps, dict) or "endpoint" not in ps or "keys" not in ps:
+            del update_data["push_subscription"]
+        elif not isinstance(ps.get("endpoint"), str) or not ps["endpoint"].startswith("https://"):
+            del update_data["push_subscription"]
+
     # Content moderation on text fields
     text_keys = ("name", "title", "bio", "skills", "company", "current_employer", "school", "degree", "certifications")
     text_fields = {k: v for k, v in update_data.items() if k in text_keys and v}
@@ -1196,11 +1228,12 @@ async def apple_oauth(body: dict):
 
         result = await _find_or_create_oauth_user(email, name, "apple", role)
 
-        # Store the Apple refresh token for future revocation on account deletion
+        # Store the Apple refresh token encrypted for future revocation on account deletion
         if apple_refresh_token:
+            from database import encrypt_value
             await db.users.update_one(
                 {"email": email},
-                {"$set": {"apple_refresh_token": apple_refresh_token}}
+                {"$set": {"apple_refresh_token": encrypt_value(apple_refresh_token)}}
             )
 
         return result
@@ -1224,9 +1257,14 @@ async def delete_account(current_user: dict = Depends(get_current_user)):
         # Revoke Sign in with Apple token if user signed in with Apple (required by Apple guideline 5.1.1)
         user_doc = await db.users.find_one({"id": user_id}, {"_id": 0, "oauth_providers": 1, "apple_refresh_token": 1})
         if user_doc and "apple" in (user_doc.get("oauth_providers") or []):
-            apple_refresh_token = user_doc.get("apple_refresh_token")
-            if apple_refresh_token and APPLE_CLIENT_ID:
+            encrypted_token = user_doc.get("apple_refresh_token")
+            if encrypted_token and APPLE_CLIENT_ID:
                 try:
+                    from database import decrypt_value
+                    try:
+                        apple_refresh_token = decrypt_value(encrypted_token)
+                    except Exception:
+                        apple_refresh_token = encrypted_token  # fallback for unencrypted legacy tokens
                     import requests as http_requests
                     client_secret = _generate_apple_client_secret()
                     revoke_resp = http_requests.post(

@@ -203,31 +203,8 @@ app.include_router(users.router, prefix="/api")
 
 # ==================== WEBSOCKET ====================
 
-@app.websocket("/ws/{token}")
-async def websocket_endpoint(websocket: WebSocket, token: str):
-    """WebSocket endpoint for real-time notifications and chat"""
-    # Decode JWT token to get real user_id
-    try:
-        payload = pyjwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
-        user_id = payload.get("user_id")
-        if not user_id:
-            await websocket.close(code=4001, reason="Invalid token")
-            return
-    except pyjwt.InvalidTokenError:
-        await websocket.accept()
-        await websocket.close(code=4001, reason="Invalid token")
-        return
-
-    # Block banned/suspended users from WebSocket
-    ws_user = await db.users.find_one({"id": user_id}, {"_id": 0, "status": 1})
-    if ws_user and ws_user.get("status") in ("banned", "suspended"):
-        await websocket.accept()
-        await websocket.close(code=4003, reason="Account banned or suspended")
-        return
-
-    await manager.connect(websocket, user_id)
-    logger.info(f"WebSocket connected: {user_id}")
-
+async def _ws_message_loop(websocket: WebSocket, user_id: str):
+    """Shared WebSocket message-handling loop for both /ws and /ws/{token} endpoints."""
     try:
         while True:
             data = await websocket.receive_text()
@@ -333,6 +310,65 @@ async def websocket_endpoint(websocket: WebSocket, token: str):
     except Exception as e:
         logger.error(f"WebSocket error for {user_id}: {str(e)}")
         manager.disconnect(websocket, user_id)
+
+
+async def _ws_validate_and_connect(websocket: WebSocket, token: str, accept_subprotocol: str = None):
+    """Validate JWT token, block banned users, accept connection, and run message loop."""
+    # Decode JWT token to get real user_id
+    try:
+        payload = pyjwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+        user_id = payload.get("user_id")
+        if not user_id:
+            await websocket.close(code=4001, reason="Invalid token")
+            return
+    except pyjwt.InvalidTokenError:
+        await websocket.accept()
+        await websocket.close(code=4001, reason="Invalid token")
+        return
+
+    # Block banned/suspended users from WebSocket
+    ws_user = await db.users.find_one({"id": user_id}, {"_id": 0, "status": 1})
+    if ws_user and ws_user.get("status") in ("banned", "suspended"):
+        await websocket.accept()
+        await websocket.close(code=4003, reason="Account banned or suspended")
+        return
+
+    if accept_subprotocol:
+        # Accept with the negotiated subprotocol, then register with manager manually
+        await websocket.accept(subprotocol=accept_subprotocol)
+        if user_id not in manager.active_connections:
+            manager.active_connections[user_id] = []
+        manager.active_connections[user_id].append(websocket)
+    else:
+        # Legacy path: manager.connect calls accept() internally
+        await manager.connect(websocket, user_id)
+
+    logger.info(f"WebSocket connected: {user_id}")
+    await _ws_message_loop(websocket, user_id)
+
+
+@app.websocket("/ws")
+async def websocket_endpoint_secure(websocket: WebSocket):
+    """WebSocket endpoint that accepts token via Sec-WebSocket-Protocol header."""
+    protocols = (websocket.headers.get("sec-websocket-protocol") or "").split(",")
+    token = None
+    for proto in protocols:
+        proto = proto.strip()
+        if proto.startswith("access_token."):
+            token = proto[len("access_token."):]
+            break
+
+    if not token:
+        await websocket.close(code=4001, reason="Missing token")
+        return
+
+    await _ws_validate_and_connect(websocket, token, accept_subprotocol=f"access_token.{token}")
+
+
+@app.websocket("/ws/{token}")
+async def websocket_endpoint(websocket: WebSocket, token: str):
+    """Legacy WebSocket endpoint with token in URL path (kept for backwards compatibility)."""
+    await _ws_validate_and_connect(websocket, token)
 
 # ==================== HEALTH CHECK ====================
 

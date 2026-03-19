@@ -43,6 +43,23 @@ if not JWT_SECRET:
 JWT_ALGORITHM = "HS256"
 JWT_EXPIRATION_HOURS = 24
 
+# Encryption key for sensitive data at rest (derived from JWT_SECRET)
+import hashlib as _hashlib
+import base64 as _base64
+_ENCRYPTION_KEY = _base64.urlsafe_b64encode(_hashlib.sha256(JWT_SECRET.encode()).digest())
+
+def encrypt_value(plaintext: str) -> str:
+    """Encrypt a string value for storage at rest using Fernet (AES-128-CBC)."""
+    from cryptography.fernet import Fernet
+    f = Fernet(_ENCRYPTION_KEY)
+    return f.encrypt(plaintext.encode()).decode()
+
+def decrypt_value(ciphertext: str) -> str:
+    """Decrypt a Fernet-encrypted value."""
+    from cryptography.fernet import Fernet
+    f = Fernet(_ENCRYPTION_KEY)
+    return f.decrypt(ciphertext.encode()).decode()
+
 # Email Configuration
 RESEND_API_KEY = os.environ.get('RESEND_API_KEY')
 SENDER_EMAIL = os.environ.get('SENDER_EMAIL', 'onboarding@resend.dev')
