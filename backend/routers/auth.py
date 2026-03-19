@@ -14,11 +14,20 @@ from database import (
     JWT_SECRET, JWT_ALGORITHM,
     hash_password, verify_password, create_token, get_current_user,
     send_email_notification, get_email_template, escape_html, manager,
+    encrypt_value, decrypt_value,
     UserCreate, UserLogin, UserResponse, ForgotPasswordRequest,
     ResetPasswordRequest, ChangePasswordRequest
 )
 from cachetools import TTLCache
 from content_filter import check_fields, is_severe
+
+
+def _decrypt_totp_secret(stored_value: str) -> str:
+    """Decrypt TOTP secret from DB. Handles both encrypted and legacy plaintext values."""
+    try:
+        return decrypt_value(stored_value)
+    except Exception:
+        return stored_value  # Legacy unencrypted value
 from cache import invalidate_user, _get_redis
 
 # Track failed login attempts — Redis-backed for multi-worker consistency
@@ -313,7 +322,7 @@ def _create_2fa_token(user_id: str) -> str:
 
 
 @router.post("/login")
-@limiter.limit("15/minute")
+@limiter.limit("5/minute")
 async def login(credentials: UserLogin, request: Request):
     email_key = credentials.email.lower()
 
@@ -325,13 +334,12 @@ async def login(credentials: UserLogin, request: Request):
             detail="Too many failed login attempts. Please try again in 15 minutes."
         )
 
+    # Always perform a password check to prevent timing-based user enumeration
+    _DUMMY_HASH = "$2b$12$LJ3m4ys3Lg7E90Sv7RnKruYSfFnMKHbTFAOBqSTbSuPaFStKiVKxe"
     user = await db.users.find_one({"email": credentials.email})
-    if not user:
-        # Increment failed attempts even for non-existent accounts (prevents enumeration)
-        _incr_login_attempts(email_key)
-        raise HTTPException(status_code=401, detail="Invalid credentials")
+    password_valid = verify_password(credentials.password, user["password"] if user else _DUMMY_HASH)
 
-    if not verify_password(credentials.password, user["password"]):
+    if not user or not password_valid:
         _incr_login_attempts(email_key)
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
@@ -352,7 +360,7 @@ async def login(credentials: UserLogin, request: Request):
             }
 
         import pyotp
-        totp = pyotp.TOTP(user["totp_secret"])
+        totp = pyotp.TOTP(_decrypt_totp_secret(user["totp_secret"]))
 
         # Check TOTP code
         if not totp.verify(totp_code, valid_window=1):
@@ -482,7 +490,7 @@ async def forgot_password(body: ForgotPasswordRequest, request: Request):
             email_html
         ))
     else:
-        logger.warning(f"RESEND_API_KEY not configured. Reset link: {reset_link}")
+        logger.warning(f"RESEND_API_KEY not configured — password reset email not sent for {body.email}")
     
     return {"message": "If an account exists with this email, a reset link has been sent."}
 
@@ -570,10 +578,10 @@ async def setup_2fa(current_user: dict = Depends(get_current_user)):
         issuer_name="Hireabble"
     )
 
-    # Store secret (not yet enabled — user must verify first)
+    # Store secret encrypted at rest (not yet enabled — user must verify first)
     await db.users.update_one(
         {"id": current_user["id"]},
-        {"$set": {"totp_secret": secret, "totp_enabled": False}}
+        {"$set": {"totp_secret": encrypt_value(secret), "totp_enabled": False}}
     )
 
     return {
@@ -597,12 +605,12 @@ async def verify_2fa_setup(body: dict, current_user: dict = Depends(get_current_
     if not user or not user.get("totp_secret"):
         raise HTTPException(status_code=400, detail="2FA setup not started. Call /2fa/setup first.")
 
-    totp = pyotp.TOTP(user["totp_secret"])
+    totp = pyotp.TOTP(_decrypt_totp_secret(user["totp_secret"]))
     if not totp.verify(code, valid_window=1):
         raise HTTPException(status_code=400, detail="Invalid verification code. Please try again.")
 
-    # Generate backup codes
-    backup_codes = [secrets.token_hex(4) for _ in range(8)]
+    # Generate backup codes (128-bit entropy each)
+    backup_codes = [secrets.token_hex(8) for _ in range(8)]
     hashed_backups = [hash_password(c) for c in backup_codes]
 
     await db.users.update_one(
@@ -622,7 +630,8 @@ async def verify_2fa_setup(body: dict, current_user: dict = Depends(get_current_
 
 
 @router.post("/2fa/disable")
-async def disable_2fa(body: dict, current_user: dict = Depends(get_current_user)):
+@limiter.limit("5/minute")
+async def disable_2fa(body: dict, request: Request, current_user: dict = Depends(get_current_user)):
     """Disable 2FA. Requires password confirmation."""
     password = body.get("password", "")
 
@@ -667,7 +676,7 @@ async def complete_2fa_login(body: dict, request: Request):
     if not user or not user.get("totp_enabled"):
         raise HTTPException(status_code=401, detail="Invalid request")
 
-    totp = pyotp.TOTP(user["totp_secret"])
+    totp = pyotp.TOTP(_decrypt_totp_secret(user["totp_secret"]))
     code_valid = totp.verify(totp_code, valid_window=1)
 
     # Check backup codes if TOTP fails
@@ -730,14 +739,16 @@ async def request_email_change(body: dict, request: Request, current_user: dict 
     if existing:
         raise HTTPException(status_code=400, detail="This email is already registered")
 
-    # Generate verification token
+    # Generate verification token (hash before storage — same pattern as password reset)
+    import hashlib
     change_token = str(uuid.uuid4())
+    token_hash = hashlib.sha256(change_token.encode()).hexdigest()
     expires_at = datetime.now(timezone.utc) + timedelta(hours=1)
 
-    # Store the pending email change
+    # Store the pending email change (hashed token)
     await db.email_change_tokens.delete_many({"user_id": current_user["id"]})
     await db.email_change_tokens.insert_one({
-        "token": change_token,
+        "token": token_hash,
         "user_id": current_user["id"],
         "old_email": current_user["email"],
         "new_email": new_email,
@@ -745,7 +756,7 @@ async def request_email_change(body: dict, request: Request, current_user: dict 
         "created_at": datetime.now(timezone.utc).isoformat()
     })
 
-    # Send verification to new email
+    # Send verification to new email (raw token in link, hash in DB)
     confirm_link = f"{FRONTEND_URL}/verify-email?token={change_token}&type=email-change"
     html = get_email_template(
         title="Confirm Email Change",
@@ -761,24 +772,27 @@ async def request_email_change(body: dict, request: Request, current_user: dict 
 @router.post("/confirm-email-change")
 async def confirm_email_change(body: dict):
     """Confirm email change using token from verification email."""
+    import hashlib
     token_str = body.get("token")
     if not token_str:
         raise HTTPException(status_code=400, detail="Missing verification token")
 
-    token_doc = await db.email_change_tokens.find_one({"token": token_str})
+    # Hash the incoming token before DB lookup (tokens stored as hashes)
+    token_hash = hashlib.sha256(token_str.encode()).hexdigest()
+    token_doc = await db.email_change_tokens.find_one({"token": token_hash})
     if not token_doc:
         raise HTTPException(status_code=400, detail="Invalid or expired token")
 
     # Check expiration
     expires_at = datetime.fromisoformat(token_doc["expires_at"].replace('Z', '+00:00'))
     if datetime.now(timezone.utc) > expires_at:
-        await db.email_change_tokens.delete_one({"token": token_str})
+        await db.email_change_tokens.delete_one({"token": token_hash})
         raise HTTPException(status_code=400, detail="Token has expired")
 
     # Check new email isn't taken (race condition check)
     existing = await db.users.find_one({"email": token_doc["new_email"]})
     if existing:
-        await db.email_change_tokens.delete_one({"token": token_str})
+        await db.email_change_tokens.delete_one({"token": token_hash})
         raise HTTPException(status_code=400, detail="This email is already registered")
 
     # Update email
@@ -827,12 +841,28 @@ async def update_profile(updates: dict, current_user: dict = Depends(get_current
             if not isinstance(update_data[field], expected_type):
                 del update_data[field]
 
-    # Validate URL fields to prevent injection
+    # Validate URL fields — must be valid HTTPS URLs from trusted domains
+    _TRUSTED_URL_DOMAINS = {"supabase.co", "dicebear.com", "googleapis.com", "hireabble.com", "localhost"}
     for url_field in ("photo_url", "video_url", "avatar"):
         if url_field in update_data and update_data[url_field]:
             url_val = str(update_data[url_field])
             if not (url_val.startswith("https://") or url_val.startswith("http://")):
                 del update_data[url_field]
+            else:
+                from urllib.parse import urlparse
+                try:
+                    parsed = urlparse(url_val)
+                    host = parsed.hostname or ""
+                    # Allow URLs from trusted domains only
+                    if not any(host == d or host.endswith(f".{d}") for d in _TRUSTED_URL_DOMAINS):
+                        del update_data[url_field]
+                except Exception:
+                    del update_data[url_field]
+
+    # Reject nested dicts in scalar fields to prevent NoSQL operator injection
+    for key, val in list(update_data.items()):
+        if isinstance(val, dict) and key not in ("push_subscription",):
+            del update_data[key]
 
     # Validate push_subscription structure
     if "push_subscription" in update_data and update_data["push_subscription"] is not None:
@@ -935,7 +965,8 @@ async def _find_or_create_oauth_user(email: str, name: str, provider: str, role:
 
 
 @router.post("/oauth/google")
-async def google_oauth(body: dict):
+@limiter.limit("10/minute")
+async def google_oauth(body: dict, request: Request):
     """Authenticate with Google OAuth. Expects {code, redirect_uri, role?}"""
     code = body.get("code")
     redirect_uri = body.get("redirect_uri")
@@ -984,7 +1015,8 @@ async def google_oauth(body: dict):
 
 
 @router.post("/oauth/github")
-async def github_oauth(body: dict):
+@limiter.limit("10/minute")
+async def github_oauth(body: dict, request: Request):
     """Authenticate with GitHub OAuth. Expects {code, role?}"""
     code = body.get("code")
     role = body.get("role", "seeker")
@@ -1072,7 +1104,8 @@ async def get_oauth_config():
 # ==================== LINKEDIN OAUTH ====================
 
 @router.post("/oauth/linkedin")
-async def linkedin_oauth(body: dict):
+@limiter.limit("10/minute")
+async def linkedin_oauth(body: dict, request: Request):
     """Authenticate with LinkedIn OAuth. Expects {code, redirect_uri, role?}"""
     code = body.get("code")
     redirect_uri = body.get("redirect_uri")
@@ -1128,7 +1161,8 @@ async def linkedin_oauth(body: dict):
 # ==================== FACEBOOK OAUTH ====================
 
 @router.post("/oauth/facebook")
-async def facebook_oauth(body: dict):
+@limiter.limit("10/minute")
+async def facebook_oauth(body: dict, request: Request):
     """Authenticate with Facebook OAuth. Expects {code, redirect_uri, role?}"""
     code = body.get("code")
     redirect_uri = body.get("redirect_uri")
@@ -1185,9 +1219,15 @@ APPLE_TEAM_ID = os.environ.get('APPLE_TEAM_ID', '')
 APPLE_KEY_ID = os.environ.get('APPLE_KEY_ID', '')
 APPLE_PRIVATE_KEY = os.environ.get('APPLE_PRIVATE_KEY', '')
 
+# Warn at import time if Apple Sign In is partially configured (missing private key)
+if APPLE_CLIENT_ID and not APPLE_PRIVATE_KEY:
+    logger.warning("APPLE_CLIENT_ID is set but APPLE_PRIVATE_KEY is missing — Apple Sign In token exchange will fail")
+
 
 def _generate_apple_client_secret():
     """Generate a client secret JWT for Apple Sign In API calls (token exchange, revocation)."""
+    if not APPLE_PRIVATE_KEY:
+        raise ValueError("APPLE_PRIVATE_KEY is not configured — cannot generate Apple client secret")
     import jwt as pyjwt
     now = datetime.now(timezone.utc)
     payload = {
@@ -1201,7 +1241,8 @@ def _generate_apple_client_secret():
 
 
 @router.post("/oauth/apple")
-async def apple_oauth(body: dict):
+@limiter.limit("10/minute")
+async def apple_oauth(body: dict, request: Request):
     """Authenticate with Apple Sign In. Expects {code, id_token, redirect_uri, role?}"""
     id_token = body.get("id_token")
     code = body.get("code")

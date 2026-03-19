@@ -61,19 +61,21 @@ app.add_middleware(GZipMiddleware, minimum_size=500)
 # CORS middleware — restrict to known origins in production
 import os as _os
 _frontend_url = _os.getenv("FRONTEND_URL", "https://hireabble.com")
+_environment = _os.getenv("ENVIRONMENT", "development")
 _cors_origins = [
-    "http://localhost:3000",
-    "http://localhost:3001",
     "capacitor://localhost",   # iOS Capacitor native app
     "https://localhost",       # iOS Capacitor WKWebView (iosScheme: https)
 ]
+# Only allow localhost dev origins in development
+if _environment == "development":
+    _cors_origins.extend(["http://localhost:3000", "http://localhost:3001"])
 if _frontend_url:
     _cors_origins.append(_frontend_url)
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=_cors_origins,
-    allow_origin_regex=r"https://(.*\.(vercel\.app|up\.railway\.app)|(www\.)?hireabble\.com)",
+    allow_origin_regex=r"https://(hireabble[a-z0-9-]*\.vercel\.app|hireabble[a-z0-9-]*\.up\.railway\.app|(www\.)?hireabble\.com)",
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["Authorization", "Content-Type"],
@@ -117,7 +119,7 @@ async def csrf_protection(request: Request, call_next):
         # Also allow Vercel/Railway preview deployments and hireabble.com
         import re as _csrf_re
         if not origin_valid and _csrf_re.match(
-            r"https://(.*\.(vercel\.app|up\.railway\.app)|(www\.)?hireabble\.com)",
+            r"https://(hireabble[a-z0-9-]*\.vercel\.app|hireabble[a-z0-9-]*\.up\.railway\.app|(www\.)?hireabble\.com)",
             check_value
         ):
             origin_valid = True
@@ -142,8 +144,8 @@ async def add_security_headers(request: Request, call_next):
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
     response.headers["Content-Security-Policy"] = (
         "default-src 'self'; "
-        "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://fonts.googleapis.com https://apis.google.com; "
-        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
+        "script-src 'self' https://fonts.googleapis.com https://apis.google.com; "
+        "style-src 'self' https://fonts.googleapis.com; "
         "font-src 'self' https://fonts.gstatic.com; "
         "img-src 'self' data: blob: https: http:; "
         "connect-src 'self' https: wss:; "
@@ -151,6 +153,8 @@ async def add_security_headers(request: Request, call_next):
         "object-src 'none'; "
         "base-uri 'self'"
     )
+    response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=(), payment=()"
+    response.headers["X-Permitted-Cross-Domain-Policies"] = "none"
     if request.url.scheme == "https":
         response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
     return response
@@ -216,14 +220,18 @@ async def _ws_message_loop(websocket: WebSocket, user_id: str):
 
             # Handle typing indicators
             elif message_data.get("type") == "typing":
-                receiver_id = message_data.get("receiver_id")
-                if receiver_id:
-                    await manager.send_to_user(receiver_id, {
-                        "type": "typing",
-                        "sender_id": user_id,
-                        "match_id": message_data.get("match_id"),
-                        "is_typing": message_data.get("is_typing", True)
-                    })
+                match_id = message_data.get("match_id")
+                if match_id:
+                    # Derive receiver from match — never trust client-provided receiver_id
+                    typing_match = await db.matches.find_one({"id": match_id}, {"_id": 0, "seeker_id": 1, "recruiter_id": 1})
+                    if typing_match and (typing_match["seeker_id"] == user_id or typing_match["recruiter_id"] == user_id):
+                        receiver_id = typing_match["recruiter_id"] if user_id == typing_match["seeker_id"] else typing_match["seeker_id"]
+                        await manager.send_to_user(receiver_id, {
+                            "type": "typing",
+                            "sender_id": user_id,
+                            "match_id": match_id,
+                            "is_typing": message_data.get("is_typing", True)
+                        })
 
             # Handle chat messages sent via WebSocket
             elif message_data.get("type") == "message":
@@ -367,7 +375,10 @@ async def websocket_endpoint_secure(websocket: WebSocket):
 
 @app.websocket("/ws/{token}")
 async def websocket_endpoint(websocket: WebSocket, token: str):
-    """Legacy WebSocket endpoint with token in URL path (kept for backwards compatibility)."""
+    """Legacy WebSocket endpoint with token in URL path — DEPRECATED.
+    Tokens in URLs leak via logs, browser history, and referrer headers.
+    Use /ws with Sec-WebSocket-Protocol header instead."""
+    logger.warning("Deprecated /ws/{token} endpoint used — migrate to /ws with subprotocol auth")
     await _ws_validate_and_connect(websocket, token)
 
 # ==================== HEALTH CHECK ====================

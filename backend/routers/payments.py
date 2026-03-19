@@ -446,7 +446,7 @@ async def reactivate_subscription(current_user: dict = Depends(get_current_user)
 
 @router.post("/subscribe")
 async def subscribe(data: SubscriptionCheckout, current_user: dict = Depends(get_current_user)):
-    """Subscribe to a tier (creates Stripe checkout or processes Apple IAP)"""
+    """Subscribe to a tier — redirects to payment. Direct activation is disabled in production."""
     tier = SUBSCRIPTION_TIERS.get(data.tier_id)
     if not tier:
         raise HTTPException(status_code=400, detail="Invalid tier")
@@ -458,10 +458,18 @@ async def subscribe(data: SubscriptionCheckout, current_user: dict = Depends(get
     if not price:
         raise HTTPException(status_code=400, detail="Invalid duration")
 
+    # In production, subscriptions must go through a payment provider
+    # Direct activation is only allowed in development for testing
+    _env = os.getenv("ENVIRONMENT", "development")
+    if _env != "development":
+        raise HTTPException(
+            status_code=400,
+            detail="Please subscribe through the app (Apple/Google) or web checkout (Stripe)."
+        )
+
     duration_days = {"weekly": 7, "monthly": 30, "6month": 180}[data.duration]
     period_end = (datetime.now(timezone.utc) + timedelta(days=duration_days)).isoformat()
 
-    # For now, activate immediately (in production, this would go through Stripe/Apple payment first)
     subscription = {
         "tier_id": data.tier_id,
         "tier_name": tier["name"],
@@ -477,10 +485,8 @@ async def subscribe(data: SubscriptionCheckout, current_user: dict = Depends(get
         {"$set": {"subscription": subscription}}
     )
 
-    # Invalidate all caches so dashboard/stats reflect new subscription limits
     invalidate_user(current_user["id"])
 
-    # Record transaction
     await db.transactions.insert_one({
         "id": str(uuid.uuid4()),
         "user_id": current_user["id"],
@@ -561,6 +567,18 @@ async def verify_apple_receipt(
     if status != 0:
         logger.warning(f"Apple receipt invalid, status: {status}")
         raise HTTPException(status_code=400, detail=f"Invalid receipt (Apple status: {status})")
+
+    # Validate bundle_id matches our app to prevent cross-app receipt reuse
+    receipt_bundle_id = result.get("receipt", {}).get("bundle_id", "")
+    if receipt_bundle_id and receipt_bundle_id != APPLE_BUNDLE_ID:
+        logger.warning(f"Apple receipt bundle_id mismatch: {receipt_bundle_id} != {APPLE_BUNDLE_ID}")
+        raise HTTPException(status_code=400, detail="Receipt is not from this application")
+
+    # Validate environment matches (prevent sandbox receipts in production)
+    receipt_env = result.get("environment", "")
+    if APPLE_PRODUCTION and receipt_env == "Sandbox":
+        logger.warning("Sandbox receipt received in production mode")
+        raise HTTPException(status_code=400, detail="Sandbox receipts not accepted in production")
 
     # Find the matching in_app purchase in the receipt
     in_app = result.get("receipt", {}).get("in_app", [])
@@ -1081,6 +1099,20 @@ async def stripe_webhook(request: Request):
         session = event["data"]["object"]
         metadata = session.get("metadata", {})
         sid = session.get("id")
+
+        # Defense-in-depth: verify amount_total matches expected price from server-side definitions
+        amount_total = session.get("amount_total")
+        if metadata.get("type") == "subscription" and metadata.get("tier_id"):
+            tier = SUBSCRIPTION_TIERS.get(metadata["tier_id"])
+            expected_price = tier["prices"].get(metadata.get("duration")) if tier else None
+            if expected_price and amount_total and amount_total != expected_price:
+                logger.error(f"Stripe webhook amount mismatch: paid={amount_total} expected={expected_price} session={sid}")
+                return {"status": "error", "reason": "amount_mismatch"}
+        elif metadata.get("type") == "consumable" and metadata.get("product_id"):
+            product = PRODUCTS.get(metadata["product_id"])
+            if product and amount_total and amount_total != product["price"]:
+                logger.error(f"Stripe webhook amount mismatch: paid={amount_total} expected={product['price']} session={sid}")
+                return {"status": "error", "reason": "amount_mismatch"}
 
         # Skip if already fulfilled by verify-session endpoint
         already = await db.transactions.find_one({
