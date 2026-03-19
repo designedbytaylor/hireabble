@@ -148,6 +148,18 @@ export const AuthProvider = ({ children }) => {
     return userData;
   }, [persistToken]);
 
+  const verifyTotp2FA = useCallback(async (tempToken, code) => {
+    const response = await axios.post(`${API}/auth/2fa/login`, {
+      temp_token: tempToken,
+      code,
+    });
+    const { token: newToken, user: userData } = response.data;
+    persistToken(newToken, userData);
+    setToken(newToken);
+    setUser(userData);
+    return userData;
+  }, [persistToken]);
+
   const register = useCallback(async (userData) => {
     const response = await axios.post(`${API}/auth/register`, userData);
     const { token: newToken, user: newUser, promo } = response.data;
@@ -252,7 +264,7 @@ export const AuthProvider = ({ children }) => {
   }, [cacheUser]);
 
   const value = useMemo(() => ({
-    user, token, loading, login, verifyEmail2FA, loginWithToken, register, logout, updateProfile, refreshUser, patchUser
+    user, token, loading, login, verifyEmail2FA, verifyTotp2FA, loginWithToken, register, logout, updateProfile, refreshUser, patchUser
   }), [user, token, loading, login, verifyEmail2FA, loginWithToken, register, logout, updateProfile, refreshUser, patchUser]);
 
   return (

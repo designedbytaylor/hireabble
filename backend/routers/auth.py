@@ -366,6 +366,7 @@ async def login(credentials: UserLogin, request: Request):
             # Return partial auth — client must re-submit with TOTP code
             return {
                 "requires_2fa": True,
+                "two_fa_type": "totp",
                 "message": "Two-factor authentication code required",
                 "temp_token": _create_2fa_token(user["id"])
             }

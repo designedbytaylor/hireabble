@@ -19,7 +19,7 @@ export default function Login() {
   const [tempToken, setTempToken] = useState('');
   const [verificationCode, setVerificationCode] = useState('');
   const [twoFAType, setTwoFAType] = useState('');
-  const { login, verifyEmail2FA } = useAuth();
+  const { login, verifyEmail2FA, verifyTotp2FA } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const role = searchParams.get('role') === 'recruiter' ? 'recruiter' : 'seeker';
@@ -61,7 +61,8 @@ export default function Login() {
     e.preventDefault();
     setLoading(true);
     try {
-      const userData = await verifyEmail2FA(tempToken, verificationCode);
+      const verifyFn = twoFAType === 'totp' ? verifyTotp2FA : verifyEmail2FA;
+      const userData = await verifyFn(tempToken, verificationCode);
       toast.success('Welcome back!');
       navigate(userData.role === 'seeker' ? '/dashboard' : '/recruiter');
     } catch (error) {
