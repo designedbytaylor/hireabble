@@ -8,6 +8,7 @@ import { toast } from 'sonner';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import Navigation from '../components/Navigation';
+import useDocumentTitle from '../hooks/useDocumentTitle';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -29,6 +30,7 @@ const STATUS_CONFIG = {
 };
 
 export default function Support() {
+  useDocumentTitle('Support');
   const { token } = useAuth();
   const [view, setView] = useState('list'); // 'list', 'new', 'detail'
   const [tickets, setTickets] = useState([]);

@@ -12,6 +12,7 @@ import { useAuth } from '../context/AuthContext';
 import Navigation from '../components/Navigation';
 import { SkeletonPageBackground, SkeletonListItem, SkeletonFilterTabs } from '../components/skeletons';
 import { Skeleton } from '../components/ui/skeleton';
+import useDocumentTitle from '../hooks/useDocumentTitle';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -148,6 +149,7 @@ function JobDetailSheet({ job, onClose }) {
 }
 
 export default function AppliedJobs() {
+  useDocumentTitle('My Applications');
   const navigate = useNavigate();
   const { token } = useAuth();
   const [applications, setApplications] = useState([]);

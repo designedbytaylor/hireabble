@@ -11,6 +11,7 @@ import { useAuth } from '../context/AuthContext';
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 import OAuthButtons from '../components/OAuthButtons';
 import LocationAutocomplete from '../components/LocationAutocomplete';
+import useDocumentTitle from '../hooks/useDocumentTitle';
 
 const ROLE_CONFIG = {
   seeker: {
@@ -46,6 +47,7 @@ const ROLE_CONFIG = {
 };
 
 export default function Register() {
+  useDocumentTitle('Sign Up');
   const { role: urlRole } = useParams();
   const role = urlRole === 'recruiter' ? 'recruiter' : 'seeker';
   const config = ROLE_CONFIG[role];

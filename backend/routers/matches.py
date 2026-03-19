@@ -12,7 +12,7 @@ from database import (
     db, get_current_user, manager, create_notification,
     MatchResponse, MessageCreate, MessageResponse,
     send_email_notification, get_email_template, get_unsubscribe_url,
-    get_user_email_prefs, FRONTEND_URL, logger,
+    get_user_email_prefs, escape_html, FRONTEND_URL, logger,
 )
 from content_filter import check_text, is_severe
 from routers.users import get_all_blocked_ids
@@ -271,7 +271,7 @@ async def send_message(message: MessageCreate, current_user: dict = Depends(get_
                 sender_list += f" and {len(senders) - 3} more"
             html = get_email_template(
                 title="You have unread messages",
-                body_html=f"<p>You have <strong>{unread}</strong> unread message{'s' if unread != 1 else ''} from {sender_list}.</p>",
+                body_html=f"<p>You have <strong>{unread}</strong> unread message{'s' if unread != 1 else ''} from {escape_html(sender_list)}.</p>",
                 cta_text="Read Messages",
                 cta_url=f"{FRONTEND_URL}/messages",
                 unsubscribe_url=get_unsubscribe_url(receiver_id, "messages"),

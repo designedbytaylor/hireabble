@@ -7,8 +7,10 @@ import { Label } from '../components/ui/label';
 import { toast } from 'sonner';
 import { useAuth } from '../context/AuthContext';
 import OAuthButtons from '../components/OAuthButtons';
+import useDocumentTitle from '../hooks/useDocumentTitle';
 
 export default function Login() {
+  useDocumentTitle('Sign In');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);

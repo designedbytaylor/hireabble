@@ -2,18 +2,23 @@
 Applications/Swipe routes for Hireabble API
 """
 from fastapi import APIRouter, HTTPException, Depends, Request, Query
+from slowapi import Limiter
+from slowapi.util import get_remote_address
+
+limiter = Limiter(key_func=get_remote_address)
 from pydantic import BaseModel
 from typing import List, Optional
 import os
 import json
 import logging
+import re
 from datetime import datetime, timezone, timedelta
 import uuid
 import asyncio
 
 from database import (
     db, get_current_user, manager, send_email_notification, create_notification,
-    send_system_message,
+    send_system_message, escape_html,
     SwipeAction, ApplicationResponse, RecruiterAction, MatchResponse
 )
 from cache import invalidate_user, invalidate, stats_cache, cache_key
@@ -38,13 +43,16 @@ def _get_seeker_daily_superlike_limit(user: dict) -> int:
 
 def get_match_email_html(job_title: str, company: str, other_name: str, is_seeker: bool = True):
     """Generate match notification email HTML"""
+    safe_job_title = escape_html(job_title)
+    safe_company = escape_html(company)
+    safe_other_name = escape_html(other_name)
     if is_seeker:
-        message = f"Great news! {company} is interested in your application for the {job_title} position."
+        message = f"Great news! {safe_company} is interested in your application for the {safe_job_title} position."
         cta_text = "View Match"
     else:
-        message = f"{other_name} has applied to your {job_title} position at {company}."
+        message = f"{safe_other_name} has applied to your {safe_job_title} position at {safe_company}."
         cta_text = "View Applicant"
-    
+
     return f"""
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
         <div style="text-align: center; margin-bottom: 30px;">
@@ -52,8 +60,8 @@ def get_match_email_html(job_title: str, company: str, other_name: str, is_seeke
         </div>
         <div style="background: linear-gradient(135deg, #6366f1 0%, #d946ef 100%); padding: 30px; border-radius: 16px; text-align: center;">
             <h2 style="color: white; margin: 0 0 10px 0;">It's a Match!</h2>
-            <p style="color: rgba(255,255,255,0.9); margin: 0; font-size: 18px;">{job_title}</p>
-            <p style="color: rgba(255,255,255,0.7); margin: 5px 0 0 0;">{company}</p>
+            <p style="color: rgba(255,255,255,0.9); margin: 0; font-size: 18px;">{safe_job_title}</p>
+            <p style="color: rgba(255,255,255,0.7); margin: 5px 0 0 0;">{safe_company}</p>
         </div>
         <div style="padding: 30px 20px; text-align: center;">
             <p style="color: #333; font-size: 16px; margin-bottom: 25px;">{message}</p>
@@ -149,13 +157,13 @@ async def browse_candidates(
 
     # Apply basic filters (available to all)
     if location:
-        query["location"] = {"$regex": location, "$options": "i"}
+        query["location"] = {"$regex": re.escape(location), "$options": "i"}
     if experience_level:
         level_map = {"entry": (0, 2), "mid": (2, 5), "senior": (5, 10), "lead": (8, 99)}
         low, high = level_map.get(experience_level, (0, 99))
         query["experience_years"] = {"$gte": low, "$lte": high}
     if skill:
-        query["skills"] = {"$regex": skill, "$options": "i"}
+        query["skills"] = {"$regex": re.escape(skill), "$options": "i"}
 
     # Advanced filters (Pro+ subscription required)
     sub = current_user.get("subscription") or {}
@@ -554,7 +562,8 @@ async def _swipe_match_notify(match_id, match_payload, job, current_user_snapsho
 
 
 @router.post("/swipe")
-async def swipe(action: SwipeAction, current_user: dict = Depends(get_current_user)):
+@limiter.limit("60/minute")
+async def swipe(request: Request, action: SwipeAction, current_user: dict = Depends(get_current_user)):
     """Job seeker swipes on a job.
 
     Optimized for speed: validates + writes in parallel, then kicks off
@@ -1169,7 +1178,7 @@ async def update_pipeline_stage(
     )
 
     # Send email if user has status_updates enabled
-    from database import send_email_notification, get_email_template, get_unsubscribe_url, get_user_email_prefs, FRONTEND_URL
+    from database import send_email_notification, get_email_template, get_unsubscribe_url, get_user_email_prefs, escape_html, FRONTEND_URL
     async def _send_stage_email():
         prefs = await get_user_email_prefs(application["seeker_id"])
         if not prefs.get("status_updates", True):
@@ -1179,7 +1188,7 @@ async def update_pipeline_stage(
             return
         html = get_email_template(
             title="Application Status Update",
-            body_html=f"<p>Your application for <strong>{job_title}</strong> has moved to: <strong>{stage_label}</strong></p>",
+            body_html=f"<p>Your application for <strong>{escape_html(job_title)}</strong> has moved to: <strong>{escape_html(stage_label)}</strong></p>",
             cta_text="View Applications",
             cta_url=f"{FRONTEND_URL}/applied",
             unsubscribe_url=get_unsubscribe_url(application["seeker_id"], "status_updates"),

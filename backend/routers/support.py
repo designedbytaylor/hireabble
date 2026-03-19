@@ -4,11 +4,16 @@ Support ticket system for Hireabble.
 User endpoints: create/view/reply to their own tickets.
 Admin endpoints: list all tickets, reply, update status/priority/assignee.
 """
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, Request
+from slowapi import Limiter
+from slowapi.util import get_remote_address
+
+limiter = Limiter(key_func=get_remote_address)
 from pydantic import BaseModel
 from typing import Optional, List
 from datetime import datetime, timezone
 import uuid
+import re
 
 from database import db, get_current_user, get_current_admin, create_notification, manager
 
@@ -36,7 +41,8 @@ VALID_PRIORITIES = {'low', 'medium', 'high', 'urgent'}
 # ==================== USER ENDPOINTS ====================
 
 @router.post("/support/tickets")
-async def create_ticket(ticket: TicketCreate, current_user=Depends(get_current_user)):
+@limiter.limit("10/minute")
+async def create_ticket(request: Request, ticket: TicketCreate, current_user=Depends(get_current_user)):
     """Create a new support ticket."""
     if ticket.category not in VALID_CATEGORIES:
         raise HTTPException(status_code=400, detail=f"Invalid category. Must be one of: {', '.join(VALID_CATEGORIES)}")
@@ -115,7 +121,8 @@ async def get_my_ticket(ticket_id: str, current_user=Depends(get_current_user)):
 
 
 @router.post("/support/tickets/{ticket_id}/reply")
-async def reply_to_ticket(ticket_id: str, reply: TicketReply, current_user=Depends(get_current_user)):
+@limiter.limit("10/minute")
+async def reply_to_ticket(request: Request, ticket_id: str, reply: TicketReply, current_user=Depends(get_current_user)):
     """User replies to their own ticket."""
     if not reply.message.strip():
         raise HTTPException(status_code=400, detail="Message is required")
@@ -175,10 +182,11 @@ async def admin_list_tickets(
     if assigned_to:
         query["assigned_to"] = assigned_to if assigned_to != "unassigned" else None
     if search:
+        safe_search = re.escape(search)
         query["$or"] = [
-            {"subject": {"$regex": search, "$options": "i"}},
-            {"user_name": {"$regex": search, "$options": "i"}},
-            {"user_email": {"$regex": search, "$options": "i"}},
+            {"subject": {"$regex": safe_search, "$options": "i"}},
+            {"user_name": {"$regex": safe_search, "$options": "i"}},
+            {"user_email": {"$regex": safe_search, "$options": "i"}},
         ]
 
     total = await db.support_tickets.count_documents(query)

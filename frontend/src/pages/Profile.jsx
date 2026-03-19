@@ -17,6 +17,7 @@ import { UpgradePrompt } from '../components/UpgradeModal';
 import ConfirmDialog from '../components/ConfirmDialog';
 import PhotoCropModal from '../components/PhotoCropModal';
 import LocationAutocomplete from '../components/LocationAutocomplete';
+import useDocumentTitle from '../hooks/useDocumentTitle';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
@@ -99,6 +100,7 @@ function EmailNotificationSettings({ token }) {
 }
 
 export default function Profile() {
+  useDocumentTitle('Profile');
   const { user, token, updateProfile, logout, refreshUser, patchUser } = useAuth();
   const [loading, setLoading] = useState(false);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);

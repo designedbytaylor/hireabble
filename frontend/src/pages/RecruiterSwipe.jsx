@@ -17,6 +17,7 @@ import UpgradeModal from '../components/UpgradeModal';
 import MatchModal from '../components/MatchModal';
 import { SkeletonPageBackground, SkeletonStatCard, SkeletonSwipeCard, SkeletonActionButtons } from '../components/skeletons';
 import { Skeleton } from '../components/ui/skeleton';
+import useDocumentTitle from '../hooks/useDocumentTitle';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -39,6 +40,7 @@ function useImagePreloader(items, currentIndex, mode) {
 }
 
 export default function RecruiterSwipe() {
+  useDocumentTitle('Candidates');
   const navigate = useNavigate();
   const { user, token, refreshUser } = useAuth();
   const [searchParams] = useSearchParams();

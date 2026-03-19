@@ -5,6 +5,8 @@ import { AuthProvider, useAuth } from "./context/AuthContext";
 import { AdminAuthProvider, useAdminAuth } from "./context/AdminAuthContext";
 import { ThemeProvider } from "./context/ThemeContext";
 
+import useCanonical from './hooks/useCanonical';
+
 // Eager load only the landing/auth pages (first paint)
 import Landing from "./pages/Landing";
 import Login from "./pages/Login";
@@ -247,6 +249,7 @@ function CapacitorInit() {
 }
 
 function AppRoutes() {
+  useCanonical();
   return (
     <>
     <Suspense fallback={null}><ImpersonationBanner /></Suspense>

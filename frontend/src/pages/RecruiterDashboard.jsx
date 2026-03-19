@@ -36,10 +36,12 @@ import { SkeletonPageBackground, SkeletonStatCard, SkeletonListItem, SkeletonApp
 import { Skeleton } from '../components/ui/skeleton';
 import ConfirmDialog from '../components/ConfirmDialog';
 import LocationAutocomplete from '../components/LocationAutocomplete';
+import useDocumentTitle from '../hooks/useDocumentTitle';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
 export default function RecruiterDashboard() {
+  useDocumentTitle('Dashboard');
   const navigate = useNavigate();
   const { user, token } = useAuth();
   const [stats, setStats] = useState({ active_jobs: 0, total_applications: 0, super_likes: 0, matches: 0 });

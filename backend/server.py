@@ -80,6 +80,58 @@ app.add_middleware(
 )
 
 
+# CSRF protection — verify Origin header on state-changing requests
+@app.middleware("http")
+async def csrf_protection(request: Request, call_next):
+    # Only check state-changing methods
+    if request.method in ("POST", "PUT", "DELETE", "PATCH"):
+        # Skip for webhooks and health checks
+        path = request.url.path
+        if path.startswith("/api/payments/stripe/webhook") or path == "/api/health":
+            return await call_next(request)
+
+        origin = request.headers.get("origin") or ""
+        referer = request.headers.get("referer") or ""
+
+        # Allow requests with no origin (non-browser clients, mobile apps)
+        if not origin and not referer:
+            return await call_next(request)
+
+        # Check origin against allowed list
+        allowed_patterns = [
+            "http://localhost:3000",
+            "http://localhost:3001",
+            "capacitor://localhost",
+            "https://localhost",
+        ]
+        if _frontend_url:
+            allowed_patterns.append(_frontend_url)
+
+        origin_valid = False
+        check_value = origin or referer
+        for pattern in allowed_patterns:
+            if check_value.startswith(pattern):
+                origin_valid = True
+                break
+
+        # Also allow Vercel/Railway preview deployments and hireabble.com
+        import re as _csrf_re
+        if not origin_valid and _csrf_re.match(
+            r"https://(.*\.(vercel\.app|up\.railway\.app)|(www\.)?hireabble\.com)",
+            check_value
+        ):
+            origin_valid = True
+
+        if not origin_valid:
+            from fastapi.responses import JSONResponse
+            return JSONResponse(
+                status_code=403,
+                content={"detail": "Invalid origin"}
+            )
+
+    return await call_next(request)
+
+
 # Security headers
 @app.middleware("http")
 async def add_security_headers(request: Request, call_next):
@@ -88,6 +140,17 @@ async def add_security_headers(request: Request, call_next):
     response.headers["X-Frame-Options"] = "DENY"
     response.headers["X-XSS-Protection"] = "1; mode=block"
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    response.headers["Content-Security-Policy"] = (
+        "default-src 'self'; "
+        "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://fonts.googleapis.com https://apis.google.com; "
+        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
+        "font-src 'self' https://fonts.gstatic.com; "
+        "img-src 'self' data: blob: https: http:; "
+        "connect-src 'self' https: wss:; "
+        "frame-src 'self' https://accounts.google.com https://appleid.apple.com; "
+        "object-src 'none'; "
+        "base-uri 'self'"
+    )
     if request.url.scheme == "https":
         response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
     return response
@@ -323,6 +386,10 @@ async def startup():
     await ensure_index(db.notifications, [("user_id", 1), ("is_read", 1)])
     await ensure_index(db.password_reset_tokens, "token", unique=True)
     await ensure_index(db.password_reset_tokens, "expires_at", expireAfterSeconds=0)
+
+    # Email change tokens indexes
+    await ensure_index(db.email_change_tokens, "token", unique=True)
+    await ensure_index(db.email_change_tokens, "user_id")
 
     # Admin & moderation indexes
     await ensure_index(db.admin_users, "id", unique=True)

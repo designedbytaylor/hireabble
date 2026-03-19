@@ -362,6 +362,88 @@ async def get_subscription_status(current_user: dict = Depends(get_current_user)
     return {"subscribed": False, "tier": None, "tier_name": "Free", "limits": {}}
 
 
+@router.post("/subscription/cancel")
+async def cancel_subscription(current_user: dict = Depends(get_current_user)):
+    """Cancel the current subscription. Subscription remains active until period end."""
+    user = await db.users.find_one({"id": current_user["id"]}, {"_id": 0, "subscription": 1})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    sub = user.get("subscription")
+    if not sub or sub.get("status") != "active":
+        raise HTTPException(status_code=400, detail="No active subscription to cancel")
+
+    # If it was a Stripe subscription, cancel via Stripe API
+    stripe_sub_id = sub.get("stripe_subscription_id")
+    if stripe_sub_id and STRIPE_AVAILABLE:
+        try:
+            stripe.Subscription.modify(
+                stripe_sub_id,
+                cancel_at_period_end=True
+            )
+        except Exception as e:
+            logger.error(f"Stripe cancellation failed: {e}")
+            # Continue anyway — mark as cancelled locally
+
+    # Mark subscription as cancelled (still active until period_end)
+    await db.users.update_one(
+        {"id": current_user["id"]},
+        {"$set": {
+            "subscription.cancel_at_period_end": True,
+            "subscription.cancelled_at": datetime.now(timezone.utc).isoformat(),
+        }}
+    )
+    invalidate_user(current_user["id"])
+
+    return {
+        "message": "Subscription will be cancelled at the end of the current billing period",
+        "active_until": sub.get("period_end"),
+    }
+
+
+@router.post("/subscription/reactivate")
+async def reactivate_subscription(current_user: dict = Depends(get_current_user)):
+    """Reactivate a cancelled subscription before it expires."""
+    user = await db.users.find_one({"id": current_user["id"]}, {"_id": 0, "subscription": 1})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    sub = user.get("subscription")
+    if not sub or sub.get("status") != "active":
+        raise HTTPException(status_code=400, detail="No active subscription found")
+
+    if not sub.get("cancel_at_period_end"):
+        raise HTTPException(status_code=400, detail="Subscription is not pending cancellation")
+
+    # Check if still within period
+    now = datetime.now(timezone.utc).isoformat()
+    if sub.get("period_end", "") < now:
+        raise HTTPException(status_code=400, detail="Subscription has already expired")
+
+    # Reactivate on Stripe if applicable
+    stripe_sub_id = sub.get("stripe_subscription_id")
+    if stripe_sub_id and STRIPE_AVAILABLE:
+        try:
+            stripe.Subscription.modify(
+                stripe_sub_id,
+                cancel_at_period_end=False
+            )
+        except Exception as e:
+            logger.error(f"Stripe reactivation failed: {e}")
+
+    await db.users.update_one(
+        {"id": current_user["id"]},
+        {"$set": {
+            "subscription.cancel_at_period_end": False,
+        }, "$unset": {
+            "subscription.cancelled_at": ""
+        }}
+    )
+    invalidate_user(current_user["id"])
+
+    return {"message": "Subscription reactivated successfully"}
+
+
 @router.post("/subscribe")
 async def subscribe(data: SubscriptionCheckout, current_user: dict = Depends(get_current_user)):
     """Subscribe to a tier (creates Stripe checkout or processes Apple IAP)"""

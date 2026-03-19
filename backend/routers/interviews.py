@@ -10,7 +10,7 @@ import uuid
 from database import (
     db, get_current_user, create_notification, send_system_message, manager, logger,
     send_email_notification, get_email_template, get_unsubscribe_url, get_user_email_prefs,
-    FRONTEND_URL,
+    escape_html, FRONTEND_URL,
 )
 import asyncio
 
@@ -117,7 +117,7 @@ async def create_interview(data: InterviewCreate, current_user: dict = Depends(g
             return
         html = get_email_template(
             title="Interview Request",
-            body_html=f"<p>{current_user['name']} wants to schedule an interview for <strong>{match.get('job_title', 'a position')}</strong> at {match.get('company', 'their company')}.</p><p>Interview: {interview_title}</p>",
+            body_html=f"<p>{escape_html(current_user['name'])} wants to schedule an interview for <strong>{escape_html(match.get('job_title', 'a position'))}</strong> at {escape_html(match.get('company', 'their company'))}.</p><p>Interview: {escape_html(interview_title)}</p>",
             cta_text="View Interview",
             cta_url=f"{FRONTEND_URL}/interviews",
             unsubscribe_url=get_unsubscribe_url(other_id, "interviews"),
@@ -240,7 +240,7 @@ async def respond_to_interview(
         action_label = {"accept": "accepted", "decline": "declined", "reschedule": "requested to reschedule"}.get(data.action, data.action)
         html = get_email_template(
             title=f"Interview {data.action.capitalize()}d",
-            body_html=f"<p>{current_user['name']} has {action_label} the interview: <strong>{interview['title']}</strong></p>",
+            body_html=f"<p>{escape_html(current_user['name'])} has {action_label} the interview: <strong>{escape_html(interview['title'])}</strong></p>",
             cta_text="View Interview",
             cta_url=f"{FRONTEND_URL}/interviews",
             unsubscribe_url=get_unsubscribe_url(interview["created_by"], "interviews"),

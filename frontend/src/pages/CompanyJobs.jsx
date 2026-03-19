@@ -7,6 +7,7 @@ import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import Navigation from '../components/Navigation';
 import { getPhotoUrl } from '../utils/helpers';
+import useDocumentTitle from '../hooks/useDocumentTitle';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -19,6 +20,7 @@ const formatSalary = (min, max) => {
 };
 
 export default function CompanyJobs() {
+  useDocumentTitle('Company');
   const { recruiterId } = useParams();
   const navigate = useNavigate();
   const { token, user } = useAuth();

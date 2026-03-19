@@ -11,13 +11,20 @@ import httpx
 
 from database import (
     db, security, logger, RESEND_API_KEY, FRONTEND_URL,
+    JWT_SECRET, JWT_ALGORITHM,
     hash_password, verify_password, create_token, get_current_user,
-    send_email_notification, get_email_template, manager,
+    send_email_notification, get_email_template, escape_html, manager,
     UserCreate, UserLogin, UserResponse, ForgotPasswordRequest,
     ResetPasswordRequest, ChangePasswordRequest
 )
+from cachetools import TTLCache
 from content_filter import check_fields, is_severe
 from cache import invalidate_user
+
+# Track failed login attempts per email - auto-expires after 15 minutes
+_login_attempts = TTLCache(maxsize=10000, ttl=900)  # 15 min TTL
+_LOCKOUT_THRESHOLD = 10  # Lock after 10 failed attempts
+_LOCKOUT_DURATION = 900  # 15 minutes in seconds
 
 # OAuth Configuration
 GOOGLE_CLIENT_ID = os.environ.get('GOOGLE_CLIENT_ID', '')
@@ -208,7 +215,7 @@ async def _send_verification_email(user_id: str, email: str, name: str):
     verify_link = f"{FRONTEND_URL}/verify-email?token={verification_token}"
     html = get_email_template(
         title="Verify Your Email",
-        body_html=f"<p>Hi {name},</p><p>Welcome to Hireabble! Please verify your email address to get full access to all features.</p>",
+        body_html=f"<p>Hi {escape_html(name)},</p><p>Welcome to Hireabble! Please verify your email address to get full access to all features.</p>",
         cta_text="Verify Email",
         cta_url=verify_link,
     )
@@ -257,12 +264,63 @@ async def resend_verification(request: Request, current_user: dict = Depends(get
 @router.post("/login")
 @limiter.limit("15/minute")
 async def login(credentials: UserLogin, request: Request):
+    email_key = credentials.email.lower()
+
+    # Check if account is locked out
+    attempts = _login_attempts.get(email_key, 0)
+    if attempts >= _LOCKOUT_THRESHOLD:
+        raise HTTPException(
+            status_code=429,
+            detail="Too many failed login attempts. Please try again in 15 minutes."
+        )
+
     user = await db.users.find_one({"email": credentials.email})
     if not user:
+        # Increment failed attempts even for non-existent accounts (prevents enumeration)
+        _login_attempts[email_key] = attempts + 1
         raise HTTPException(status_code=401, detail="Invalid credentials")
-    
+
     if not verify_password(credentials.password, user["password"]):
+        _login_attempts[email_key] = attempts + 1
         raise HTTPException(status_code=401, detail="Invalid credentials")
+
+    # Successful login - clear failed attempts
+    _login_attempts.pop(email_key, None)
+
+    # Check if 2FA is enabled
+    if user.get("totp_enabled") and user.get("totp_secret"):
+        totp_code = credentials.totp_code if hasattr(credentials, 'totp_code') else None
+
+        # If no TOTP code provided, return a challenge response
+        if not totp_code:
+            # Return partial auth — client must re-submit with TOTP code
+            return {
+                "requires_2fa": True,
+                "message": "Two-factor authentication code required",
+                "temp_token": create_token(user["id"], "__2fa_pending")
+            }
+
+        import pyotp
+        totp = pyotp.TOTP(user["totp_secret"])
+
+        # Check TOTP code
+        if not totp.verify(totp_code, valid_window=1):
+            # Check backup codes
+            backup_valid = False
+            if user.get("totp_backup_codes"):
+                for i, hashed_code in enumerate(user["totp_backup_codes"]):
+                    if verify_password(totp_code, hashed_code):
+                        backup_valid = True
+                        # Remove used backup code
+                        remaining = user["totp_backup_codes"][:i] + user["totp_backup_codes"][i+1:]
+                        await db.users.update_one(
+                            {"id": user["id"]},
+                            {"$set": {"totp_backup_codes": remaining}}
+                        )
+                        break
+
+            if not backup_valid:
+                raise HTTPException(status_code=401, detail="Invalid 2FA code")
 
     # Block banned/suspended users from logging in
     user_status = user.get("status", "active")
@@ -272,8 +330,8 @@ async def login(credentials: UserLogin, request: Request):
         raise HTTPException(status_code=403, detail="Your account is temporarily suspended. Contact support for more info.")
 
     token = create_token(user["id"], user["role"])
-    user_response = {k: v for k, v in user.items() if k not in ['_id', 'password']}
-    
+    user_response = {k: v for k, v in user.items() if k not in ['_id', 'password', 'totp_secret', 'totp_backup_codes']}
+
     return {"token": token, "user": user_response}
 
 @router.get("/me", response_model=UserResponse)
@@ -435,6 +493,249 @@ async def change_password(request: ChangePasswordRequest, current_user: dict = D
     )
     
     return {"message": "Password changed successfully"}
+
+# ==================== TWO-FACTOR AUTHENTICATION ====================
+
+@router.post("/2fa/setup")
+async def setup_2fa(current_user: dict = Depends(get_current_user)):
+    """Generate a TOTP secret and provisioning URI for authenticator app setup."""
+    import pyotp
+
+    # Check if already enabled
+    user = await db.users.find_one({"id": current_user["id"]}, {"_id": 0, "totp_secret": 1, "totp_enabled": 1})
+    if user and user.get("totp_enabled"):
+        raise HTTPException(status_code=400, detail="2FA is already enabled. Disable it first to reconfigure.")
+
+    # Generate new secret
+    secret = pyotp.random_base32()
+    totp = pyotp.TOTP(secret)
+    provisioning_uri = totp.provisioning_uri(
+        name=current_user["email"],
+        issuer_name="Hireabble"
+    )
+
+    # Store secret (not yet enabled — user must verify first)
+    await db.users.update_one(
+        {"id": current_user["id"]},
+        {"$set": {"totp_secret": secret, "totp_enabled": False}}
+    )
+
+    return {
+        "secret": secret,
+        "provisioning_uri": provisioning_uri,
+        "message": "Scan the QR code with your authenticator app, then verify with a code."
+    }
+
+
+@router.post("/2fa/verify")
+async def verify_2fa_setup(body: dict, current_user: dict = Depends(get_current_user)):
+    """Verify TOTP code to complete 2FA setup. Generates backup codes."""
+    import pyotp
+    import secrets
+
+    code = body.get("code", "").strip()
+    if not code or len(code) != 6:
+        raise HTTPException(status_code=400, detail="A 6-digit verification code is required")
+
+    user = await db.users.find_one({"id": current_user["id"]}, {"_id": 0, "totp_secret": 1})
+    if not user or not user.get("totp_secret"):
+        raise HTTPException(status_code=400, detail="2FA setup not started. Call /2fa/setup first.")
+
+    totp = pyotp.TOTP(user["totp_secret"])
+    if not totp.verify(code, valid_window=1):
+        raise HTTPException(status_code=400, detail="Invalid verification code. Please try again.")
+
+    # Generate backup codes
+    backup_codes = [secrets.token_hex(4) for _ in range(8)]
+    hashed_backups = [hash_password(c) for c in backup_codes]
+
+    await db.users.update_one(
+        {"id": current_user["id"]},
+        {"$set": {
+            "totp_enabled": True,
+            "totp_backup_codes": hashed_backups,
+        }}
+    )
+    invalidate_user(current_user["id"])
+
+    return {
+        "enabled": True,
+        "backup_codes": backup_codes,
+        "message": "2FA enabled successfully. Save your backup codes in a safe place."
+    }
+
+
+@router.post("/2fa/disable")
+async def disable_2fa(body: dict, current_user: dict = Depends(get_current_user)):
+    """Disable 2FA. Requires password confirmation."""
+    password = body.get("password", "")
+
+    user = await db.users.find_one({"id": current_user["id"]})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    if not verify_password(password, user["password"]):
+        raise HTTPException(status_code=400, detail="Incorrect password")
+
+    await db.users.update_one(
+        {"id": current_user["id"]},
+        {"$set": {"totp_enabled": False}, "$unset": {"totp_secret": "", "totp_backup_codes": ""}}
+    )
+    invalidate_user(current_user["id"])
+
+    return {"enabled": False, "message": "2FA has been disabled"}
+
+
+@router.post("/2fa/login")
+@limiter.limit("10/minute")
+async def complete_2fa_login(body: dict, request: Request):
+    """Complete login with 2FA code after receiving requires_2fa response."""
+    import pyotp
+    temp_token = body.get("temp_token", "")
+    totp_code = body.get("code", "").strip()
+
+    if not temp_token or not totp_code:
+        raise HTTPException(status_code=400, detail="Token and code are required")
+
+    # Verify temp token
+    import jwt as pyjwt
+    try:
+        payload = pyjwt.decode(temp_token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+        if payload.get("role") != "__2fa_pending":
+            raise HTTPException(status_code=401, detail="Invalid token")
+        user_id = payload.get("user_id")
+    except pyjwt.InvalidTokenError:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+
+    user = await db.users.find_one({"id": user_id})
+    if not user or not user.get("totp_enabled"):
+        raise HTTPException(status_code=401, detail="Invalid request")
+
+    totp = pyotp.TOTP(user["totp_secret"])
+    code_valid = totp.verify(totp_code, valid_window=1)
+
+    # Check backup codes if TOTP fails
+    if not code_valid and user.get("totp_backup_codes"):
+        for i, hashed_code in enumerate(user["totp_backup_codes"]):
+            if verify_password(totp_code, hashed_code):
+                code_valid = True
+                remaining = user["totp_backup_codes"][:i] + user["totp_backup_codes"][i+1:]
+                await db.users.update_one(
+                    {"id": user["id"]},
+                    {"$set": {"totp_backup_codes": remaining}}
+                )
+                break
+
+    if not code_valid:
+        raise HTTPException(status_code=401, detail="Invalid 2FA code")
+
+    # Check banned/suspended
+    if user.get("status") == "banned":
+        raise HTTPException(status_code=403, detail="Your account has been banned.")
+    if user.get("status") == "suspended":
+        raise HTTPException(status_code=403, detail="Your account is temporarily suspended.")
+
+    token = create_token(user["id"], user["role"])
+    user_response = {k: v for k, v in user.items() if k not in ['_id', 'password', 'totp_secret', 'totp_backup_codes']}
+
+    return {"token": token, "user": user_response}
+
+
+# ==================== EMAIL CHANGE ====================
+
+@router.post("/change-email")
+@limiter.limit("3/minute")
+async def request_email_change(body: dict, request: Request, current_user: dict = Depends(get_current_user)):
+    """Request email change — sends verification to new email address."""
+    new_email = (body.get("new_email") or "").strip().lower()
+    password = body.get("password", "")
+
+    if not new_email:
+        raise HTTPException(status_code=400, detail="New email is required")
+
+    # Basic email validation
+    import re as _re
+    if not _re.match(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$', new_email):
+        raise HTTPException(status_code=400, detail="Invalid email address")
+
+    if new_email == current_user.get("email", "").lower():
+        raise HTTPException(status_code=400, detail="New email must be different from current email")
+
+    # Verify password for security
+    user = await db.users.find_one({"id": current_user["id"]})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    if not verify_password(password, user["password"]):
+        raise HTTPException(status_code=400, detail="Incorrect password")
+
+    # Check if new email is already taken
+    existing = await db.users.find_one({"email": new_email})
+    if existing:
+        raise HTTPException(status_code=400, detail="This email is already registered")
+
+    # Generate verification token
+    change_token = str(uuid.uuid4())
+    expires_at = datetime.now(timezone.utc) + timedelta(hours=1)
+
+    # Store the pending email change
+    await db.email_change_tokens.delete_many({"user_id": current_user["id"]})
+    await db.email_change_tokens.insert_one({
+        "token": change_token,
+        "user_id": current_user["id"],
+        "old_email": current_user["email"],
+        "new_email": new_email,
+        "expires_at": expires_at.isoformat(),
+        "created_at": datetime.now(timezone.utc).isoformat()
+    })
+
+    # Send verification to new email
+    confirm_link = f"{FRONTEND_URL}/verify-email?token={change_token}&type=email-change"
+    html = get_email_template(
+        title="Confirm Email Change",
+        body_html=f"<p>Hi {escape_html(current_user.get('name', ''))},</p><p>You requested to change your Hireabble email to this address. Click below to confirm.</p><p style='color: #999; font-size: 13px;'>This link expires in 1 hour. If you didn't request this, you can safely ignore this email.</p>",
+        cta_text="Confirm Email Change",
+        cta_url=confirm_link,
+    )
+    asyncio.create_task(send_email_notification(new_email, "Confirm your new Hireabble email", html))
+
+    return {"message": "Verification email sent to your new address. Please check your inbox."}
+
+
+@router.post("/confirm-email-change")
+async def confirm_email_change(body: dict):
+    """Confirm email change using token from verification email."""
+    token_str = body.get("token")
+    if not token_str:
+        raise HTTPException(status_code=400, detail="Missing verification token")
+
+    token_doc = await db.email_change_tokens.find_one({"token": token_str})
+    if not token_doc:
+        raise HTTPException(status_code=400, detail="Invalid or expired token")
+
+    # Check expiration
+    expires_at = datetime.fromisoformat(token_doc["expires_at"].replace('Z', '+00:00'))
+    if datetime.now(timezone.utc) > expires_at:
+        await db.email_change_tokens.delete_one({"token": token_str})
+        raise HTTPException(status_code=400, detail="Token has expired")
+
+    # Check new email isn't taken (race condition check)
+    existing = await db.users.find_one({"email": token_doc["new_email"]})
+    if existing:
+        await db.email_change_tokens.delete_one({"token": token_str})
+        raise HTTPException(status_code=400, detail="This email is already registered")
+
+    # Update email
+    await db.users.update_one(
+        {"id": token_doc["user_id"]},
+        {"$set": {"email": token_doc["new_email"], "email_verified": True}}
+    )
+
+    # Clean up
+    await db.email_change_tokens.delete_many({"user_id": token_doc["user_id"]})
+    invalidate_user(token_doc["user_id"])
+
+    return {"message": "Email changed successfully"}
 
 # ==================== PROFILE ====================
 

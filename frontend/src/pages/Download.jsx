@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams, useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import useDocumentTitle from '../hooks/useDocumentTitle';
 import { MapPin, Briefcase, Smartphone } from 'lucide-react';
 import { isNative } from '../utils/capacitor';
 import axios from 'axios';
@@ -21,6 +22,7 @@ const STORE_URLS = {
 };
 
 export default function Download() {
+  useDocumentTitle('Download');
   const [params] = useSearchParams();
   const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();

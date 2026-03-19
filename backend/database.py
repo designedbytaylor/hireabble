@@ -134,6 +134,14 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
 
 # ==================== EMAIL HELPERS ====================
 
+import html as _html
+
+def escape_html(text: str) -> str:
+    """Escape HTML entities in user-provided text for safe email embedding."""
+    if not text:
+        return ""
+    return _html.escape(str(text), quote=True)
+
 async def send_email_notification(to_email: str, subject: str, html_content: str):
     """Send email notification asynchronously"""
     import resend
@@ -160,6 +168,7 @@ FRONTEND_URL = os.environ.get('FRONTEND_URL', 'https://hireabble.com')
 
 def get_email_template(title: str, body_html: str, cta_text: str = None, cta_url: str = None, unsubscribe_url: str = None):
     """Generate branded HTML email template"""
+    title = escape_html(title)
     cta_block = ""
     if cta_text and cta_url:
         cta_block = f'<a href="{cta_url}" style="display: inline-block; background: #6366f1; color: white; padding: 14px 40px; border-radius: 25px; text-decoration: none; font-weight: bold;">{cta_text}</a>'
@@ -334,6 +343,7 @@ class UserCreate(BaseModel):
 class UserLogin(BaseModel):
     email: EmailStr
     password: str
+    totp_code: Optional[str] = None
 
 class UserResponse(BaseModel):
     model_config = ConfigDict(extra="ignore")

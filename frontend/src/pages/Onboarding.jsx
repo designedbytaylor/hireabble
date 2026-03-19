@@ -24,6 +24,7 @@ import PhotoCropModal from '../components/PhotoCropModal';
 import LocationInput from '../components/LocationInput';
 import { getPhotoUrl } from '../utils/helpers';
 import LocationAutocomplete from '../components/LocationAutocomplete';
+import useDocumentTitle from '../hooks/useDocumentTitle';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
@@ -43,6 +44,7 @@ const STEPS = [
 ];
 
 export default function Onboarding() {
+  useDocumentTitle('Get Started');
   const { user, token, updateProfile } = useAuth();
   const navigate = useNavigate();
   const [currentStep, setCurrentStep] = useState(0);

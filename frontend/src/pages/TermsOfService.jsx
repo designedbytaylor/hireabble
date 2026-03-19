@@ -1,7 +1,9 @@
 import { Link } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
+import useDocumentTitle from '../hooks/useDocumentTitle';
 
 export default function TermsOfService() {
+  useDocumentTitle('Terms of Service');
   return (
     <div className="min-h-screen bg-background">
       <div className="max-w-3xl mx-auto px-6 py-12">

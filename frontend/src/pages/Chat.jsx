@@ -9,11 +9,13 @@ import { Input } from '../components/ui/input';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import { toast } from 'sonner';
+import useDocumentTitle from '../hooks/useDocumentTitle';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 const WS_URL = process.env.REACT_APP_BACKEND_URL?.replace('https://', 'wss://').replace('http://', 'ws://');
 
 export default function Chat() {
+  useDocumentTitle('Chat');
   const { matchId } = useParams();
   const navigate = useNavigate();
   const { user, token } = useAuth();

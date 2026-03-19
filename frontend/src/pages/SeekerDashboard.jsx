@@ -31,6 +31,7 @@ import UpgradeModal from '../components/UpgradeModal';
 import { SkeletonPageBackground, SkeletonStatCard, SkeletonSwipeCard, SkeletonActionButtons } from '../components/skeletons';
 import { Skeleton } from '../components/ui/skeleton';
 import LocationAutocomplete from '../components/LocationAutocomplete';
+import useDocumentTitle from '../hooks/useDocumentTitle';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -144,6 +145,7 @@ function saveCachedSuperLikes(n, userId) {
 let globalPendingSwipes = [];
 
 export default function SeekerDashboard() {
+  useDocumentTitle('Jobs');
   const navigate = useNavigate();
   const { user, token, refreshUser } = useAuth();
   const [searchParams] = useSearchParams();
