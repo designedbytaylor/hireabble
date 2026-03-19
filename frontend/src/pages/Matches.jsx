@@ -457,6 +457,8 @@ export default function Matches() {
                             src={getPhotoUrl(match.listing_photo || match.company_logo)}
                             alt={match.company}
                             className="w-14 h-14 rounded-xl object-cover border-2 border-primary/50"
+                            loading="lazy"
+                            decoding="async"
                             onError={handleImgError(match.company || match.recruiter_name)}
                           />
                         ) : (
@@ -469,6 +471,8 @@ export default function Matches() {
                           src={getPhotoUrl(match.seeker_photo || match.seeker_avatar, match.seeker_name || match.seeker_id)}
                           alt={match.seeker_name}
                           className="w-14 h-14 rounded-xl object-cover border-2 border-primary/50"
+                          loading="lazy"
+                          decoding="async"
                           onError={handleImgError(match.seeker_name || match.seeker_id)}
                         />
                       )}

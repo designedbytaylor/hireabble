@@ -27,6 +27,7 @@ from database import (
     JobCreate, JobResponse
 )
 from content_filter import check_fields, is_severe
+from cache import invalidate, recruiter_jobs_cache
 
 logger = logging.getLogger(__name__)
 
@@ -189,6 +190,8 @@ async def create_job(job: JobCreate, current_user: dict = Depends(get_current_us
         })
 
     await db.jobs.insert_one(job_doc)
+    # Invalidate recruiter jobs cache
+    invalidate(recruiter_jobs_cache, f"rjobs:{current_user['id']}")
     return {k: v for k, v in job_doc.items() if k != '_id'}
 
 @router.get("/recruiter")
@@ -439,7 +442,9 @@ async def update_job(job_id: str, updates: dict, current_user: dict = Depends(ge
 
     if update_data:
         await db.jobs.update_one({"id": job_id}, {"$set": update_data})
-    
+        # Invalidate recruiter jobs cache
+        invalidate(recruiter_jobs_cache, f"rjobs:{current_user['id']}")
+
     updated_job = await db.jobs.find_one({"id": job_id}, {"_id": 0})
     return updated_job
 
