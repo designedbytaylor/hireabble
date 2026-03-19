@@ -223,6 +223,8 @@ export default function RecruiterApplications() {
                     src={getPhotoUrl(app.seeker_photo || app.seeker_avatar, app.seeker_name || app.seeker_id)}
                     alt={app.seeker_name}
                     className="w-14 h-14 rounded-full border-2 border-border object-cover flex-shrink-0"
+                    loading="lazy"
+                    decoding="async"
                   />
 
                   {/* Info */}

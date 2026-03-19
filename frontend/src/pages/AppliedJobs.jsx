@@ -316,7 +316,7 @@ export default function AppliedJobs() {
                   {/* Company Logo */}
                   <div className="w-12 h-12 rounded-xl bg-primary/20 flex items-center justify-center flex-shrink-0 overflow-hidden">
                     {job.company_logo ? (
-                      <img src={job.company_logo} alt="" className="w-full h-full object-cover" loading="lazy" />
+                      <img src={job.company_logo} alt="" className="w-full h-full object-cover" loading="lazy" decoding="async" />
                     ) : (
                       <Building2 className="w-6 h-6 text-primary" />
                     )}

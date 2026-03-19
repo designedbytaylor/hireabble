@@ -115,6 +115,8 @@ export default function Messages() {
                               src={getPhotoUrl(match.seeker_photo || match.seeker_avatar, match.seeker_name || match.seeker_id)}
                               alt={match.seeker_name}
                               className="w-12 h-12 rounded-xl object-cover border-2 border-primary/50 shrink-0"
+                              loading="lazy"
+                              decoding="async"
                               onError={handleImgError(match.seeker_name || match.seeker_id)}
                             />
                           )}
