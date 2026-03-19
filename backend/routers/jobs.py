@@ -1,7 +1,7 @@
 """
 Jobs routes for Hireabble API
 """
-from fastapi import APIRouter, HTTPException, Depends, UploadFile, File
+from fastapi import APIRouter, HTTPException, Depends, UploadFile, File, Request
 from fastapi.responses import StreamingResponse
 from typing import List, Optional
 from datetime import datetime, timezone
@@ -30,6 +30,11 @@ from content_filter import check_fields, is_severe
 from cache import invalidate, recruiter_jobs_cache
 
 logger = logging.getLogger(__name__)
+
+from slowapi import Limiter
+from slowapi.util import get_remote_address
+
+limiter = Limiter(key_func=get_remote_address)
 
 router = APIRouter(prefix="/jobs", tags=["Jobs"])
 
@@ -113,7 +118,8 @@ def calculate_job_match_score(seeker: dict, job: dict) -> int:
     return min(100, int((score / max_score) * 100))
 
 @router.post("", response_model=JobResponse)
-async def create_job(job: JobCreate, current_user: dict = Depends(get_current_user)):
+@limiter.limit("10/minute")
+async def create_job(job: JobCreate, request: Request, current_user: dict = Depends(get_current_user)):
     """Create a new job posting (recruiters only)"""
     if current_user["role"] != "recruiter":
         raise HTTPException(status_code=403, detail="Only recruiters can post jobs")
@@ -573,7 +579,9 @@ def _call_anthropic(client, messages, max_tokens=4000):
 
 
 @router.post("/parse-screenshots")
+@limiter.limit("5/minute")
 async def parse_job_screenshots(
+    request: Request,
     files: List[UploadFile] = File(...),
     current_user: dict = Depends(get_current_user),
 ):
@@ -675,7 +683,9 @@ class AIAssistRequest(BaseModel):
 
 
 @router.post("/ai-assist")
+@limiter.limit("10/minute")
 async def ai_assist_job(
+    request: Request,
     req: AIAssistRequest,
     current_user: dict = Depends(get_current_user),
 ):

@@ -5,6 +5,8 @@ Supports:
   - Stripe as web fallback
 """
 from fastapi import APIRouter, HTTPException, Depends, Request
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 from typing import Optional
 from datetime import datetime, timezone, timedelta
 from pydantic import BaseModel
@@ -14,6 +16,8 @@ import json
 
 from database import db, get_current_user, create_notification, logger
 from cache import invalidate_user
+
+limiter = Limiter(key_func=get_remote_address)
 
 router = APIRouter(prefix="/payments", tags=["Payments & Boosts"])
 
@@ -512,6 +516,7 @@ async def subscribe(data: SubscriptionCheckout, current_user: dict = Depends(get
 # ==================== APPLE IN-APP PURCHASE ====================
 
 @router.post("/apple/verify-receipt")
+@limiter.limit("10/minute")
 async def verify_apple_receipt(
     data: AppleReceiptValidation,
     current_user: dict = Depends(get_current_user)
@@ -758,6 +763,7 @@ def _get_google_play_service():
 
 
 @router.post("/google/verify-purchase")
+@limiter.limit("10/minute")
 async def verify_google_purchase(
     data: GooglePlayPurchaseValidation,
     current_user: dict = Depends(get_current_user)
@@ -934,6 +940,7 @@ async def google_play_notification(request: Request):
 # ==================== STRIPE CHECKOUT (Web Fallback) ====================
 
 @router.post("/create-checkout-session")
+@limiter.limit("10/minute")
 async def create_checkout_session(
     data: CreateCheckoutSession,
     current_user: dict = Depends(get_current_user)
@@ -1203,7 +1210,8 @@ class PromoRedeemRequest(BaseModel):
     code: str
 
 @router.post("/redeem-promo")
-async def redeem_promo(body: PromoRedeemRequest, current_user: dict = Depends(get_current_user)):
+@limiter.limit("5/minute")
+async def redeem_promo(body: PromoRedeemRequest, request: Request, current_user: dict = Depends(get_current_user)):
     """Redeem a promo code to activate a free subscription."""
     user_id = current_user["id"]
     user_role = current_user.get("role", "seeker")

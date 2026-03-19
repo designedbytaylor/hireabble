@@ -23,13 +23,19 @@ from database import (
 )
 from content_filter import check_text, BANNED_WORDS
 from cache import invalidate_user, invalidate_users_batch
+from slowapi import Limiter
+from slowapi.util import get_remote_address
+from fastapi import Request
+
+limiter = Limiter(key_func=get_remote_address)
 
 router = APIRouter(tags=["Admin"])
 
 # ==================== ADMIN AUTH (separate flow) ====================
 
 @router.post("/admin/setup")
-async def admin_setup(admin: AdminCreate, setup_token: str = ""):
+@limiter.limit("3/hour")
+async def admin_setup(admin: AdminCreate, request: Request, setup_token: str = ""):
     """One-time bootstrap: create the first admin. Only works when no admins exist."""
     expected_token = os.environ.get("ADMIN_SETUP_TOKEN")
     if expected_token and setup_token != expected_token:
@@ -58,7 +64,8 @@ async def admin_setup(admin: AdminCreate, setup_token: str = ""):
     }
 
 @router.post("/admin/login")
-async def admin_login(credentials: AdminLogin):
+@limiter.limit("5/minute")
+async def admin_login(credentials: AdminLogin, request: Request):
     """Admin login — completely separate from user auth."""
     admin = await db.admin_users.find_one({"email": credentials.email})
     if not admin:
