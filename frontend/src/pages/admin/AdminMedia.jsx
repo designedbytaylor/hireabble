@@ -58,7 +58,14 @@ export default function AdminMedia() {
       toast.success(silent ? 'Media removed silently' : 'Media removed and user notified');
       setRemoving(null);
       setRemoveReason('');
-      fetchItems();
+      // Remove the card from local state immediately
+      setItems(prev => prev.filter(item => item.id !== mediaId));
+      setTotal(prev => Math.max(0, prev - 1));
+      setStats(prev => ({
+        ...prev,
+        removed: (prev.removed || 0) + 1,
+        total: Math.max(0, (prev.total || 0) - 1),
+      }));
     } catch (e) {
       toast.error('Failed to remove media');
     }
