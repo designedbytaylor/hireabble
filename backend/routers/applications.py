@@ -21,7 +21,7 @@ from database import (
     send_system_message, escape_html,
     SwipeAction, ApplicationResponse, RecruiterAction, MatchResponse
 )
-from cache import invalidate_user, invalidate, stats_cache, cache_key
+from cache import invalidate_user, invalidate, stats_cache, cache_key, get_cached, set_cached, recruiter_jobs_cache
 
 router = APIRouter(tags=["Applications"])
 
@@ -192,11 +192,15 @@ async def browse_candidates(
         query, {"_id": 0, "password": 0}
     ).sort("created_at", -1).to_list(50)
 
-    # Get recruiter's jobs for match scoring
-    recruiter_jobs = await db.jobs.find(
-        {"recruiter_id": current_user["id"], "is_active": True},
-        {"_id": 0}
-    ).to_list(50)
+    # Get recruiter's jobs for match scoring (cached 5 min)
+    cache_key_rj = f"rjobs:{current_user['id']}"
+    recruiter_jobs = get_cached(recruiter_jobs_cache, cache_key_rj)
+    if recruiter_jobs is None:
+        recruiter_jobs = await db.jobs.find(
+            {"recruiter_id": current_user["id"], "is_active": True},
+            {"_id": 0}
+        ).to_list(50)
+        set_cached(recruiter_jobs_cache, cache_key_rj, recruiter_jobs)
 
     # Calculate best match score across all recruiter jobs
     from routers.jobs import calculate_job_match_score

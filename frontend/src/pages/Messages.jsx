@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { MessageCircle, ArrowLeft, Building2, User } from 'lucide-react';
 import axios from 'axios';
