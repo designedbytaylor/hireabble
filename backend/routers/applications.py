@@ -779,27 +779,30 @@ async def undo_last_swipe(current_user: dict = Depends(get_current_user)):
 async def swipe_beacon(request: Request, token: Optional[str] = Query(None)):
     """sendBeacon-compatible swipe endpoint.
 
-    sendBeacon cannot set Authorization headers, so the JWT is passed as a
-    query parameter.  This endpoint does a best-effort fire-and-forget save
+    sendBeacon cannot set Authorization headers, so the JWT is passed in the
+    request body (preferred) or as a query parameter (legacy fallback).
+    This endpoint does a best-effort fire-and-forget save
     (no response body needed — the page is already closing)."""
     import jwt as _jwt
     from database import JWT_SECRET, JWT_ALGORITHM
-
-    if not token:
-        raise HTTPException(status_code=401, detail="Token required")
-
-    try:
-        payload = _jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
-        user_id = payload.get("user_id")
-        if not user_id:
-            raise HTTPException(status_code=401, detail="Invalid token")
-    except Exception:
-        raise HTTPException(status_code=401, detail="Invalid token")
 
     try:
         body = await request.json()
     except Exception:
         raise HTTPException(status_code=400, detail="Invalid body")
+
+    # Prefer token from body (avoids URL logging), fall back to query param
+    auth_token = body.get("token") or token
+    if not auth_token:
+        raise HTTPException(status_code=401, detail="Token required")
+
+    try:
+        payload = _jwt.decode(auth_token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+        user_id = payload.get("user_id")
+        if not user_id:
+            raise HTTPException(status_code=401, detail="Invalid token")
+    except Exception:
+        raise HTTPException(status_code=401, detail="Invalid token")
 
     job_id = body.get("job_id")
     action_str = body.get("action", "like")
@@ -1226,6 +1229,15 @@ async def request_references(seeker_id: str, current_user: dict = Depends(get_cu
     """Recruiter requests references from a seeker"""
     if current_user["role"] != "recruiter":
         raise HTTPException(status_code=403, detail="Only recruiters can request references")
+
+    # Verify recruiter has received an application from this seeker
+    app = await db.applications.find_one({
+        "seeker_id": seeker_id,
+        "recruiter_id": current_user["id"],
+        "action": {"$in": ["like", "superlike"]}
+    })
+    if not app:
+        raise HTTPException(status_code=403, detail="No application from this candidate")
 
     seeker = await db.users.find_one({"id": seeker_id}, {"_id": 0})
     if not seeker:
@@ -1670,6 +1682,15 @@ async def save_candidate_note(
     if current_user["role"] != "recruiter":
         raise HTTPException(status_code=403, detail="Only recruiters can add notes")
 
+    # Verify recruiter has received an application from this seeker
+    app = await db.applications.find_one({
+        "seeker_id": seeker_id,
+        "recruiter_id": current_user["id"],
+        "action": {"$in": ["like", "superlike"]}
+    })
+    if not app:
+        raise HTTPException(status_code=403, detail="No application from this candidate")
+
     note_text = body.note.strip()[:2000]  # max 2000 chars
 
     await db.candidate_notes.update_one(
@@ -1693,6 +1714,15 @@ async def get_candidate_note(
     """Get a recruiter's private note on a candidate."""
     if current_user["role"] != "recruiter":
         raise HTTPException(status_code=403, detail="Only recruiters can view notes")
+
+    # Verify recruiter has received an application from this seeker
+    app = await db.applications.find_one({
+        "seeker_id": seeker_id,
+        "recruiter_id": current_user["id"],
+        "action": {"$in": ["like", "superlike"]}
+    })
+    if not app:
+        raise HTTPException(status_code=403, detail="No application from this candidate")
 
     doc = await db.candidate_notes.find_one(
         {"recruiter_id": current_user["id"], "seeker_id": seeker_id},

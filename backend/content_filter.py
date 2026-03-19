@@ -6,6 +6,7 @@ violence, and other inappropriate content. Used across all user-generated
 text fields (profiles, jobs, messages).
 """
 import re
+import unicodedata
 from typing import List, Tuple
 
 # Categories of banned content
@@ -71,7 +72,14 @@ SEVERE_PATTERNS = [
 
 
 def _normalize(text: str) -> str:
-    """Normalize text for matching: lowercase, collapse whitespace."""
+    """Normalize text for matching: lowercase, collapse whitespace, strip homoglyphs and zero-width chars."""
+    # Remove zero-width characters (U+200B, U+200C, U+200D, U+FEFF, U+00AD, etc.)
+    text = re.sub(r'[\u200b\u200c\u200d\ufeff\u00ad\u2060\u180e]', '', text)
+    # NFKD normalization converts lookalike chars (Cyrillic а→a, etc.) to base forms
+    text = unicodedata.normalize('NFKD', text)
+    # Remove combining marks (accents, diacritics) to get base characters
+    text = ''.join(c for c in text if unicodedata.category(c) != 'Mn')
+    # Collapse whitespace and lowercase
     return re.sub(r'\s+', ' ', text.lower().strip())
 
 
