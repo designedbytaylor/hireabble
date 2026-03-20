@@ -221,8 +221,15 @@ APPLE_TO_PRODUCT = {v["apple_product_id"]: k for k, v in PRODUCTS.items() if "ap
 GOOGLE_TO_PRODUCT = {v["google_product_id"]: k for k, v in PRODUCTS.items() if "google_product_id" in v}
 
 
-async def _get_pricing_overrides():
-    """Load admin-configured pricing overrides from the database."""
+async def _get_pricing_overrides(country: str = ""):
+    """Load admin-configured pricing overrides from the database.
+    Falls back to default overrides if no country-specific ones exist."""
+    if country and country != "CA":
+        # Try country-specific first
+        doc = await db.site_settings.find_one({"key": f"pricing_overrides_{country}"})
+        if doc:
+            return doc.get("value", {})
+    # Fall back to default (CA / base)
     doc = await db.site_settings.find_one({"key": "pricing_overrides"})
     return doc.get("value", {}) if doc else {}
 
@@ -284,10 +291,10 @@ class GooglePlayPurchaseValidation(BaseModel):
 # ==================== PRODUCTS & PRICING ====================
 
 @router.get("/products")
-async def get_products(current_user: dict = Depends(get_current_user)):
+async def get_products(country: str = "", current_user: dict = Depends(get_current_user)):
     """Get available products and pricing, including Apple IAP product IDs"""
     role = current_user.get("role", "seeker")
-    overrides = await _get_pricing_overrides()
+    overrides = await _get_pricing_overrides(country)
     result = {}
 
     if role == "recruiter":
@@ -311,12 +318,12 @@ async def get_products(current_user: dict = Depends(get_current_user)):
 # ==================== SUBSCRIPTION TIERS ====================
 
 @router.get("/tiers")
-async def get_subscription_tiers(current_user: dict = Depends(get_current_user)):
+async def get_subscription_tiers(country: str = "", current_user: dict = Depends(get_current_user)):
     """Get available subscription tiers for the user's role"""
     role = current_user.get("role", "seeker")
     user = await db.users.find_one({"id": current_user["id"]}, {"_id": 0, "subscription": 1})
     current_sub = (user or {}).get("subscription", {})
-    overrides = await _get_pricing_overrides()
+    overrides = await _get_pricing_overrides(country)
 
     tiers = []
     for tier_id, tier in SUBSCRIPTION_TIERS.items():
