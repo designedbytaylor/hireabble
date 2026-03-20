@@ -171,7 +171,7 @@ async def create_job(job: JobCreate, request: Request, current_user: dict = Depe
         "experience_level": job.experience_level,
         "recruiter_id": current_user["id"],
         "recruiter_name": current_user["name"],
-        "company_logo": f"https://api.dicebear.com/7.x/identicon/svg?seed={job.company}",
+        "company_logo": current_user.get("company_logo") or f"https://api.dicebear.com/7.x/identicon/svg?seed={job.company}",
         "background_image": backgrounds[hash(job_id) % len(backgrounds)],
         "created_at": datetime.now(timezone.utc).isoformat(),
         "listing_photo": job.listing_photo if job.listing_photo and job.listing_photo != "profile" else (current_user.get("photo_url") if job.listing_photo == "profile" else None),

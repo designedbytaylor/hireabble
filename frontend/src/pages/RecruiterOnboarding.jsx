@@ -1,22 +1,55 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Building2, Briefcase, ArrowRight, Loader2 } from 'lucide-react';
+import { Building2, Briefcase, ArrowRight, Loader2, Upload, X, Image } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { toast } from 'sonner';
 import { useAuth } from '../context/AuthContext';
 import useDocumentTitle from '../hooks/useDocumentTitle';
+import axios from 'axios';
+
+const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
 export default function RecruiterOnboarding() {
   useDocumentTitle('Get Started');
-  const { user, updateProfile } = useAuth();
+  const { user, token, updateProfile } = useAuth();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
+  const [uploadingLogo, setUploadingLogo] = useState(false);
+  const logoInputRef = useRef(null);
   const [formData, setFormData] = useState({
     company: user?.company || '',
     title: user?.title || '',
+    company_logo: user?.company_logo || '',
   });
+
+  const handleLogoUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      toast.error('Please select an image file');
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('Image must be under 5MB');
+      return;
+    }
+    setUploadingLogo(true);
+    try {
+      const fd = new FormData();
+      fd.append('file', file);
+      const response = await axios.post(`${API}/upload/photo`, fd, {
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'multipart/form-data' },
+      });
+      setFormData(prev => ({ ...prev, company_logo: response.data.photo_url }));
+      toast.success('Logo uploaded!');
+    } catch (error) {
+      toast.error('Failed to upload logo');
+    } finally {
+      setUploadingLogo(false);
+    }
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -29,6 +62,7 @@ export default function RecruiterOnboarding() {
       await updateProfile({
         company: formData.company.trim(),
         title: formData.title.trim() || null,
+        company_logo: formData.company_logo || null,
         onboarding_complete: true,
       });
       toast.success('Welcome to Hireabble!');
@@ -56,6 +90,63 @@ export default function RecruiterOnboarding() {
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-5">
+            {/* Company Logo */}
+            <div className="space-y-2">
+              <Label>Company Logo</Label>
+              <div className="flex items-center gap-4">
+                <div className="relative">
+                  {formData.company_logo ? (
+                    <div className="relative">
+                      <img
+                        src={formData.company_logo}
+                        alt="Company logo"
+                        className="w-16 h-16 rounded-xl object-cover border-2 border-primary"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setFormData(prev => ({ ...prev, company_logo: '' }))}
+                        className="absolute -top-2 -right-2 w-6 h-6 rounded-full bg-destructive flex items-center justify-center"
+                      >
+                        <X className="w-3 h-3 text-white" />
+                      </button>
+                    </div>
+                  ) : (
+                    <div
+                      onClick={() => logoInputRef.current?.click()}
+                      className="w-16 h-16 rounded-xl bg-accent border-2 border-dashed border-border flex items-center justify-center cursor-pointer hover:border-primary/50 transition-colors"
+                    >
+                      {uploadingLogo ? (
+                        <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+                      ) : (
+                        <Image className="w-6 h-6 text-muted-foreground" />
+                      )}
+                    </div>
+                  )}
+                </div>
+                <div className="flex-1">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => logoInputRef.current?.click()}
+                    disabled={uploadingLogo}
+                    className="rounded-lg"
+                  >
+                    <Upload className="w-4 h-4 mr-2" />
+                    {uploadingLogo ? 'Uploading...' : formData.company_logo ? 'Change' : 'Upload Logo'}
+                  </Button>
+                  <p className="text-xs text-muted-foreground mt-1">Optional. Shown on job listings.</p>
+                </div>
+              </div>
+              <input
+                ref={logoInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleLogoUpload}
+                className="hidden"
+              />
+            </div>
+
             <div className="space-y-2">
               <Label htmlFor="company">Company Name <span className="text-red-500">*</span></Label>
               <div className="relative">
