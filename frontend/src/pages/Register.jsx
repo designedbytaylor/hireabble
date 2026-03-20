@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { Mail, Lock, User, Building2, ArrowRight, Eye, EyeOff, MapPin, Search, Users, Zap, Target, Shield, BarChart3, Tag, ChevronDown, Gift } from 'lucide-react';
+import { Mail, Lock, User, Building2, ArrowRight, Eye, EyeOff, Search, Users, Zap, Target, Shield, BarChart3, Tag, ChevronDown, Gift } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
@@ -10,7 +10,6 @@ import { useAuth } from '../context/AuthContext';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 import OAuthButtons from '../components/OAuthButtons';
-import LocationAutocomplete from '../components/LocationAutocomplete';
 import useDocumentTitle from '../hooks/useDocumentTitle';
 
 const ROLE_CONFIG = {
@@ -57,8 +56,7 @@ export default function Register() {
     email: '',
     password: '',
     role,
-    company: '',
-    location: ''
+    company: ''
   });
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -259,21 +257,6 @@ export default function Register() {
                 </div>
               )}
 
-              {role === 'seeker' && (
-                <div className="space-y-2">
-                  <Label htmlFor="location">Location</Label>
-                  <div className="relative">
-                    <MapPin className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-muted-foreground z-10" />
-                    <LocationAutocomplete
-                      value={formData.location}
-                      onChange={(val) => setFormData(prev => ({ ...prev, location: val }))}
-                      placeholder="San Francisco, CA"
-                      inputClassName="pl-12 h-12"
-                      data-testid="register-location-input"
-                    />
-                  </div>
-                </div>
-              )}
 
               <label className="flex items-start gap-3 mt-4 cursor-pointer">
                 <input
