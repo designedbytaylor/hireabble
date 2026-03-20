@@ -56,6 +56,7 @@ export default function RecruiterSwipe() {
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [showMatch, setShowMatch] = useState(false);
   const [matchData, setMatchData] = useState(null);
+  const [discoverLoading, setDiscoverLoading] = useState(false);
   const [showDiscoverFilters, setShowDiscoverFilters] = useState(false);
   const [discoverFilters, setDiscoverFilters] = useState({
     location: '', experience_level: '', skill: '',
@@ -184,6 +185,10 @@ export default function RecruiterSwipe() {
       setApplications(pending);
       setStats(statsRes.data);
       swipedIdsRef.current.clear();
+      // Prefetch discover candidates in background so they're ready when recruiter clicks Discover
+      if (candidates.length === 0) {
+        fetchCandidates();
+      }
     } catch (error) {
       if (retry < 1 && (!error.response || error.code === 'ECONNABORTED')) {
         return fetchData(retry + 1);
@@ -196,6 +201,7 @@ export default function RecruiterSwipe() {
 
   const fetchCandidates = async (retry = 0, filterParams = null) => {
     try {
+      setDiscoverLoading(true);
       const opts = { headers: { Authorization: `Bearer ${token}` }, timeout: 15000 };
       const f = filterParams || discoverFilters;
       const params = new URLSearchParams();
@@ -215,9 +221,11 @@ export default function RecruiterSwipe() {
       swipedIdsRef.current.clear();
     } catch (error) {
       if (retry < 1 && (!error.response || error.code === 'ECONNABORTED')) {
-        return fetchCandidates(retry + 1);
+        return fetchCandidates(retry + 1, filterParams);
       }
       console.error('Failed to fetch candidates:', error);
+    } finally {
+      setDiscoverLoading(false);
     }
   };
 
@@ -641,6 +649,11 @@ export default function RecruiterSwipe() {
                 </button>
               </div>
             </>
+          ) : discoverLoading && mode === 'discover' ? (
+            <div className="flex-1 flex flex-col min-h-0">
+              <SkeletonSwipeCard />
+              <SkeletonActionButtons />
+            </div>
           ) : (
             <div className="flex-1 rounded-3xl glass-card flex flex-col items-center justify-center p-8 text-center">
               <div className="w-20 h-20 rounded-full bg-primary/20 flex items-center justify-center mb-6">
