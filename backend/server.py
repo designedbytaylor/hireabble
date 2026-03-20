@@ -17,10 +17,10 @@ from datetime import datetime, timezone
 import json
 import uuid
 import jwt as pyjwt
-import os as _os_sentry
+import os
 
 # Sentry error tracking
-_sentry_dsn = _os_sentry.getenv("SENTRY_DSN")
+_sentry_dsn = os.getenv("SENTRY_DSN")
 if _sentry_dsn:
     import sentry_sdk
     from sentry_sdk.integrations.fastapi import FastApiIntegration
@@ -28,7 +28,7 @@ if _sentry_dsn:
     sentry_sdk.init(
         dsn=_sentry_dsn,
         traces_sample_rate=0.1,
-        environment=_os_sentry.getenv("ENVIRONMENT", "production"),
+        environment=os.getenv("ENVIRONMENT", "production"),
         integrations=[StarletteIntegration(), FastApiIntegration()],
     )
 
@@ -43,7 +43,6 @@ from routers import auth, jobs, applications, matches, notifications, uploads, s
 limiter = Limiter(key_func=get_remote_address, default_limits=["120/minute"])
 
 # Create the main app — disable docs/OpenAPI in production to reduce attack surface
-import os
 _is_production = os.getenv("ENVIRONMENT", "production") != "development"
 app = FastAPI(
     title="Hireabble API",
@@ -66,9 +65,8 @@ app.add_middleware(BrotliMiddleware, minimum_size=500)
 app.add_middleware(GZipMiddleware, minimum_size=500)
 
 # CORS middleware — restrict to known origins in production
-import os as _os
-_frontend_url = _os.getenv("FRONTEND_URL", "https://hireabble.com")
-_environment = _os.getenv("ENVIRONMENT", "development")
+_frontend_url = os.getenv("FRONTEND_URL", "https://hireabble.com")
+_environment = os.getenv("ENVIRONMENT", "development")
 _cors_origins = [
     "capacitor://localhost",   # iOS Capacitor native app
     "https://localhost",       # iOS Capacitor WKWebView (iosScheme: https)

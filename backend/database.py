@@ -43,6 +43,10 @@ if not JWT_SECRET:
 JWT_ALGORITHM = "HS256"
 JWT_EXPIRATION_HOURS = 24
 
+# Logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
+
 # Encryption key for sensitive data at rest — use dedicated key, fallback to JWT_SECRET-derived key
 import hashlib as _hashlib
 import base64 as _base64
@@ -75,10 +79,6 @@ SUPABASE_KEY = os.environ.get('SUPABASE_KEY', '')  # service_role key for storag
 
 # Security
 security = HTTPBearer()
-
-# Logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-logger = logging.getLogger(__name__)
 
 # ==================== WEBSOCKET MANAGER ====================
 
