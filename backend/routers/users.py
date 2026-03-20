@@ -1,10 +1,13 @@
 """
-User management routes for Hireabble API (blocking, etc.)
+User management routes for Hireabble API (blocking, verification, referrals, etc.)
 """
 from fastapi import APIRouter, HTTPException, Depends
 from datetime import datetime, timezone
+import uuid
+import secrets
+import string
 
-from database import db, get_current_user, logger
+from database import db, get_current_user, create_notification, send_web_push, logger
 
 router = APIRouter(tags=["Users"])
 
@@ -73,3 +76,147 @@ async def get_blocked_users(current_user: dict = Depends(get_current_user)):
     ).to_list(len(blocked_ids))
 
     return blocked_users
+
+
+# ==================== PROFILE VERIFICATION ====================
+
+@router.post("/users/verification/request")
+async def request_verification(current_user: dict = Depends(get_current_user)):
+    """Request profile verification. Submitted for admin review."""
+    uid = current_user["id"]
+    user = await db.users.find_one({"id": uid}, {"_id": 0, "verified": 1, "verification_status": 1})
+
+    if (user or {}).get("verified"):
+        raise HTTPException(status_code=400, detail="Your profile is already verified")
+
+    status = (user or {}).get("verification_status")
+    if status == "pending":
+        raise HTTPException(status_code=400, detail="You already have a pending verification request")
+
+    now = datetime.now(timezone.utc).isoformat()
+    request_doc = {
+        "id": str(uuid.uuid4()),
+        "user_id": uid,
+        "user_name": current_user.get("name", ""),
+        "user_email": current_user.get("email", ""),
+        "user_role": current_user.get("role", ""),
+        "user_photo": current_user.get("photo_url", ""),
+        "status": "pending",
+        "created_at": now,
+        "updated_at": now,
+    }
+    await db.verification_requests.insert_one(request_doc)
+    await db.users.update_one({"id": uid}, {"$set": {"verification_status": "pending"}})
+
+    return {"message": "Verification request submitted! An admin will review your profile."}
+
+
+@router.get("/users/verification/status")
+async def get_verification_status(current_user: dict = Depends(get_current_user)):
+    """Check the current user's verification status."""
+    user = await db.users.find_one(
+        {"id": current_user["id"]},
+        {"_id": 0, "verified": 1, "verification_status": 1},
+    )
+    return {
+        "verified": (user or {}).get("verified", False),
+        "status": (user or {}).get("verification_status"),  # pending, approved, rejected, or None
+    }
+
+
+# ==================== REFERRAL SYSTEM ====================
+
+def _generate_referral_code():
+    """Generate a short, unique referral code like 'AB3K7X'."""
+    chars = string.ascii_uppercase + string.digits
+    return ''.join(secrets.choice(chars) for _ in range(6))
+
+
+@router.get("/users/referral")
+async def get_referral_info(current_user: dict = Depends(get_current_user)):
+    """Get the current user's referral code and stats."""
+    uid = current_user["id"]
+    user = await db.users.find_one({"id": uid}, {"_id": 0, "referral_code": 1})
+    code = (user or {}).get("referral_code")
+
+    # Generate code on first access
+    if not code:
+        code = _generate_referral_code()
+        # Ensure uniqueness
+        while await db.users.find_one({"referral_code": code}):
+            code = _generate_referral_code()
+        await db.users.update_one({"id": uid}, {"$set": {"referral_code": code}})
+
+    # Count successful referrals
+    referral_count = await db.referrals.count_documents({"referrer_id": uid, "status": "completed"})
+    total_swipes_earned = referral_count * 5
+
+    return {
+        "referral_code": code,
+        "referral_count": referral_count,
+        "total_swipes_earned": total_swipes_earned,
+    }
+
+
+@router.post("/users/referral/redeem")
+async def redeem_referral_code(current_user: dict = Depends(get_current_user)):
+    """Called internally after signup when a user registered with a referral code.
+    The referral code is stored on the user during registration; this endpoint
+    processes the reward for the referrer."""
+    uid = current_user["id"]
+    user = await db.users.find_one({"id": uid}, {"_id": 0, "referred_by_code": 1, "referral_redeemed": 1})
+
+    if not user or not user.get("referred_by_code"):
+        raise HTTPException(status_code=400, detail="No referral code to redeem")
+    if user.get("referral_redeemed"):
+        raise HTTPException(status_code=400, detail="Referral already redeemed")
+
+    code = user["referred_by_code"]
+    referrer = await db.users.find_one({"referral_code": code}, {"_id": 0, "id": 1, "name": 1})
+    if not referrer:
+        raise HTTPException(status_code=400, detail="Invalid referral code")
+    if referrer["id"] == uid:
+        raise HTTPException(status_code=400, detail="Cannot refer yourself")
+
+    now = datetime.now(timezone.utc).isoformat()
+
+    # Record the referral
+    await db.referrals.insert_one({
+        "id": str(uuid.uuid4()),
+        "referrer_id": referrer["id"],
+        "referred_id": uid,
+        "code": code,
+        "status": "completed",
+        "created_at": now,
+    })
+
+    # Award 5 super swipes to referrer
+    role = (await db.users.find_one({"id": referrer["id"]}, {"role": 1}) or {}).get("role", "seeker")
+    swipe_field = "seeker_purchased_superlikes" if role == "seeker" else "recruiter_purchased_superlikes"
+    await db.users.update_one(
+        {"id": referrer["id"]},
+        {"$inc": {swipe_field: 5}},
+    )
+
+    # Mark as redeemed
+    await db.users.update_one({"id": uid}, {"$set": {"referral_redeemed": True}})
+
+    # Notify the referrer
+    referred_name = current_user.get("name", "Someone")
+    await create_notification(
+        referrer["id"], "referral",
+        "Referral Reward!",
+        f"{referred_name} joined using your referral code! You earned 5 Super Swipes.",
+    )
+    await send_web_push(
+        referrer["id"],
+        "Referral Reward!",
+        f"{referred_name} joined using your code! +5 Super Swipes",
+        {"type": "referral"},
+    )
+
+    # Invalidate referrer's cache
+    from cache import invalidate_user
+    invalidate_user(referrer["id"])
+
+    return {"message": "Referral redeemed! Referrer awarded 5 Super Swipes."}

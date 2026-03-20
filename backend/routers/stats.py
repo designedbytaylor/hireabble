@@ -153,13 +153,22 @@ async def get_seeker_dashboard(current_user: dict = Depends(get_current_user)):
     daily_limit = _get_seeker_daily_superlike_limit(user_data or {})
     free_remaining = max(0, daily_limit - superlikes_today)
 
-    # Check if user's subscription allows undo (use fresh DB data, not auth cache)
+    # Check if user can undo: paid tiers get unlimited, free tier gets 1/day
     sub = (user_data or {}).get("subscription") or current_user.get("subscription") or {}
-    can_undo = (
+    is_paid_undo = (
         sub.get("status") == "active"
         and sub.get("period_end", "") >= now
         and sub.get("tier_id", "") in ("seeker_plus", "seeker_premium")
     )
+    if is_paid_undo:
+        can_undo = True
+    else:
+        today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0).isoformat()
+        undos_today = await db.undo_log.count_documents({
+            "user_id": current_user["id"],
+            "created_at": {"$gte": today_start},
+        })
+        can_undo = undos_today < 1
 
     # Check subscription for premium features
     is_plus_or_premium = (

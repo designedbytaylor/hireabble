@@ -3360,3 +3360,65 @@ async def update_health_config(body: dict = Body(...), admin: dict = Depends(get
     )
 
     return {"status": "updated", "config": update}
+
+
+# ==================== VERIFICATION REQUESTS ====================
+
+@router.get("/admin/verification-requests")
+async def list_verification_requests(
+    status: str = "pending",
+    page: int = 1,
+    limit: int = 20,
+    admin: dict = Depends(get_current_admin),
+):
+    """List verification requests (default: pending)."""
+    query = {}
+    if status:
+        query["status"] = status
+    skip = (page - 1) * limit
+    total = await db.verification_requests.count_documents(query)
+    items = await db.verification_requests.find(
+        query, {"_id": 0}
+    ).sort("created_at", -1).skip(skip).limit(limit).to_list(limit)
+    return {"items": items, "total": total, "page": page, "pages": max(1, (total + limit - 1) // limit)}
+
+
+@router.put("/admin/verification-requests/{request_id}")
+async def review_verification_request(
+    request_id: str,
+    body: dict = Body(...),
+    admin: dict = Depends(get_current_admin),
+):
+    """Approve or reject a verification request."""
+    action = body.get("action")  # "approve" or "reject"
+    reason = body.get("reason", "")
+
+    if action not in ("approve", "reject"):
+        raise HTTPException(status_code=400, detail="Action must be 'approve' or 'reject'")
+
+    req = await db.verification_requests.find_one({"id": request_id}, {"_id": 0})
+    if not req:
+        raise HTTPException(status_code=404, detail="Verification request not found")
+    if req["status"] != "pending":
+        raise HTTPException(status_code=400, detail=f"Request already {req['status']}")
+
+    now = datetime.now(timezone.utc).isoformat()
+    new_status = "approved" if action == "approve" else "rejected"
+
+    await db.verification_requests.update_one(
+        {"id": request_id},
+        {"$set": {"status": new_status, "reviewed_by": admin.get("email", ""), "reason": reason, "updated_at": now}},
+    )
+
+    user_id = req["user_id"]
+    if action == "approve":
+        await db.users.update_one({"id": user_id}, {"$set": {"verified": True, "verification_status": "approved", "verified_at": now}})
+        await create_notification(user_id, "verification", "Profile Verified!", "Your profile has been verified. You now have a verified badge!")
+    else:
+        await db.users.update_one({"id": user_id}, {"$set": {"verification_status": "rejected"}})
+        msg = f"Your verification request was not approved."
+        if reason:
+            msg += f" Reason: {reason}"
+        await create_notification(user_id, "verification", "Verification Update", msg)
+
+    return {"status": new_status, "user_id": user_id}

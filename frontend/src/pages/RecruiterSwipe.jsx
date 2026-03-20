@@ -4,7 +4,7 @@ import { motion, AnimatePresence, useMotionValue, useTransform } from 'framer-mo
 import {
   X, Heart, Star, MapPin, Briefcase, GraduationCap, Clock,
   ChevronDown, BarChart3, Users, FileText, Building2, SlidersHorizontal,
-  Search, Sparkles, Zap, MessageSquare, Plus, Lock, Crown, Filter, Video
+  Search, Sparkles, Zap, MessageSquare, Plus, Lock, Crown, Filter, Video, BadgeCheck
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { toast } from 'sonner';
@@ -880,7 +880,10 @@ function CandidateDetailSheet({ item, mode, onClose }) {
               onError={handleImgError(name || 'default')}
             />
             <div className="flex-1">
-              <h2 className="text-xl font-bold font-['Outfit']">{name}</h2>
+              <h2 className="text-xl font-bold font-['Outfit'] flex items-center gap-1.5">
+                {name}
+                {item.verified && <BadgeCheck className="w-5 h-5 text-blue-400 shrink-0" />}
+              </h2>
               <p className="text-primary text-sm">{title}</p>
               {mode === 'applicants' && item.job_title && (
                 <p className="text-muted-foreground text-xs mt-0.5">Applied for: {item.job_title}</p>
@@ -1351,7 +1354,10 @@ function CandidateCard({ candidate, onSwipe, expanded, setExpanded }) {
 
         {/* Content - overlaid on photo */}
         <div className="absolute inset-x-0 bottom-0 flex flex-col px-5 pb-4 pt-8 z-10">
-          <h2 className="text-xl font-bold font-['Outfit'] leading-tight text-white drop-shadow-lg">{candidate.name}</h2>
+          <h2 className="text-xl font-bold font-['Outfit'] leading-tight text-white drop-shadow-lg flex items-center gap-1.5">
+            {candidate.name}
+            {candidate.verified && <BadgeCheck className="w-5 h-5 text-blue-400 shrink-0" />}
+          </h2>
           <p className="text-primary text-sm mt-0.5 drop-shadow">{candidate.title || 'Job Seeker'}</p>
           {candidate.best_match_job && (
             <p className="text-white/70 text-xs mt-0.5 flex items-center gap-1 drop-shadow">

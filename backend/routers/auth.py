@@ -175,8 +175,34 @@ async def register(user: UserCreate, request: Request):
             "created_at": datetime.now(timezone.utc).isoformat()
         }
 
+        # Store referral code if provided
+        if user.referral_code:
+            user_doc["referred_by_code"] = user.referral_code.strip().upper()
+
         await db.users.insert_one(user_doc)
         logger.info(f"User created successfully: {user_id}")
+
+        # Process referral reward in background
+        if user.referral_code:
+            async def _process_referral(uid, code, name):
+                try:
+                    referrer = await db.users.find_one({"referral_code": code}, {"_id": 0, "id": 1, "role": 1})
+                    if referrer and referrer["id"] != uid:
+                        from routers.users import _generate_referral_code
+                        now = datetime.now(timezone.utc).isoformat()
+                        await db.referrals.insert_one({
+                            "id": str(uuid.uuid4()), "referrer_id": referrer["id"],
+                            "referred_id": uid, "code": code, "status": "completed", "created_at": now,
+                        })
+                        swipe_field = "seeker_purchased_superlikes" if referrer.get("role") == "seeker" else "recruiter_purchased_superlikes"
+                        await db.users.update_one({"id": referrer["id"]}, {"$inc": {swipe_field: 5}})
+                        await db.users.update_one({"id": uid}, {"$set": {"referral_redeemed": True}})
+                        await create_notification(referrer["id"], "referral", "Referral Reward!", f"{name} joined using your referral code! You earned 5 Super Swipes.")
+                        from cache import invalidate_user
+                        invalidate_user(referrer["id"])
+                except Exception as e:
+                    logger.error(f"Referral processing failed: {e}")
+            asyncio.create_task(_process_referral(user_id, user.referral_code.strip().upper(), user.name))
 
         # Apply promo code if provided
         promo_result = None

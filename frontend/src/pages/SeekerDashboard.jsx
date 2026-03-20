@@ -839,9 +839,14 @@ export default function SeekerDashboard() {
       }
     } catch (err) {
       const detail = err.response?.data?.detail || 'Could not undo swipe';
-      if (err.response?.status === 403 && detail.includes('Upgrade')) {
-        setUpgradeTrigger('undo');
-        setShowUpgradeModal(true);
+      if (err.response?.status === 403) {
+        if (detail.includes('1 undo per day')) {
+          toast.error('You\'ve used your free undo for today. Upgrade for unlimited undos!');
+          setCanUndo(false);
+        } else {
+          setUpgradeTrigger('undo');
+          setShowUpgradeModal(true);
+        }
       } else {
         toast.error(detail);
       }
