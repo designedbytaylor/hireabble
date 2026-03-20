@@ -1817,6 +1817,62 @@ _SEEKER_HEADSHOTS = [
     "https://images.unsplash.com/photo-1544723795-3fb6469f5b39?w=500&h=500&fit=crop&crop=faces",
 ]
 
+# Professional headshots for recruiter profiles (diverse, business-appropriate)
+_RECRUITER_HEADSHOTS = [
+    # Professional men
+    "https://images.unsplash.com/photo-1560250097-0b93528c311a?w=500&h=500&fit=crop&crop=faces",
+    "https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=500&h=500&fit=crop&crop=faces",
+    "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=500&h=500&fit=crop&crop=faces",
+    "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=500&h=500&fit=crop&crop=faces",
+    "https://images.unsplash.com/photo-1556157382-97eda2d62296?w=500&h=500&fit=crop&crop=faces",
+    "https://images.unsplash.com/photo-1600486913747-55e5470d6f40?w=500&h=500&fit=crop&crop=faces",
+    "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=500&h=500&fit=crop&crop=faces",
+    "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=500&h=500&fit=crop&crop=faces",
+    "https://images.unsplash.com/photo-1566492031773-4f4e44671857?w=500&h=500&fit=crop&crop=faces",
+    "https://images.unsplash.com/photo-1480429370612-2f63b4f4f6e6?w=500&h=500&fit=crop&crop=faces",
+    "https://images.unsplash.com/photo-1564564321837-a57b7070ac4f?w=500&h=500&fit=crop&crop=faces",
+    "https://images.unsplash.com/photo-1557862921-37829c790f19?w=500&h=500&fit=crop&crop=faces",
+    "https://images.unsplash.com/photo-1504257432389-52343af06ae3?w=500&h=500&fit=crop&crop=faces",
+    "https://images.unsplash.com/photo-1492562080023-ab3db95bfbce?w=500&h=500&fit=crop&crop=faces",
+    "https://images.unsplash.com/photo-1545167622-3a6ac756afa4?w=500&h=500&fit=crop&crop=faces",
+    "https://images.unsplash.com/photo-1587614382346-4ec70e388b28?w=500&h=500&fit=crop&crop=faces",
+    "https://images.unsplash.com/photo-1519345182560-3f2917c472ef?w=500&h=500&fit=crop&crop=faces",
+    "https://images.unsplash.com/photo-1504593811423-6dd665756598?w=500&h=500&fit=crop&crop=faces",
+    "https://images.unsplash.com/photo-1583195764036-6dc248ac07d9?w=500&h=500&fit=crop&crop=faces",
+    "https://images.unsplash.com/photo-1521572267360-ee0c2909d518?w=500&h=500&fit=crop&crop=faces",
+    "https://images.unsplash.com/photo-1542178243-bc20704bd5fc?w=500&h=500&fit=crop&crop=faces",
+    "https://images.unsplash.com/photo-1503023345310-bd7c1de61c7d?w=500&h=500&fit=crop&crop=faces",
+    "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=500&h=500&fit=crop&crop=faces",
+    "https://images.unsplash.com/photo-1548142813-c348350df52b?w=500&h=500&fit=crop&crop=faces",
+    "https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?w=500&h=500&fit=crop&crop=faces",
+    # Professional women
+    "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=500&h=500&fit=crop&crop=faces",
+    "https://images.unsplash.com/photo-1573497019940-1c28c88b4f3e?w=500&h=500&fit=crop&crop=faces",
+    "https://images.unsplash.com/photo-1580489944761-15a19d654956?w=500&h=500&fit=crop&crop=faces",
+    "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=500&h=500&fit=crop&crop=faces",
+    "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=500&h=500&fit=crop&crop=faces",
+    "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=500&h=500&fit=crop&crop=faces",
+    "https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=500&h=500&fit=crop&crop=faces",
+    "https://images.unsplash.com/photo-1531746020798-e6953c6e8e04?w=500&h=500&fit=crop&crop=faces",
+    "https://images.unsplash.com/photo-1517841905240-472988babdf9?w=500&h=500&fit=crop&crop=faces",
+    "https://images.unsplash.com/photo-1488426862026-3ee34a7d66df?w=500&h=500&fit=crop&crop=faces",
+    "https://images.unsplash.com/photo-1508214751196-bcfd4ca60f91?w=500&h=500&fit=crop&crop=faces",
+    "https://images.unsplash.com/photo-1567532939604-b6b5b0db2604?w=500&h=500&fit=crop&crop=faces",
+    "https://images.unsplash.com/photo-1499952127939-9bbf5af6c51c?w=500&h=500&fit=crop&crop=faces",
+    "https://images.unsplash.com/photo-1502767089025-6572583495f0?w=500&h=500&fit=crop&crop=faces",
+    "https://images.unsplash.com/photo-1487412720507-e7ab37603c6f?w=500&h=500&fit=crop&crop=faces",
+    "https://images.unsplash.com/photo-1529626455594-4ff0802cfb7e?w=500&h=500&fit=crop&crop=faces",
+    "https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=500&h=500&fit=crop&crop=faces",
+    "https://images.unsplash.com/photo-1584999734482-0361aecad844?w=500&h=500&fit=crop&crop=faces",
+    "https://images.unsplash.com/photo-1544168190-e12bbc0d6cbf?w=500&h=500&fit=crop&crop=faces",
+    "https://images.unsplash.com/photo-1485893226355-9a1c32a0c81e?w=500&h=500&fit=crop&crop=faces",
+    "https://images.unsplash.com/photo-1558203728-00f45181dd84?w=500&h=500&fit=crop&crop=faces",
+    "https://images.unsplash.com/photo-1522556189639-b150ed9c4330?w=500&h=500&fit=crop&crop=faces",
+    "https://images.unsplash.com/photo-1509967419530-da38b4704bc6?w=500&h=500&fit=crop&crop=faces",
+    "https://images.unsplash.com/photo-1507591064344-4c6ce005b128?w=500&h=500&fit=crop&crop=faces",
+    "https://images.unsplash.com/photo-1544723795-3fb6469f5b39?w=500&h=500&fit=crop&crop=faces",
+]
+
 SAMPLE_JOBS = [
     {"title": "Senior React Developer", "description": "Join our frontend team building a next-gen dashboard used by millions. You'll architect component systems, optimize performance, and mentor junior devs.", "requirements": ["React", "TypeScript", "5+ years experience", "Design systems"], "salary_min": 150000, "salary_max": 200000, "location": "San Francisco, CA", "job_type": "hybrid", "experience_level": "senior"},
     {"title": "Backend Engineer (Go)", "description": "Build high-throughput microservices for our real-time data platform. You'll work with distributed systems at scale.", "requirements": ["Go", "Kubernetes", "PostgreSQL", "3+ years experience"], "salary_min": 140000, "salary_max": 190000, "location": "Remote", "job_type": "remote", "experience_level": "mid"},
@@ -1901,13 +1957,20 @@ async def seed_test_data(body: dict = {}, admin: dict = Depends(get_current_admi
         invalidate_users_batch(old_ids)
 
     # Build all documents in memory first, then batch-insert for speed
-    # Shuffle headshots so no two seekers share the same photo
+    # Shuffle headshots so no two users share the same photo
     shuffled_headshots = list(_SEEKER_HEADSHOTS)
     random.shuffle(shuffled_headshots)
     while len(shuffled_headshots) < num_seekers:
         extra = list(_SEEKER_HEADSHOTS)
         random.shuffle(extra)
         shuffled_headshots.extend(extra)
+
+    shuffled_rec_headshots = list(_RECRUITER_HEADSHOTS)
+    random.shuffle(shuffled_rec_headshots)
+    while len(shuffled_rec_headshots) < num_recruiters:
+        extra = list(_RECRUITER_HEADSHOTS)
+        random.shuffle(extra)
+        shuffled_rec_headshots.extend(extra)
 
     seeker_docs = []
     for i in range(num_seekers):
@@ -1943,8 +2006,7 @@ async def seed_test_data(body: dict = {}, admin: dict = Depends(get_current_admi
         email = f"recruiter{i+1}@test.hireabble.com"
 
         brand_color = _BRAND_COLORS[i % len(_BRAND_COLORS)]
-        company_url_name = company["name"].replace(" ", "+")
-        rec_photo = f"https://ui-avatars.com/api/?name={company_url_name}&size=500&background={brand_color}&color=fff&bold=true&format=png"
+        rec_photo = shuffled_rec_headshots[i]
         avatar = f"https://api.dicebear.com/7.x/initials/svg?seed={user_id}"
         user_doc = {
             "id": user_id, "email": email, "password": password,
