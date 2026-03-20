@@ -1502,40 +1502,42 @@ export default function Profile() {
           {/* Email Notifications */}
           <EmailNotificationSettings token={token} />
 
-          {/* Profile Verification */}
-          <div className="glass-card rounded-2xl p-5 mt-6">
-            <h3 className="text-lg font-bold font-['Outfit'] mb-3 flex items-center gap-2">
-              <BadgeCheck className="w-5 h-5" /> Profile Verification
-            </h3>
-            {verificationStatus === 'approved' || user?.verified ? (
-              <div className="flex items-center gap-2 text-blue-400">
-                <BadgeCheck className="w-5 h-5" />
-                <span className="text-sm font-medium">Your profile is verified</span>
-              </div>
-            ) : verificationStatus === 'pending' ? (
-              <div className="flex items-center gap-2 text-amber-500">
-                <Clock className="w-4 h-4" />
-                <span className="text-sm">Verification request pending admin review</span>
-              </div>
-            ) : (
-              <>
-                <p className="text-sm text-muted-foreground mb-3">
-                  Get a verified badge on your profile to build trust with {user?.role === 'seeker' ? 'recruiters' : 'candidates'}.
-                </p>
-                {verificationStatus === 'rejected' && (
-                  <p className="text-sm text-destructive mb-3">Your previous request was not approved. You can try again.</p>
-                )}
-                <Button
-                  onClick={handleRequestVerification}
-                  disabled={requestingVerification}
-                  className="rounded-full bg-gradient-to-r from-primary to-secondary hover:opacity-90"
-                  size="sm"
-                >
-                  {requestingVerification ? 'Submitting...' : 'Request Verification'}
-                </Button>
-              </>
-            )}
-          </div>
+          {/* Profile Verification — recruiters only for now */}
+          {user?.role === 'recruiter' && (
+            <div className="glass-card rounded-2xl p-5 mt-6">
+              <h3 className="text-lg font-bold font-['Outfit'] mb-3 flex items-center gap-2">
+                <BadgeCheck className="w-5 h-5" /> Profile Verification
+              </h3>
+              {verificationStatus === 'approved' || user?.verified ? (
+                <div className="flex items-center gap-2 text-blue-400">
+                  <BadgeCheck className="w-5 h-5" />
+                  <span className="text-sm font-medium">Your profile is verified</span>
+                </div>
+              ) : verificationStatus === 'pending' ? (
+                <div className="flex items-center gap-2 text-amber-500">
+                  <Clock className="w-4 h-4" />
+                  <span className="text-sm">Verification request pending admin review</span>
+                </div>
+              ) : (
+                <>
+                  <p className="text-sm text-muted-foreground mb-3">
+                    Get a verified badge on your profile to build trust with candidates.
+                  </p>
+                  {verificationStatus === 'rejected' && (
+                    <p className="text-sm text-destructive mb-3">Your previous request was not approved. You can try again.</p>
+                  )}
+                  <Button
+                    onClick={handleRequestVerification}
+                    disabled={requestingVerification}
+                    className="rounded-full bg-gradient-to-r from-primary to-secondary hover:opacity-90"
+                    size="sm"
+                  >
+                    {requestingVerification ? 'Submitting...' : 'Request Verification'}
+                  </Button>
+                </>
+              )}
+            </div>
+          )}
 
           {/* Referral Program */}
           <div className="glass-card rounded-2xl p-5 mt-6">
