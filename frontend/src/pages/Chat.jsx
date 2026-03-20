@@ -347,6 +347,17 @@ export default function Chat() {
     );
   }
 
+  if (!match) {
+    return (
+      <div className="min-h-screen bg-background flex flex-col items-center justify-center gap-4 px-6">
+        <p className="text-muted-foreground">This conversation could not be found.</p>
+        <Button onClick={() => navigate('/matches')} variant="outline" className="rounded-xl">
+          <ArrowLeft className="w-4 h-4 mr-2" /> Back to Matches
+        </Button>
+      </div>
+    );
+  }
+
   // Group messages by date
   const groupedMessages = [];
   let lastDate = '';

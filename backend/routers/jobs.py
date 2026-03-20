@@ -472,7 +472,7 @@ async def duplicate_job(job_id: str, current_user: dict = Depends(get_current_us
     new_job["id"] = new_id
     new_job["title"] = f"{job['title']} (Copy)"
     new_job["created_at"] = datetime.now(timezone.utc).isoformat()
-    new_job["is_active"] = True
+    new_job["is_active"] = False
     new_job.pop("is_boosted", None)
     new_job.pop("boost_until", None)
     new_job.pop("is_flagged", None)
@@ -491,6 +491,24 @@ async def duplicate_job(job_id: str, current_user: dict = Depends(get_current_us
     # Invalidate recruiter jobs cache
     invalidate(recruiter_jobs_cache, f"rjobs:{current_user['id']}")
     return {k: v for k, v in new_job.items() if k != '_id'}
+
+
+@router.put("/{job_id}/status")
+async def toggle_job_status(job_id: str, body: dict, current_user: dict = Depends(get_current_user)):
+    """Pause or activate a job posting."""
+    if current_user["role"] != "recruiter":
+        raise HTTPException(status_code=403, detail="Only recruiters can update job status")
+
+    job = await db.jobs.find_one({"id": job_id, "recruiter_id": current_user["id"]})
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found or not authorized")
+
+    is_active = bool(body.get("is_active", False))
+    await db.jobs.update_one({"id": job_id}, {"$set": {"is_active": is_active}})
+    invalidate(recruiter_jobs_cache, f"rjobs:{current_user['id']}")
+
+    updated = await db.jobs.find_one({"id": job_id}, {"_id": 0})
+    return updated
 
 
 @router.delete("/{job_id}")

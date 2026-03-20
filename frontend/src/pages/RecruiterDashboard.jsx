@@ -5,7 +5,8 @@ import {
   Plus, Briefcase, Users, Star, Heart, X, Check,
   MapPin, DollarSign, Building2, ChevronRight, Clock,
   Edit, GraduationCap, Trash2, BarChart3, Calendar, Globe,
-  FileText, Send, Info, Copy, Upload, Sparkles, Wand2, Image as ImageIcon, Printer, Zap
+  FileText, Send, Info, Copy, Upload, Sparkles, Wand2, Image as ImageIcon, Printer, Zap,
+  Pause, Play
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -58,6 +59,7 @@ export default function RecruiterDashboard() {
   const [requestingRefs, setRequestingRefs] = useState(false);
   const [subscription, setSubscription] = useState(null);
   const [confirmDelete, setConfirmDelete] = useState(null); // job ID to delete
+  const [confirmPause, setConfirmPause] = useState(null); // job to pause/activate
 
   useEffect(() => {
     fetchData();
@@ -137,14 +139,37 @@ export default function RecruiterDashboard() {
 
   const handleDuplicateJob = async (jobId) => {
     try {
-      await axios.post(`${API}/jobs/${jobId}/duplicate`, {}, {
+      const res = await axios.post(`${API}/jobs/${jobId}/duplicate`, {}, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      toast.success('Job duplicated');
-      fetchData();
+      // Add the duplicated job to the list immediately
+      if (res.data) {
+        setJobs(prev => [res.data, ...prev]);
+      } else {
+        fetchData();
+      }
+      toast.success('Job duplicated as inactive draft. Activate it when ready to publish.');
     } catch {
       toast.error('Failed to duplicate job');
     }
+  };
+
+  const handleToggleJobStatus = async (job) => {
+    const newActive = !job.is_active;
+    try {
+      await axios.put(`${API}/jobs/${job.id}/status`, { is_active: newActive }, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setJobs(prev => prev.map(j => j.id === job.id ? { ...j, is_active: newActive } : j));
+      setStats(prev => ({
+        ...prev,
+        active_jobs: newActive ? prev.active_jobs + 1 : Math.max(0, prev.active_jobs - 1)
+      }));
+      toast.success(newActive ? 'Job activated! Candidates can now see it.' : 'Job paused. It won\'t appear in search.');
+    } catch {
+      toast.error('Failed to update job status');
+    }
+    setConfirmPause(null);
   };
 
   const [generatingPoster, setGeneratingPoster] = useState(null);
@@ -463,9 +488,9 @@ export default function RecruiterDashboard() {
           {jobs.length > 0 ? (
             <div className="space-y-4">
               {jobs.map((job) => (
-                <div 
+                <div
                   key={job.id}
-                  className="glass-card rounded-2xl p-5 hover:border-primary/30 transition-colors"
+                  className={`glass-card rounded-2xl p-5 hover:border-primary/30 transition-colors ${!job.is_active ? 'opacity-70' : ''}`}
                   data-testid={`job-item-${job.id}`}
                 >
                   <div
@@ -479,7 +504,12 @@ export default function RecruiterDashboard() {
                       loading="lazy"
                     />
                     <div className="flex-1 min-w-0">
-                      <h3 className="font-bold font-['Outfit'] text-lg truncate">{job.title}</h3>
+                      <div className="flex items-center gap-2">
+                        <h3 className="font-bold font-['Outfit'] text-lg truncate">{job.title}</h3>
+                        {!job.is_active && (
+                          <span className="px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-400 text-[10px] font-bold shrink-0">PAUSED</span>
+                        )}
+                      </div>
                       <div className="flex flex-wrap gap-2 mt-2">
                         <span className="px-2 py-1 rounded-lg bg-accent text-xs text-muted-foreground flex items-center gap-1">
                           <MapPin className="w-3 h-3" />
@@ -543,6 +573,18 @@ export default function RecruiterDashboard() {
                         <span className="hidden sm:inline">Boost</span>
                       </button>
                     )}
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setConfirmPause(job); }}
+                      className={`flex-1 flex items-center justify-center gap-1.5 p-2 rounded-lg transition-colors text-xs ${
+                        job.is_active
+                          ? 'hover:bg-amber-500/10 text-amber-400'
+                          : 'hover:bg-green-500/10 text-green-400'
+                      }`}
+                      title={job.is_active ? 'Pause job listing' : 'Activate job listing'}
+                    >
+                      {job.is_active ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
+                      <span className="hidden sm:inline">{job.is_active ? 'Pause' : 'Activate'}</span>
+                    </button>
                     <button
                       onClick={(e) => { e.stopPropagation(); setConfirmDelete(job.id); }}
                       className="flex-1 flex items-center justify-center gap-1.5 p-2 rounded-lg hover:bg-destructive/10 transition-colors text-xs text-destructive"
@@ -777,6 +819,20 @@ export default function RecruiterDashboard() {
         onConfirm={() => { handleDeleteJob(confirmDelete); setConfirmDelete(null); }}
       />
 
+      <ConfirmDialog
+        open={!!confirmPause}
+        onOpenChange={(open) => { if (!open) setConfirmPause(null); }}
+        title={confirmPause?.is_active ? 'Pause this job listing?' : 'Activate this job listing?'}
+        description={
+          confirmPause?.is_active
+            ? 'This job will be hidden from candidates. You can reactivate it at any time.'
+            : 'This job will become visible to candidates and they can apply to it.'
+        }
+        confirmLabel={confirmPause?.is_active ? 'Pause' : 'Activate'}
+        variant={confirmPause?.is_active ? 'default' : 'default'}
+        onConfirm={() => handleToggleJobStatus(confirmPause)}
+      />
+
       <Navigation />
     </div>
   );
@@ -823,6 +879,15 @@ function JobFormDialog({ open, onClose, onSuccess, token, company, job = null, i
         category: job.category || '',
         employment_type: job.employment_type || 'full-time'
       });
+      // Restore photo option from existing job data
+      if (job.listing_photo === 'profile') {
+        setPhotoOption('profile');
+      } else if (job.listing_photo && job.listing_photo !== 'profile') {
+        setPhotoOption('custom');
+        setCustomPhotoPreview(job.listing_photo);
+      } else {
+        setPhotoOption('none');
+      }
     } else if (!isEditing) {
       setFormData({
         title: '',
@@ -935,6 +1000,9 @@ function JobFormDialog({ open, onClose, onSuccess, token, company, job = null, i
           headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'multipart/form-data' },
         });
         listingPhoto = photoRes.data.photo_url;
+      } else if (photoOption === 'custom' && isEditing && job?.listing_photo) {
+        // Keep existing custom photo when no new file was selected
+        listingPhoto = job.listing_photo;
       }
 
       const payload = {
