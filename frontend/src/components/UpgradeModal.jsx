@@ -278,20 +278,15 @@ export default function UpgradeModal({ open, onClose, onSubscribed, trigger, hig
                       <button
                         key={dur}
                         onClick={() => setSelectedDuration(dur)}
-                        className={`relative py-3 px-2 rounded-2xl border-2 transition-all text-center ${
+                        className={`relative ${savings > 0 || dur === '6month' ? 'pt-5 pb-3' : 'py-3'} px-2 rounded-2xl border-2 transition-all text-center ${
                           isSelected
                             ? `${colors.border} ${colors.bg}`
                             : 'border-border bg-card hover:border-primary/20'
                         }`}
                       >
-                        {savings > 0 && (
-                          <span className={`absolute -top-2.5 left-1/2 -translate-x-1/2 px-2 py-0.5 rounded-full text-[10px] font-bold bg-gradient-to-r ${colors.gradient} text-white`}>
-                            SAVE {savings}%
-                          </span>
-                        )}
-                        {dur === '6month' && (
-                          <span className={`absolute -top-2.5 right-1 px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-gradient-to-r ${colors.gradient} text-white`}>
-                            BEST
+                        {(savings > 0 || dur === '6month') && (
+                          <span className={`absolute -top-2.5 left-1/2 -translate-x-1/2 px-2 py-0.5 rounded-full text-[10px] font-bold bg-gradient-to-r ${colors.gradient} text-white whitespace-nowrap`}>
+                            {dur === '6month' ? `SAVE ${savings}% · BEST` : `SAVE ${savings}%`}
                           </span>
                         )}
                         <p className="text-xs text-muted-foreground">{DURATION_LABELS[dur]}</p>
