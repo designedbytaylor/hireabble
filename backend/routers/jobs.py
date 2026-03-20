@@ -730,6 +730,12 @@ Return JSON:
   "requirements": ["requirement 1", "requirement 2", "...up to 8 key requirements"]
 }}
 
+IMPORTANT for requirements:
+- Each requirement must be a short, concise phrase (e.g. "5+ years Python experience")
+- Do NOT use commas within a single requirement — split into separate items instead
+- Wrong: "Experience with Python, Java, or Scala" → Right: "Python proficiency", "Java or Scala experience"
+- Keep each requirement under 60 characters
+
 Write in a professional but approachable tone. Do NOT include salary or location — just the description and requirements."""
     else:
         prompt = f"""Improve the following job description to be more professional, engaging, and well-structured. Return ONLY valid JSON.
@@ -744,6 +750,12 @@ Return JSON:
   "description": "The improved, polished job description",
   "requirements": ["requirement 1", "requirement 2", "...extracted or improved requirements"]
 }}
+
+IMPORTANT for requirements:
+- Each requirement must be a short, concise phrase (e.g. "5+ years Python experience")
+- Do NOT use commas within a single requirement — split into separate items instead
+- Wrong: "Experience with Python, Java, or Scala" → Right: "Python proficiency", "Java or Scala experience"
+- Keep each requirement under 60 characters
 
 Keep the core content but make it more compelling and well-organized. Do NOT include salary or location."""
 
