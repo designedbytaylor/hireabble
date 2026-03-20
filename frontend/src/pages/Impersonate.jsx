@@ -38,12 +38,13 @@ export default function Impersonate() {
     // 4. Sets the new token and fetches /auth/me
     // Do NOT call logout() — it causes a race condition where
     // setToken(null) triggers authInit useEffect competing with loginWithToken.
-    loginWithToken(impersonateToken).then(user => {
-      if (user) {
-        toast.success(`Logged in as ${user.name}`);
+    loginWithToken(impersonateToken).then(result => {
+      if (result && !result._error) {
+        toast.success(`Logged in as ${result.name}`);
         navigate(redirect, { replace: true });
       } else {
-        toast.error('Impersonation failed — could not load user profile');
+        const detail = result?._error ? `(${result.status}: ${result.detail})` : '';
+        toast.error(`Impersonation failed ${detail}`.trim());
         navigate('/login', { replace: true });
       }
     });

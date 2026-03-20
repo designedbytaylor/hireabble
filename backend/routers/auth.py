@@ -434,7 +434,7 @@ async def login(credentials: UserLogin, request: Request):
 
     return {"token": token, "user": user_response}
 
-@router.get("/me", response_model=UserResponse)
+@router.get("/me")
 async def get_me(current_user: dict = Depends(get_current_user)):
     return current_user
 

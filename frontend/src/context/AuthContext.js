@@ -211,10 +211,12 @@ export const AuthProvider = ({ children }) => {
       persistToken(impersonateToken, response.data);
       return response.data;
     } catch (err) {
-      console.error('loginWithToken /auth/me failed:', err.response?.status, err.response?.data || err.message);
+      const status = err.response?.status;
+      const detail = err.response?.data?.detail || err.message;
+      console.error('loginWithToken /auth/me failed:', status, detail);
       clearPersistedToken();
       setToken(null);
-      return null;
+      return { _error: true, status, detail };
     }
   }, [persistToken, clearPersistedToken]);
 
