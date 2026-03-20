@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import { toast } from 'sonner';
+import { isIOS, isAndroid } from '../utils/capacitor';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -110,6 +111,28 @@ export default function UpgradeModal({ open, onClose, onSubscribed, trigger, hig
     if (!selectedTier || !selectedDuration) return;
     setPurchasing(true);
     try {
+      if (isIOS && window.webkit?.messageHandlers?.storeKit) {
+        const productId = `com.hireabble.${selectedTier}.${selectedDuration}`;
+        window.webkit.messageHandlers.storeKit.postMessage({
+          action: 'purchase',
+          productId,
+          tier_id: selectedTier,
+          duration: selectedDuration,
+        });
+        return;
+      }
+
+      if (isIOS) {
+        toast.error('Please download the app from the App Store to subscribe.');
+        return;
+      }
+
+      if (isAndroid && window.Android?.purchase) {
+        const productId = `com.hireabble.${selectedTier}.${selectedDuration}`;
+        window.Android.purchase(productId, selectedTier, selectedDuration);
+        return;
+      }
+
       const res = await axios.post(
         `${API}/payments/create-checkout-session`,
         { tier_id: selectedTier, duration: selectedDuration },

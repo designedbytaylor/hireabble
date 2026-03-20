@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Send, Briefcase, User, Flag, ShieldBan, Calendar, CheckCheck, Check, Image, X, Video, Square, Loader2, Clock, Phone, MapPin, FileText } from 'lucide-react';
 import { getPhotoUrl, handleImgError } from '../utils/helpers';
+import { openExternal } from '../utils/capacitor';
 import ReportDialog from '../components/ReportDialog';
 import BlockDialog from '../components/BlockDialog';
 import { Button } from '../components/ui/button';
@@ -700,7 +701,7 @@ function MessageContent({ content }) {
           alt="Shared image"
           className="rounded-lg max-w-full cursor-pointer mb-1"
           style={{ maxHeight: '250px' }}
-          onClick={() => window.open(imageUrl, '_blank')}
+          onClick={() => openExternal(imageUrl)}
           onError={(e) => {
             e.target.onerror = null;
             e.target.style.display = 'none';

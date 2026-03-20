@@ -28,6 +28,23 @@ export function getPaymentMethod() {
 }
 
 /**
+ * Open an external URL. Uses Capacitor Browser (SFSafariViewController /
+ * Chrome Custom Tabs) on native, falls back to window.open on web.
+ */
+export async function openExternal(url) {
+  if (isNative) {
+    try {
+      const { Browser } = await import('@capacitor/browser');
+      await Browser.open({ url });
+      return;
+    } catch {
+      // plugin unavailable, fall through
+    }
+  }
+  window.open(url, '_blank');
+}
+
+/**
  * Secure token storage abstraction.
  * Uses Capacitor Preferences (encrypted on native) when available,
  * falls back to localStorage on web.

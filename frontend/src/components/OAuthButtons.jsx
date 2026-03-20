@@ -2,8 +2,26 @@ import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import axios from 'axios';
+import { isNative } from '../utils/capacitor';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
+
+/**
+ * Open a URL — uses Capacitor Browser (SFSafariViewController / Chrome Custom Tabs)
+ * on native platforms so the WebView is preserved, falls back to window.location.href on web.
+ */
+async function openAuthUrl(url) {
+  if (isNative) {
+    try {
+      const { Browser } = await import('@capacitor/browser');
+      await Browser.open({ url, presentationStyle: 'popover' });
+      return;
+    } catch {
+      // fallback to window.location if plugin unavailable
+    }
+  }
+  window.location.href = url;
+}
 
 const GoogleIcon = () => (
   <svg className="w-5 h-5" viewBox="0 0 24 24">
@@ -72,7 +90,7 @@ export default function OAuthButtons({ role = 'seeker' }) {
       state: generateState(role),
     });
 
-    window.location.href = `https://accounts.google.com/o/oauth2/v2/auth?${params}`;
+    openAuthUrl(`https://accounts.google.com/o/oauth2/v2/auth?${params}`);
   }, [oauthConfig, role, generateState]);
 
   const handleGithubLogin = useCallback(() => {
@@ -84,7 +102,7 @@ export default function OAuthButtons({ role = 'seeker' }) {
       state: generateState(role),
     });
 
-    window.location.href = `https://github.com/login/oauth/authorize?${params}`;
+    openAuthUrl(`https://github.com/login/oauth/authorize?${params}`);
   }, [oauthConfig, role, generateState]);
 
   const handleAppleLogin = useCallback(() => {
@@ -100,7 +118,7 @@ export default function OAuthButtons({ role = 'seeker' }) {
       state: generateState(role, { provider: 'apple' }),
     });
 
-    window.location.href = `https://appleid.apple.com/auth/authorize?${params}`;
+    openAuthUrl(`https://appleid.apple.com/auth/authorize?${params}`);
   }, [oauthConfig, role, generateState]);
 
   const handleLinkedInLogin = useCallback(() => {
@@ -115,7 +133,7 @@ export default function OAuthButtons({ role = 'seeker' }) {
       state: generateState(role, { provider: 'linkedin' }),
     });
 
-    window.location.href = `https://www.linkedin.com/oauth/v2/authorization?${params}`;
+    openAuthUrl(`https://www.linkedin.com/oauth/v2/authorization?${params}`);
   }, [oauthConfig, role, generateState]);
 
   const handleFacebookLogin = useCallback(() => {
@@ -130,7 +148,7 @@ export default function OAuthButtons({ role = 'seeker' }) {
       state: generateState(role, { provider: 'facebook' }),
     });
 
-    window.location.href = `https://www.facebook.com/v19.0/dialog/oauth?${params}`;
+    openAuthUrl(`https://www.facebook.com/v19.0/dialog/oauth?${params}`);
   }, [oauthConfig, role, generateState]);
 
   // Handle OAuth callback

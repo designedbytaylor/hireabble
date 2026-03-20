@@ -282,8 +282,12 @@ export default function Onboarding() {
       toast.error('Please upload a photo to continue. Recruiters need to see you!');
       return;
     }
-    // Age verification on the DOB step
-    if (STEPS[currentStep]?.id === 'dob' && formData.dob) {
+    // Age verification on the DOB step (required)
+    if (STEPS[currentStep]?.id === 'dob') {
+      if (!formData.dob) {
+        toast.error('Please enter your date of birth to continue');
+        return;
+      }
       const dob = new Date(formData.dob);
       const today = new Date();
       let age = today.getFullYear() - dob.getFullYear();
@@ -577,7 +581,7 @@ export default function Onboarding() {
                       className="h-12 rounded-xl bg-card border-border"
                       data-testid="dob-input"
                     />
-                    <p className="text-xs text-muted-foreground">You must be at least 16 years old to use Hireabble</p>
+                    <p className="text-xs text-muted-foreground">Required. You must be at least 16 years old to use Hireabble.</p>
                   </div>
                 </div>
               )}

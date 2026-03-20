@@ -43,6 +43,7 @@ const BrowseJobs = React.lazy(() => import("./pages/BrowseJobs"));
 const TermsOfService = React.lazy(() => import("./pages/TermsOfService"));
 const PrivacyPolicy = React.lazy(() => import("./pages/PrivacyPolicy"));
 const CookiePolicy = React.lazy(() => import("./pages/CookiePolicy"));
+const CommunityGuidelines = React.lazy(() => import("./pages/CommunityGuidelines"));
 
 // Prefetch likely-next page chunks after initial load so navigation feels instant
 const prefetchChunks = () => {
@@ -418,6 +419,7 @@ function AppRoutes() {
       <Route path="/terms" element={<TermsOfService />} />
       <Route path="/privacy" element={<PrivacyPolicy />} />
       <Route path="/cookie-policy" element={<CookiePolicy />} />
+      <Route path="/community-guidelines" element={<CommunityGuidelines />} />
 
       {/* Admin impersonation — no PublicRoute wrapper so it always works */}
       <Route path="/impersonate" element={<Impersonate />} />
