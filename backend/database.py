@@ -472,6 +472,7 @@ class JobResponse(BaseModel):
     match_score: Optional[int] = None
     created_at: str
     is_active: bool = True
+    listing_photo: Optional[str] = None
     already_applied: Optional[bool] = None
 
 class SwipeAction(BaseModel):
