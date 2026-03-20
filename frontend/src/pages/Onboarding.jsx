@@ -390,13 +390,15 @@ export default function Onboarding() {
           <div className="text-sm text-muted-foreground">
             {STEPS[currentStep]?.title}
           </div>
-          <button 
-            onClick={handleSkip}
-            className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-            data-testid="skip-onboarding"
-          >
-            Skip for now
-          </button>
+          {STEPS[currentStep]?.id !== 'photo' && (
+            <button
+              onClick={handleSkip}
+              className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+              data-testid="skip-onboarding"
+            >
+              Skip for now
+            </button>
+          )}
         </div>
         
         {/* Progress Bar */}
@@ -566,25 +568,73 @@ export default function Onboarding() {
                 </div>
               )}
 
-              {step.id === 'dob' && (
-                <div className="space-y-6">
-                  <div className="w-16 h-16 rounded-2xl bg-primary/20 flex items-center justify-center mb-4">
-                    <Calendar className="w-8 h-8 text-primary" />
+              {step.id === 'dob' && (() => {
+                const currentYear = new Date().getFullYear();
+                const dobParts = formData.dob ? formData.dob.split('-') : ['', '', ''];
+                const dobYear = dobParts[0] || '';
+                const dobMonth = dobParts[1] || '';
+                const dobDay = dobParts[2] || '';
+                const updateDob = (part, value) => {
+                  const parts = formData.dob ? formData.dob.split('-') : ['', '', ''];
+                  if (part === 'year') parts[0] = value;
+                  if (part === 'month') parts[1] = value;
+                  if (part === 'day') parts[2] = value;
+                  if (parts[0] && parts[1] && parts[2]) {
+                    handleChange('dob', `${parts[0]}-${parts[1]}-${parts[2]}`);
+                  } else {
+                    handleChange('dob', parts.join('-'));
+                  }
+                };
+                const daysInMonth = dobYear && dobMonth
+                  ? new Date(parseInt(dobYear), parseInt(dobMonth), 0).getDate()
+                  : 31;
+                return (
+                  <div className="space-y-6">
+                    <div className="w-16 h-16 rounded-2xl bg-primary/20 flex items-center justify-center mb-4">
+                      <Calendar className="w-8 h-8 text-primary" />
+                    </div>
+                    <div className="space-y-3">
+                      <Label>When were you born?</Label>
+                      <div className="grid grid-cols-3 gap-3">
+                        <select
+                          value={dobMonth}
+                          onChange={(e) => updateDob('month', e.target.value)}
+                          className="h-12 rounded-xl bg-card border border-border px-3 text-sm text-foreground appearance-none"
+                          data-testid="dob-month"
+                        >
+                          <option value="">Month</option>
+                          {['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'].map((m, i) => (
+                            <option key={m} value={String(i + 1).padStart(2, '0')}>{m}</option>
+                          ))}
+                        </select>
+                        <select
+                          value={dobDay}
+                          onChange={(e) => updateDob('day', e.target.value)}
+                          className="h-12 rounded-xl bg-card border border-border px-3 text-sm text-foreground appearance-none"
+                          data-testid="dob-day"
+                        >
+                          <option value="">Day</option>
+                          {Array.from({ length: daysInMonth }, (_, i) => i + 1).map(d => (
+                            <option key={d} value={String(d).padStart(2, '0')}>{d}</option>
+                          ))}
+                        </select>
+                        <select
+                          value={dobYear}
+                          onChange={(e) => updateDob('year', e.target.value)}
+                          className="h-12 rounded-xl bg-card border border-border px-3 text-sm text-foreground appearance-none"
+                          data-testid="dob-year"
+                        >
+                          <option value="">Year</option>
+                          {Array.from({ length: 80 }, (_, i) => currentYear - 16 - i).map(y => (
+                            <option key={y} value={String(y)}>{y}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <p className="text-xs text-muted-foreground">Required. You must be at least 16 years old to use Hireabble.</p>
+                    </div>
                   </div>
-                  <div className="space-y-2">
-                    <Label>When were you born?</Label>
-                    <Input
-                      type="date"
-                      value={formData.dob}
-                      onChange={(e) => handleChange('dob', e.target.value)}
-                      max={new Date().toISOString().split('T')[0]}
-                      className="h-12 rounded-xl bg-card border-border"
-                      data-testid="dob-input"
-                    />
-                    <p className="text-xs text-muted-foreground">Required. You must be at least 16 years old to use Hireabble.</p>
-                  </div>
-                </div>
-              )}
+                );
+              })()}
 
               {step.id === 'role' && (
                 <div className="space-y-6">
@@ -881,11 +931,21 @@ export default function Onboarding() {
                   {!notificationsEnabled && getPermissionStatus() !== 'denied' && (
                     <Button
                       onClick={async () => {
+                        if (!isPushSupported()) {
+                          toast.error('Push notifications are not supported on this device/browser. You can enable them later.');
+                          return;
+                        }
                         setEnablingNotifications(true);
                         const success = await subscribeToPush(token);
                         setNotificationsEnabled(success);
                         setEnablingNotifications(false);
-                        if (success) toast.success('Notifications enabled!');
+                        if (success) {
+                          toast.success('Notifications enabled!');
+                        } else if (getPermissionStatus() === 'denied') {
+                          toast.error('Notifications were blocked. You can enable them in your browser/device settings.');
+                        } else {
+                          toast.error('Could not enable notifications. You can try again later in Settings.');
+                        }
                       }}
                       disabled={enablingNotifications}
                       className="w-full h-12 rounded-xl bg-gradient-to-r from-primary to-secondary hover:opacity-90"
