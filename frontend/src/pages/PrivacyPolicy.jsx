@@ -83,6 +83,7 @@ export default function PrivacyPolicy() {
               <li><strong>Web Push (Browser Notifications):</strong> We use the Web Push API to deliver notifications about matches, messages, and interviews. Push subscription tokens are stored on our servers</li>
               <li><strong>OpenStreetMap (Nominatim):</strong> Reverse geocoding for location detection. Your coordinates are sent to the Nominatim service when you use "detect my location"</li>
               <li><strong>Google Fonts:</strong> Web fonts are loaded from Google's CDN. See <a href="https://policies.google.com/privacy" className="text-primary hover:underline" target="_blank" rel="noopener noreferrer">Google's Privacy Policy</a></li>
+              <li><strong>Sentry:</strong> Error tracking and performance monitoring. When a crash or error occurs, Sentry collects technical diagnostic data (device type, OS version, app version, stack traces) to help us fix bugs. No personally identifiable information is intentionally sent. See <a href="https://sentry.io/privacy/" className="text-primary hover:underline" target="_blank" rel="noopener noreferrer">Sentry's Privacy Policy</a></li>
             </ul>
           </section>
 

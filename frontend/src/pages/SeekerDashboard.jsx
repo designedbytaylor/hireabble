@@ -10,6 +10,7 @@ import NotificationBell from '../components/NotificationBell';
 import MatchModal from '../components/MatchModal';
 import { isPushSupported, getPermissionStatus, subscribeToPush } from '../utils/pushNotifications';
 import { shouldPromptRating, dismissRatingPrompt, getStoreUrl } from '../utils/appRating';
+import { openExternal } from '../utils/capacitor';
 import { Button } from '../components/ui/button';
 import {
   Dialog,
@@ -374,7 +375,7 @@ export default function SeekerDashboard() {
         if (storeUrl) {
           toast('Enjoying Hireabble?', {
             description: 'A quick rating helps us reach more job seekers!',
-            action: { label: 'Rate us', onClick: () => { dismissRatingPrompt(); window.open(storeUrl, '_blank'); } },
+            action: { label: 'Rate us', onClick: () => { dismissRatingPrompt(); openExternal(storeUrl); } },
             cancel: { label: 'Not now', onClick: dismissRatingPrompt },
             duration: 10000,
           });
