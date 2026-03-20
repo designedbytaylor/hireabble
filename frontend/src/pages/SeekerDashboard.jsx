@@ -1787,7 +1787,7 @@ function SwipeCard({ job, onSwipe, expanded, setExpanded }) {
         {/* Content */}
         <div className="absolute inset-0 flex flex-col justify-end p-6 z-10">
           <div className="flex items-center gap-3 mb-4">
-            <img src={job.company_logo} alt={job.company} className="w-12 h-12 rounded-xl object-cover border border-white/20" />
+            <img src={job.company_logo} alt={job.company} className="w-12 h-12 rounded-xl object-cover border border-white/20" onError={handleImgError(job.company)} />
             <div>
               <div className="text-sm text-muted-foreground">{job.company}</div>
               <div className="text-xs text-muted-foreground flex items-center gap-1">

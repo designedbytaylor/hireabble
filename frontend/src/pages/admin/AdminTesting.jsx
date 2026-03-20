@@ -3,7 +3,7 @@ import axios from 'axios';
 import { useAdminAuth } from '../../context/AdminAuthContext';
 import { Button } from '../../components/ui/button';
 import { Badge } from '../../components/ui/badge';
-import { getPhotoUrl } from '../../utils/helpers';
+import { getPhotoUrl, getAvatarFallback } from '../../utils/helpers';
 import {
   Database, Users, Trash2, Play,
   LogIn, ExternalLink, RefreshCw, CheckCircle,
@@ -294,6 +294,7 @@ export default function AdminTesting() {
                   src={getPhotoUrl(u.photo_url || u.avatar, u.id)}
                   alt={u.name}
                   className="w-8 h-8 sm:w-10 sm:h-10 rounded-full object-cover flex-shrink-0"
+                  onError={(e) => { e.target.onerror = null; e.target.src = getAvatarFallback(u.name || u.id); }}
                 />
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-1 flex-wrap">
