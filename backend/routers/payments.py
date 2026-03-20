@@ -518,6 +518,7 @@ async def subscribe(data: SubscriptionCheckout, current_user: dict = Depends(get
 @router.post("/apple/verify-receipt")
 @limiter.limit("10/minute")
 async def verify_apple_receipt(
+    request: Request,
     data: AppleReceiptValidation,
     current_user: dict = Depends(get_current_user)
 ):
@@ -765,6 +766,7 @@ def _get_google_play_service():
 @router.post("/google/verify-purchase")
 @limiter.limit("10/minute")
 async def verify_google_purchase(
+    request: Request,
     data: GooglePlayPurchaseValidation,
     current_user: dict = Depends(get_current_user)
 ):
@@ -942,6 +944,7 @@ async def google_play_notification(request: Request):
 @router.post("/create-checkout-session")
 @limiter.limit("10/minute")
 async def create_checkout_session(
+    request: Request,
     data: CreateCheckoutSession,
     current_user: dict = Depends(get_current_user)
 ):
