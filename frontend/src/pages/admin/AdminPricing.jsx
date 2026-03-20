@@ -3,13 +3,13 @@ import axios from 'axios';
 import { useAdminAuth } from '../../context/AdminAuthContext';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
-import { DollarSign, Save, RotateCcw, Crown, Zap, Star } from 'lucide-react';
+import { DollarSign, Save, RotateCcw, Crown, Zap, Star, Globe, ChevronDown } from 'lucide-react';
 import { toast } from 'sonner';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
-function formatPrice(cents) {
-  return `$${(cents / 100).toFixed(2)}`;
+function formatPrice(cents, symbol = '$') {
+  return `${symbol}${(cents / 100).toFixed(2)}`;
 }
 
 function parseDollars(str) {
@@ -24,11 +24,25 @@ export default function AdminPricing() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [edits, setEdits] = useState({ tiers: {}, products: {} });
+  const [countries, setCountries] = useState({});
+  const [selectedCountry, setSelectedCountry] = useState('CA');
+  const [currencySymbol, setCurrencySymbol] = useState('CA$');
 
-  const fetchPricing = useCallback(async () => {
+  const fetchCountries = useCallback(async () => {
     try {
+      const res = await axios.get(`${API}/admin/pricing/countries`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setCountries(res.data.countries);
+    } catch { /* ignore */ }
+  }, [token]);
+
+  const fetchPricing = useCallback(async (country) => {
+    try {
+      const c = country || selectedCountry;
       const res = await axios.get(`${API}/admin/pricing`, {
         headers: { Authorization: `Bearer ${token}` },
+        params: c !== 'CA' ? { country: c } : {},
       });
       setTiers(res.data.tiers);
       setProducts(res.data.products);
@@ -38,9 +52,18 @@ export default function AdminPricing() {
     } finally {
       setLoading(false);
     }
-  }, [token]);
+  }, [token, selectedCountry]);
 
+  useEffect(() => { fetchCountries(); }, [fetchCountries]);
   useEffect(() => { fetchPricing(); }, [fetchPricing]);
+
+  const handleCountryChange = (country) => {
+    setSelectedCountry(country);
+    const info = countries[country];
+    setCurrencySymbol(info?.symbol || '$');
+    setLoading(true);
+    fetchPricing(country);
+  };
 
   const setTierPrice = (tierId, duration, value) => {
     setEdits(prev => ({
@@ -107,8 +130,10 @@ export default function AdminPricing() {
 
       await axios.put(`${API}/admin/pricing`, payload, {
         headers: { Authorization: `Bearer ${token}` },
+        params: selectedCountry !== 'CA' ? { country: selectedCountry } : {},
       });
-      toast.success('Pricing updated');
+      const label = countries[selectedCountry]?.name || 'default';
+      toast.success(`Pricing updated for ${label}`);
       fetchPricing();
     } catch (e) {
       toast.error(e.response?.data?.detail || 'Failed to save pricing');
@@ -118,12 +143,14 @@ export default function AdminPricing() {
   };
 
   const handleReset = async () => {
-    if (!window.confirm('Reset all prices to defaults? This cannot be undone.')) return;
+    const label = countries[selectedCountry]?.name || 'default';
+    if (!window.confirm(`Reset ${label} prices to defaults? This cannot be undone.`)) return;
     try {
       await axios.delete(`${API}/admin/pricing/reset`, {
         headers: { Authorization: `Bearer ${token}` },
+        params: selectedCountry !== 'CA' ? { country: selectedCountry } : {},
       });
-      toast.success('Pricing reset to defaults');
+      toast.success(`Pricing reset to defaults for ${label}`);
       fetchPricing();
     } catch (e) {
       toast.error('Failed to reset pricing');
@@ -170,6 +197,36 @@ export default function AdminPricing() {
         </div>
       </div>
 
+      {/* Country Selector */}
+      <div className="bg-gray-900 border border-gray-800 rounded-xl p-4 mb-6">
+        <div className="flex items-center gap-3">
+          <Globe className="w-5 h-5 text-blue-400 shrink-0" />
+          <div className="flex-1">
+            <label className="block text-sm font-medium text-gray-300 mb-1">Pricing Region</label>
+            <p className="text-xs text-gray-500">Set different prices per country. Canada is the default. Country-specific prices override the default when a user is in that region.</p>
+          </div>
+          <div className="relative">
+            <select
+              value={selectedCountry}
+              onChange={(e) => handleCountryChange(e.target.value)}
+              className="appearance-none bg-gray-800 border border-gray-700 text-white rounded-lg px-4 py-2 pr-8 text-sm focus:outline-none focus:border-blue-500 cursor-pointer"
+            >
+              {Object.entries(countries).map(([code, info]) => (
+                <option key={code} value={code}>
+                  {info.name} ({info.currency})
+                </option>
+              ))}
+            </select>
+            <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+          </div>
+        </div>
+        {selectedCountry !== 'CA' && (
+          <p className="text-xs text-amber-400 mt-2 ml-8">
+            Editing prices for <strong>{countries[selectedCountry]?.name}</strong> ({countries[selectedCountry]?.currency}). Leave blank to use Canada defaults.
+          </p>
+        )}
+      </div>
+
       {/* Subscription Tiers */}
       <h2 className="text-lg font-semibold text-white mb-3 flex items-center gap-2">
         <Crown className="w-5 h-5 text-amber-400" />
@@ -178,11 +235,12 @@ export default function AdminPricing() {
       <div className="grid gap-4 mb-8">
         {seekerTiers.map(([tierId, tier]) => (
           <TierPriceCard
-            key={tierId}
+            key={`${tierId}-${selectedCountry}`}
             tierId={tierId}
             tier={tier}
             getTierPrice={getTierPrice}
             setTierPrice={setTierPrice}
+            symbol={currencySymbol}
           />
         ))}
       </div>
@@ -194,11 +252,12 @@ export default function AdminPricing() {
       <div className="grid gap-4 mb-8">
         {recruiterTiers.map(([tierId, tier]) => (
           <TierPriceCard
-            key={tierId}
+            key={`${tierId}-${selectedCountry}`}
             tierId={tierId}
             tier={tier}
             getTierPrice={getTierPrice}
             setTierPrice={setTierPrice}
+            symbol={currencySymbol}
           />
         ))}
       </div>
@@ -211,11 +270,12 @@ export default function AdminPricing() {
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
         {seekerProducts.map(([prodId, prod]) => (
           <ProductPriceCard
-            key={prodId}
+            key={`${prodId}-${selectedCountry}`}
             productId={prodId}
             product={prod}
             getProductPrice={getProductPrice}
             setProductPrice={setProductPrice}
+            symbol={currencySymbol}
           />
         ))}
       </div>
@@ -227,24 +287,26 @@ export default function AdminPricing() {
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
         {recruiterProducts.map(([prodId, prod]) => (
           <ProductPriceCard
-            key={prodId}
+            key={`${prodId}-${selectedCountry}`}
             productId={prodId}
             product={prod}
             getProductPrice={getProductPrice}
             setProductPrice={setProductPrice}
+            symbol={currencySymbol}
           />
         ))}
       </div>
 
       <div className="text-xs text-gray-500 mt-4">
-        <p>Prices are in USD cents internally. Enter dollar amounts (e.g. $9.99) in the fields above.</p>
-        <p className="mt-1">For iOS/Android, prices must match what you configure in App Store Connect / Google Play Console.</p>
+        <p>Prices are stored in the smallest currency unit (cents). Enter amounts as displayed (e.g. 9.99) in the fields above.</p>
+        <p className="mt-1">For iOS/Android, prices must match what you configure in App Store Connect / Google Play Console per region.</p>
+        <p className="mt-1">You do NOT need separate apps per country — configure regional pricing in App Store Connect and Google Play Console from one app.</p>
       </div>
     </div>
   );
 }
 
-function TierPriceCard({ tierId, tier, getTierPrice, setTierPrice }) {
+function TierPriceCard({ tierId, tier, getTierPrice, setTierPrice, symbol = '$' }) {
   const durations = [
     { id: 'weekly', label: 'Weekly' },
     { id: 'monthly', label: 'Monthly' },
@@ -271,7 +333,7 @@ function TierPriceCard({ tierId, tier, getTierPrice, setTierPrice }) {
             <div key={dur.id}>
               <label className="block text-xs text-gray-400 mb-1">{dur.label}</label>
               <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm">$</span>
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm">{symbol}</span>
                 <Input
                   type="text"
                   value={(currentCents / 100).toFixed(2)}
@@ -279,14 +341,14 @@ function TierPriceCard({ tierId, tier, getTierPrice, setTierPrice }) {
                     const cents = parseDollars(e.target.value);
                     if (cents !== null) setTierPrice(tierId, dur.id, cents);
                   }}
-                  className={`pl-7 bg-gray-800 border-gray-700 text-white text-sm ${
+                  className={`pl-${symbol.length > 1 ? '10' : '7'} bg-gray-800 border-gray-700 text-white text-sm ${
                     isOverridden ? 'border-amber-500/50' : ''
                   }`}
                 />
               </div>
               {isOverridden && (
                 <p className="text-[10px] text-amber-400 mt-0.5">
-                  Default: {formatPrice(defaultCents)}
+                  Default: {formatPrice(defaultCents, symbol)}
                 </p>
               )}
             </div>
@@ -297,7 +359,7 @@ function TierPriceCard({ tierId, tier, getTierPrice, setTierPrice }) {
   );
 }
 
-function ProductPriceCard({ productId, product, getProductPrice, setProductPrice }) {
+function ProductPriceCard({ productId, product, getProductPrice, setProductPrice, symbol = '$' }) {
   const currentCents = getProductPrice(productId);
   const defaultCents = product.default_price;
   const isOverridden = currentCents !== defaultCents;
@@ -309,7 +371,7 @@ function ProductPriceCard({ productId, product, getProductPrice, setProductPrice
       <div>
         <label className="block text-xs text-gray-400 mb-1">Price</label>
         <div className="relative">
-          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm">$</span>
+          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm">{symbol}</span>
           <Input
             type="text"
             value={(currentCents / 100).toFixed(2)}
@@ -317,14 +379,14 @@ function ProductPriceCard({ productId, product, getProductPrice, setProductPrice
               const cents = parseDollars(e.target.value);
               if (cents !== null) setProductPrice(productId, cents);
             }}
-            className={`pl-7 bg-gray-800 border-gray-700 text-white text-sm ${
+            className={`pl-${symbol.length > 1 ? '10' : '7'} bg-gray-800 border-gray-700 text-white text-sm ${
               isOverridden ? 'border-amber-500/50' : ''
             }`}
           />
         </div>
         {isOverridden && (
           <p className="text-[10px] text-amber-400 mt-0.5">
-            Default: {formatPrice(defaultCents)}
+            Default: {formatPrice(defaultCents, symbol)}
           </p>
         )}
       </div>

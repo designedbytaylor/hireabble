@@ -2557,13 +2557,45 @@ async def update_app_store_settings(
 
 PRICING_OVERRIDES_KEY = "pricing_overrides"
 
+# Supported countries for pricing (country_code → display name, currency symbol)
+PRICING_COUNTRIES = {
+    "CA": {"name": "Canada", "currency": "CAD", "symbol": "CA$"},
+    "US": {"name": "United States", "currency": "USD", "symbol": "$"},
+    "GB": {"name": "United Kingdom", "currency": "GBP", "symbol": "£"},
+    "AU": {"name": "Australia", "currency": "AUD", "symbol": "A$"},
+    "IN": {"name": "India", "currency": "INR", "symbol": "₹"},
+    "DE": {"name": "Germany", "currency": "EUR", "symbol": "€"},
+    "FR": {"name": "France", "currency": "EUR", "symbol": "€"},
+    "BR": {"name": "Brazil", "currency": "BRL", "symbol": "R$"},
+    "MX": {"name": "Mexico", "currency": "MXN", "symbol": "MX$"},
+    "JP": {"name": "Japan", "currency": "JPY", "symbol": "¥"},
+    "KR": {"name": "South Korea", "currency": "KRW", "symbol": "₩"},
+    "NG": {"name": "Nigeria", "currency": "NGN", "symbol": "₦"},
+    "PH": {"name": "Philippines", "currency": "PHP", "symbol": "₱"},
+    "SG": {"name": "Singapore", "currency": "SGD", "symbol": "S$"},
+    "AE": {"name": "UAE", "currency": "AED", "symbol": "د.إ"},
+}
+
+def _pricing_key(country: str = ""):
+    """Get the DB key for a country's pricing overrides."""
+    if not country or country == "CA":
+        return PRICING_OVERRIDES_KEY
+    return f"{PRICING_OVERRIDES_KEY}_{country}"
+
+
+@router.get("/admin/pricing/countries")
+async def get_pricing_countries(admin=Depends(get_current_admin)):
+    """Get list of supported pricing countries."""
+    return {"countries": PRICING_COUNTRIES, "default": "CA"}
+
 
 @router.get("/admin/pricing")
-async def get_pricing(admin=Depends(get_current_admin)):
-    """Get all pricing: default definitions + any admin overrides."""
+async def get_pricing(country: str = "", admin=Depends(get_current_admin)):
+    """Get all pricing: default definitions + any admin overrides for a country."""
     from routers.payments import SUBSCRIPTION_TIERS, PRODUCTS
 
-    doc = await db.site_settings.find_one({"key": PRICING_OVERRIDES_KEY})
+    key = _pricing_key(country)
+    doc = await db.site_settings.find_one({"key": key})
     overrides = doc.get("value", {}) if doc else {}
 
     # Build tiers response with effective prices
@@ -2602,10 +2634,12 @@ async def get_pricing(admin=Depends(get_current_admin)):
 @router.put("/admin/pricing")
 async def update_pricing(
     body: dict = Body(...),
+    country: str = "",
     admin=Depends(get_current_admin),
 ):
-    """Update pricing overrides. Body: {tiers: {tier_id: {prices: {weekly, monthly, 6month}}}, products: {prod_id: {price}}}."""
-    doc = await db.site_settings.find_one({"key": PRICING_OVERRIDES_KEY})
+    """Update pricing overrides for a country. Body: {tiers: {tier_id: {prices: {weekly, monthly, 6month}}}, products: {prod_id: {price}}}."""
+    key = _pricing_key(country)
+    doc = await db.site_settings.find_one({"key": key})
     current = doc.get("value", {}) if doc else {}
 
     # Merge tier overrides
@@ -2633,21 +2667,24 @@ async def update_pricing(
                 current["products"][prod_id]["price"] = int(prod_data["price"])
 
     await db.site_settings.update_one(
-        {"key": PRICING_OVERRIDES_KEY},
-        {"$set": {"key": PRICING_OVERRIDES_KEY, "value": current, "updated_at": datetime.now(timezone.utc)}},
+        {"key": key},
+        {"$set": {"key": key, "value": current, "updated_at": datetime.now(timezone.utc)}},
         upsert=True,
     )
 
-    logger.info(f"Admin {admin['id']} updated pricing overrides")
-    return {"message": "Pricing updated successfully"}
+    label = PRICING_COUNTRIES.get(country, {}).get("name", "default") if country else "default"
+    logger.info(f"Admin {admin['id']} updated pricing overrides for {label}")
+    return {"message": f"Pricing updated for {label}"}
 
 
 @router.delete("/admin/pricing/reset")
-async def reset_pricing(admin=Depends(get_current_admin)):
-    """Reset all pricing back to defaults (removes all overrides)."""
-    await db.site_settings.delete_one({"key": PRICING_OVERRIDES_KEY})
-    logger.info(f"Admin {admin['id']} reset pricing to defaults")
-    return {"message": "Pricing reset to defaults"}
+async def reset_pricing(country: str = "", admin=Depends(get_current_admin)):
+    """Reset pricing back to defaults for a country (removes overrides)."""
+    key = _pricing_key(country)
+    await db.site_settings.delete_one({"key": key})
+    label = PRICING_COUNTRIES.get(country, {}).get("name", "default") if country else "default"
+    logger.info(f"Admin {admin['id']} reset pricing to defaults for {label}")
+    return {"message": f"Pricing reset to defaults for {label}"}
 
 
 # ==================== MARKETING DASHBOARD ====================
