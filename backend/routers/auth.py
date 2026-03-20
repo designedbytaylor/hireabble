@@ -2,6 +2,7 @@
 Authentication routes for Hireabble API
 """
 from fastapi import APIRouter, HTTPException, Depends, Request
+from fastapi.security import HTTPAuthorizationCredentials
 from datetime import datetime, timezone, timedelta
 import uuid
 import asyncio
