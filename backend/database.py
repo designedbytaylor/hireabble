@@ -388,6 +388,7 @@ class UserCreate(BaseModel):
     dob: Optional[str] = None  # Date of birth, ISO format YYYY-MM-DD
     marketing_emails_opt_in: bool = False
     promo_code: Optional[str] = None
+    referral_code: Optional[str] = None
 
 class UserLogin(BaseModel):
     email: EmailStr

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { User, Mail, Briefcase, MapPin, Save, LogOut, Building2, Download, Upload, CheckCircle, AlertCircle, Lock, Eye, EyeOff, ChevronDown, Plus, Trash2, GraduationCap, Award, Clock, Navigation2, Bell, BellOff, CreditCard, Crown, ExternalLink, FileText, Loader2, HelpCircle, Shield } from 'lucide-react';
+import { User, Mail, Briefcase, MapPin, Save, LogOut, Building2, Download, Upload, CheckCircle, AlertCircle, Lock, Eye, EyeOff, ChevronDown, Plus, Trash2, GraduationCap, Award, Clock, Navigation2, Bell, BellOff, CreditCard, Crown, ExternalLink, FileText, Loader2, HelpCircle, Shield, BadgeCheck, Gift, Copy, Share2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -171,6 +171,8 @@ export default function Profile() {
       fetchReferenceRequests();
       fetchSubscription();
       fetchEmail2FAStatus();
+      fetchVerificationStatus();
+      fetchReferralData();
     }
     // Check push notification status - auto-enable on first visit
     if (pushSupported) {
@@ -251,6 +253,63 @@ export default function Profile() {
       toast.error(e.response?.data?.detail || 'Failed to update 2FA setting');
     } finally {
       setToggling2FA(false);
+    }
+  };
+
+  const fetchVerificationStatus = async () => {
+    try {
+      const res = await axios.get(`${API}/users/verification/status`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setVerificationStatus(res.data.verified ? 'approved' : res.data.status);
+    } catch { /* ignore */ }
+  };
+
+  const handleRequestVerification = async () => {
+    setRequestingVerification(true);
+    try {
+      await axios.post(`${API}/users/verification/request`, {}, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setVerificationStatus('pending');
+      toast.success('Verification request submitted!');
+    } catch (e) {
+      toast.error(e.response?.data?.detail || 'Failed to request verification');
+    } finally {
+      setRequestingVerification(false);
+    }
+  };
+
+  const fetchReferralData = async () => {
+    setReferralLoading(true);
+    try {
+      const res = await axios.get(`${API}/users/referral`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setReferralData(res.data);
+    } catch { /* ignore */ }
+    finally { setReferralLoading(false); }
+  };
+
+  const handleCopyReferralCode = () => {
+    if (referralData?.referral_code) {
+      navigator.clipboard.writeText(referralData.referral_code);
+      toast.success('Referral code copied!');
+    }
+  };
+
+  const handleShareReferral = async () => {
+    if (!referralData?.referral_code) return;
+    const shareData = {
+      title: 'Join Hireabble',
+      text: `Join Hireabble using my referral code ${referralData.referral_code} and help me earn Super Swipes!`,
+      url: `${window.location.origin}/signup?ref=${referralData.referral_code}`,
+    };
+    if (navigator.share) {
+      try { await navigator.share(shareData); } catch { /* cancelled */ }
+    } else {
+      navigator.clipboard.writeText(shareData.url);
+      toast.success('Referral link copied!');
     }
   };
 
@@ -460,6 +519,10 @@ export default function Profile() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [exportLoading, setExportLoading] = useState(false);
+  const [verificationStatus, setVerificationStatus] = useState(null); // null, 'pending', 'approved', 'rejected'
+  const [requestingVerification, setRequestingVerification] = useState(false);
+  const [referralData, setReferralData] = useState(null);
+  const [referralLoading, setReferralLoading] = useState(false);
 
   const handleExportData = async () => {
     setExportLoading(true);
@@ -627,7 +690,10 @@ export default function Profile() {
                 className="hidden"
               />
             </div>
-            <h2 className="text-xl font-bold font-['Outfit']">{user?.name}</h2>
+            <h2 className="text-xl font-bold font-['Outfit'] flex items-center justify-center gap-1.5">
+              {user?.name}
+              {user?.verified && <BadgeCheck className="w-5 h-5 text-blue-400 shrink-0" />}
+            </h2>
             <p className="text-muted-foreground">{user?.email}</p>
             <span className="inline-block mt-2 px-3 py-1 rounded-full bg-primary/20 text-primary text-sm capitalize">
               {user?.role}
@@ -1435,6 +1501,84 @@ export default function Profile() {
 
           {/* Email Notifications */}
           <EmailNotificationSettings token={token} />
+
+          {/* Profile Verification */}
+          <div className="glass-card rounded-2xl p-5 mt-6">
+            <h3 className="text-lg font-bold font-['Outfit'] mb-3 flex items-center gap-2">
+              <BadgeCheck className="w-5 h-5" /> Profile Verification
+            </h3>
+            {verificationStatus === 'approved' || user?.verified ? (
+              <div className="flex items-center gap-2 text-blue-400">
+                <BadgeCheck className="w-5 h-5" />
+                <span className="text-sm font-medium">Your profile is verified</span>
+              </div>
+            ) : verificationStatus === 'pending' ? (
+              <div className="flex items-center gap-2 text-amber-500">
+                <Clock className="w-4 h-4" />
+                <span className="text-sm">Verification request pending admin review</span>
+              </div>
+            ) : (
+              <>
+                <p className="text-sm text-muted-foreground mb-3">
+                  Get a verified badge on your profile to build trust with {user?.role === 'seeker' ? 'recruiters' : 'candidates'}.
+                </p>
+                {verificationStatus === 'rejected' && (
+                  <p className="text-sm text-destructive mb-3">Your previous request was not approved. You can try again.</p>
+                )}
+                <Button
+                  onClick={handleRequestVerification}
+                  disabled={requestingVerification}
+                  className="rounded-full bg-gradient-to-r from-primary to-secondary hover:opacity-90"
+                  size="sm"
+                >
+                  {requestingVerification ? 'Submitting...' : 'Request Verification'}
+                </Button>
+              </>
+            )}
+          </div>
+
+          {/* Referral Program */}
+          <div className="glass-card rounded-2xl p-5 mt-6">
+            <h3 className="text-lg font-bold font-['Outfit'] mb-3 flex items-center gap-2">
+              <Gift className="w-5 h-5" /> Invite Friends
+            </h3>
+            <p className="text-sm text-muted-foreground mb-4">
+              Share your referral code — when someone joins, you get <strong className="text-foreground">5 Super Swipes</strong>!
+            </p>
+            {referralLoading ? (
+              <div className="flex items-center gap-2 text-muted-foreground">
+                <Loader2 className="w-4 h-4 animate-spin" /> Loading...
+              </div>
+            ) : referralData ? (
+              <div className="space-y-4">
+                <div className="flex items-center gap-2">
+                  <div className="flex-1 bg-muted/50 rounded-xl px-4 py-3 font-mono text-lg font-bold tracking-widest text-center">
+                    {referralData.referral_code}
+                  </div>
+                  <button
+                    onClick={handleCopyReferralCode}
+                    className="w-10 h-10 rounded-xl bg-primary/10 border border-primary/30 flex items-center justify-center hover:bg-primary/20 transition-colors"
+                    title="Copy code"
+                  >
+                    <Copy className="w-4 h-4 text-primary" />
+                  </button>
+                  <button
+                    onClick={handleShareReferral}
+                    className="w-10 h-10 rounded-xl bg-primary/10 border border-primary/30 flex items-center justify-center hover:bg-primary/20 transition-colors"
+                    title="Share"
+                  >
+                    <Share2 className="w-4 h-4 text-primary" />
+                  </button>
+                </div>
+                {referralData.referral_count > 0 && (
+                  <p className="text-sm text-muted-foreground">
+                    {referralData.referral_count} friend{referralData.referral_count !== 1 ? 's' : ''} joined
+                    {' '}· {referralData.total_swipes_earned} Super Swipes earned
+                  </p>
+                )}
+              </div>
+            ) : null}
+          </div>
 
           {/* Subscription Management */}
           {user?.subscription?.tier_id && (

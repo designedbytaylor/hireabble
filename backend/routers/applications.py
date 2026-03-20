@@ -196,7 +196,7 @@ async def browse_candidates(
         "school": 1, "degree": 1, "current_employer": 1, "bio": 1,
         "work_preference": 1, "certifications": 1, "work_history": 1,
         "education": 1, "created_at": 1, "subscription": 1,
-        "profile_boost_until": 1, "incognito_mode": 1,
+        "profile_boost_until": 1, "incognito_mode": 1, "verified": 1,
     }
     limit = min(limit, 100)
     seekers = await db.users.find(
@@ -736,16 +736,24 @@ async def undo_last_swipe(current_user: dict = Depends(get_current_user)):
 
     uid = current_user["id"]
 
-    # Check subscription allows undo
+    # Check subscription tier
     sub = current_user.get("subscription") or {}
     now = datetime.now(timezone.utc).isoformat()
-    can_undo = (
+    is_paid = (
         sub.get("status") == "active"
         and sub.get("period_end", "") >= now
         and sub.get("tier_id", "") in ("seeker_plus", "seeker_premium")
     )
-    if not can_undo:
-        raise HTTPException(status_code=403, detail="Upgrade to Plus or Premium to undo swipes")
+
+    # Free tier gets 1 undo per day; paid tiers get unlimited
+    if not is_paid:
+        today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0).isoformat()
+        undos_today = await db.undo_log.count_documents({
+            "user_id": uid,
+            "created_at": {"$gte": today_start},
+        })
+        if undos_today >= 1:
+            raise HTTPException(status_code=403, detail="Free tier allows 1 undo per day. Upgrade for unlimited undos!")
 
     # Find the most recent application (like or superlike, not pass)
     last_app = await db.applications.find_one(
@@ -762,6 +770,14 @@ async def undo_last_swipe(current_user: dict = Depends(get_current_user)):
 
     # Delete the application
     await db.applications.delete_one({"id": last_app["id"]})
+
+    # Log the undo for daily limit tracking (free tier)
+    await db.undo_log.insert_one({
+        "user_id": uid,
+        "job_id": last_app["job_id"],
+        "action": last_app["action"],
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    })
 
     # If it was a superlike, refund the daily count (by not doing anything — the count
     # is derived from DB at query time, so deleting the record is sufficient)

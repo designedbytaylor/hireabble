@@ -109,7 +109,7 @@ SUBSCRIPTION_TIERS = {
         "features": [
             "10 Super Likes per day (vs 3)",
             "See who viewed your profile",
-            "Undo last swipe",
+            "Unlimited undo swipes (free: 1/day)",
             "Priority application badge",
             "Advanced job filters",
             "1 weekly profile boost",

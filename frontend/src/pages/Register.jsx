@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
-import { Mail, Lock, User, Building2, ArrowRight, Eye, EyeOff, MapPin, Search, Users, Zap, Target, Shield, BarChart3, Tag, ChevronDown } from 'lucide-react';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { Mail, Lock, User, Building2, ArrowRight, Eye, EyeOff, MapPin, Search, Users, Zap, Target, Shield, BarChart3, Tag, ChevronDown, Gift } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
@@ -67,6 +67,8 @@ export default function Register() {
   const [promoCode, setPromoCode] = useState('');
   const [showPromo, setShowPromo] = useState(false);
   const [promoStatus, setPromoStatus] = useState(null); // null | 'checking' | { valid, reason?, tier_name?, duration_days? }
+  const [searchParams] = useSearchParams();
+  const [referralCode, setReferralCode] = useState(searchParams.get('ref') || '');
   const { register } = useAuth();
   const navigate = useNavigate();
 
@@ -111,6 +113,7 @@ export default function Register() {
     try {
       const payload = { ...formData, marketing_emails_opt_in: marketingOptIn };
       if (promoCode.trim()) payload.promo_code = promoCode.trim();
+      if (referralCode.trim()) payload.referral_code = referralCode.trim();
       const user = await register(payload);
       if (user._promoApplied) {
         toast.success(`Promo applied! You have ${user._promoApplied.tier_name} for ${user._promoApplied.duration_days} days.`, { duration: 5000 });
@@ -356,6 +359,16 @@ export default function Register() {
                   </div>
                 </div>
               </div>
+
+              {/* Referral Code */}
+              {(referralCode || searchParams.get('ref')) && (
+                <div className="flex items-center gap-2 mt-2 p-3 rounded-xl bg-green-500/10 border border-green-500/20">
+                  <Gift className="w-4 h-4 text-green-500 shrink-0" />
+                  <span className="text-sm text-green-500">
+                    Referred by code: <strong>{referralCode}</strong>
+                  </span>
+                </div>
+              )}
 
               <Button
                 type="submit"
