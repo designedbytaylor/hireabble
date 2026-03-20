@@ -210,7 +210,8 @@ export const AuthProvider = ({ children }) => {
       setUser(response.data);
       persistToken(impersonateToken, response.data);
       return response.data;
-    } catch {
+    } catch (err) {
+      console.error('loginWithToken /auth/me failed:', err.response?.status, err.response?.data || err.message);
       clearPersistedToken();
       setToken(null);
       return null;

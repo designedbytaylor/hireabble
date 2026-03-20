@@ -432,7 +432,7 @@ class UserResponse(BaseModel):
     marketing_emails_opt_in: bool = False
     status: Optional[str] = None
     profile_boost_until: Optional[str] = None
-    created_at: str
+    created_at: Optional[str] = None
 
 class JobCreate(BaseModel):
     title: str

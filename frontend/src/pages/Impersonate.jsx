@@ -43,7 +43,7 @@ export default function Impersonate() {
         toast.success(`Logged in as ${user.name}`);
         navigate(redirect, { replace: true });
       } else {
-        toast.error('Impersonation failed — user may be banned or suspended');
+        toast.error('Impersonation failed — could not load user profile');
         navigate('/login', { replace: true });
       }
     });
