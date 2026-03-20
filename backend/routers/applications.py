@@ -956,6 +956,20 @@ async def get_applications(
             if other:
                 app["other_applications"] = other
 
+    # Attach match_id for matched applications so frontend can navigate to chat
+    matched_apps = [a for a in applications if a.get("is_matched")]
+    if matched_apps:
+        matched_seeker_ids = list(set(a.get("seeker_id") for a in matched_apps))
+        matches = await db.matches.find(
+            {"recruiter_id": current_user["id"], "seeker_id": {"$in": matched_seeker_ids}},
+            {"_id": 0, "id": 1, "seeker_id": 1, "job_id": 1}
+        ).to_list(500)
+        match_lookup = {(m["seeker_id"], m.get("job_id")): m["id"] for m in matches}
+        for app in matched_apps:
+            key = (app.get("seeker_id"), app.get("job_id"))
+            if key in match_lookup:
+                app["match_id"] = match_lookup[key]
+
     # Sort: superlikes first, then premium seekers, then regular - newest first within each group
     superlikes = [a for a in applications if a.get("action") == "superlike"]
     premium_regulars = [a for a in applications if a.get("action") != "superlike" and a.get("is_premium_seeker")]

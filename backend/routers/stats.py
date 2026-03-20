@@ -849,14 +849,20 @@ async def download_applicant_resume_pdf(seeker_id: str, current_user: dict = Dep
     if current_user["role"] != "recruiter":
         raise HTTPException(status_code=403, detail="Only recruiters can download applicant resumes")
 
-    # Verify there's an application from this seeker to this recruiter
+    # Verify there's an application or match between this seeker and recruiter
     app = await db.applications.find_one({
         "seeker_id": seeker_id,
         "recruiter_id": current_user["id"],
         "action": {"$in": ["like", "superlike"]}
     })
     if not app:
-        raise HTTPException(status_code=403, detail="No application from this seeker")
+        # Also allow if there's a match (e.g. recruiter swiped right first)
+        match = await db.matches.find_one({
+            "seeker_id": seeker_id,
+            "recruiter_id": current_user["id"]
+        })
+        if not match:
+            raise HTTPException(status_code=403, detail="No application from this seeker")
 
     user = await db.users.find_one({"id": seeker_id}, {"_id": 0, "password": 0})
     if not user:
