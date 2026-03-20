@@ -43,6 +43,7 @@ from routers import auth, jobs, applications, matches, notifications, uploads, s
 limiter = Limiter(key_func=get_remote_address, default_limits=["120/minute"])
 
 # Create the main app — disable docs/OpenAPI in production to reduce attack surface
+import os
 _is_production = os.getenv("ENVIRONMENT", "production") != "development"
 app = FastAPI(
     title="Hireabble API",
