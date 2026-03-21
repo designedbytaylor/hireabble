@@ -408,7 +408,7 @@ export default function RecruiterDashboard() {
             <div className="w-12 h-12 rounded-xl bg-success/20 flex items-center justify-center mb-3">
               <Users className="w-6 h-6 text-success" />
             </div>
-            <div className="text-3xl font-bold font-['Outfit']">{stats.pending_applications || 0}</div>
+            <div className="text-3xl font-bold font-['Outfit']">{stats.pipeline_counts?.applied || 0}</div>
             <div className="text-sm text-muted-foreground flex items-center gap-1">New Applicants <ChevronRight className="w-3 h-3" /></div>
           </div>
           <div
