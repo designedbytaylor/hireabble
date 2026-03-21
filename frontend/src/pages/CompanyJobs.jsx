@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useState, useEffect, useCallback } from 'react';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { ArrowLeft, MapPin, DollarSign, Building2, Briefcase, Clock, Heart, Star } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { toast } from 'sonner';
@@ -23,18 +23,15 @@ export default function CompanyJobs() {
   useDocumentTitle('Company');
   const { recruiterId } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const { token, user } = useAuth();
   const [company, setCompany] = useState(null);
   const [jobs, setJobs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [applying, setApplying] = useState(null);
 
-  useEffect(() => {
-    fetchCompanyJobs();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [recruiterId]);
-
-  const fetchCompanyJobs = async () => {
+  const fetchCompanyJobs = useCallback(async () => {
+    setLoading(true);
     try {
       const response = await axios.get(`${API}/jobs/company/${recruiterId}`, {
         headers: { Authorization: `Bearer ${token}` }
@@ -46,7 +43,11 @@ export default function CompanyJobs() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [recruiterId, token]);
+
+  useEffect(() => {
+    fetchCompanyJobs();
+  }, [fetchCompanyJobs, location.key]);
 
   const handleApply = async (jobId) => {
     setApplying(jobId);
