@@ -351,6 +351,20 @@ async def get_recruiter_dashboard_data(current_user: dict = Depends(get_current_
         if stage in stage_map:
             app["pipeline_stage"] = stage_map[stage]
 
+    # Attach match_id so frontend can navigate directly to chat
+    matched_apps = [a for a in applications if a.get("recruiter_action") == "accept"]
+    if matched_apps:
+        matched_seeker_ids = list(set(a.get("seeker_id") for a in matched_apps))
+        matches = await db.matches.find(
+            {"recruiter_id": uid, "seeker_id": {"$in": matched_seeker_ids}},
+            {"_id": 0, "id": 1, "seeker_id": 1, "job_id": 1}
+        ).to_list(500)
+        match_lookup = {(m["seeker_id"], m.get("job_id")): m["id"] for m in matches}
+        for app in matched_apps:
+            key = (app.get("seeker_id"), app.get("job_id"))
+            if key in match_lookup:
+                app["match_id"] = match_lookup[key]
+
     # Subscription status
     sub = (user_sub_data or {}).get("subscription", {})
     from routers.payments import SUBSCRIPTION_TIERS

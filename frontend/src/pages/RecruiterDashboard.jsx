@@ -944,7 +944,11 @@ export default function RecruiterDashboard() {
                   </div>
                   <Button
                     size="sm"
-                    onClick={() => { setSelectedCandidate(null); navigate('/matches'); }}
+                    onClick={() => {
+                      const matchId = selectedCandidate.match_id;
+                      setSelectedCandidate(null);
+                      navigate(matchId ? `/chat/${matchId}` : '/messages');
+                    }}
                     className="w-full rounded-xl bg-gradient-to-r from-primary to-secondary"
                   >
                     <MessageCircle className="w-4 h-4 mr-1.5" />
