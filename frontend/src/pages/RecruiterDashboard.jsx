@@ -954,6 +954,50 @@ export default function RecruiterDashboard() {
                     <MessageCircle className="w-4 h-4 mr-1.5" />
                     Message
                   </Button>
+                  <Button
+                    size="sm"
+                    onClick={() => {
+                      const app = selectedCandidate;
+                      setSelectedCandidate(null);
+                      navigate('/interviews', { state: { seekerId: app.seeker_id, seekerName: app.seeker_name } });
+                    }}
+                    className="w-full rounded-xl bg-purple-500/20 border border-purple-500/30 text-purple-400 hover:bg-purple-500/30"
+                    variant="outline"
+                  >
+                    <Calendar className="w-4 h-4 mr-1.5" />
+                    Schedule Interview
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={async () => {
+                      const app = selectedCandidate;
+                      try {
+                        await axios.put(`${API}/applications/${app.id}/stage`,
+                          { stage: 'declined' },
+                          { headers: { Authorization: `Bearer ${token}` } }
+                        );
+                        setApplications(prev => prev.map(a =>
+                          a.id === app.id ? { ...a, pipeline_stage: 'declined', recruiter_action: 'reject' } : a
+                        ));
+                        setStats(prev => ({
+                          ...prev,
+                          pipeline_counts: {
+                            ...prev.pipeline_counts,
+                            shortlisted: Math.max(0, (prev.pipeline_counts?.shortlisted || 0) - 1),
+                          },
+                        }));
+                        setSelectedCandidate(null);
+                        toast.info('Candidate declined');
+                      } catch {
+                        toast.error('Failed to update candidate');
+                      }
+                    }}
+                    className="w-full rounded-xl text-muted-foreground hover:text-red-400 hover:bg-red-500/10"
+                  >
+                    <X className="w-4 h-4 mr-1.5" />
+                    Pass on Applicant
+                  </Button>
                 </div>
               ) : (
                 <div className="py-3 rounded-xl text-center font-medium bg-muted text-muted-foreground">
