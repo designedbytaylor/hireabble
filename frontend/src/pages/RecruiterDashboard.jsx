@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -48,6 +48,7 @@ export default function RecruiterDashboard() {
   const [stats, setStats] = useState({ active_jobs: 0, total_applications: 0, super_likes: 0, matches: 0 });
   const [jobs, setJobs] = useState([]);
   const [applications, setApplications] = useState([]);
+  const unlockedAppIds = useRef(new Set()); // tracks which app IDs were originally in the free visible slots
   const [loading, setLoading] = useState(true);
   const [showNewJob, setShowNewJob] = useState(false);
   const [editingJob, setEditingJob] = useState(null);
@@ -76,6 +77,9 @@ export default function RecruiterDashboard() {
       setStats(data.stats);
       setJobs(data.jobs);
       setApplications(data.applications);
+      // Snapshot which pending app IDs are in the free visible slots (first 3)
+      const pending = (data.applications || []).filter(a => !a.recruiter_action);
+      unlockedAppIds.current = new Set(pending.slice(0, 3).map(a => a.id));
       setSubscription(data.subscription);
     } catch (error) {
       console.error('Failed to fetch data:', error);
@@ -459,7 +463,7 @@ export default function RecruiterDashboard() {
                     {applications.filter(a => !a.recruiter_action).slice(0, 10).map((app, appIndex) => (
                       <PremiumBlur
                         key={app.id}
-                        isUnlocked={subscription?.subscribed || appIndex < 3}
+                        isUnlocked={subscription?.subscribed || unlockedAppIds.current.has(app.id)}
                         tierHint="recruiter_pro"
                         trigger="blurred"
                       >

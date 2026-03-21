@@ -631,6 +631,7 @@ def _call_anthropic(client, messages, max_tokens=4000):
     """Call Anthropic API with model fallback chain."""
     models = [
         "claude-haiku-4-5-20251001",
+        "claude-sonnet-4-5-20250514",
         "claude-3-5-haiku-20241022",
         "claude-3-haiku-20240307",
     ]
@@ -823,7 +824,10 @@ Keep the core content but make it more compelling and well-organized. Do NOT inc
         }
     except Exception as e:
         logger.error(f"AI assist failed: {type(e).__name__}: {e}")
-        raise HTTPException(status_code=500, detail="AI assist failed. Please try again.")
+        detail = "AI assist failed. Please try again."
+        if "api_key" in str(e).lower() or "auth" in str(e).lower():
+            detail = "AI service not configured. Please check ANTHROPIC_API_KEY."
+        raise HTTPException(status_code=500, detail=detail)
 
 
 # ==================== SAVED JOBS ====================
