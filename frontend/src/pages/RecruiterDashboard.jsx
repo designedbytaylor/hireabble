@@ -121,14 +121,17 @@ export default function RecruiterDashboard() {
     ));
     setStats(prev => ({
       ...prev,
-      matches: action === 'accept' ? (prev.matches || 0) + 1 : prev.matches,
       pending_applications: Math.max(0, (prev.pending_applications || 0) - 1),
+      pipeline_counts: {
+        ...prev.pipeline_counts,
+        shortlisted: action === 'accept' ? (prev.pipeline_counts?.shortlisted || 0) + 1 : (prev.pipeline_counts?.shortlisted || 0),
+      },
     }));
 
     if (action === 'accept') {
-      toast.success("Candidate moved forward!");
+      toast.success("Candidate shortlisted!");
     } else {
-      toast.info('Application declined');
+      toast.info('Candidate archived');
     }
 
     // Fire API call in background — revert on failure
@@ -393,8 +396,8 @@ export default function RecruiterDashboard() {
             <div className="w-12 h-12 rounded-xl bg-success/20 flex items-center justify-center mb-3">
               <Users className="w-6 h-6 text-success" />
             </div>
-            <div className="text-3xl font-bold font-['Outfit']">{stats.total_applications}</div>
-            <div className="text-sm text-muted-foreground flex items-center gap-1">Applied <ChevronRight className="w-3 h-3" /></div>
+            <div className="text-3xl font-bold font-['Outfit']">{stats.pending_applications || 0}</div>
+            <div className="text-sm text-muted-foreground flex items-center gap-1">New Applicants <ChevronRight className="w-3 h-3" /></div>
           </div>
           <div className="glass-card rounded-2xl p-5 hover:border-secondary/30 transition-colors">
             <div className="w-12 h-12 rounded-xl bg-secondary/20 flex items-center justify-center mb-3">
@@ -413,13 +416,13 @@ export default function RecruiterDashboard() {
           </div>
           <div
             className="glass-card rounded-2xl p-5 hover:border-primary/30 transition-colors cursor-pointer active:scale-[0.97]"
-            onClick={() => navigate('/matches')}
+            onClick={() => navigate('/recruiter/applications?stage=shortlisted')}
           >
             <div className="w-12 h-12 rounded-xl bg-primary/20 flex items-center justify-center mb-3">
-              <Sparkles className="w-6 h-6 text-primary" />
+              <Star className="w-6 h-6 text-primary" />
             </div>
-            <div className="text-3xl font-bold font-['Outfit']">{stats.matches}</div>
-            <div className="text-sm text-muted-foreground flex items-center gap-1">Moving Forward <ChevronRight className="w-3 h-3" /></div>
+            <div className="text-3xl font-bold font-['Outfit']">{stats.pipeline_counts?.shortlisted || 0}</div>
+            <div className="text-sm text-muted-foreground flex items-center gap-1">Shortlisted <ChevronRight className="w-3 h-3" /></div>
           </div>
         </div>
 
@@ -428,10 +431,8 @@ export default function RecruiterDashboard() {
           <div className="flex gap-2 mt-4 overflow-x-auto pb-1">
             {[
               { key: 'applied', label: 'Applied', icon: '🆕', color: 'text-blue-400 bg-blue-500/10 border-blue-500/20' },
-              { key: 'reviewing', label: 'Viewed', icon: '👀', color: 'text-amber-400 bg-amber-500/10 border-amber-500/20' },
               { key: 'shortlisted', label: 'Shortlisted', icon: '⭐', color: 'text-yellow-400 bg-yellow-500/10 border-yellow-500/20' },
               { key: 'interviewing', label: 'Interview', icon: '🎯', color: 'text-purple-400 bg-purple-500/10 border-purple-500/20' },
-              { key: 'offered', label: 'Offered', icon: '🚀', color: 'text-green-400 bg-green-500/10 border-green-500/20' },
               { key: 'hired', label: 'Hired', icon: '✅', color: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20' },
             ].map(stage => (
               <div
@@ -529,14 +530,14 @@ export default function RecruiterDashboard() {
               )}
 
               {/* Shortlisted */}
-              {applications.filter(a => a.pipeline_stage === 'shortlisted').length > 0 && (
+              {applications.filter(a => a.pipeline_stage === 'shortlisted' || a.recruiter_action === 'accept').length > 0 && (
                 <div className="mb-6">
                   <h2 className="text-xl font-bold font-['Outfit'] mb-4 flex items-center gap-2">
                     ⭐ Shortlisted
-                    <span className="text-sm font-normal text-muted-foreground">({applications.filter(a => a.pipeline_stage === 'shortlisted').length})</span>
+                    <span className="text-sm font-normal text-muted-foreground">({applications.filter(a => a.pipeline_stage === 'shortlisted' || a.recruiter_action === 'accept').length})</span>
                   </h2>
                   <div className="flex gap-4 overflow-x-auto pb-4">
-                    {applications.filter(a => a.pipeline_stage === 'shortlisted').map((app) => (
+                    {applications.filter(a => a.pipeline_stage === 'shortlisted' || a.recruiter_action === 'accept').map((app) => (
                       <div
                         key={app.id}
                         className="glass-card rounded-2xl p-4 min-w-[220px] flex-shrink-0 relative cursor-pointer hover:border-primary/30 transition-colors"
@@ -564,41 +565,6 @@ export default function RecruiterDashboard() {
                 </div>
               )}
 
-              {/* Moving Forward */}
-              {applications.filter(a => a.recruiter_action === 'accept').length > 0 && (
-                <div className="mb-6">
-                  <h2 className="text-xl font-bold font-['Outfit'] mb-4 flex items-center gap-2">
-                    🚀 Moving Forward
-                    <span className="text-sm font-normal text-muted-foreground">({applications.filter(a => a.recruiter_action === 'accept').length})</span>
-                  </h2>
-                  <div className="flex gap-4 overflow-x-auto pb-4">
-                    {applications.filter(a => a.recruiter_action === 'accept').map((app) => (
-                      <div
-                        key={app.id}
-                        className="glass-card rounded-2xl p-4 min-w-[220px] flex-shrink-0 relative cursor-pointer hover:border-primary/30 transition-colors"
-                        onClick={() => setSelectedCandidate(app)}
-                      >
-                        <div className="flex items-center gap-3 mb-3">
-                          <img
-                            src={getPhotoUrl(app.seeker_photo || app.seeker_avatar, app.seeker_name || app.seeker_id)}
-                            alt={app.seeker_name}
-                            className="w-14 h-14 rounded-full border-2 border-green-500/50 object-cover"
-                            loading="lazy"
-                          />
-                        </div>
-                        <div className="font-medium truncate">{app.seeker_name}</div>
-                        <div className="text-sm text-primary truncate">{app.seeker_title || 'Job Seeker'}</div>
-                        {app.seeker_experience && (
-                          <div className="text-xs text-muted-foreground mt-1">{app.seeker_experience}+ years exp</div>
-                        )}
-                        <div className="mt-3 py-2 rounded-lg text-center text-sm bg-green-500/10 text-green-400">
-                          Moving Forward
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
             </>
           ) : (
             <div className="glass-card rounded-2xl p-8 text-center">
@@ -919,7 +885,7 @@ export default function RecruiterDashboard() {
                     }}
                   >
                     <Check className="w-5 h-5 mr-2" />
-                    Move Forward
+                    Shortlist
                   </Button>
                 </div>
               ) : selectedCandidate.recruiter_action === 'accept' ? (
@@ -927,10 +893,10 @@ export default function RecruiterDashboard() {
                   <div className="p-4 rounded-xl bg-green-500/10 border border-green-500/20">
                     <div className="flex items-center gap-2 text-green-400 font-medium mb-1">
                       <Rocket className="w-4 h-4" />
-                      You're moving forward with this candidate
+                      Candidate shortlisted
                     </div>
                     <p className="text-xs text-muted-foreground">
-                      This candidate applied and you expressed interest. You can now message them.
+                      This candidate applied and you expressed interest. You can now message them or review their resume.
                     </p>
                   </div>
                   <div className="flex gap-2">
@@ -1636,7 +1602,7 @@ function JobApplicationsDialog({ selectedJob, onClose, jobApplications, onViewCa
     { key: 'all', label: 'All', count: jobApplications.length },
     { key: 'pending', label: 'Pending', count: pendingApps.length },
     { key: 'superlike', label: 'Priority Applies', count: jobApplications.filter(a => a.action === 'superlike').length },
-    { key: 'matched', label: 'Moving Forward', count: jobApplications.filter(a => a.recruiter_action === 'accept').length },
+    { key: 'matched', label: 'Shortlisted', count: jobApplications.filter(a => a.recruiter_action === 'accept').length },
   ];
 
   return (
@@ -1753,7 +1719,7 @@ function JobApplicationsDialog({ selectedJob, onClose, jobApplications, onViewCa
                         ? 'bg-success/10 text-success'
                         : 'bg-muted text-muted-foreground'
                     }`}>
-                      {app.recruiter_action === 'accept' ? 'Moving Forward' : 'Declined'}
+                      {app.recruiter_action === 'accept' ? 'Shortlisted' : 'Declined'}
                     </span>
                   )}
                 </div>

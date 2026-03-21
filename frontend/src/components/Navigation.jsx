@@ -88,7 +88,7 @@ export default memo(function Navigation() {
     }]),
     {
       icon: Sparkles,
-      label: 'Opportunities',
+      label: isSeeker ? 'Opportunities' : 'Pipeline',
       path: '/matches'
     },
     {

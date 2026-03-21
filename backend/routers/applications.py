@@ -59,7 +59,7 @@ def get_match_email_html(job_title: str, company: str, other_name: str, is_seeke
             <h1 style="color: #6366f1; margin: 0;">Hireabble</h1>
         </div>
         <div style="background: linear-gradient(135deg, #6366f1 0%, #d946ef 100%); padding: 30px; border-radius: 16px; text-align: center;">
-            <h2 style="color: white; margin: 0 0 10px 0;">It's a Match!</h2>
+            <h2 style="color: white; margin: 0 0 10px 0;">You've Been Shortlisted!</h2>
             <p style="color: rgba(255,255,255,0.9); margin: 0; font-size: 18px;">{safe_job_title}</p>
             <p style="color: rgba(255,255,255,0.7); margin: 5px 0 0 0;">{safe_company}</p>
         </div>
@@ -68,7 +68,7 @@ def get_match_email_html(job_title: str, company: str, other_name: str, is_seeke
             <a href="{os.environ.get('FRONTEND_URL', 'https://hireabble.com')}/matches" style="display: inline-block; background: #6366f1; color: white; padding: 14px 40px; border-radius: 25px; text-decoration: none; font-weight: bold;">{cta_text}</a>
         </div>
         <div style="border-top: 1px solid #eee; padding-top: 20px; text-align: center; color: #999; font-size: 12px;">
-            <p>Hireabble - Your career starts with a swipe</p>
+            <p>Hireabble - Where talent meets opportunity</p>
         </div>
     </div>
     """
@@ -364,7 +364,7 @@ async def _recruiter_swipe_post_process(
                 create_notification(
                     user_id=seeker_id,
                     notif_type="match",
-                    title="It's a Match!",
+                    title="You've Been Shortlisted!",
                     message=f"{recruiter_snapshot.get('company', 'A company')} is interested in you for the {job['title'] if job else 'a'} position!",
                     data={"match_id": match_id}
                 ),
@@ -724,7 +724,7 @@ async def swipe(request: Request, action: SwipeAction, current_user: dict = Depe
     invalidate(stats_cache, cache_key("stats", uid))
 
     # ── Phase 3: Check for match inline so the response includes match data ───
-    # This enables the frontend to show the "It's a Match!" modal immediately.
+    # This enables the frontend to show the shortlist notification modal immediately.
     match_data = None
     try:
         match_data = await _check_match_on_swipe(
@@ -1232,7 +1232,14 @@ async def respond_to_application(response: RecruiterAction, current_user: dict =
 
 # ==================== PIPELINE STAGES ====================
 
-PIPELINE_STAGES = ["applied", "reviewing", "shortlisted", "interviewing", "offered", "hired", "declined"]
+PIPELINE_STAGES = ["applied", "shortlisted", "interviewing", "hired", "declined"]
+
+# Map legacy stages to current stages for backward compatibility
+STAGE_NORMALIZATION = {"reviewing": "applied", "offered": "shortlisted"}
+
+def normalize_stage(stage):
+    """Normalize legacy pipeline stages to current valid stages."""
+    return STAGE_NORMALIZATION.get(stage, stage) if stage else "applied"
 
 class PipelineStageUpdate(BaseModel):
     stage: str

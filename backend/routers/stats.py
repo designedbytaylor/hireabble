@@ -291,7 +291,15 @@ async def get_recruiter_dashboard_data(current_user: dict = Depends(get_current_
         ]).to_list(20),
     )
 
-    pipeline_counts = {doc["_id"]: doc["count"] for doc in pipeline_agg if doc["_id"]}
+    # Normalize legacy pipeline stages (reviewing→applied, offered→shortlisted)
+    stage_map = {"reviewing": "applied", "offered": "shortlisted"}
+    raw_counts = {}
+    for doc in pipeline_agg:
+        if not doc["_id"]:
+            continue
+        normalized = stage_map.get(doc["_id"], doc["_id"])
+        raw_counts[normalized] = raw_counts.get(normalized, 0) + doc["count"]
+    pipeline_counts = raw_counts
 
     # Per-job stats aggregation
     response_rate = round((responded / total_applications * 100) if total_applications > 0 else 0)
@@ -336,6 +344,12 @@ async def get_recruiter_dashboard_data(current_user: dict = Depends(get_current_
     pr = [a for a in raw_applications if a.get("action") != "superlike" and a.get("is_premium_seeker")]
     rg = [a for a in raw_applications if a.get("action") != "superlike" and not a.get("is_premium_seeker")]
     applications = sl + pr + rg
+
+    # Normalize legacy pipeline stages on individual applications
+    for app in applications:
+        stage = app.get("pipeline_stage")
+        if stage in stage_map:
+            app["pipeline_stage"] = stage_map[stage]
 
     # Subscription status
     sub = (user_sub_data or {}).get("subscription", {})

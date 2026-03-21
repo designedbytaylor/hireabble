@@ -262,7 +262,7 @@ export default function RecruiterSwipe() {
         { headers: { Authorization: `Bearer ${token}` } }
       ).then(res => {
         if (action === 'accept' || action === 'superlike' || res.data?.is_matched) {
-          toast.success("New candidate ready! View their profile.", { duration: 2000 });
+          toast.success("Candidate shortlisted! View their profile.", { duration: 2000 });
         }
         if (action === 'superlike') {
           setSuperSwipesRemaining(prev => prev ? { ...prev, remaining: prev.remaining - 1 } : prev);
