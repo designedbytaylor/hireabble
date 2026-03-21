@@ -120,8 +120,8 @@ export const AuthProvider = ({ children }) => {
     }
   }, []);
 
-  const login = useCallback(async (email, password) => {
-    const response = await axios.post(`${API}/auth/login`, { email, password });
+  const login = useCallback(async (email, password, rememberMe = false) => {
+    const response = await axios.post(`${API}/auth/login`, { email, password, remember_me: rememberMe });
     if (response.data.requires_2fa) {
       return {
         requires_2fa: true,

@@ -645,7 +645,7 @@ export default function RecruiterSwipe() {
                   data-testid="accept-btn"
                   aria-label="Accept this candidate"
                 >
-                  <CheckCircle className="w-7 h-7 text-success" />
+                  <CheckCircle className="w-7 h-7 text-green-500" />
                 </button>
               </div>
             </>

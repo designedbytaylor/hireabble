@@ -24,7 +24,7 @@ from reportlab.lib.colors import HexColor, Color
 
 from database import (
     db, get_current_user,
-    JobCreate, JobResponse
+    JobCreate, JobResponse, send_web_push
 )
 from content_filter import check_fields, is_severe
 from cache import invalidate, recruiter_jobs_cache
@@ -117,6 +117,57 @@ def calculate_job_match_score(seeker: dict, job: dict) -> int:
         return 50
     return min(100, int((score / max_score) * 100))
 
+async def _notify_matching_seekers(job_doc: dict):
+    """Background: send push notifications to seekers whose preferences match the new job."""
+    try:
+        location = job_doc.get("location", "")
+        category = job_doc.get("category", "")
+
+        # Find seekers with push subscriptions who might be interested
+        # Match on location (if seeker has location set) or send broadly
+        query = {
+            "role": "seeker",
+            "push_subscription": {"$ne": None},
+        }
+        # If job has a location, prefer seekers in the same area
+        if location:
+            # Try location-based match first (city-level)
+            city = location.split(",")[0].strip() if "," in location else location
+            query["location"] = {"$regex": city, "$options": "i"}
+
+        seekers = await db.users.find(
+            query,
+            {"_id": 0, "id": 1, "push_subscription": 1}
+        ).to_list(100)  # Cap at 100 to avoid overwhelming
+
+        # If no location matches, fall back to broader audience (max 50)
+        if not seekers and location:
+            del query["location"]
+            seekers = await db.users.find(
+                query,
+                {"_id": 0, "id": 1, "push_subscription": 1}
+            ).to_list(50)
+
+        title = job_doc.get("title", "New Job")
+        company = job_doc.get("company", "")
+        body = f"{title} at {company}" if company else title
+        if location:
+            body += f" — {location}"
+
+        for seeker in seekers:
+            try:
+                await send_web_push(
+                    seeker["id"],
+                    "New jobs in your area",
+                    body,
+                    {"type": "new_job", "job_id": job_doc.get("id")}
+                )
+            except Exception:
+                pass  # Don't fail the batch for one push error
+    except Exception as e:
+        logging.getLogger(__name__).error(f"New job notification error: {e}")
+
+
 @router.post("", response_model=JobResponse)
 @limiter.limit("10/minute")
 async def create_job(job: JobCreate, request: Request, current_user: dict = Depends(get_current_user)):
@@ -198,6 +249,10 @@ async def create_job(job: JobCreate, request: Request, current_user: dict = Depe
     await db.jobs.insert_one(job_doc)
     # Invalidate recruiter jobs cache
     invalidate(recruiter_jobs_cache, f"rjobs:{current_user['id']}")
+
+    # Notify matching seekers about the new job (background, non-blocking)
+    asyncio.create_task(_notify_matching_seekers(job_doc))
+
     return {k: v for k, v in job_doc.items() if k != '_id'}
 
 @router.get("/recruiter")

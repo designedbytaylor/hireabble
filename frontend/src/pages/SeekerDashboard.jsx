@@ -1102,7 +1102,7 @@ export default function SeekerDashboard() {
                   data-testid="like-btn"
                   aria-label="Apply to this job"
                 >
-                  <CheckCircle className="w-7 h-7 text-success" />
+                  <CheckCircle className="w-7 h-7 text-green-500" />
                 </button>
                 <button
                   onClick={() => currentJob && toggleSaveJob(currentJob.id)}
