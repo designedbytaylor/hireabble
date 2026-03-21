@@ -50,13 +50,6 @@ export default function PublicJobDetail() {
 
   useDocumentTitle(job ? `${job.title} at ${job.company}` : 'Job Detail');
 
-  // Redirect logged-in users to dashboard
-  useEffect(() => {
-    if (!authLoading && user) {
-      navigate('/dashboard', { replace: true });
-    }
-  }, [authLoading, user, navigate]);
-
   // Fetch public job data
   useEffect(() => {
     if (!id) return;
@@ -111,7 +104,7 @@ export default function PublicJobDetail() {
     };
   }, [job]);
 
-  if (authLoading || (!authLoading && user)) {
+  if (authLoading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
@@ -132,14 +125,24 @@ export default function PublicJobDetail() {
             <span className="text-lg font-bold font-['Outfit']">hireabble</span>
           </Link>
           <div className="flex items-center gap-2">
-            <Link to="/login">
-              <Button variant="ghost" size="sm">Log in</Button>
-            </Link>
-            <Link to="/register/seeker">
-              <Button size="sm" className="bg-gradient-to-r from-primary to-secondary text-white">
-                Sign Up
-              </Button>
-            </Link>
+            {user ? (
+              <Link to="/dashboard">
+                <Button size="sm" className="bg-gradient-to-r from-primary to-secondary text-white">
+                  Go to Dashboard
+                </Button>
+              </Link>
+            ) : (
+              <>
+                <Link to="/login">
+                  <Button variant="ghost" size="sm">Log in</Button>
+                </Link>
+                <Link to="/register/seeker">
+                  <Button size="sm" className="bg-gradient-to-r from-primary to-secondary text-white">
+                    Sign Up
+                  </Button>
+                </Link>
+              </>
+            )}
           </div>
         </div>
       </header>
@@ -250,14 +253,29 @@ export default function PublicJobDetail() {
             <div className="glass-card rounded-xl p-6 text-center space-y-3 mt-8">
               <Building2 className="w-8 h-8 text-primary mx-auto" />
               <h3 className="font-semibold">Interested in this role?</h3>
-              <p className="text-sm text-muted-foreground">
-                Sign up on Hireabble to apply and get matched with employers.
-              </p>
-              <Link to="/register/seeker">
-                <Button className="bg-gradient-to-r from-primary to-secondary text-white px-8 mt-2">
-                  Create Free Account <ChevronRight className="w-4 h-4 ml-1" />
-                </Button>
-              </Link>
+              {user ? (
+                <>
+                  <p className="text-sm text-muted-foreground">
+                    Head to your dashboard to find and apply for this job.
+                  </p>
+                  <Link to="/dashboard">
+                    <Button className="bg-gradient-to-r from-primary to-secondary text-white px-8 mt-2">
+                      Open Dashboard <ChevronRight className="w-4 h-4 ml-1" />
+                    </Button>
+                  </Link>
+                </>
+              ) : (
+                <>
+                  <p className="text-sm text-muted-foreground">
+                    Sign up on Hireabble to apply and get matched with employers.
+                  </p>
+                  <Link to="/register/seeker">
+                    <Button className="bg-gradient-to-r from-primary to-secondary text-white px-8 mt-2">
+                      Create Free Account <ChevronRight className="w-4 h-4 ml-1" />
+                    </Button>
+                  </Link>
+                </>
+              )}
             </div>
           </div>
         )}
@@ -267,24 +285,40 @@ export default function PublicJobDetail() {
       {job && (
         <div className="fixed bottom-0 left-0 right-0 bg-background/95 backdrop-blur-sm border-t border-border/50 z-30">
           <div className="max-w-3xl mx-auto px-4 py-3 flex items-center gap-3">
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-semibold truncate">Download Hireabble to Apply</p>
-              <p className="text-xs text-muted-foreground">Available on iOS and Android</p>
-            </div>
-            {storeUrl ? (
-              <a
-                href={storeUrl}
-                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-primary to-secondary text-white font-semibold text-sm hover:opacity-90 transition-opacity shrink-0"
-              >
-                <Download className="w-4 h-4" />
-                Get App
-              </a>
+            {user ? (
+              <>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold truncate">Apply on Hireabble</p>
+                  <p className="text-xs text-muted-foreground">Find this job in your dashboard</p>
+                </div>
+                <Link to="/dashboard">
+                  <Button size="sm" className="bg-gradient-to-r from-primary to-secondary text-white shrink-0">
+                    Open Dashboard
+                  </Button>
+                </Link>
+              </>
             ) : (
-              <Link to="/register/seeker">
-                <Button size="sm" className="bg-gradient-to-r from-primary to-secondary text-white shrink-0">
-                  Sign Up to Apply
-                </Button>
-              </Link>
+              <>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold truncate">Download Hireabble to Apply</p>
+                  <p className="text-xs text-muted-foreground">Available on iOS and Android</p>
+                </div>
+                {storeUrl ? (
+                  <a
+                    href={storeUrl}
+                    className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-primary to-secondary text-white font-semibold text-sm hover:opacity-90 transition-opacity shrink-0"
+                  >
+                    <Download className="w-4 h-4" />
+                    Get App
+                  </a>
+                ) : (
+                  <Link to="/register/seeker">
+                    <Button size="sm" className="bg-gradient-to-r from-primary to-secondary text-white shrink-0">
+                      Sign Up to Apply
+                    </Button>
+                  </Link>
+                )}
+              </>
             )}
           </div>
         </div>

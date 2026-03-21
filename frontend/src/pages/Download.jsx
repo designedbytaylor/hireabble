@@ -38,13 +38,6 @@ export default function Download() {
     }
   }, [navigate, user]);
 
-  // If logged in, redirect straight to the job
-  useEffect(() => {
-    if (!authLoading && user && jobId) {
-      navigate(`/dashboard`, { replace: true });
-    }
-  }, [authLoading, user, jobId, navigate]);
-
   // Redirect to public job detail page when job ID is present
   useEffect(() => {
     if (jobId) {
