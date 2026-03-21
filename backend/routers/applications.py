@@ -289,6 +289,77 @@ async def get_remaining_superswipes(current_user: dict = Depends(get_current_use
     }
 
 
+# ─── Invite to Apply ────────────────────────────────────────────────────────
+
+class InviteToApply(BaseModel):
+    seeker_id: str
+    job_id: str
+
+
+@router.post("/candidates/invite")
+async def invite_to_apply(data: InviteToApply, current_user: dict = Depends(get_current_user)):
+    """Invite a sourced candidate to apply to a specific job."""
+    if current_user["role"] != "recruiter":
+        raise HTTPException(status_code=403, detail="Only recruiters can invite candidates")
+
+    # Verify job belongs to recruiter and is active
+    job = await db.jobs.find_one({"id": data.job_id, "recruiter_id": current_user["id"], "is_active": True})
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found or inactive")
+
+    # Verify seeker exists
+    seeker = await db.users.find_one({"id": data.seeker_id, "role": "seeker"}, {"_id": 0, "name": 1, "id": 1})
+    if not seeker:
+        raise HTTPException(status_code=404, detail="Candidate not found")
+
+    # Check for duplicate invite
+    existing = await db.recruiter_invites.find_one({
+        "recruiter_id": current_user["id"],
+        "seeker_id": data.seeker_id,
+        "job_id": data.job_id,
+    })
+    if existing:
+        raise HTTPException(status_code=400, detail="Already invited this candidate for this role")
+
+    invite_doc = {
+        "id": str(uuid.uuid4()),
+        "recruiter_id": current_user["id"],
+        "recruiter_name": current_user.get("name", "Recruiter"),
+        "seeker_id": data.seeker_id,
+        "job_id": data.job_id,
+        "job_title": job.get("title", ""),
+        "company": job.get("company", current_user.get("company", "")),
+        "status": "pending",
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+    await db.recruiter_invites.insert_one(invite_doc)
+
+    # Notify the candidate
+    await create_notification(
+        user_id=data.seeker_id,
+        notif_type="invite_to_apply",
+        title="You're Invited to Apply!",
+        message=f"{current_user.get('company', 'A company')} invited you to apply for {job['title']}",
+        data={"job_id": data.job_id, "invite_id": invite_doc["id"], "recruiter_id": current_user["id"]}
+    )
+
+    return {"message": "Invite sent!", "invite_id": invite_doc["id"]}
+
+
+@router.get("/candidates/invites/sent")
+async def get_sent_invites(current_user: dict = Depends(get_current_user)):
+    """Get all invites sent by this recruiter (for UI state tracking)."""
+    if current_user["role"] != "recruiter":
+        raise HTTPException(status_code=403, detail="Only recruiters can access this")
+
+    invites = await db.recruiter_invites.find(
+        {"recruiter_id": current_user["id"]},
+        {"_id": 0, "seeker_id": 1, "job_id": 1, "status": 1, "created_at": 1}
+    ).to_list(500)
+
+    return invites
+
+
 async def _recruiter_swipe_post_process(
     swipe_id: str,
     seeker_id: str,
