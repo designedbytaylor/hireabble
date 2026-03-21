@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  Heart, MessageCircle, Briefcase, Building2, Calendar, ChevronRight,
+  Sparkles, MessageCircle, Briefcase, Building2, Calendar, ChevronRight, CheckCircle,
   X, MapPin, GraduationCap, Clock, User, Mail, ArrowLeft, Star, FileText, Award, Download,
 } from 'lucide-react';
 import { Badge } from '../components/ui/badge';
@@ -18,7 +18,7 @@ import useDocumentTitle from '../hooks/useDocumentTitle';
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
 export default function Matches() {
-  useDocumentTitle('Matches');
+  useDocumentTitle('Opportunities');
   const navigate = useNavigate();
   const { user, token } = useAuth();
   const [matches, setMatches] = useState([]);
@@ -157,7 +157,7 @@ export default function Matches() {
             onClick={() => setViewingProfile(null)}
             className="flex items-center gap-2 text-muted-foreground hover:text-foreground mb-4 transition-colors"
           >
-            <ArrowLeft className="w-4 h-4" /> Back to Matches
+            <ArrowLeft className="w-4 h-4" /> Back to Opportunities
           </button>
         </header>
 
@@ -199,7 +199,7 @@ export default function Matches() {
               {viewingProfile.match_score != null && (
                 <div className="mt-3 inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-success/10 text-success text-sm font-medium">
                   <Star className="w-4 h-4 fill-success" />
-                  {viewingProfile.match_score}% Match
+                  Fit Score: {viewingProfile.match_score}%
                 </div>
               )}
 
@@ -445,8 +445,8 @@ export default function Matches() {
       </div>
 
       <header className="relative z-10 p-6 md:p-8">
-        <h1 className="text-2xl font-bold font-['Outfit']">Matches</h1>
-        <p className="text-muted-foreground">Your successful connections</p>
+        <h1 className="text-2xl font-bold font-['Outfit']">Opportunities</h1>
+        <p className="text-muted-foreground">Your active connections</p>
       </header>
 
       <main className="relative z-10 px-6 md:px-8">
@@ -491,7 +491,7 @@ export default function Matches() {
                         />
                       )}
                       <div className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-success flex items-center justify-center">
-                        <Heart className="w-3 h-3 text-white fill-white" />
+                        <CheckCircle className="w-3 h-3 text-white" />
                       </div>
                     </div>
 
@@ -520,7 +520,7 @@ export default function Matches() {
 
                       <div className="flex items-center gap-2 mt-2 text-xs text-muted-foreground">
                         <Calendar className="w-3 h-3" />
-                        Matched {new Date(match.created_at).toLocaleDateString()}
+                        Connected {new Date(match.created_at).toLocaleDateString()}
                       </div>
                     </div>
 
@@ -548,13 +548,13 @@ export default function Matches() {
           ) : (
             <div className="glass-card rounded-3xl p-12 text-center">
               <div className="w-20 h-20 rounded-full bg-primary/20 flex items-center justify-center mx-auto mb-6">
-                <Heart className="w-10 h-10 text-primary" />
+                <Sparkles className="w-10 h-10 text-primary" />
               </div>
-              <h2 className="text-2xl font-bold font-['Outfit'] mb-3">No Matches Yet</h2>
+              <h2 className="text-2xl font-bold font-['Outfit'] mb-3">No Opportunities Yet</h2>
               <p className="text-muted-foreground max-w-xs mx-auto">
                 {user?.role === 'seeker'
-                  ? "Keep swiping! When a recruiter likes you back, you'll see your matches here."
-                  : "Accept applications from job seekers to create matches and start conversations."}
+                  ? "Keep applying! When a recruiter is interested, your opportunities will appear here."
+                  : "Accept applications from job seekers to create connections and start conversations."}
               </p>
             </div>
           )}

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Bookmark, MapPin, DollarSign, Briefcase, Trash2, Clock, X, Building2 } from 'lucide-react';
+import { ArrowLeft, Bookmark, MapPin, DollarSign, Briefcase, Trash2, Clock, X, Building2, CheckCircle, User } from 'lucide-react';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import { toast } from 'sonner';
@@ -139,6 +139,23 @@ export default function SavedJobs() {
     }
   };
 
+  const handleApply = async (jobId) => {
+    try {
+      await axios.post(`${API}/swipe`, { job_id: jobId, action: 'like' }, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setJobs(prev => prev.map(j => j.id === jobId ? { ...j, already_applied: true } : j));
+      toast.success('Applied successfully!');
+    } catch (err) {
+      const detail = err.response?.data?.detail || '';
+      if (detail.toLowerCase().includes('already swiped')) {
+        setJobs(prev => prev.map(j => j.id === jobId ? { ...j, already_applied: true } : j));
+      } else {
+        toast.error(detail || 'Failed to apply');
+      }
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background pb-24">
       <div className="absolute top-0 left-1/4 w-64 h-64 sm:w-96 sm:h-96 bg-primary/5 rounded-full blur-3xl" />
@@ -205,6 +222,29 @@ export default function SavedJobs() {
                   >
                     <Trash2 className="w-4 h-4" />
                   </button>
+                </div>
+                {/* Action buttons */}
+                <div className="flex items-center gap-2 mt-3 pt-3 border-t border-border">
+                  {job.already_applied ? (
+                    <span className="flex items-center gap-1.5 text-xs text-success font-medium px-3 py-1.5 rounded-full bg-success/10">
+                      <CheckCircle className="w-3.5 h-3.5" /> Applied
+                    </span>
+                  ) : (
+                    <button
+                      onClick={(e) => { e.stopPropagation(); handleApply(job.id); }}
+                      className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-full bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
+                    >
+                      <CheckCircle className="w-3.5 h-3.5" /> Apply
+                    </button>
+                  )}
+                  {job.recruiter_id && (
+                    <button
+                      onClick={(e) => { e.stopPropagation(); navigate(`/company/${job.recruiter_id}`); }}
+                      className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-full bg-secondary/10 text-secondary hover:bg-secondary/20 transition-colors"
+                    >
+                      <User className="w-3.5 h-3.5" /> View Recruiter
+                    </button>
+                  )}
                 </div>
               </div>
             ))}

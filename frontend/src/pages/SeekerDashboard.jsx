@@ -674,7 +674,7 @@ export default function SeekerDashboard() {
         setSuperLikesRemaining(response.data.remaining_superlikes);
         saveCachedSuperLikes(response.data.remaining_superlikes, uidRef.current);
       }
-      // Show "It's a Match!" modal if the API returned match data
+      // Show selection modal if the API returned match data
       if (response.data.match) {
         setStats(prev => {
           const next = { ...prev, matches: prev.matches + 1 };

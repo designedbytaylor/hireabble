@@ -58,7 +58,7 @@ function EmailNotificationSettings({ token }) {
   if (!prefs) return null;
 
   const items = [
-    { key: 'matches', label: 'New matches', desc: 'When you match with a job or candidate' },
+    { key: 'matches', label: 'New opportunities', desc: 'When a recruiter is interested in your profile' },
     { key: 'interviews', label: 'Interview updates', desc: 'Interview requests, acceptances & changes' },
     { key: 'messages', label: 'Message digests', desc: 'Summary of unread messages (max every 15 min)' },
     { key: 'status_updates', label: 'Application updates', desc: 'When your application stage changes' },
@@ -200,7 +200,7 @@ export default function Profile() {
       const ok = await subscribeToPush(token);
       if (ok) {
         setPushEnabled(true);
-        toast.success('Push notifications enabled! You\'ll be notified of new matches and messages.');
+        toast.success('Push notifications enabled! You\'ll be notified of new opportunities and messages.');
       } else {
         toast.error('Could not enable notifications. Please check your browser settings.');
       }

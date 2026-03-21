@@ -104,7 +104,7 @@ export default function RecruiterDashboard() {
       );
       
       if (action === 'accept') {
-        toast.success("It's a match! 🎉");
+        toast.success("New opportunity! 🎉");
       } else {
         toast.info('Application declined');
       }
@@ -376,14 +376,14 @@ export default function RecruiterDashboard() {
             </div>
           </div>
           <div
-            className="glass-card rounded-2xl p-5 hover:border-pink-500/30 transition-colors cursor-pointer active:scale-[0.97]"
+            className="glass-card rounded-2xl p-5 hover:border-primary/30 transition-colors cursor-pointer active:scale-[0.97]"
             onClick={() => navigate('/matches')}
           >
-            <div className="w-12 h-12 rounded-xl bg-pink-500/20 flex items-center justify-center mb-3">
-              <Heart className="w-6 h-6 text-pink-500" />
+            <div className="w-12 h-12 rounded-xl bg-primary/20 flex items-center justify-center mb-3">
+              <Sparkles className="w-6 h-6 text-primary" />
             </div>
             <div className="text-3xl font-bold font-['Outfit']">{stats.matches}</div>
-            <div className="text-sm text-muted-foreground flex items-center gap-1">Matches <ChevronRight className="w-3 h-3" /></div>
+            <div className="text-sm text-muted-foreground flex items-center gap-1">Opportunities <ChevronRight className="w-3 h-3" /></div>
           </div>
         </div>
       </header>
