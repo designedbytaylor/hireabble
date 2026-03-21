@@ -97,24 +97,44 @@ export default function RecruiterDashboard() {
   };
 
   const handleRespondToApplication = async (applicationId, action) => {
+    // Optimistic UI: update state immediately so the card moves/disappears instantly
+    setApplications(prev => prev.map(a =>
+      a.id === applicationId ? { ...a, recruiter_action: action === 'accept' ? 'accept' : 'reject' } : a
+    ));
+    setStats(prev => ({
+      ...prev,
+      matches: action === 'accept' ? (prev.matches || 0) + 1 : prev.matches,
+      pending_applications: Math.max(0, (prev.pending_applications || 0) - 1),
+    }));
+
+    if (action === 'accept') {
+      toast.success("Candidate moved forward!");
+    } else {
+      toast.info('Application declined');
+    }
+
+    // Fire API call in background — revert on failure
     try {
-      await axios.post(`${API}/applications/respond`, 
+      await axios.post(`${API}/applications/respond`,
         { application_id: applicationId, action },
         { headers: { Authorization: `Bearer ${token}` } }
       );
-      
-      if (action === 'accept') {
-        toast.success("Candidate moved forward!");
-      } else {
-        toast.info('Application declined');
-      }
-      
+      // Sync with server in background (non-blocking)
       fetchData();
       if (selectedJob) {
         handleViewApplications(selectedJob);
       }
     } catch (error) {
-      toast.error('Failed to respond');
+      toast.error('Failed to respond — reverting');
+      // Revert optimistic update
+      setApplications(prev => prev.map(a =>
+        a.id === applicationId ? { ...a, recruiter_action: null } : a
+      ));
+      setStats(prev => ({
+        ...prev,
+        matches: action === 'accept' ? Math.max(0, (prev.matches || 0) - 1) : prev.matches,
+        pending_applications: (prev.pending_applications || 0) + 1,
+      }));
     }
   };
 
