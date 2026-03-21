@@ -45,14 +45,13 @@ export default function Download() {
     }
   }, [authLoading, user, jobId, navigate]);
 
-  // Fetch public job info
+  // Redirect to public job detail page when job ID is present
   useEffect(() => {
-    if (!jobId) return;
-    axios.get(`${API}/jobs/${jobId}/public`)
-      .then(res => setJob(res.data))
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  }, [jobId]);
+    if (jobId) {
+      const ref = params.get('ref');
+      navigate(`/jobs/${jobId}${ref ? `?ref=${ref}` : ''}`, { replace: true });
+    }
+  }, [jobId, navigate, params]);
 
   if (authLoading) {
     return (

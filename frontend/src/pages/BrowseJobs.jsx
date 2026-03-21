@@ -199,7 +199,7 @@ export default function BrowseJobs() {
               return (
                 <div key={job.id} className="glass-card rounded-xl p-4 hover:border-primary/30 transition-colors">
                   <div className="flex items-start justify-between gap-3">
-                    <div className="flex-1 min-w-0">
+                    <Link to={`/jobs/${job.id}`} className="flex-1 min-w-0">
                       <h3 className="font-semibold text-base truncate">{job.title}</h3>
                       <div className="flex items-center gap-1.5 text-muted-foreground text-sm mt-1">
                         <Building2 className="w-3.5 h-3.5 flex-shrink-0" />
@@ -227,10 +227,10 @@ export default function BrowseJobs() {
                           </span>
                         )}
                       </div>
-                    </div>
-                    <Link to={`/register/seeker`}>
+                    </Link>
+                    <Link to={`/jobs/${job.id}`}>
                       <Button size="sm" variant="outline" className="shrink-0 text-xs">
-                        Apply <ArrowRight className="w-3 h-3 ml-1" />
+                        View <ArrowRight className="w-3 h-3 ml-1" />
                       </Button>
                     </Link>
                   </div>
