@@ -4,7 +4,7 @@ import { motion, AnimatePresence, useMotionValue, useTransform } from 'framer-mo
 import {
   X, Heart, Star, MapPin, Briefcase, GraduationCap, Clock,
   ChevronDown, BarChart3, Users, FileText, Building2, SlidersHorizontal,
-  Search, Sparkles, Zap, MessageSquare, Plus, Lock, Crown, Filter, Video, BadgeCheck
+  Search, Sparkles, Zap, MessageSquare, Plus, Lock, Crown, Filter, Video, BadgeCheck, Rocket, CheckCircle
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { toast } from 'sonner';
@@ -617,9 +617,9 @@ export default function RecruiterSwipe() {
                     }}
                     className="w-14 h-14 rounded-full bg-secondary/10 border border-secondary/30 flex items-center justify-center hover:scale-110 transition-all duration-300"
                     data-testid="superswipe-btn"
-                    aria-label="Super like this candidate"
+                    aria-label="Priority Pick this candidate"
                   >
-                    <Star className="w-6 h-6 text-secondary fill-secondary" />
+                    <Rocket className="w-6 h-6 text-secondary" />
                   </button>
                   {superSwipesRemaining && (
                     <span className="absolute -top-1 -right-1 w-6 h-6 rounded-full bg-secondary text-xs font-bold flex items-center justify-center text-white">
@@ -643,9 +643,9 @@ export default function RecruiterSwipe() {
                   onClick={() => handleSwipe('accept', { x: 1500, y: 0 })}
                   className="w-16 h-16 rounded-full bg-success/10 border border-success/30 flex items-center justify-center hover:scale-110 hover:neon-glow-green transition-all duration-300"
                   data-testid="accept-btn"
-                  aria-label="Like this candidate"
+                  aria-label="Accept this candidate"
                 >
-                  <Heart className="w-7 h-7 text-success" />
+                  <CheckCircle className="w-7 h-7 text-success" />
                 </button>
               </div>
             </>
@@ -799,7 +799,7 @@ export default function RecruiterSwipe() {
   );
 }
 
-// Tinder-style bottom sheet for candidate/applicant details
+// Bottom sheet for candidate/applicant details
 function CandidateDetailSheet({ item, mode, onClose }) {
   const sheetY = useMotionValue(0);
   const sheetOpacity = useTransform(sheetY, [0, 300], [1, 0]);
@@ -896,7 +896,7 @@ function CandidateDetailSheet({ item, mode, onClose }) {
                 'bg-muted text-muted-foreground'
               }`}>
                 <Sparkles className="w-3.5 h-3.5" />
-                {matchScore}%
+                Fit Score: {matchScore}%
               </span>
             )}
           </div>
@@ -913,7 +913,7 @@ function CandidateDetailSheet({ item, mode, onClose }) {
             </div>
           )}
 
-          {/* Super Like Note */}
+          {/* Priority Apply Note */}
           {item.superlike_note && (
             <div className="mb-4 px-3 py-2 rounded-xl bg-secondary/10 border border-secondary/20">
               <p className="text-xs text-secondary flex items-center gap-1 mb-0.5 font-medium">
@@ -934,7 +934,7 @@ function CandidateDetailSheet({ item, mode, onClose }) {
                   <span className="w-1.5 h-1.5 rounded-full bg-primary/60 flex-shrink-0" />
                   {oa.job_title}
                   {oa.action === 'superlike' && (
-                    <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-secondary/20 text-secondary font-medium">Super Like</span>
+                    <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-secondary/20 text-secondary font-medium">Priority Apply</span>
                   )}
                 </p>
               ))}
@@ -1158,13 +1158,13 @@ function ApplicantCard({ app, onSwipe, expanded, setExpanded }) {
           className="absolute top-8 left-1/2 -translate-x-1/2 px-6 py-2 rounded-full bg-secondary border-2 border-secondary font-bold text-white z-20"
           style={{ opacity: superlikeOpacity }}
         >
-          SUPER LIKE
+          PRIORITY PICK
         </motion.div>
 
-        {/* Super Like Badge */}
+        {/* Priority Apply Badge */}
         {app.action === 'superlike' && (
           <div className="absolute top-4 right-4 z-20 px-3 py-1 rounded-full bg-gradient-to-r from-secondary to-pink-500 text-white text-xs font-bold flex items-center gap-1 shadow-lg">
-            <Star className="w-3 h-3 fill-white" /> Super Like
+            <Rocket className="w-3 h-3" /> Priority Apply
           </div>
         )}
         {/* Priority Badge for upgraded seekers */}
@@ -1335,14 +1335,14 @@ function CandidateCard({ candidate, onSwipe, expanded, setExpanded }) {
           className="absolute top-8 left-1/2 -translate-x-1/2 px-6 py-2 rounded-full bg-secondary border-2 border-secondary font-bold text-white z-20"
           style={{ opacity: superlikeOpacity }}
         >
-          SUPER LIKE
+          PRIORITY PICK
         </motion.div>
 
-        {/* Match Score Badge */}
+        {/* Fit Score Badge */}
         {candidate.best_match_job && (
           <div className="absolute top-4 right-4 z-20 px-3 py-1 rounded-full bg-black/50 backdrop-blur-sm border border-white/20 text-xs font-bold flex items-center gap-1 shadow-lg text-white">
             <Sparkles className={`w-3 h-3 ${scoreColor}`} />
-            <span className={scoreColor}>{matchScore}%</span> match
+            <span className={scoreColor}>Fit Score: {matchScore}%</span>
           </div>
         )}
         {/* Featured Badge for Premium seekers */}
@@ -1448,7 +1448,7 @@ function ExitingRecruiterCard({ card }) {
           <div className="absolute top-8 left-8 px-6 py-2 rounded-full bg-destructive border-2 border-destructive font-bold text-white transform -rotate-12 z-20">PASS</div>
         )}
         {action === 'superlike' && (
-          <div className="absolute top-8 left-1/2 -translate-x-1/2 px-6 py-2 rounded-full bg-secondary border-2 border-secondary font-bold text-white z-20">SUPER SWIPE</div>
+          <div className="absolute top-8 left-1/2 -translate-x-1/2 px-6 py-2 rounded-full bg-secondary border-2 border-secondary font-bold text-white z-20">PRIORITY PICK</div>
         )}
         <div className="absolute inset-x-0 bottom-0 px-5 pb-4 pt-8 z-10">
           <h2 className="text-2xl font-bold font-['Outfit'] text-white drop-shadow-lg">{name}</h2>
@@ -1472,7 +1472,7 @@ const StaticApplicantCard = memo(function StaticApplicantCard({ app }) {
       <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 via-[45%] to-transparent" />
       {app.action === 'superlike' && (
         <div className="absolute top-4 right-4 z-20 px-3 py-1 rounded-full bg-gradient-to-r from-secondary to-pink-500 text-white text-xs font-bold flex items-center gap-1 shadow-lg">
-          <Star className="w-3 h-3 fill-white" /> Super Like
+          <Rocket className="w-3 h-3" /> Priority Apply
         </div>
       )}
       {app.is_premium_seeker && app.action !== 'superlike' && (

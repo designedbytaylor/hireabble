@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, Briefcase, MapPin, DollarSign, Clock,
-  CheckCircle, XCircle, Star, Zap, Building2, Eye,
+  CheckCircle, XCircle, Star, Zap, Building2, Eye, Rocket,
   BarChart3, ChevronDown, ChevronUp, Search, UserCheck,
   CalendarCheck, Award, Trophy, X
 } from 'lucide-react';
@@ -364,8 +364,8 @@ export default function AppliedJobs() {
                     <div className="flex items-center justify-between mt-2">
                       <div className="flex items-center gap-3">
                         <span className="text-xs text-muted-foreground flex items-center gap-1">
-                          {app.action === 'superlike' && <Star className="w-3 h-3 text-secondary fill-secondary" />}
-                          {app.action === 'superlike' ? 'Super Liked' : 'Applied'} {new Date(app.created_at).toLocaleDateString()}
+                          {app.action === 'superlike' && <Rocket className="w-3 h-3 text-secondary" />}
+                          {app.action === 'superlike' ? 'Priority Applied' : 'Applied'} {new Date(app.created_at).toLocaleDateString()}
                         </span>
                         {app.read_at && (
                           <span className="text-xs text-primary flex items-center gap-1">

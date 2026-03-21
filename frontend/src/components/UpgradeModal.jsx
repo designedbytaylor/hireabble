@@ -8,7 +8,7 @@ import { isIOS, isAndroid } from '../utils/capacitor';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
-// Tier color schemes (Tinder-inspired)
+// Tier color schemes
 const TIER_COLORS = {
   seeker_plus: {
     gradient: 'from-blue-500 to-cyan-400',
@@ -204,16 +204,16 @@ export default function UpgradeModal({ open, onClose, onSubscribed, trigger, hig
                   <TierIcon className="w-8 h-8" />
                 </div>
                 <h2 className="text-2xl font-bold font-['Outfit']">
-                  {trigger === 'super_likes' && 'Get More Super Likes'}
-                  {trigger === 'super_swipes' && 'Get More Super Swipes'}
+                  {trigger === 'super_likes' && 'Get More Priority Applies'}
+                  {trigger === 'super_swipes' && 'Get More Priority Picks'}
                   {trigger === 'blurred' && 'See Who Applied'}
                   {trigger === 'boost' && 'Boost Your Listings'}
                   {trigger === 'undo' && 'Undo Your Last Swipe'}
                   {!trigger && 'Upgrade Your Experience'}
                 </h2>
                 <p className="text-sm text-white/80 mt-1">
-                  {trigger === 'super_likes' && "You've used all your free Super Likes today"}
-                  {trigger === 'super_swipes' && "You've used all your free Super Swipes today"}
+                  {trigger === 'super_likes' && "You've used all your free Priority Applies today"}
+                  {trigger === 'super_swipes' && "You've used all your free Priority Picks today"}
                   {trigger === 'blurred' && 'Unlock the full applicant list'}
                   {trigger === 'boost' && 'Get your jobs in front of more candidates'}
                   {!trigger && 'Unlock premium features'}

@@ -1153,9 +1153,9 @@ async def respond_to_application(response: RecruiterAction, current_user: dict =
         await db.matches.insert_one(match_doc)
 
         # Create in-app notification for seeker
-        notif_title = "Super Match!" if is_superlike else "It's a Match!"
+        notif_title = "Priority Match!" if is_superlike else "It's a Match!"
         notif_msg = (
-            f"{job['company'] if job else 'A company'} super liked your application for {job['title'] if job else 'a position'}!"
+            f"{job['company'] if job else 'A company'} priority picked your application for {job['title'] if job else 'a position'}!"
             if is_superlike else
             f"{job['company'] if job else 'A company'} accepted your application for {job['title'] if job else 'a position'}!"
         )
