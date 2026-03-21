@@ -823,6 +823,13 @@ async def get_saved_jobs(current_user: dict = Depends(get_current_user)):
         {"_id": 0}
     ).to_list(100)
 
+    # Check which saved jobs the user has already applied to
+    applied_apps = await db.applications.find(
+        {"seeker_id": current_user["id"], "job_id": {"$in": job_ids}, "action": {"$in": ["like", "superlike"]}},
+        {"_id": 0, "job_id": 1}
+    ).to_list(len(job_ids))
+    applied_job_ids = set(a["job_id"] for a in applied_apps)
+
     # Preserve saved order
     job_map = {j["id"]: j for j in jobs}
     ordered = []
@@ -830,6 +837,7 @@ async def get_saved_jobs(current_user: dict = Depends(get_current_user)):
         job = job_map.get(s["job_id"])
         if job:
             job["saved_at"] = s["created_at"]
+            job["already_applied"] = job["id"] in applied_job_ids
             ordered.append(job)
 
     return {"jobs": ordered}

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, BarChart3, TrendingUp, Users, Briefcase,
-  Heart, Star, Calendar, Clock, CheckCircle, XCircle, Rocket,
+  Heart, Star, Calendar, Clock, CheckCircle, XCircle, Rocket, Sparkles,
   Target, Zap, Crown, Lock
 } from 'lucide-react';
 import axios from 'axios';
@@ -129,11 +129,11 @@ export default function RecruiterAnalytics() {
             color="green-500"
           />
           <MetricCard
-            icon={<Heart className="w-6 h-6 text-pink-500" />}
+            icon={<Sparkles className="w-6 h-6 text-primary" />}
             value={stats.matches}
-            label="Matches"
+            label="Opportunities"
             sublabel={`${stats.match_rate}% rate`}
-            color="pink-500"
+            color="primary"
           />
           <MetricCard
             icon={<Rocket className="w-6 h-6 text-secondary" />}
