@@ -457,7 +457,7 @@ function CandidateRow({ candidate, jobs, sentInvites, inviting, onInvite, onView
   }, [jobSelectorOpen, onToggleJobSelector]);
 
   return (
-    <div ref={rowRef} className="glass-card rounded-2xl p-4 hover:border-primary/30 transition-colors">
+    <div ref={rowRef} className={`glass-card rounded-2xl p-4 hover:border-primary/30 transition-colors ${jobSelectorOpen ? 'relative z-20' : ''}`}>
       <div className="flex items-start gap-3">
         {/* Avatar */}
         <div className="relative flex-shrink-0">
