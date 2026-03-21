@@ -15,6 +15,7 @@ export default function Login() {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [rememberMe, setRememberMe] = useState(true);
   const [needs2FA, setNeeds2FA] = useState(false);
   const [tempToken, setTempToken] = useState('');
   const [verificationCode, setVerificationCode] = useState('');
@@ -33,7 +34,7 @@ export default function Login() {
 
     setLoading(true);
     try {
-      const result = await login(email, password);
+      const result = await login(email, password, rememberMe);
       if (result?.requires_2fa) {
         if (result.two_fa_type === 'email') {
           setNeeds2FA(true);
@@ -225,6 +226,19 @@ export default function Login() {
                         {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                       </button>
                     </div>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      id="remember-me"
+                      checked={rememberMe}
+                      onChange={(e) => setRememberMe(e.target.checked)}
+                      className="w-4 h-4 rounded border-border accent-primary"
+                    />
+                    <Label htmlFor="remember-me" className="text-sm text-muted-foreground cursor-pointer">
+                      Keep me logged in
+                    </Label>
                   </div>
 
                   <Button

@@ -455,7 +455,7 @@ async def login(credentials: UserLogin, request: Request):
     if user_status == "suspended":
         raise HTTPException(status_code=403, detail="Your account is temporarily suspended. Contact support for more info.")
 
-    token = create_token(user["id"], user["role"])
+    token = create_token(user["id"], user["role"], remember_me=credentials.remember_me)
     user_response = _safe_user_response(user)
 
     return {"token": token, "user": user_response}
