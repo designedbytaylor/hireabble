@@ -269,13 +269,13 @@ async def get_recruiter_dashboard_data(current_user: dict = Depends(get_current_
     ) = await asyncio.gather(
         db.jobs.count_documents({"recruiter_id": uid, "is_active": True}),
         db.jobs.count_documents({"recruiter_id": uid}),
-        db.applications.count_documents({"recruiter_id": uid}),
-        db.applications.count_documents({"recruiter_id": uid, "recruiter_action": None}),
+        db.applications.count_documents({"recruiter_id": uid, "action": {"$in": ["like", "superlike"]}}),
+        db.applications.count_documents({"recruiter_id": uid, "action": {"$in": ["like", "superlike"]}, "recruiter_action": None}),
         db.applications.count_documents({"recruiter_id": uid, "action": "superlike"}),
         db.matches.count_documents({"recruiter_id": uid}),
         db.interviews.count_documents({"recruiter_id": uid, "status": "accepted"}),
         db.interviews.count_documents({"recruiter_id": uid, "status": "pending"}),
-        db.applications.count_documents({"recruiter_id": uid, "recruiter_action": {"$ne": None}}),
+        db.applications.count_documents({"recruiter_id": uid, "action": {"$in": ["like", "superlike"]}, "recruiter_action": {"$ne": None}}),
         db.applications.count_documents({"recruiter_id": uid, "created_at": {"$gte": week_ago}}),
         db.jobs.find({"recruiter_id": uid}, {"_id": 0, "id": 1, "title": 1}).to_list(50),
         db.jobs.find({"recruiter_id": uid}, {"_id": 0}).sort("created_at", -1).to_list(100),
@@ -286,7 +286,7 @@ async def get_recruiter_dashboard_data(current_user: dict = Depends(get_current_
         db.messages.count_documents({"receiver_id": uid, "is_read": False}),
         db.notifications.count_documents({"user_id": uid, "is_read": False}),
         db.applications.aggregate([
-            {"$match": {"recruiter_id": uid}},
+            {"$match": {"recruiter_id": uid, "action": {"$in": ["like", "superlike"]}}},
             {"$group": {"_id": "$pipeline_stage", "count": {"$sum": 1}}}
         ]).to_list(20),
     )
@@ -445,13 +445,13 @@ async def get_recruiter_stats(current_user: dict = Depends(get_current_user)):
     ) = await asyncio.gather(
         db.jobs.count_documents({"recruiter_id": uid, "is_active": True}),
         db.jobs.count_documents({"recruiter_id": uid}),
-        db.applications.count_documents({"recruiter_id": uid}),
-        db.applications.count_documents({"recruiter_id": uid, "recruiter_action": None}),
+        db.applications.count_documents({"recruiter_id": uid, "action": {"$in": ["like", "superlike"]}}),
+        db.applications.count_documents({"recruiter_id": uid, "action": {"$in": ["like", "superlike"]}, "recruiter_action": None}),
         db.applications.count_documents({"recruiter_id": uid, "action": "superlike"}),
         db.matches.count_documents({"recruiter_id": uid}),
         db.interviews.count_documents({"recruiter_id": uid, "status": "accepted"}),
         db.interviews.count_documents({"recruiter_id": uid, "status": "pending"}),
-        db.applications.count_documents({"recruiter_id": uid, "recruiter_action": {"$ne": None}}),
+        db.applications.count_documents({"recruiter_id": uid, "action": {"$in": ["like", "superlike"]}, "recruiter_action": {"$ne": None}}),
         db.applications.count_documents({"recruiter_id": uid, "created_at": {"$gte": week_ago}}),
         db.jobs.find({"recruiter_id": uid}, {"_id": 0, "id": 1, "title": 1}).to_list(50),
     )
