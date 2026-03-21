@@ -3459,3 +3459,37 @@ async def review_verification_request(
         await create_notification(user_id, "verification", "Verification Update", msg)
 
     return {"status": new_status, "user_id": user_id}
+
+
+@router.put("/admin/users/{user_id}/revoke-verification")
+async def revoke_user_verification(
+    user_id: str,
+    body: dict = Body(default={}),
+    admin: dict = Depends(get_current_admin),
+):
+    """Remove verified status from a user."""
+    user = await db.users.find_one({"id": user_id}, {"_id": 0, "id": 1, "verified": 1})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    reason = body.get("reason", "")
+    now = datetime.now(timezone.utc).isoformat()
+
+    await db.users.update_one(
+        {"id": user_id},
+        {"$set": {"verified": False, "verification_status": "revoked", "verified_at": None}},
+    )
+
+    # Update the verification request record too if one exists
+    await db.verification_requests.update_many(
+        {"user_id": user_id, "status": "approved"},
+        {"$set": {"status": "revoked", "revoked_by": admin.get("email", ""), "revoke_reason": reason, "updated_at": now}},
+    )
+
+    msg = "Your profile verification has been removed."
+    if reason:
+        msg += f" Reason: {reason}"
+    await create_notification(user_id, "verification", "Verification Removed", msg)
+    invalidate_user(user_id)
+
+    return {"status": "revoked", "user_id": user_id}
