@@ -1014,7 +1014,7 @@ export default function SeekerDashboard() {
           {currentJob ? (
             <>
               {/* Card Stack */}
-              <div className="relative flex-1 card-stack overflow-hidden min-h-0" data-testid="swipe-deck">
+              <div className="relative flex-1 card-stack min-h-0" data-testid="swipe-deck">
                 {/* Background cards — real job cards for instant reveal */}
                 {jobs.slice(currentIndex + 1, currentIndex + 3).map((bgJob, i) => (
                   <div
