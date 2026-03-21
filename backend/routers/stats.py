@@ -265,6 +265,7 @@ async def get_recruiter_dashboard_data(current_user: dict = Depends(get_current_
         raw_applications,
         user_sub_data,
         unread_messages, unread_notifications,
+        pipeline_agg,
     ) = await asyncio.gather(
         db.jobs.count_documents({"recruiter_id": uid, "is_active": True}),
         db.jobs.count_documents({"recruiter_id": uid}),
@@ -284,7 +285,13 @@ async def get_recruiter_dashboard_data(current_user: dict = Depends(get_current_
         db.users.find_one({"id": uid}, {"_id": 0, "subscription": 1}),
         db.messages.count_documents({"receiver_id": uid, "is_read": False}),
         db.notifications.count_documents({"user_id": uid, "is_read": False}),
+        db.applications.aggregate([
+            {"$match": {"recruiter_id": uid}},
+            {"$group": {"_id": "$pipeline_stage", "count": {"$sum": 1}}}
+        ]).to_list(20),
     )
+
+    pipeline_counts = {doc["_id"]: doc["count"] for doc in pipeline_agg if doc["_id"]}
 
     # Per-job stats aggregation
     response_rate = round((responded / total_applications * 100) if total_applications > 0 else 0)
@@ -355,6 +362,7 @@ async def get_recruiter_dashboard_data(current_user: dict = Depends(get_current_
             "interviews_scheduled": interviews_scheduled, "interviews_pending": interviews_pending,
             "response_rate": response_rate, "match_rate": match_rate,
             "weekly_applications": weekly_apps, "top_jobs": top_jobs[:10],
+            "pipeline_counts": pipeline_counts,
         },
         "jobs": recruiter_jobs,
         "applications": applications,
