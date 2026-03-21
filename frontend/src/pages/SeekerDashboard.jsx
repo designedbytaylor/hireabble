@@ -1420,6 +1420,8 @@ export default function SeekerDashboard() {
             }
           }}
           onMessage={() => { setShowMatch(false); navigate(matchData?.id ? `/chat/${matchData.id}` : '/matches'); }}
+          userRole="seeker"
+          ranking={matchData?.ranking}
         />
       )}
 

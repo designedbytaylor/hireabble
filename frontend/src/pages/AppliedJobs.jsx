@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, Briefcase, MapPin, DollarSign, Clock,
-  CheckCircle, XCircle, Star, Zap, Building2, Eye, Rocket,
+  CheckCircle, XCircle, Star, Zap, Building2, Eye, Rocket, Target,
   BarChart3, ChevronDown, ChevronUp, Search, UserCheck,
   CalendarCheck, Award, Trophy, X
 } from 'lucide-react';
@@ -18,20 +18,20 @@ const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
 const PIPELINE_STAGES = [
   { key: 'applied', label: 'Applied', icon: Briefcase, color: 'text-blue-500', bg: 'bg-blue-500' },
-  { key: 'reviewing', label: 'Reviewing', icon: Eye, color: 'text-yellow-500', bg: 'bg-yellow-500' },
-  { key: 'shortlisted', label: 'Shortlisted', icon: UserCheck, color: 'text-purple-500', bg: 'bg-purple-500' },
-  { key: 'interviewing', label: 'Interviewing', icon: CalendarCheck, color: 'text-cyan-500', bg: 'bg-cyan-500' },
-  { key: 'offered', label: 'Offered', icon: Award, color: 'text-orange-500', bg: 'bg-orange-500' },
-  { key: 'hired', label: 'Hired', icon: Trophy, color: 'text-green-500', bg: 'bg-green-500' },
+  { key: 'reviewing', label: 'Viewed', icon: Eye, color: 'text-yellow-500', bg: 'bg-yellow-500' },
+  { key: 'shortlisted', label: 'Shortlisted', icon: Star, color: 'text-purple-500', bg: 'bg-purple-500' },
+  { key: 'interviewing', label: 'Interview', icon: Target, color: 'text-cyan-500', bg: 'bg-cyan-500' },
+  { key: 'offered', label: 'Moving Forward', icon: Rocket, color: 'text-green-500', bg: 'bg-green-500' },
+  { key: 'hired', label: 'Hired', icon: CheckCircle, color: 'text-emerald-500', bg: 'bg-emerald-500' },
 ];
 
 const STAGE_CONFIG = {
   applied: { label: 'Applied', color: 'bg-blue-500/10 text-blue-500', icon: Briefcase },
-  reviewing: { label: 'In Review', color: 'bg-yellow-500/10 text-yellow-500', icon: Clock },
-  shortlisted: { label: 'Shortlisted', color: 'bg-purple-500/10 text-purple-500', icon: UserCheck },
-  interviewing: { label: 'Interviewing', color: 'bg-cyan-500/10 text-cyan-500', icon: CalendarCheck },
-  offered: { label: 'Offered', color: 'bg-orange-500/10 text-orange-500', icon: Award },
-  hired: { label: 'Hired', color: 'bg-green-500/10 text-green-500', icon: Trophy },
+  reviewing: { label: 'Viewed', color: 'bg-yellow-500/10 text-yellow-500', icon: Eye },
+  shortlisted: { label: 'Shortlisted', color: 'bg-purple-500/10 text-purple-500', icon: Star },
+  interviewing: { label: 'Interview', color: 'bg-cyan-500/10 text-cyan-500', icon: Target },
+  offered: { label: 'Moving Forward', color: 'bg-green-500/10 text-green-500', icon: Rocket },
+  hired: { label: 'Hired', color: 'bg-emerald-500/10 text-emerald-500', icon: CheckCircle },
   declined: { label: 'Not Selected', color: 'bg-red-500/10 text-red-500', icon: XCircle },
 };
 
@@ -262,10 +262,10 @@ export default function AppliedJobs() {
           {[
             { key: 'all', label: 'All' },
             { key: 'applied', label: 'Applied' },
-            { key: 'reviewing', label: 'In Review' },
+            { key: 'reviewing', label: 'Viewed' },
             { key: 'shortlisted', label: 'Shortlisted' },
-            { key: 'interviewing', label: 'Interviewing' },
-            { key: 'offered', label: 'Offered' },
+            { key: 'interviewing', label: 'Interview' },
+            { key: 'offered', label: 'Moving Forward' },
             { key: 'hired', label: 'Hired' },
             { key: 'declined', label: 'Declined' },
           ].filter(tab => tab.key === 'all' || counts[tab.key] > 0).map(tab => (
@@ -360,6 +360,14 @@ export default function AppliedJobs() {
 
                     {/* Pipeline Progress Tracker */}
                     <PipelineTracker stage={stage} />
+
+                    {/* Ranking Badge */}
+                    {app.ranking?.percentile && (
+                      <div className="flex items-center gap-1.5 mt-2 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-400 text-xs font-bold w-fit">
+                        <Star className="w-3 h-3 fill-amber-400" />
+                        Top {app.ranking.percentile}% of applicants
+                      </div>
+                    )}
 
                     <div className="flex items-center justify-between mt-2">
                       <div className="flex items-center gap-3">

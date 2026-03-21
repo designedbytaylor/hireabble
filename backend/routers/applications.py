@@ -327,6 +327,7 @@ async def _recruiter_swipe_post_process(
             )
             match_id = str(uuid.uuid4())
             now = datetime.now(timezone.utc).isoformat()
+            ranking = await _calc_applicant_ranking(seeker_app["job_id"])
             match_doc = {
                 "id": match_id,
                 "application_id": seeker_app["id"],
@@ -341,6 +342,7 @@ async def _recruiter_swipe_post_process(
                 "recruiter_name": recruiter_snapshot["name"],
                 "recruiter_avatar": recruiter_snapshot.get("avatar"),
                 "recruiter_photo": recruiter_snapshot.get("photo_url"),
+                "ranking": ranking,
                 "created_at": now,
             }
 
@@ -480,6 +482,20 @@ async def recruiter_swipe_candidate(
 
 # ==================== SWIPE ====================
 
+
+async def _calc_applicant_ranking(job_id: str) -> dict:
+    """Calculate how a selected applicant ranks among all applicants for a job."""
+    try:
+        total = await db.applications.count_documents({"job_id": job_id})
+        if total <= 0:
+            total = 1
+        # Being selected means you're among the top — cap at 25% to be conservative
+        percentile = max(1, min(round((1 / total) * 100), 25))
+        return {"percentile": percentile, "total_applicants": total}
+    except Exception:
+        return {"percentile": 10, "total_applicants": 0}
+
+
 async def _check_match_on_swipe(
     application_id: str,
     job: dict,
@@ -516,6 +532,10 @@ async def _check_match_on_swipe(
         {"id": job["recruiter_id"]},
         {"_id": 0, "avatar": 1, "photo_url": 1}
     )
+
+    # Calculate applicant ranking
+    ranking = await _calc_applicant_ranking(job_id)
+
     match_doc = {
         "id": match_id,
         "application_id": application_id,
@@ -526,6 +546,7 @@ async def _check_match_on_swipe(
         "seeker_name": current_user_snapshot["name"],
         "seeker_avatar": current_user_snapshot.get("avatar"),
         "seeker_photo": current_user_snapshot.get("photo_url"),
+        "ranking": ranking,
         "recruiter_id": job["recruiter_id"],
         "recruiter_name": job.get("recruiter_name", ""),
         "recruiter_avatar": recruiter.get("avatar") if recruiter else None,
@@ -564,8 +585,8 @@ async def _swipe_match_notify(match_id, match_payload, job, current_user_snapsho
             create_notification(
                 user_id=job["recruiter_id"],
                 notif_type="match",
-                title="It's a Match!",
-                message=f"{current_user_snapshot['name']} applied to {job.get('title', 'your position')} - mutual interest!",
+                title="You've Been Selected!",
+                message=f"{current_user_snapshot['name']} applied to {job.get('title', 'your position')} — mutual interest!",
                 data={"match_id": match_id, "job_id": job_id}
             ),
             manager.send_to_user(uid, {"type": "new_match", "match": match_payload}),
@@ -1013,6 +1034,16 @@ async def get_my_applications(current_user: dict = Depends(get_current_user)):
     jobs_list = await db.jobs.find({"id": {"$in": job_ids}}, _JOB_LIST_PROJECTION).to_list(len(job_ids)) if job_ids else []
     jobs_map = {j["id"]: j for j in jobs_list}
 
+    # Batch-fetch match ranking data for matched applications
+    matched_job_ids = [app["job_id"] for app in applications if app.get("is_matched") and app.get("job_id")]
+    ranking_map = {}
+    if matched_job_ids:
+        matches_list = await db.matches.find(
+            {"seeker_id": current_user["id"], "job_id": {"$in": matched_job_ids}},
+            {"_id": 0, "job_id": 1, "ranking": 1}
+        ).to_list(len(matched_job_ids))
+        ranking_map = {m["job_id"]: m.get("ranking") for m in matches_list if m.get("ranking")}
+
     result = []
     for app in applications:
         job = jobs_map.get(app.get("job_id"))
@@ -1047,6 +1078,9 @@ async def get_my_applications(current_user: dict = Depends(get_current_user)):
                 "benefits": job.get("benefits", []) if job else [],
             },
         }
+        # Include ranking data for matched applications
+        if app.get("is_matched") and app.get("job_id") in ranking_map:
+            app_entry["ranking"] = ranking_map[app["job_id"]]
         # Include read receipt for premium seekers
         if has_read_receipts and app.get("read_at"):
             app_entry["read_at"] = app["read_at"]
@@ -1135,6 +1169,7 @@ async def respond_to_application(response: RecruiterAction, current_user: dict =
     # If matched, create a match record and send notifications
     if is_matched:
         job = await db.jobs.find_one({"id": application["job_id"]}, {"_id": 0})
+        ranking = await _calc_applicant_ranking(application["job_id"])
         match_doc = {
             "id": str(uuid.uuid4()),
             "application_id": response.application_id,
@@ -1147,17 +1182,16 @@ async def respond_to_application(response: RecruiterAction, current_user: dict =
             "seeker_photo": application.get("seeker_photo"),
             "recruiter_id": current_user["id"],
             "recruiter_name": current_user["name"],
+            "ranking": ranking,
             "is_superliked": is_superlike,
             "created_at": datetime.now(timezone.utc).isoformat()
         }
         await db.matches.insert_one(match_doc)
 
         # Create in-app notification for seeker
-        notif_title = "Priority Match!" if is_superlike else "It's a Match!"
+        notif_title = "You've Been Selected!"
         notif_msg = (
-            f"{job['company'] if job else 'A company'} priority picked your application for {job['title'] if job else 'a position'}!"
-            if is_superlike else
-            f"{job['company'] if job else 'A company'} accepted your application for {job['title'] if job else 'a position'}!"
+            f"{job['company'] if job else 'A company'} is interested in your application for {job['title'] if job else 'a position'}!"
         )
         await create_notification(
             user_id=application["seeker_id"],

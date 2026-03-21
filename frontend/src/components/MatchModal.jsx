@@ -1,9 +1,11 @@
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Heart, MessageCircle } from 'lucide-react';
+import { X, Rocket, MessageCircle, Star } from 'lucide-react';
 import { Button } from './ui/button';
 
-export default function MatchModal({ match, onClose, onMessage }) {
+export default function MatchModal({ match, onClose, onMessage, userRole = 'seeker', ranking }) {
   if (!match) return null;
+
+  const isSeeker = userRole === 'seeker';
 
   return (
     <AnimatePresence>
@@ -83,14 +85,14 @@ export default function MatchModal({ match, onClose, onMessage }) {
             <X className="w-5 h-5 text-muted-foreground" />
           </button>
 
-          {/* Heart Animation */}
+          {/* Rocket Animation */}
           <motion.div
             initial={{ scale: 0 }}
             animate={{ scale: [0, 1.2, 1] }}
             transition={{ duration: 0.5, delay: 0.2 }}
             className="w-20 h-20 rounded-full bg-gradient-to-br from-primary to-secondary flex items-center justify-center mx-auto mb-6"
           >
-            <Heart className="w-10 h-10 text-white fill-white" />
+            <Rocket className="w-10 h-10 text-white" />
           </motion.div>
 
           {/* Title */}
@@ -100,17 +102,33 @@ export default function MatchModal({ match, onClose, onMessage }) {
             transition={{ delay: 0.3 }}
             className="text-3xl font-bold font-['Outfit'] mb-2 gradient-text"
           >
-            It's a Match!
+            You've Been Selected!
           </motion.h2>
 
           <motion.p
             initial={{ y: 20, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             transition={{ delay: 0.4 }}
-            className="text-muted-foreground mb-6"
+            className="text-muted-foreground mb-4"
           >
-            You and {match.seeker_name || match.company} have liked each other
+            {isSeeker
+              ? 'A recruiter is interested in your profile'
+              : `${match.seeker_name || 'A candidate'} is a great fit for your role`
+            }
           </motion.p>
+
+          {/* Ranking Badge (seeker only) */}
+          {isSeeker && ranking?.percentile && (
+            <motion.div
+              initial={{ y: 20, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              transition={{ delay: 0.45 }}
+              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-400 text-sm font-bold mb-4"
+            >
+              <Star className="w-4 h-4 fill-amber-400" />
+              You ranked in the Top {ranking.percentile}% of applicants
+            </motion.div>
+          )}
 
           {/* Match Details */}
           {match.job_title && (
@@ -137,14 +155,14 @@ export default function MatchModal({ match, onClose, onMessage }) {
               onClick={onClose}
               className="flex-1 rounded-full"
             >
-              Keep Swiping
+              Keep Browsing
             </Button>
             <Button
               onClick={onMessage || onClose}
               className="flex-1 rounded-full bg-gradient-to-r from-primary to-secondary"
             >
               <MessageCircle className="w-4 h-4 mr-2" />
-              Message
+              {isSeeker ? 'Message Recruiter' : 'Message Candidate'}
             </Button>
           </motion.div>
         </motion.div>
