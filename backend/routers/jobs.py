@@ -453,7 +453,10 @@ async def get_job_public(job_id: str):
     """Get basic public info for a job (no auth required) — used by QR code download page."""
     job = await db.jobs.find_one(
         {"id": job_id, "is_active": True},
-        {"_id": 0, "title": 1, "company": 1, "location": 1, "job_type": 1}
+        {"_id": 0, "id": 1, "title": 1, "company": 1, "location": 1, "job_type": 1,
+         "description": 1, "requirements": 1, "salary_min": 1, "salary_max": 1,
+         "experience_level": 1, "employment_type": 1, "category": 1,
+         "created_at": 1, "listing_photo": 1, "company_logo": 1}
     )
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
@@ -1079,7 +1082,7 @@ async def generate_job_poster(job_id: str, current_user: dict = Depends(get_curr
 
     # Generate QR code
     frontend_url = os.environ.get('FRONTEND_URL', 'https://hireabble.com')
-    qr_url = f"{frontend_url}/download?ref=poster&job={job_id}"
+    qr_url = f"{frontend_url}/jobs/{job_id}?ref=poster"
     qr = qrcode.QRCode(version=1, box_size=10, border=2)
     qr.add_data(qr_url)
     qr.make(fit=True)
