@@ -48,7 +48,17 @@ export default function RecruiterDashboard() {
   const [stats, setStats] = useState({ active_jobs: 0, total_applications: 0, super_likes: 0, matches: 0 });
   const [jobs, setJobs] = useState([]);
   const [applications, setApplications] = useState([]);
-  const unlockedAppIds = useRef(new Set()); // tracks which app IDs were originally in the free visible slots
+  // Tracks which app IDs the free-tier recruiter can see (persisted across navigation)
+  const unlockedAppIds = useRef(() => {
+    try {
+      const stored = sessionStorage.getItem('unlockedAppIds');
+      return stored ? new Set(JSON.parse(stored)) : new Set();
+    } catch { return new Set(); }
+  });
+  // Lazily initialize the ref (useState-style initializer isn't supported by useRef)
+  if (typeof unlockedAppIds.current === 'function') {
+    unlockedAppIds.current = unlockedAppIds.current();
+  }
   const [loading, setLoading] = useState(true);
   const [showNewJob, setShowNewJob] = useState(false);
   const [editingJob, setEditingJob] = useState(null);
@@ -77,9 +87,13 @@ export default function RecruiterDashboard() {
       setStats(data.stats);
       setJobs(data.jobs);
       setApplications(data.applications);
-      // Snapshot which pending app IDs are in the free visible slots (first 3)
-      const pending = (data.applications || []).filter(a => !a.recruiter_action);
-      unlockedAppIds.current = new Set(pending.slice(0, 3).map(a => a.id));
+      // Only snapshot unlocked IDs if we don't already have a persisted set
+      if (unlockedAppIds.current.size === 0) {
+        const pending = (data.applications || []).filter(a => !a.recruiter_action);
+        const ids = pending.slice(0, 3).map(a => a.id);
+        unlockedAppIds.current = new Set(ids);
+        try { sessionStorage.setItem('unlockedAppIds', JSON.stringify(ids)); } catch {}
+      }
       setSubscription(data.subscription);
     } catch (error) {
       console.error('Failed to fetch data:', error);
