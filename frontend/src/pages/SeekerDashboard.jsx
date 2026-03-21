@@ -703,6 +703,41 @@ export default function SeekerDashboard() {
         return;
       }
 
+      // Super like limit hit on the server — bring the card back and show upgrade modal
+      if (status === 400 && detail.toLowerCase().includes('no super likes remaining')) {
+        // Revert stats
+        setStats(prev => {
+          const pending = prev._pending || {};
+          const next = {
+            ...prev,
+            applications_sent: Math.max(0, prev.applications_sent - 1),
+            super_likes_used: Math.max(0, prev.super_likes_used - 1),
+            _pending: {
+              ...pending,
+              applications_sent: Math.max(0, (pending.applications_sent || 0) - 1),
+              super_likes_used: Math.max(0, (pending.super_likes_used || 0) - 1),
+            },
+          };
+          saveCachedStats(next, uidRef.current);
+          return next;
+        });
+        // Sync count to 0 — server is the source of truth
+        setSuperLikesRemaining(0);
+        saveCachedSuperLikes(0, uidRef.current);
+        // Remove from swiped IDs so the job can be re-swiped
+        swipedIdsRef.current.delete(job.id);
+        saveSwipedIds(swipedIdsRef.current, uidRef.current);
+        // Remove the exiting card animation
+        setExitingCards(prev => prev.filter(c => c.id !== job.id));
+        // Put the card back by reverting the index
+        setCurrentIndex(prev => Math.max(0, prev - 1));
+        // Show upgrade modal
+        setUpgradeTrigger('super_likes');
+        setShowUpgradeModal(true);
+        return;
+      }
+
+
       // Retry twice on server/network errors (500, timeout, network failure)
       if (retryCount < 2 && (!status || status >= 500 || isTimeout)) {
         const delay = 1500 * Math.pow(2, retryCount); // 1.5s, 3s
