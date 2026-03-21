@@ -1,12 +1,115 @@
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Rocket, MessageCircle, Star } from 'lucide-react';
+import { X, Rocket, MessageCircle, Star, User, XCircle } from 'lucide-react';
 import { Button } from './ui/button';
 
-export default function MatchModal({ match, onClose, onMessage, userRole = 'seeker', ranking }) {
+export default function MatchModal({ match, onClose, onMessage, userRole = 'seeker', ranking, onShortlist, onReject }) {
   if (!match) return null;
 
   const isSeeker = userRole === 'seeker';
 
+  // ==================== RECRUITER VIEW ====================
+  if (!isSeeker) {
+    return (
+      <AnimatePresence>
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="fixed inset-0 z-50 flex items-center justify-center p-6"
+        >
+          <motion.div
+            className="absolute inset-0 bg-black/80 backdrop-blur-sm"
+            onClick={onClose}
+          />
+
+          <motion.div
+            initial={{ y: 50, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: 50, opacity: 0 }}
+            transition={{ type: 'spring', damping: 20, stiffness: 300 }}
+            className="relative z-10 glass-card rounded-3xl p-6 max-w-sm w-full"
+          >
+            {/* Close button */}
+            <button
+              onClick={onClose}
+              className="absolute top-4 right-4 p-2 rounded-full hover:bg-accent transition-colors"
+            >
+              <X className="w-5 h-5 text-muted-foreground" />
+            </button>
+
+            {/* Header */}
+            <div className="flex items-center gap-2 mb-4">
+              <div className="w-10 h-10 rounded-full bg-green-500/20 flex items-center justify-center">
+                <Rocket className="w-5 h-5 text-green-500" />
+              </div>
+              <div>
+                <h2 className="text-lg font-bold font-['Outfit']">New Candidate Ready</h2>
+                <p className="text-xs text-muted-foreground">{match.seeker_name || 'A candidate'} applied to your role</p>
+              </div>
+            </div>
+
+            {/* Candidate Card */}
+            <div className="p-4 rounded-2xl bg-background border border-border mb-4">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center">
+                  <User className="w-6 h-6 text-primary" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="font-bold font-['Outfit'] text-base">{match.seeker_name || 'Candidate'}</div>
+                  <div className="text-sm text-muted-foreground">{match.job_title}</div>
+                  {match.company && <div className="text-xs text-muted-foreground">{match.company}</div>}
+                </div>
+              </div>
+
+              {/* Fit Score */}
+              {match.match_score != null && (
+                <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-400 text-sm font-bold w-fit">
+                  <Star className="w-3.5 h-3.5 fill-amber-400" />
+                  Fit Score: {match.match_score}%
+                </div>
+              )}
+            </div>
+
+            {/* Quick Actions */}
+            <div className="flex gap-2">
+              {onShortlist && (
+                <Button
+                  variant="outline"
+                  onClick={() => { onShortlist(); onClose(); }}
+                  className="flex-1 rounded-full border-amber-500/30 text-amber-400 hover:bg-amber-500/10"
+                  size="sm"
+                >
+                  <Star className="w-4 h-4 mr-1.5" />
+                  Shortlist
+                </Button>
+              )}
+              {onReject && (
+                <Button
+                  variant="outline"
+                  onClick={() => { onReject(); onClose(); }}
+                  className="flex-1 rounded-full border-destructive/30 text-destructive hover:bg-destructive/10"
+                  size="sm"
+                >
+                  <XCircle className="w-4 h-4 mr-1.5" />
+                  Reject
+                </Button>
+              )}
+              <Button
+                onClick={onMessage || onClose}
+                className="flex-1 rounded-full bg-gradient-to-r from-primary to-secondary"
+                size="sm"
+              >
+                <MessageCircle className="w-4 h-4 mr-1.5" />
+                Message
+              </Button>
+            </div>
+          </motion.div>
+        </motion.div>
+      </AnimatePresence>
+    );
+  }
+
+  // ==================== SEEKER VIEW ====================
   return (
     <AnimatePresence>
       <motion.div
@@ -32,7 +135,7 @@ export default function MatchModal({ match, onClose, onMessage, userRole = 'seek
             const shapes = ['rounded-sm', 'rounded-full', 'rounded-none'];
             const w = 6 + Math.random() * 10;
             const h = Math.random() > 0.5 ? w : w * (0.3 + Math.random() * 0.5);
-            const burst = i < 50 ? 0 : 1; // two bursts
+            const burst = i < 50 ? 0 : 1;
             const burstDelay = burst * 0.3;
 
             return (
@@ -111,14 +214,11 @@ export default function MatchModal({ match, onClose, onMessage, userRole = 'seek
             transition={{ delay: 0.4 }}
             className="text-muted-foreground mb-4"
           >
-            {isSeeker
-              ? 'A recruiter is interested in your profile'
-              : `${match.seeker_name || 'A candidate'} is a great fit for your role`
-            }
+            A recruiter is interested in your profile
           </motion.p>
 
           {/* Ranking Badge (seeker only) */}
-          {isSeeker && ranking?.percentile && (
+          {ranking?.percentile && (
             <motion.div
               initial={{ y: 20, opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
@@ -162,7 +262,7 @@ export default function MatchModal({ match, onClose, onMessage, userRole = 'seek
               className="flex-1 rounded-full bg-gradient-to-r from-primary to-secondary"
             >
               <MessageCircle className="w-4 h-4 mr-2" />
-              {isSeeker ? 'Message Recruiter' : 'Message Candidate'}
+              Message Recruiter
             </Button>
           </motion.div>
         </motion.div>

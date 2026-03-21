@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Bell, Heart, MessageSquare, Briefcase } from 'lucide-react';
+import { Bell, Rocket, MessageSquare, Briefcase } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
@@ -123,7 +123,7 @@ export default function NotificationBell() {
   const getNotificationIcon = (type) => {
     switch (type) {
       case 'match':
-        return <Heart className="w-4 h-4 text-pink-500" />;
+        return <Rocket className="w-4 h-4 text-green-500" />;
       case 'message':
         return <MessageSquare className="w-4 h-4 text-blue-500" />;
       case 'application':
@@ -185,7 +185,7 @@ export default function NotificationBell() {
                   data-testid={`notification-${notification.id}`}
                 >
                   <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${
-                    notification.type === 'match' ? 'bg-pink-500/10' :
+                    notification.type === 'match' ? 'bg-green-500/10' :
                     notification.type === 'message' ? 'bg-blue-500/10' : 'bg-purple-500/10'
                   }`}>
                     {getNotificationIcon(notification.type)}

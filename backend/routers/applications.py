@@ -585,8 +585,8 @@ async def _swipe_match_notify(match_id, match_payload, job, current_user_snapsho
             create_notification(
                 user_id=job["recruiter_id"],
                 notif_type="match",
-                title="You've Been Selected!",
-                message=f"{current_user_snapshot['name']} applied to {job.get('title', 'your position')} — mutual interest!",
+                title="New Candidate Ready",
+                message=f"{current_user_snapshot['name']} applied to {job.get('title', 'your position')}",
                 data={"match_id": match_id, "job_id": job_id}
             ),
             manager.send_to_user(uid, {"type": "new_match", "match": match_payload}),
@@ -1170,6 +1170,7 @@ async def respond_to_application(response: RecruiterAction, current_user: dict =
     if is_matched:
         job = await db.jobs.find_one({"id": application["job_id"]}, {"_id": 0})
         ranking = await _calc_applicant_ranking(application["job_id"])
+        match_score = application.get("match_score")
         match_doc = {
             "id": str(uuid.uuid4()),
             "application_id": response.application_id,
@@ -1183,6 +1184,7 @@ async def respond_to_application(response: RecruiterAction, current_user: dict =
             "recruiter_id": current_user["id"],
             "recruiter_name": current_user["name"],
             "ranking": ranking,
+            "match_score": match_score,
             "is_superliked": is_superlike,
             "created_at": datetime.now(timezone.utc).isoformat()
         }
@@ -1212,7 +1214,7 @@ async def respond_to_application(response: RecruiterAction, current_user: dict =
         if seeker and seeker.get("email"):
             asyncio.create_task(send_email_notification(
                 seeker["email"],
-                f"You matched with {job['company'] if job else 'a company'} on Hireabble!",
+                f"You've been selected by {job['company'] if job else 'a company'} on Hireabble!",
                 get_match_email_html(
                     job["title"] if job else "Unknown",
                     job["company"] if job else "Unknown",

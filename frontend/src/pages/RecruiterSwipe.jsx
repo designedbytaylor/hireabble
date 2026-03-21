@@ -144,6 +144,9 @@ export default function RecruiterSwipe() {
                 seeker_name: data.match.seeker_name,
                 job_title: data.match.job_title,
                 company: data.match.company || user?.company,
+                match_score: data.match.match_score,
+                application_id: data.match.application_id,
+                id: data.match.id,
               });
               setShowMatch(true);
               setStats(prev => ({ ...prev, matches: (prev.matches || 0) + 1 }));
@@ -259,7 +262,7 @@ export default function RecruiterSwipe() {
         { headers: { Authorization: `Bearer ${token}` } }
       ).then(res => {
         if (action === 'accept' || action === 'superlike' || res.data?.is_matched) {
-          toast.success("Matched! You can now message this candidate.", { duration: 2000 });
+          toast.success("New candidate ready! View their profile.", { duration: 2000 });
         }
         if (action === 'superlike') {
           setSuperSwipesRemaining(prev => prev ? { ...prev, remaining: prev.remaining - 1 } : prev);
@@ -737,6 +740,12 @@ export default function RecruiterSwipe() {
           onClose={() => setShowMatch(false)}
           onMessage={() => { setShowMatch(false); navigate('/matches'); }}
           userRole="recruiter"
+          onShortlist={matchData?.application_id ? () => {
+            axios.put(`${API}/applications/${matchData.application_id}/stage`,
+              { stage: 'shortlisted' },
+              { headers: { Authorization: `Bearer ${token}` } }
+            ).then(() => toast.success('Candidate shortlisted!')).catch(() => {});
+          } : undefined}
         />
       )}
 
