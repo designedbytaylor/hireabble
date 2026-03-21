@@ -269,7 +269,17 @@ export default function RecruiterDashboard() {
       const url = window.URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }));
       window.open(url, '_blank');
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Failed to load resume');
+      let message = 'Failed to load resume';
+      if (error.response?.data instanceof Blob) {
+        try {
+          const text = await error.response.data.text();
+          const json = JSON.parse(text);
+          message = json.detail || message;
+        } catch {}
+      } else if (error.response?.data?.detail) {
+        message = error.response.data.detail;
+      }
+      toast.error(message);
     } finally {
       setLoadingResume(false);
     }
@@ -932,26 +942,14 @@ export default function RecruiterDashboard() {
                       This candidate applied and you shortlisted them. You can now message them or review their resume.
                     </p>
                   </div>
-                  <div className="flex gap-2">
-                    <Button
-                      size="sm"
-                      onClick={() => { setSelectedCandidate(null); navigate('/matches'); }}
-                      className="flex-1 rounded-xl bg-gradient-to-r from-primary to-secondary"
-                    >
-                      <MessageCircle className="w-4 h-4 mr-1.5" />
-                      Message
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleViewResume(selectedCandidate.seeker_id)}
-                      disabled={loadingResume}
-                      className="flex-1 rounded-xl border-primary/30 text-primary hover:bg-primary/10"
-                    >
-                      <FileText className="w-4 h-4 mr-1.5" />
-                      View Resume
-                    </Button>
-                  </div>
+                  <Button
+                    size="sm"
+                    onClick={() => { setSelectedCandidate(null); navigate('/matches'); }}
+                    className="w-full rounded-xl bg-gradient-to-r from-primary to-secondary"
+                  >
+                    <MessageCircle className="w-4 h-4 mr-1.5" />
+                    Message
+                  </Button>
                 </div>
               ) : (
                 <div className="py-3 rounded-xl text-center font-medium bg-muted text-muted-foreground">
@@ -1195,7 +1193,7 @@ function JobFormDialog({ open, onClose, onSuccess, token, company, job = null, i
     const newFiles = Array.from(e.target.files || []);
     const total = screenshots.length + newFiles.length;
     if (total > 5) {
-      toast.error('Maximum 5 screenshots allowed');
+      toast.error('Maximum 5 files allowed');
       return;
     }
     setScreenshots(prev => [...prev, ...newFiles]);
@@ -1333,7 +1331,7 @@ function JobFormDialog({ open, onClose, onSuccess, token, company, job = null, i
             <div className="space-y-3">
               <Label className="flex items-center gap-2">
                 <ImageIcon className="w-4 h-4" />
-                Import from Screenshots
+                Import from Screenshots or Documents
               </Label>
               <div className="border-2 border-dashed border-border rounded-xl p-4 text-center hover:border-primary/50 transition-colors">
                 {screenshots.length === 0 ? (
@@ -1342,10 +1340,10 @@ function JobFormDialog({ open, onClose, onSuccess, token, company, job = null, i
                     <span className="text-sm text-muted-foreground">
                       Already posted your job elsewhere? Quick-upload here
                     </span>
-                    <span className="text-xs text-muted-foreground">Upload screenshots of your listing (up to 5)</span>
+                    <span className="text-xs text-muted-foreground">Upload screenshots, PDFs, or Word docs (up to 5)</span>
                     <input
                       type="file"
-                      accept="image/*"
+                      accept="image/*,.pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
                       multiple
                       onChange={handleScreenshotSelect}
                       className="hidden"
@@ -1356,11 +1354,18 @@ function JobFormDialog({ open, onClose, onSuccess, token, company, job = null, i
                     <div className="flex flex-wrap gap-2 justify-center">
                       {screenshots.map((file, i) => (
                         <div key={i} className="relative group">
-                          <img
-                            src={URL.createObjectURL(file)}
-                            alt={`Screenshot ${i + 1}`}
-                            className="w-16 h-16 object-cover rounded-lg border border-border"
-                          />
+                          {file.type.startsWith('image/') ? (
+                            <img
+                              src={URL.createObjectURL(file)}
+                              alt={`Screenshot ${i + 1}`}
+                              className="w-16 h-16 object-cover rounded-lg border border-border"
+                            />
+                          ) : (
+                            <div className="w-16 h-16 rounded-lg border border-border flex flex-col items-center justify-center bg-muted/50 gap-1">
+                              <FileText className="w-5 h-5 text-muted-foreground" />
+                              <span className="text-[8px] text-muted-foreground truncate max-w-[56px]">{file.name.split('.').pop()?.toUpperCase()}</span>
+                            </div>
+                          )}
                           <button
                             type="button"
                             onClick={() => removeScreenshot(i)}
@@ -1375,7 +1380,7 @@ function JobFormDialog({ open, onClose, onSuccess, token, company, job = null, i
                           <Plus className="w-5 h-5 text-muted-foreground" />
                           <input
                             type="file"
-                            accept="image/*"
+                            accept="image/*,.pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
                             multiple
                             onChange={handleScreenshotSelect}
                             className="hidden"

@@ -587,8 +587,10 @@ async def delete_job(job_id: str, current_user: dict = Depends(get_current_user)
 
 # ==================== SCREENSHOT PARSING & AI ASSIST ====================
 
-ALLOWED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/webp"}
-MAX_IMAGE_SIZE = 5 * 1024 * 1024  # 5MB
+ALLOWED_UPLOAD_TYPES = {"image/jpeg", "image/png", "image/webp",
+                        "application/pdf", "application/msword",
+                        "application/vnd.openxmlformats-officedocument.wordprocessingml.document"}
+MAX_UPLOAD_SIZE = 10 * 1024 * 1024  # 10MB
 
 def _resize_image_bytes(img_bytes: bytes, max_dim: int = 1500) -> bytes:
     """Resize image to max dimension while preserving aspect ratio."""
@@ -602,6 +604,38 @@ def _resize_image_bytes(img_bytes: bytes, max_dim: int = 1500) -> bytes:
         fmt = "JPEG"
     img.save(buf, format=fmt)
     return buf.getvalue()
+
+
+def _extract_text_from_document(file_bytes: bytes, content_type: str) -> str:
+    """Extract text from PDF or Word document."""
+    text = ""
+    MAX_EXTRACTED_TEXT = 500_000
+    if content_type == "application/pdf":
+        from PyPDF2 import PdfReader
+        reader = PdfReader(io.BytesIO(file_bytes))
+        for page in reader.pages:
+            page_text = page.extract_text()
+            if page_text:
+                text += page_text + "\n"
+            if len(text) > MAX_EXTRACTED_TEXT:
+                text = text[:MAX_EXTRACTED_TEXT]
+                break
+    elif content_type in (
+        "application/msword",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    ):
+        from docx import Document
+        doc = Document(io.BytesIO(file_bytes))
+        for para in doc.paragraphs:
+            if para.text.strip():
+                text += para.text + "\n"
+        for table in doc.tables:
+            for row in table.rows:
+                row_text = "\t".join(cell.text.strip() for cell in row.cells if cell.text.strip())
+                if row_text:
+                    text += row_text + "\n"
+    return text
+
 
 def _extract_json(text: str) -> dict:
     """Extract JSON from model response, handling markdown code blocks."""
@@ -662,44 +696,59 @@ async def parse_job_screenshots(
     files: List[UploadFile] = File(...),
     current_user: dict = Depends(get_current_user),
 ):
-    """Parse job listing screenshots using Claude Vision to extract structured job data."""
+    """Parse job listing from screenshots, PDFs, or Word docs using Claude to extract structured job data."""
     if current_user["role"] != "recruiter":
         raise HTTPException(status_code=403, detail="Only recruiters can use this feature")
 
     if len(files) > 5:
-        raise HTTPException(status_code=400, detail="Maximum 5 images allowed")
+        raise HTTPException(status_code=400, detail="Maximum 5 files allowed")
     if len(files) == 0:
-        raise HTTPException(status_code=400, detail="At least one image is required")
+        raise HTTPException(status_code=400, detail="At least one file is required")
 
-    # Validate and read images
-    images = []
+    # Validate and process files
+    content = []
     for f in files:
-        if f.content_type not in ALLOWED_IMAGE_TYPES:
-            raise HTTPException(status_code=400, detail=f"Invalid image type: {f.content_type}. Use JPEG, PNG, or WebP.")
+        if f.content_type not in ALLOWED_UPLOAD_TYPES:
+            raise HTTPException(status_code=400, detail=f"Invalid file type: {f.content_type}. Use images, PDF, or Word documents.")
         data = await f.read()
-        if len(data) > MAX_IMAGE_SIZE:
-            raise HTTPException(status_code=400, detail=f"Image {f.filename} exceeds 5MB limit")
-        # Resize to keep API payload small (CPU-bound, run in thread)
-        data = await asyncio.to_thread(_resize_image_bytes, data)
-        images.append((data, f.content_type))
+        if len(data) > MAX_UPLOAD_SIZE:
+            raise HTTPException(status_code=400, detail=f"File {f.filename} exceeds 10MB limit")
+
+        if f.content_type.startswith("image/"):
+            # Resize to keep API payload small (CPU-bound, run in thread)
+            data = await asyncio.to_thread(_resize_image_bytes, data)
+            content.append({
+                "type": "image",
+                "source": {
+                    "type": "base64",
+                    "media_type": f.content_type,
+                    "data": base64.b64encode(data).decode("utf-8"),
+                },
+            })
+        else:
+            # PDF or Word document — extract text
+            try:
+                text = await asyncio.to_thread(_extract_text_from_document, data, f.content_type)
+                if not text.strip():
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"Could not extract text from {f.filename}. Please ensure it's a text-based document."
+                    )
+                content.append({
+                    "type": "text",
+                    "text": f"[Document: {f.filename}]\n{text}"
+                })
+            except HTTPException:
+                raise
+            except Exception as e:
+                logger.error(f"Document parsing failed for {f.filename}: {type(e).__name__}: {e}")
+                raise HTTPException(status_code=400, detail=f"Could not read {f.filename}. Please ensure it's a valid document.")
 
     client = _get_anthropic_client()
 
-    # Build multi-image content
-    content = []
-    for img_bytes, media_type in images:
-        content.append({
-            "type": "image",
-            "source": {
-                "type": "base64",
-                "media_type": media_type,
-                "data": base64.b64encode(img_bytes).decode("utf-8"),
-            },
-        })
-
     content.append({
         "type": "text",
-        "text": """You are parsing a job listing from screenshots. Extract ALL available information and return ONLY valid JSON with this structure:
+        "text": """You are parsing a job listing from screenshots, PDFs, or documents. Extract ALL available information and return ONLY valid JSON with this structure:
 
 {
   "title": "Job Title",
