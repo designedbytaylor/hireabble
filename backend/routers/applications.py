@@ -329,14 +329,25 @@ async def invite_to_apply(data: InviteToApply, current_user: dict = Depends(get_
     if existing_app:
         raise HTTPException(status_code=400, detail="Candidate already applied to this job")
 
-    # Rate limit: max 20 invites per day (prevents spam)
+    # Rate limit: subscription-based daily invite limit
+    daily_invite_limit = 3  # free tier default
+    sub = current_user.get("subscription", {})
+    if sub and sub.get("status") == "active":
+        now_iso = datetime.now(timezone.utc).isoformat()
+        if sub.get("period_end", "") >= now_iso:
+            tier = sub.get("tier_id", "")
+            if tier == "recruiter_enterprise":
+                daily_invite_limit = 999  # unlimited
+            elif tier == "recruiter_pro":
+                daily_invite_limit = 10
+
     today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0).isoformat()
     sent_today = await db.recruiter_invites.count_documents({
         "recruiter_id": current_user["id"],
         "created_at": {"$gte": today_start},
     })
-    if sent_today >= 20:
-        raise HTTPException(status_code=429, detail="Daily invite limit reached (20/day)")
+    if sent_today >= daily_invite_limit:
+        raise HTTPException(status_code=429, detail=f"Daily invite limit reached ({daily_invite_limit}/day). Upgrade for more!")
 
     invite_doc = {
         "id": str(uuid.uuid4()),

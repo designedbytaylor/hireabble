@@ -205,7 +205,7 @@ export default function UpgradeModal({ open, onClose, onSubscribed, trigger, hig
                 </div>
                 <h2 className="text-2xl font-bold font-['Outfit']">
                   {trigger === 'super_likes' && 'Get More Priority Applies'}
-                  {trigger === 'super_swipes' && 'Get More Priority Picks'}
+                  {trigger === 'super_swipes' && 'Get More Candidate Invites'}
                   {trigger === 'blurred' && 'See Who Applied'}
                   {trigger === 'boost' && 'Boost Your Listings'}
                   {trigger === 'undo' && 'Undo Your Last Swipe'}
@@ -213,7 +213,7 @@ export default function UpgradeModal({ open, onClose, onSubscribed, trigger, hig
                 </h2>
                 <p className="text-sm text-white/80 mt-1">
                   {trigger === 'super_likes' && "You've used all your free Priority Applies today"}
-                  {trigger === 'super_swipes' && "You've used all your free Priority Picks today"}
+                  {trigger === 'super_swipes' && "You've used all your free Candidate Invites today"}
                   {trigger === 'blurred' && 'Unlock the full applicant list'}
                   {trigger === 'boost' && 'Get your jobs in front of more candidates'}
                   {!trigger && 'Unlock premium features'}

@@ -61,14 +61,14 @@ PRODUCTS = {
     "boost_7day": {"name": "Job Boost - 7 Days", "price": 1999, "days": 7,
                    "apple_product_id": "com.hireabble.boost.7day",
                    "google_product_id": "com.hireabble.boost.7day"},
-    # Recruiter Priority Picks (Consumable IAP)
-    "super_swipes_5": {"name": "5 Recruiter Priority Picks", "price": 999, "count": 5,
+    # Recruiter Candidate Invites (Consumable IAP)
+    "super_swipes_5": {"name": "5 Candidate Invites", "price": 999, "count": 5,
                        "apple_product_id": "com.hireabble.recruiter.superswipes.5",
                        "google_product_id": "com.hireabble.recruiter.superswipes.5"},
-    "super_swipes_15": {"name": "15 Recruiter Priority Picks", "price": 1999, "count": 15,
+    "super_swipes_15": {"name": "15 Candidate Invites", "price": 1999, "count": 15,
                         "apple_product_id": "com.hireabble.recruiter.superswipes.15",
                         "google_product_id": "com.hireabble.recruiter.superswipes.15"},
-    "super_swipes_30": {"name": "30 Recruiter Priority Picks", "price": 2999, "count": 30,
+    "super_swipes_30": {"name": "30 Candidate Invites", "price": 2999, "count": 30,
                         "apple_product_id": "com.hireabble.recruiter.superswipes.30",
                         "google_product_id": "com.hireabble.recruiter.superswipes.30"},
     # Seeker Priority Applies (Consumable IAP)
@@ -171,7 +171,7 @@ SUBSCRIPTION_TIERS = {
             "6month": "com.hireabble.recruiter.pro.6month",
         },
         "features": [
-            "10 Priority Picks per day (vs 3)",
+            "10 Candidate Invites per day (vs 3)",
             "See full applicant list (unblurred)",
             "1 free Boost per month",
             "Priority in candidate feeds",
@@ -201,7 +201,7 @@ SUBSCRIPTION_TIERS = {
             "6month": "com.hireabble.recruiter.enterprise.6month",
         },
         "features": [
-            "Unlimited Priority Picks",
+            "Unlimited Candidate Invites",
             "See full applicant list (unblurred)",
             "3 free Boosts per month",
             "Priority in candidate feeds",

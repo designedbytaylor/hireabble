@@ -17,6 +17,7 @@ import { SkeletonPageBackground, SkeletonListItem } from '../components/skeleton
 import { Skeleton } from '../components/ui/skeleton';
 import useDocumentTitle from '../hooks/useDocumentTitle';
 import { CandidateDetailSheet } from '../components/CandidateDetailSheet';
+import UpgradeModal from '../components/UpgradeModal';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -52,6 +53,7 @@ export default function RecruiterSearch() {
   const [sentInvites, setSentInvites] = useState(new Map());
   const [inviting, setInviting] = useState(new Set());
   const [jobSelectorFor, setJobSelectorFor] = useState(null); // candidate id showing job selector
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
 
   const isPro = user?.subscription?.status === 'active' &&
     ['recruiter_pro', 'recruiter_enterprise'].includes(user?.subscription?.tier_id);
@@ -149,7 +151,10 @@ export default function RecruiterSearch() {
       setJobSelectorFor(null);
     } catch (error) {
       const detail = error.response?.data?.detail || '';
-      if (detail.toLowerCase().includes('already')) {
+      if (error.response?.status === 429) {
+        setJobSelectorFor(null);
+        setShowUpgradeModal(true);
+      } else if (detail.toLowerCase().includes('already')) {
         toast.info('Already invited this candidate for this role');
         setSentInvites(prev => new Map([...prev, [`${candidate.id}-${jobId}`, { status: 'pending' }]]));
       } else {
@@ -436,6 +441,13 @@ export default function RecruiterSearch() {
       </AnimatePresence>
 
       <Navigation />
+
+      {showUpgradeModal && (
+        <UpgradeModal
+          trigger="super_swipes"
+          onClose={() => setShowUpgradeModal(false)}
+        />
+      )}
     </div>
   );
 }
