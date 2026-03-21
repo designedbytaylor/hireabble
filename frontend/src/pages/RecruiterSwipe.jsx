@@ -736,6 +736,7 @@ export default function RecruiterSwipe() {
           match={matchData}
           onClose={() => setShowMatch(false)}
           onMessage={() => { setShowMatch(false); navigate('/matches'); }}
+          userRole="recruiter"
         />
       )}
 

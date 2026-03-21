@@ -529,6 +529,7 @@ class MatchResponse(BaseModel):
     last_message_sender: Optional[str] = None
     last_message_at: Optional[str] = None
     unread_count: Optional[int] = None
+    ranking: Optional[dict] = None
 
 class MessageCreate(BaseModel):
     match_id: str
