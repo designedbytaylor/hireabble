@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, BarChart3, TrendingUp, Users, Briefcase,
-  Heart, Star, Calendar, Clock, CheckCircle, XCircle,
+  Heart, Star, Calendar, Clock, CheckCircle, XCircle, Rocket,
   Target, Zap, Crown, Lock
 } from 'lucide-react';
 import axios from 'axios';
@@ -136,9 +136,9 @@ export default function RecruiterAnalytics() {
             color="pink-500"
           />
           <MetricCard
-            icon={<Star className="w-6 h-6 text-secondary" />}
+            icon={<Rocket className="w-6 h-6 text-secondary" />}
             value={stats.super_likes}
-            label="Super Likes"
+            label="Priority Applies"
             sublabel="received"
             color="secondary"
           />

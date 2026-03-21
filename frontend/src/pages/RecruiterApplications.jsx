@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  Users, Briefcase, Star, Check, X, Clock, ArrowLeft,
+  Users, Briefcase, Star, Check, X, Clock, ArrowLeft, Rocket,
   MapPin, GraduationCap, Building2, Heart, MessageSquare,
   Calendar, FileText, ChevronRight, Award, Mail, Phone,
   Eye, UserCheck, Trophy, ChevronDown
@@ -232,7 +232,7 @@ export default function RecruiterApplications() {
                     <div className="flex items-center gap-2">
                       <span className="font-medium truncate">{app.seeker_name}</span>
                       {app.action === 'superlike' && (
-                        <Star className="w-4 h-4 text-secondary fill-secondary flex-shrink-0" />
+                        <Rocket className="w-4 h-4 text-secondary flex-shrink-0" />
                       )}
                     </div>
                     <div className="text-sm text-primary truncate">{app.seeker_title || 'Job Seeker'}</div>
@@ -296,7 +296,7 @@ export default function RecruiterApplications() {
                   <div className="flex items-center gap-2">
                     <h2 className="text-lg font-bold font-['Outfit']">{selectedApp.seeker_name}</h2>
                     {selectedApp.action === 'superlike' && (
-                      <Star className="w-4 h-4 text-secondary fill-secondary" />
+                      <Rocket className="w-4 h-4 text-secondary" />
                     )}
                   </div>
                   <p className="text-sm text-primary">{selectedApp.seeker_title || 'Job Seeker'}</p>

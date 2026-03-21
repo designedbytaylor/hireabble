@@ -113,9 +113,9 @@
     "Implement a 'Dark Mode' toggle but default to Dark Mode.",
     "Use the 'Outfit' font from Google Fonts for headings. Add it to index.html or import in CSS.",
     "Use 'DM Sans' for body text.",
-    "For the Swipe Deck, use a library like 'react-tinder-card' OR build a custom one using 'framer-motion' (Preferred for control).",
+    "For the Swipe Deck, build a custom one using 'framer-motion' (Preferred for control).",
     "Ensure the 'JobCard' has a 'data-testid=\"job-card\"' attribute.",
-    "The 'Super Like' button should trigger a special animation (shake + glow).",
+    "The 'Priority Apply' button should trigger a special animation (shake + glow).",
     "For the Recruiter Dashboard, use a 'Bento Grid' layout to show stats, recent applicants, and active jobs.",
     "DO NOT use generic blue for primary actions. Use the specified Neon Indigo (#6366f1)."
   ],

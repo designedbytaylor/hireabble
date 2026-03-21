@@ -1,6 +1,6 @@
 """
 Hireabble API - Main Server
-A Tinder-style job matching platform
+A swipe-based job application platform
 
 This is the main entry point that combines all routers.
 """
@@ -46,7 +46,7 @@ limiter = Limiter(key_func=get_remote_address, default_limits=["120/minute"])
 _is_production = os.getenv("ENVIRONMENT", "production") != "development"
 app = FastAPI(
     title="Hireabble API",
-    description="A Tinder-style job matching platform API",
+    description="A swipe-based job application platform API",
     version="2.0.0",
     docs_url=None if _is_production else "/docs",
     redoc_url=None if _is_production else "/redoc",

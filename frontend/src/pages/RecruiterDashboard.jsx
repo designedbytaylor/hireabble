@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  Plus, Briefcase, Users, Star, Heart, X, Check,
+  Plus, Briefcase, Users, Star, Heart, X, Check, Rocket,
   MapPin, DollarSign, Building2, ChevronRight, Clock,
   Edit, GraduationCap, Trash2, BarChart3, Calendar, Globe,
   FileText, Send, Info, Copy, Upload, Sparkles, Wand2, Image as ImageIcon, Printer, Zap,
@@ -362,15 +362,15 @@ export default function RecruiterDashboard() {
           </div>
           <div className="glass-card rounded-2xl p-5 hover:border-secondary/30 transition-colors">
             <div className="w-12 h-12 rounded-xl bg-secondary/20 flex items-center justify-center mb-3">
-              <Star className="w-6 h-6 text-secondary" />
+              <Rocket className="w-6 h-6 text-secondary" />
             </div>
             <div className="text-3xl font-bold font-['Outfit']">{stats.super_likes}</div>
             <div className="text-sm text-muted-foreground flex items-center gap-1">
-              Super Likes
+              Priority Applies
               <span className="relative group">
                 <Info className="w-3 h-3 cursor-help" />
                 <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 rounded-lg bg-foreground text-background text-xs w-48 text-center opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-50">
-                  Super Likes put your job at the top of seekers' queues, increasing visibility and match chances!
+                  Priority Applies put your job at the top of seekers' queues, increasing visibility and match chances!
                 </span>
               </span>
             </div>
@@ -431,7 +431,7 @@ export default function RecruiterDashboard() {
                     />
                     {app.action === 'superlike' && (
                       <div className="absolute top-3 right-3">
-                        <Star className="w-5 h-5 text-secondary fill-secondary" />
+                        <Rocket className="w-5 h-5 text-secondary" />
                       </div>
                     )}
                   </div>
@@ -1480,7 +1480,7 @@ function JobApplicationsDialog({ selectedJob, onClose, jobApplications, onViewCa
   const filterTabs = [
     { key: 'all', label: 'All', count: jobApplications.length },
     { key: 'pending', label: 'Pending', count: pendingApps.length },
-    { key: 'superlike', label: 'Super Likes', count: jobApplications.filter(a => a.action === 'superlike').length },
+    { key: 'superlike', label: 'Priority Applies', count: jobApplications.filter(a => a.action === 'superlike').length },
     { key: 'matched', label: 'Matched', count: jobApplications.filter(a => a.recruiter_action === 'accept').length },
   ];
 
@@ -1552,7 +1552,7 @@ function JobApplicationsDialog({ selectedJob, onClose, jobApplications, onViewCa
                     <div className="flex items-center gap-2">
                       <span className="font-medium truncate">{app.seeker_name}</span>
                       {app.action === 'superlike' && (
-                        <Star className="w-4 h-4 text-secondary fill-secondary flex-shrink-0" />
+                        <Rocket className="w-4 h-4 text-secondary flex-shrink-0" />
                       )}
                       {app.seeker_video && (
                         <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-purple-500/10 text-purple-500 text-[10px] font-medium flex-shrink-0">

@@ -37,7 +37,7 @@ import useDocumentTitle from '../hooks/useDocumentTitle';
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
 // ─── Persistent swipe storage (survives page reloads) ─────────────────────
-// Tinder-style: all swipe state lives in localStorage so a page refresh never
+// All swipe state lives in localStorage so a page refresh never
 // loses data.  The API is the source of truth; localStorage is the fast cache.
 
 // Storage keys are scoped by user ID so impersonating different users
@@ -590,7 +590,7 @@ export default function SeekerDashboard() {
   const handleSwipe = (action, exitDirection = { x: 0, y: 0 }, dragPos = { x: 0, y: 0 }) => {
     if (currentIndex >= jobs.length) return;
 
-    // Check super like limit before sending - show paywall
+    // Check priority apply limit before sending - show paywall
     if (action === 'superlike' && superLikesRemaining <= 0) {
       setUpgradeTrigger('super_likes');
       setShowUpgradeModal(true);
@@ -658,7 +658,7 @@ export default function SeekerDashboard() {
 
     // Fire-and-forget API call — don't block the UI
     const swipePayload = { job_id: job.id, action };
-    // Attach note for premium super likes
+    // Attach note for premium priority applies
     if (action === 'superlike' && superlikeNote.trim() && premiumFeatures.superlike_notes) {
       swipePayload.note = superlikeNote.trim().slice(0, 140);
     }
@@ -703,7 +703,7 @@ export default function SeekerDashboard() {
         return;
       }
 
-      // Super like limit hit on the server — bring the card back and show upgrade modal
+      // Priority apply limit hit on the server — bring the card back and show upgrade modal
       if (status === 400 && detail.toLowerCase().includes('no super likes remaining')) {
         // Revert stats
         setStats(prev => {
@@ -750,7 +750,7 @@ export default function SeekerDashboard() {
       }
 
       // All retries exhausted — persist to retry queue so it can be retried
-      // on next page load (Tinder-style offline queue)
+      // on next page load (offline queue)
       if (!status || status >= 500) {
         const queue = loadSwipeQueue(uidRef.current);
         if (!queue.some(q => q.job_id === job.id)) {
@@ -810,7 +810,7 @@ export default function SeekerDashboard() {
     pendingSwipesRef.current.push(swipePromise);
     globalPendingSwipes.push(swipePromise);
 
-    // Auto-fetch more jobs when running low (5 cards buffer) - endless Tinder-style
+    // Auto-fetch more jobs when running low (5 cards buffer) - endless swipe deck
     if (nextIndex >= jobs.length - 5) {
       prefetchJobs();
     }
@@ -1083,11 +1083,11 @@ export default function SeekerDashboard() {
                         : 'opacity-50 cursor-not-allowed'
                     }`}
                     data-testid="superlike-btn"
-                    aria-label={`Super like this job (${superLikesRemaining} remaining)`}
+                    aria-label={`Priority Apply to this job (${superLikesRemaining} remaining)`}
                   >
-                    <Star className={`w-9 h-9 ${superLikesRemaining > 0 ? 'text-secondary' : 'text-muted-foreground'}`} />
+                    <Rocket className={`w-9 h-9 ${superLikesRemaining > 0 ? 'text-secondary' : 'text-muted-foreground'}`} />
                   </button>
-                  {/* Super Like Counter Badge */}
+                  {/* Priority Apply Counter Badge */}
                   <span className={`absolute -top-1 -right-1 w-6 h-6 rounded-full text-xs font-bold flex items-center justify-center ${
                     superLikesRemaining > 0
                       ? 'bg-secondary text-white'
@@ -1100,9 +1100,9 @@ export default function SeekerDashboard() {
                   onClick={() => handleSwipe('like', { x: 1500, y: 0 })}
                   className="w-16 h-16 rounded-full bg-success/10 border border-success/30 flex items-center justify-center hover:scale-110 hover:neon-glow-green transition-all duration-300"
                   data-testid="like-btn"
-                  aria-label="Like this job"
+                  aria-label="Apply to this job"
                 >
-                  <Heart className="w-7 h-7 text-success" />
+                  <CheckCircle className="w-7 h-7 text-success" />
                 </button>
                 <button
                   onClick={() => currentJob && toggleSaveJob(currentJob.id)}
@@ -1117,7 +1117,7 @@ export default function SeekerDashboard() {
                   <Bookmark className={`w-5 h-5 ${currentJob && savedJobIds.has(currentJob.id) ? 'fill-current' : ''}`} />
                 </button>
               </div>
-              {/* Super Like Note (Premium) */}
+              {/* Priority Apply Note (Premium) */}
               {premiumFeatures.superlike_notes && superLikesRemaining > 0 && (
                 <div className="mt-3 flex justify-center">
                   {showNoteInput ? (
@@ -1126,7 +1126,7 @@ export default function SeekerDashboard() {
                         type="text"
                         value={superlikeNote}
                         onChange={e => setSuperlikeNote(e.target.value.slice(0, 140))}
-                        placeholder="Attach a note to your Super Like..."
+                        placeholder="Attach a note to your Priority Apply..."
                         className="w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground"
                         maxLength={140}
                       />
@@ -1140,7 +1140,7 @@ export default function SeekerDashboard() {
                       onClick={() => setShowNoteInput(true)}
                       className="text-xs text-secondary hover:text-secondary/80 flex items-center gap-1 transition-colors"
                     >
-                      <Star className="w-3 h-3" /> Attach a note to Super Like
+                      <Rocket className="w-3 h-3" /> Attach a note to Priority Apply
                     </button>
                   )}
                 </div>
@@ -1434,7 +1434,7 @@ export default function SeekerDashboard() {
   );
 }
 
-// Tinder-style bottom sheet for job details
+// Bottom sheet for job details
 function JobDetailSheet({ job, onClose }) {
   const sheetY = useMotionValue(0);
   const sheetOpacity = useTransform(sheetY, [0, 300], [1, 0]);
@@ -1504,8 +1504,8 @@ function JobDetailSheet({ job, onClose }) {
                 job.match_score >= 50 ? 'bg-primary/20 text-primary' :
                 'bg-muted text-muted-foreground'
               }`}>
-                <Star className="w-3.5 h-3.5" />
-                {job.match_score}%
+                <Sparkles className="w-3.5 h-3.5" />
+                Fit Score: {job.match_score}%
               </span>
             )}
           </div>
@@ -1669,7 +1669,7 @@ function ExitingCard({ card }) {
           <div className="absolute top-8 left-8 px-6 py-2 rounded-full bg-destructive border-2 border-destructive font-bold text-white transform -rotate-12 z-20">PASS</div>
         )}
         {action === 'superlike' && (
-          <div className="absolute top-8 left-1/2 -translate-x-1/2 px-6 py-2 rounded-full bg-secondary border-2 border-secondary font-bold text-white z-20">SUPER LIKE</div>
+          <div className="absolute top-8 left-1/2 -translate-x-1/2 px-6 py-2 rounded-full bg-secondary border-2 border-secondary font-bold text-white z-20">PRIORITY APPLY</div>
         )}
         <div className="absolute inset-0 flex flex-col justify-end p-6 z-10">
           <h2 className="text-2xl font-bold font-['Outfit'] mb-3">{card.job.title}</h2>
@@ -1679,7 +1679,7 @@ function ExitingCard({ card }) {
   );
 }
 
-// Card animating back in — Tinder-style fly back from where it exited
+// Card animating back in — fly back from where it exited
 function EnteringCard({ card }) {
   const { fromDirection, job } = card;
   return (
@@ -1804,7 +1804,7 @@ function SwipeCard({ job, onSwipe, expanded, setExpanded }) {
           className="absolute top-8 left-1/2 -translate-x-1/2 px-6 py-2 rounded-full bg-secondary border-2 border-secondary font-bold text-white z-20"
           style={{ opacity: superlikeOpacity }}
         >
-          SUPER LIKE
+          PRIORITY APPLY
         </motion.div>
 
         {/* Promoted / Featured Badge */}
@@ -1840,8 +1840,8 @@ function SwipeCard({ job, onSwipe, expanded, setExpanded }) {
                 job.match_score >= 50 ? 'bg-primary/20 text-primary' :
                 'bg-muted text-muted-foreground'
               }`}>
-                <Star className="w-3.5 h-3.5" />
-                {job.match_score}%
+                <Sparkles className="w-3.5 h-3.5" />
+                Fit Score: {job.match_score}%
               </span>
             )}
           </div>

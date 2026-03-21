@@ -28,7 +28,7 @@ export default function Landing() {
             hireabble
           </h1>
           <p className="text-white/80 text-lg md:text-xl max-w-sm mx-auto leading-relaxed">
-            Swipe right on your next career move
+            The fastest way to apply to jobs — powered by swipe
           </p>
         </div>
 

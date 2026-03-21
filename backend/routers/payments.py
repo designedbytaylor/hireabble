@@ -61,24 +61,24 @@ PRODUCTS = {
     "boost_7day": {"name": "Job Boost - 7 Days", "price": 1999, "days": 7,
                    "apple_product_id": "com.hireabble.boost.7day",
                    "google_product_id": "com.hireabble.boost.7day"},
-    # Recruiter Super Swipes (Consumable IAP)
-    "super_swipes_5": {"name": "5 Recruiter Super Swipes", "price": 999, "count": 5,
+    # Recruiter Priority Picks (Consumable IAP)
+    "super_swipes_5": {"name": "5 Recruiter Priority Picks", "price": 999, "count": 5,
                        "apple_product_id": "com.hireabble.recruiter.superswipes.5",
                        "google_product_id": "com.hireabble.recruiter.superswipes.5"},
-    "super_swipes_15": {"name": "15 Recruiter Super Swipes", "price": 1999, "count": 15,
+    "super_swipes_15": {"name": "15 Recruiter Priority Picks", "price": 1999, "count": 15,
                         "apple_product_id": "com.hireabble.recruiter.superswipes.15",
                         "google_product_id": "com.hireabble.recruiter.superswipes.15"},
-    "super_swipes_30": {"name": "30 Recruiter Super Swipes", "price": 2999, "count": 30,
+    "super_swipes_30": {"name": "30 Recruiter Priority Picks", "price": 2999, "count": 30,
                         "apple_product_id": "com.hireabble.recruiter.superswipes.30",
                         "google_product_id": "com.hireabble.recruiter.superswipes.30"},
-    # Seeker Super Likes (Consumable IAP)
-    "seeker_superlikes_5": {"name": "5 Super Likes", "price": 499, "count": 5,
+    # Seeker Priority Applies (Consumable IAP)
+    "seeker_superlikes_5": {"name": "5 Priority Applies", "price": 499, "count": 5,
                             "apple_product_id": "com.hireabble.seeker.superlikes.5",
                             "google_product_id": "com.hireabble.seeker.superlikes.5"},
-    "seeker_superlikes_15": {"name": "15 Super Likes", "price": 999, "count": 15,
+    "seeker_superlikes_15": {"name": "15 Priority Applies", "price": 999, "count": 15,
                              "apple_product_id": "com.hireabble.seeker.superlikes.15",
                              "google_product_id": "com.hireabble.seeker.superlikes.15"},
-    "seeker_superlikes_30": {"name": "30 Super Likes", "price": 1499, "count": 30,
+    "seeker_superlikes_30": {"name": "30 Priority Applies", "price": 1499, "count": 30,
                              "apple_product_id": "com.hireabble.seeker.superlikes.30",
                              "google_product_id": "com.hireabble.seeker.superlikes.30"},
 }
@@ -107,7 +107,7 @@ SUBSCRIPTION_TIERS = {
             "6month": "com.hireabble.seeker.plus.6month",
         },
         "features": [
-            "10 Super Likes per day (vs 3)",
+            "10 Priority Applies per day (vs 3)",
             "See who viewed your profile",
             "Unlimited undo swipes (free: 1/day)",
             "Priority application badge",
@@ -137,9 +137,9 @@ SUBSCRIPTION_TIERS = {
             "6month": "com.hireabble.seeker.premium.6month",
         },
         "features": [
-            "Unlimited Super Likes",
+            "Unlimited Priority Applies",
             "Everything in Plus",
-            "Attach a note to Super Likes",
+            "Attach a note to Priority Applies",
             "Featured profile in search results",
             "Application read receipts",
             "Application insights (see how you rank)",
@@ -171,7 +171,7 @@ SUBSCRIPTION_TIERS = {
             "6month": "com.hireabble.recruiter.pro.6month",
         },
         "features": [
-            "10 Super Swipes per day (vs 3)",
+            "10 Priority Picks per day (vs 3)",
             "See full applicant list (unblurred)",
             "1 free Boost per month",
             "Priority in candidate feeds",
@@ -201,7 +201,7 @@ SUBSCRIPTION_TIERS = {
             "6month": "com.hireabble.recruiter.enterprise.6month",
         },
         "features": [
-            "Unlimited Super Swipes",
+            "Unlimited Priority Picks",
             "See full applicant list (unblurred)",
             "3 free Boosts per month",
             "Priority in candidate feeds",

@@ -59,8 +59,8 @@ const TIER_STYLES = {
 };
 
 const FREE_FEATURES = {
-  seeker: ['3 Super Likes per day', 'Basic job matching', 'Apply to jobs', 'Chat with matches'],
-  recruiter: ['3 Super Swipes per day', 'Post job listings', 'View basic applicant info', 'Chat with matches'],
+  seeker: ['3 Priority Applies per day', 'Basic job matching', 'Apply to jobs', 'Chat with matches'],
+  recruiter: ['3 Priority Picks per day', 'Post job listings', 'View basic applicant info', 'Chat with matches'],
 };
 
 function formatPrice(cents) {
