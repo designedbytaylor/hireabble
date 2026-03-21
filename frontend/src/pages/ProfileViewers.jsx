@@ -107,7 +107,7 @@ export default function ProfileViewers() {
             </div>
             <h2 className="text-xl font-bold font-['Outfit'] mb-3">No Views Yet</h2>
             <p className="text-muted-foreground">
-              Complete your profile and keep swiping to get noticed by recruiters!
+              Complete your profile and keep applying to get noticed by recruiters!
             </p>
           </div>
         ) : (

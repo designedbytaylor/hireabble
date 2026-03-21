@@ -25,6 +25,7 @@ const RecruiterOnboarding = React.lazy(() => import("./pages/RecruiterOnboarding
 const SeekerDashboard = React.lazy(() => import("./pages/SeekerDashboard"));
 const RecruiterDashboard = React.lazy(() => import("./pages/RecruiterDashboard"));
 const RecruiterSwipe = React.lazy(() => import("./pages/RecruiterSwipe"));
+const RecruiterSearch = React.lazy(() => import("./pages/RecruiterSearch"));
 const Profile = React.lazy(() => import("./pages/Profile"));
 const Matches = React.lazy(() => import("./pages/Matches"));
 const Chat = React.lazy(() => import("./pages/Chat"));
@@ -293,23 +294,36 @@ function AppRoutes() {
         path="/recruiter"
         element={
           <ProtectedRoute allowedRoles={['recruiter']}>
-            <RecruiterSwipe />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/recruiter/dashboard"
-        element={
-          <ProtectedRoute allowedRoles={['recruiter']}>
             <RecruiterDashboard />
           </ProtectedRoute>
         }
       />
+      {/* Backward compat: old dashboard URL redirects to /recruiter */}
+      <Route path="/recruiter/dashboard" element={<Navigate to="/recruiter" replace />} />
       <Route
-        path="/recruiter/applications"
+        path="/recruiter/search"
+        element={
+          <ProtectedRoute allowedRoles={['recruiter']}>
+            <RecruiterSearch />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/recruiter/pipeline"
         element={
           <ProtectedRoute allowedRoles={['recruiter']}>
             <RecruiterApplications />
+          </ProtectedRoute>
+        }
+      />
+      {/* Backward compat: old applications URL redirects to pipeline */}
+      <Route path="/recruiter/applications" element={<Navigate to="/recruiter/pipeline" replace />} />
+      {/* Legacy swipe page redirects to search */}
+      <Route
+        path="/recruiter/candidates"
+        element={
+          <ProtectedRoute allowedRoles={['recruiter']}>
+            <RecruiterSwipe />
           </ProtectedRoute>
         }
       />

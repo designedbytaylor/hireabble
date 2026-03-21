@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, memo, useMemo } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Heart, User, Briefcase, MessageCircle, BarChart3, Bookmark, Sparkles } from 'lucide-react';
+import { Heart, User, Briefcase, MessageCircle, BarChart3, Bookmark, Sparkles, Search, GitBranch } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import axios from 'axios';
 
@@ -20,8 +20,11 @@ const prefetchRoute = (path, token) => {
     axios.get(`${API}/jobs`, opts).catch(() => {});
     axios.get(`${API}/stats`, opts).catch(() => {});
   } else if (path === '/recruiter') {
-    axios.get(`${API}/applications/recruiter`, opts).catch(() => {});
-    axios.get(`${API}/stats`, opts).catch(() => {});
+    axios.get(`${API}/recruiter/dashboard-data`, opts).catch(() => {});
+  } else if (path === '/recruiter/search') {
+    axios.get(`${API}/candidates`, opts).catch(() => {});
+  } else if (path === '/recruiter/pipeline') {
+    axios.get(`${API}/applications`, opts).catch(() => {});
   } else if (path === '/matches') {
     axios.get(`${API}/matches`, opts).catch(() => {});
   } else if (path === '/messages') {
@@ -82,15 +85,19 @@ export default memo(function Navigation() {
       label: 'Applied',
       path: '/applied'
     }] : [{
-      icon: BarChart3,
-      label: 'Dashboard',
-      path: '/recruiter/dashboard'
+      icon: Search,
+      label: 'Search',
+      path: '/recruiter/search'
+    }, {
+      icon: GitBranch,
+      label: 'Pipeline',
+      path: '/recruiter/pipeline'
     }]),
-    {
+    ...(isSeeker ? [{
       icon: Sparkles,
-      label: isSeeker ? 'Opportunities' : 'Pipeline',
+      label: 'Opportunities',
       path: '/matches'
-    },
+    }] : []),
     {
       icon: MessageCircle,
       label: 'Messages',

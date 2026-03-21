@@ -15,12 +15,12 @@ import useDocumentTitle from '../hooks/useDocumentTitle';
 const ROLE_CONFIG = {
   seeker: {
     heading: 'Find Your Dream Job',
-    subheading: 'Create your profile and start matching with opportunities',
+    subheading: 'Create your profile and start connecting with opportunities',
     brandHeading: 'Your Next Career Move',
-    brandSubheading: 'Swipe through curated job opportunities, get matched with top companies, and land your dream role — all from your phone.',
+    brandSubheading: 'Browse curated job opportunities, get noticed by top companies, and land your dream role — all from your phone.',
     features: [
       { icon: Search, text: 'Discover jobs tailored to your skills' },
-      { icon: Zap, text: 'Instant match when companies like you back' },
+      { icon: Zap, text: 'Get notified when recruiters shortlist you' },
       { icon: Shield, text: 'Your profile, your control' },
     ],
     switchText: 'Looking to hire?',
@@ -32,9 +32,9 @@ const ROLE_CONFIG = {
     heading: 'Hire Top Talent',
     subheading: 'Create your account and start finding the perfect candidates',
     brandHeading: 'Build Your Dream Team',
-    brandSubheading: 'Browse pre-qualified candidates, swipe to connect, and fill roles faster than ever — powered by smart matching.',
+    brandSubheading: 'Search pre-qualified candidates, shortlist top talent, and fill roles faster than ever — powered by smart scoring.',
     features: [
-      { icon: Target, text: 'Candidates matched to your requirements' },
+      { icon: Target, text: 'Candidates scored and ranked for your roles' },
       { icon: Users, text: 'Access a growing pool of verified talent' },
       { icon: BarChart3, text: 'Track your hiring pipeline in real-time' },
     ],
