@@ -90,7 +90,7 @@ export default function Download() {
           <h1 className="text-4xl font-bold font-['Outfit'] text-white tracking-tight">
             hireabble
           </h1>
-          <p className="text-white/70 text-sm mt-1">Swipe right on your next career move</p>
+          <p className="text-white/70 text-sm mt-1">Your next career move starts here</p>
         </div>
 
         {/* Main card */}
@@ -124,7 +124,7 @@ export default function Download() {
             <div className="text-center pb-4 border-b border-gray-100">
               <Smartphone className="w-10 h-10 text-[#2dd4a8] mx-auto mb-2" />
               <h2 className="text-xl font-bold text-gray-900">Get Hireabble</h2>
-              <p className="text-gray-500 text-sm">Find your dream job with a swipe</p>
+              <p className="text-gray-500 text-sm">Find your dream job faster</p>
             </div>
           )}
 

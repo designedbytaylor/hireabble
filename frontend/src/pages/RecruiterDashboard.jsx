@@ -391,7 +391,7 @@ export default function RecruiterDashboard() {
           </div>
           <div
             className="glass-card rounded-2xl p-5 hover:border-success/30 transition-colors cursor-pointer active:scale-[0.97]"
-            onClick={() => navigate('/recruiter/applications')}
+            onClick={() => navigate('/recruiter/pipeline')}
           >
             <div className="w-12 h-12 rounded-xl bg-success/20 flex items-center justify-center mb-3">
               <Users className="w-6 h-6 text-success" />
@@ -409,14 +409,14 @@ export default function RecruiterDashboard() {
               <span className="relative group">
                 <Info className="w-3 h-3 cursor-help" />
                 <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 rounded-lg bg-foreground text-background text-xs w-48 text-center opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-50">
-                  Priority Applies put your job at the top of seekers' queues, increasing visibility and match chances!
+                  Priority Applies put your job at the top of seekers' queues, increasing visibility and candidate reach!
                 </span>
               </span>
             </div>
           </div>
           <div
             className="glass-card rounded-2xl p-5 hover:border-primary/30 transition-colors cursor-pointer active:scale-[0.97]"
-            onClick={() => navigate('/recruiter/applications?stage=shortlisted')}
+            onClick={() => navigate('/recruiter/pipeline?stage=shortlisted')}
           >
             <div className="w-12 h-12 rounded-xl bg-primary/20 flex items-center justify-center mb-3">
               <Star className="w-6 h-6 text-primary" />
@@ -446,6 +446,27 @@ export default function RecruiterDashboard() {
             ))}
           </div>
         )}
+        {/* Quick Actions */}
+        <div className="flex gap-2 mt-4 overflow-x-auto pb-1">
+          <button
+            onClick={() => navigate('/recruiter/search')}
+            className="flex items-center gap-1.5 px-4 py-2 rounded-full bg-primary/10 border border-primary/20 text-sm font-medium text-primary hover:bg-primary/20 transition-colors whitespace-nowrap"
+          >
+            🔍 Search Candidates
+          </button>
+          <button
+            onClick={() => navigate('/recruiter/pipeline')}
+            className="flex items-center gap-1.5 px-4 py-2 rounded-full bg-purple-500/10 border border-purple-500/20 text-sm font-medium text-purple-400 hover:bg-purple-500/20 transition-colors whitespace-nowrap"
+          >
+            📋 View Pipeline
+          </button>
+          <button
+            onClick={() => setShowNewJob(true)}
+            className="flex items-center gap-1.5 px-4 py-2 rounded-full bg-secondary/10 border border-secondary/20 text-sm font-medium text-secondary hover:bg-secondary/20 transition-colors whitespace-nowrap"
+          >
+            ➕ Post Job
+          </button>
+        </div>
       </header>
 
       {/* Main Content */}
@@ -896,7 +917,7 @@ export default function RecruiterDashboard() {
                       Candidate shortlisted
                     </div>
                     <p className="text-xs text-muted-foreground">
-                      This candidate applied and you expressed interest. You can now message them or review their resume.
+                      This candidate applied and you shortlisted them. You can now message them or review their resume.
                     </p>
                   </div>
                   <div className="flex gap-2">
@@ -1740,7 +1761,7 @@ function JobApplicationsDialog({ selectedJob, onClose, jobApplications, onViewCa
         open={bulkConfirm === 'accept'}
         onOpenChange={(open) => { if (!open) setBulkConfirm(null); }}
         title={`Accept all ${pendingApps.length} pending applicants?`}
-        description="This will accept all pending applicants for this job. They will be notified of the match."
+        description="This will shortlist all pending applicants for this job. They will be notified."
         confirmLabel="Accept All"
         variant="default"
         onConfirm={handleBulkAccept}

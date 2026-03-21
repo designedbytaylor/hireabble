@@ -341,10 +341,10 @@ export default function RecruiterSwipe() {
               </div>
               <h2 className="text-2xl font-bold font-['Outfit'] mb-3">Post Your First Job</h2>
               <p className="text-muted-foreground mb-6">
-                You need at least one active job posting before you can review applicants or discover candidates.
+                You need at least one active job posting before you can review applicants or search candidates.
               </p>
               <Button
-                onClick={() => navigate('/recruiter/dashboard')}
+                onClick={() => navigate('/recruiter')}
                 className="rounded-full bg-gradient-to-r from-primary to-secondary hover:opacity-90 px-8"
               >
                 <Plus className="w-4 h-4 mr-2" />
@@ -375,7 +375,7 @@ export default function RecruiterSwipe() {
           <div className="flex items-center gap-1">
             <NotificationBell />
             <button
-              onClick={() => navigate('/recruiter/dashboard')}
+              onClick={() => navigate('/recruiter')}
               className="p-2 rounded-xl hover:bg-accent transition-colors"
               title="Dashboard"
             >
@@ -413,11 +413,11 @@ export default function RecruiterSwipe() {
             }`}
           >
             <Search className="w-3.5 h-3.5" />
-            Discover
+            Search
           </button>
         </div>
 
-        {/* Discover Filters Toggle */}
+        {/* Search Filters Toggle */}
         {mode === 'discover' && (
           <button
             onClick={() => setShowDiscoverFilters(f => !f)}
@@ -636,7 +636,7 @@ export default function RecruiterSwipe() {
                     onClick={() => setShowPreMatchMsg(true)}
                     className="w-12 h-12 rounded-full bg-blue-500/10 border border-blue-500/30 flex items-center justify-center hover:scale-110 transition-all duration-300"
                     aria-label="Message candidate"
-                    title="Message before matching"
+                    title="Message candidate"
                   >
                     <MessageSquare className="w-5 h-5 text-blue-400" />
                   </button>
@@ -671,7 +671,7 @@ export default function RecruiterSwipe() {
               </h2>
               <p className="text-muted-foreground mb-6">
                 {mode === 'applicants'
-                  ? "You've reviewed all current applicants. Try discovering new candidates!"
+                  ? "You've reviewed all current applicants. Try searching for new candidates!"
                   : "You've seen all available candidates. Check back later for new talent!"}
               </p>
               <div className="flex gap-3">
@@ -679,7 +679,7 @@ export default function RecruiterSwipe() {
                   <>
                     <Button
                       variant="outline"
-                      onClick={() => navigate('/recruiter/dashboard')}
+                      onClick={() => navigate('/recruiter')}
                       className="rounded-full"
                     >
                       Dashboard
@@ -688,7 +688,7 @@ export default function RecruiterSwipe() {
                       onClick={() => setMode('discover')}
                       className="rounded-full bg-gradient-to-r from-primary to-secondary"
                     >
-                      <Search className="w-4 h-4 mr-1" /> Discover
+                      <Search className="w-4 h-4 mr-1" /> Search
                     </Button>
                   </>
                 ) : (
@@ -769,7 +769,7 @@ export default function RecruiterSwipe() {
                 <X className="w-4 h-4" />
               </button>
               <h3 className="text-lg font-bold font-['Outfit'] mb-1">Message {currentItem.name}</h3>
-              <p className="text-xs text-muted-foreground mb-3">Send a message before matching (Enterprise perk)</p>
+              <p className="text-xs text-muted-foreground mb-3">Send an introductory message (Enterprise perk)</p>
               <textarea
                 value={preMatchMsgText}
                 onChange={(e) => setPreMatchMsgText(e.target.value.slice(0, 500))}

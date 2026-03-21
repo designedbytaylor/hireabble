@@ -69,7 +69,7 @@ export default function RecruiterAnalytics() {
             <h2 className="text-xl font-bold font-['Outfit'] mb-2">Unlock Analytics</h2>
             <p className="text-muted-foreground text-sm mb-6">
               Get detailed insights into your hiring performance with Pro or Enterprise.
-              Track response rates, match rates, weekly trends, and per-job analytics.
+              Track response rates, conversion rates, weekly trends, and per-job analytics.
             </p>
             <button
               onClick={() => navigate('/upgrade')}
@@ -132,7 +132,7 @@ export default function RecruiterAnalytics() {
             icon={<Sparkles className="w-6 h-6 text-primary" />}
             value={stats.matches}
             label="Shortlisted"
-            sublabel={`${stats.match_rate}% rate`}
+            sublabel={`${stats.match_rate}% conversion`}
             color="primary"
           />
           <MetricCard
@@ -162,8 +162,8 @@ export default function RecruiterAnalytics() {
             </div>
             <div className="p-4 rounded-xl bg-background border border-border">
               <div className="flex items-center gap-2 mb-2">
-                <Heart className="w-4 h-4 text-pink-500" />
-                <span className="text-xs text-muted-foreground">Match Rate</span>
+                <Star className="w-4 h-4 text-pink-500" />
+                <span className="text-xs text-muted-foreground">Shortlist Rate</span>
               </div>
               <div className="text-3xl font-bold font-['Outfit']">{stats.match_rate}%</div>
               <ProgressBar value={stats.match_rate} color="pink-500" />
@@ -196,7 +196,7 @@ export default function RecruiterAnalytics() {
             stages={[
               { label: 'Applications', value: stats.total_applications, color: 'bg-blue-500' },
               { label: 'Reviewed', value: stats.total_applications - stats.pending_applications, color: 'bg-yellow-500' },
-              { label: 'Matched', value: stats.matches, color: 'bg-pink-500' },
+              { label: 'Shortlisted', value: stats.matches, color: 'bg-pink-500' },
               { label: 'Interviewed', value: stats.interviews_scheduled, color: 'bg-green-500' },
             ]}
           />

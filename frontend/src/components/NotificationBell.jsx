@@ -116,7 +116,7 @@ export default function NotificationBell() {
     } else if (notification.type === 'recruiter_interest' && notification.data?.recruiter_id) {
       navigate(`/company/${notification.data.recruiter_id}`);
     } else if (notification.type === 'application') {
-      navigate('/recruiter/applications');
+      navigate('/recruiter/pipeline');
     }
   };
 

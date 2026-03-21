@@ -101,7 +101,7 @@ export default function Login() {
           </h1>
           
           <p className="text-lg text-muted-foreground">
-            Sign in to continue swiping through opportunities and connecting with your next career move.
+            Sign in to continue exploring opportunities and connecting with your next career move.
           </p>
         </div>
       </div>
