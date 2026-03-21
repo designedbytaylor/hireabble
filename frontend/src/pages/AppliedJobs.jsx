@@ -295,7 +295,7 @@ export default function AppliedJobs() {
             </h2>
             <p className="text-muted-foreground">
               {filter === 'all'
-                ? 'Start swiping right on jobs you like to apply!'
+                ? 'Start applying to jobs you\'re interested in!'
                 : 'No applications with this status.'}
             </p>
           </div>

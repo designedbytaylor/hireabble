@@ -520,7 +520,7 @@ export default function Matches() {
 
                       <div className="flex items-center gap-2 mt-2 text-xs text-muted-foreground">
                         <Calendar className="w-3 h-3" />
-                        Connected {new Date(match.created_at).toLocaleDateString()}
+                        {user?.role === 'recruiter' ? 'Shortlisted' : 'Connected'} {new Date(match.created_at).toLocaleDateString()}
                       </div>
                     </div>
 

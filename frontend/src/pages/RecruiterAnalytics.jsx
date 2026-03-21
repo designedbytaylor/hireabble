@@ -131,7 +131,7 @@ export default function RecruiterAnalytics() {
           <MetricCard
             icon={<Sparkles className="w-6 h-6 text-primary" />}
             value={stats.matches}
-            label="Opportunities"
+            label="Shortlisted"
             sublabel={`${stats.match_rate}% rate`}
             color="primary"
           />

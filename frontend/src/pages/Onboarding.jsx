@@ -338,7 +338,7 @@ export default function Onboarding() {
       };
       
       await updateProfile(updates);
-      toast.success('Profile complete! Start swiping!');
+      toast.success('Profile complete! Start exploring!');
       navigate('/dashboard');
     } catch (error) {
       toast.error('Failed to save profile');
