@@ -133,8 +133,8 @@ function saveSwipeQueue(queue, userId) {
 function loadCachedSuperLikes(userId) {
   try {
     const raw = localStorage.getItem(storageKey(userId, 'superlikes_remaining'));
-    return raw != null ? parseInt(raw, 10) : 0;
-  } catch { return 0; }
+    return raw != null ? parseInt(raw, 10) : null;
+  } catch { return null; }
 }
 
 function saveCachedSuperLikes(n, userId) {
@@ -1093,7 +1093,7 @@ export default function SeekerDashboard() {
                       ? 'bg-secondary text-white'
                       : 'bg-muted text-muted-foreground'
                   }`}>
-                    {superLikesRemaining}
+                    {superLikesRemaining != null ? superLikesRemaining : '–'}
                   </span>
                 </div>
                 <button
