@@ -119,7 +119,7 @@ export default function RecruiterDashboard() {
   const handleRespondToApplication = async (applicationId, action) => {
     // Optimistic UI: update state immediately so the card moves/disappears instantly
     setApplications(prev => prev.map(a =>
-      a.id === applicationId ? { ...a, recruiter_action: action === 'accept' ? 'accept' : 'reject' } : a
+      a.id === applicationId ? { ...a, recruiter_action: action === 'accept' ? 'accept' : 'reject', pipeline_stage: action === 'accept' ? 'shortlisted' : 'declined' } : a
     ));
     setStats(prev => ({
       ...prev,
@@ -149,7 +149,7 @@ export default function RecruiterDashboard() {
       toast.error('Failed to respond — reverting');
       // Revert optimistic update
       setApplications(prev => prev.map(a =>
-        a.id === applicationId ? { ...a, recruiter_action: null } : a
+        a.id === applicationId ? { ...a, recruiter_action: null, pipeline_stage: 'applied' } : a
       ));
       setStats(prev => ({
         ...prev,
@@ -563,14 +563,14 @@ export default function RecruiterDashboard() {
               )}
 
               {/* Shortlisted */}
-              {applications.filter(a => a.pipeline_stage === 'shortlisted' || a.recruiter_action === 'accept').length > 0 && (
+              {applications.filter(a => a.pipeline_stage === 'shortlisted').length > 0 && (
                 <div className="mb-6">
                   <h2 className="text-xl font-bold font-['Outfit'] mb-4 flex items-center gap-2">
                     ⭐ Shortlisted
-                    <span className="text-sm font-normal text-muted-foreground">({applications.filter(a => a.pipeline_stage === 'shortlisted' || a.recruiter_action === 'accept').length})</span>
+                    <span className="text-sm font-normal text-muted-foreground">({applications.filter(a => a.pipeline_stage === 'shortlisted').length})</span>
                   </h2>
                   <div className="flex gap-4 overflow-x-auto pb-4">
-                    {applications.filter(a => a.pipeline_stage === 'shortlisted' || a.recruiter_action === 'accept').map((app) => (
+                    {applications.filter(a => a.pipeline_stage === 'shortlisted').map((app) => (
                       <div
                         key={app.id}
                         className="glass-card rounded-2xl p-4 min-w-[220px] flex-shrink-0 relative cursor-pointer hover:border-primary/30 transition-colors"
