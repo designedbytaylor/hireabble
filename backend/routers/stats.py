@@ -295,9 +295,10 @@ async def get_recruiter_dashboard_data(current_user: dict = Depends(get_current_
     stage_map = {"reviewing": "applied", "offered": "shortlisted"}
     raw_counts = {}
     for doc in pipeline_agg:
-        if not doc["_id"]:
-            continue
-        normalized = stage_map.get(doc["_id"], doc["_id"])
+        stage = doc["_id"]
+        if not stage:
+            stage = "applied"  # apps with no pipeline_stage are new applicants
+        normalized = stage_map.get(stage, stage)
         raw_counts[normalized] = raw_counts.get(normalized, 0) + doc["count"]
     pipeline_counts = raw_counts
 
