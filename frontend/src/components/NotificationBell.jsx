@@ -117,6 +117,8 @@ export default function NotificationBell() {
       navigate(`/company/${notification.data.recruiter_id}`);
     } else if (notification.type === 'application') {
       navigate('/recruiter/pipeline');
+    } else if (notification.type === 'invite_to_apply') {
+      navigate('/browse');
     }
   };
 
@@ -126,6 +128,8 @@ export default function NotificationBell() {
         return <Rocket className="w-4 h-4 text-green-500" />;
       case 'message':
         return <MessageSquare className="w-4 h-4 text-blue-500" />;
+      case 'invite_to_apply':
+        return <Briefcase className="w-4 h-4 text-primary" />;
       case 'application':
         return <Briefcase className="w-4 h-4 text-purple-500" />;
       default:

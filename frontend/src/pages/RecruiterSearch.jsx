@@ -1,9 +1,10 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { AnimatePresence } from 'framer-motion';
 import {
   Search, SlidersHorizontal, MapPin, Briefcase, GraduationCap, Clock,
   ChevronDown, ChevronRight, Star, MessageSquare, User, Lock, Crown,
-  X, Filter, Award, BadgeCheck, Zap
+  X, Filter, Award, BadgeCheck, Zap, Send, Check
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { toast } from 'sonner';
@@ -15,6 +16,7 @@ import { getPhotoUrl, handleImgError } from '../utils/helpers';
 import { SkeletonPageBackground, SkeletonListItem } from '../components/skeletons';
 import { Skeleton } from '../components/ui/skeleton';
 import useDocumentTitle from '../hooks/useDocumentTitle';
+import { CandidateDetailSheet } from '../components/CandidateDetailSheet';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -41,17 +43,42 @@ export default function RecruiterSearch() {
     work_preference: '',
     min_experience: '',
   });
-  const [shortlisting, setShortlisting] = useState(new Set());
+
+  // View Profile state
+  const [viewingCandidate, setViewingCandidate] = useState(null);
+
+  // Invite to Apply state
+  const [jobs, setJobs] = useState([]);
+  const [sentInvites, setSentInvites] = useState(new Map());
+  const [inviting, setInviting] = useState(new Set());
+  const [jobSelectorFor, setJobSelectorFor] = useState(null); // candidate id showing job selector
 
   const isPro = user?.subscription?.status === 'active' &&
     ['recruiter_pro', 'recruiter_enterprise'].includes(user?.subscription?.tier_id);
+
+  // Fetch recruiter's active jobs + sent invites on mount
+  useEffect(() => {
+    if (!token) return;
+    const headers = { Authorization: `Bearer ${token}` };
+    // Fetch jobs
+    axios.get(`${API}/jobs`, { headers, timeout: 10000 })
+      .then(res => setJobs((res.data || []).filter(j => j.is_active)))
+      .catch(() => {});
+    // Fetch sent invites
+    axios.get(`${API}/candidates/invites/sent`, { headers, timeout: 10000 })
+      .then(res => {
+        const map = new Map();
+        (res.data || []).forEach(inv => map.set(`${inv.seeker_id}-${inv.job_id}`, inv));
+        setSentInvites(map);
+      })
+      .catch(() => {}); // endpoint may not exist yet — graceful fallback
+  }, [token]);
 
   const fetchCandidates = useCallback(async (filterOverride = null) => {
     try {
       setLoading(true);
       const f = filterOverride || filters;
       const params = new URLSearchParams();
-      // Combine search query with skill filter
       const skillSearch = searchQuery || f.skill;
       if (f.location) params.append('location', f.location);
       if (f.experience_level) params.append('experience_level', f.experience_level);
@@ -68,13 +95,11 @@ export default function RecruiterSearch() {
       });
       let results = res.data || [];
 
-      // Client-side sort
       if (sortBy === 'most_recent') {
         results.sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''));
       } else if (sortBy === 'most_experience') {
         results.sort((a, b) => (b.experience_years || 0) - (a.experience_years || 0));
       }
-      // 'best_fit' is the default server sort (by match_score)
 
       setCandidates(results);
     } catch (error) {
@@ -109,38 +134,40 @@ export default function RecruiterSearch() {
 
   const activeFilterCount = Object.values(filters).filter(v => v).length + (searchQuery ? 1 : 0);
 
-  const handleShortlist = async (candidate) => {
-    if (!candidate.best_match_job_id) {
-      toast.error('Post a job first to shortlist candidates');
-      return;
-    }
-    setShortlisting(prev => new Set([...prev, candidate.id]));
+  // Invite to Apply handler
+  const handleInvite = async (candidate, jobId) => {
+    setInviting(prev => new Set([...prev, `${candidate.id}-${jobId}`]));
     try {
-      await axios.post(`${API}/candidates/swipe`, {
+      await axios.post(`${API}/candidates/invite`, {
         seeker_id: candidate.id,
-        action: 'like',
-        job_id: candidate.best_match_job_id,
+        job_id: jobId,
       }, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      toast.success(`${candidate.name} shortlisted!`);
-      // Remove from results
-      setCandidates(prev => prev.filter(c => c.id !== candidate.id));
+      toast.success(`Invited ${candidate.name} to apply!`);
+      setSentInvites(prev => new Map([...prev, [`${candidate.id}-${jobId}`, { status: 'pending' }]]));
+      setJobSelectorFor(null);
     } catch (error) {
       const detail = error.response?.data?.detail || '';
       if (detail.toLowerCase().includes('already')) {
-        toast.info('Already reviewed this candidate');
-        setCandidates(prev => prev.filter(c => c.id !== candidate.id));
+        toast.info('Already invited this candidate for this role');
+        setSentInvites(prev => new Map([...prev, [`${candidate.id}-${jobId}`, { status: 'pending' }]]));
       } else {
-        toast.error(detail || 'Failed to shortlist');
+        toast.error(detail || 'Failed to send invite');
       }
     } finally {
-      setShortlisting(prev => {
+      setInviting(prev => {
         const next = new Set(prev);
-        next.delete(candidate.id);
+        next.delete(`${candidate.id}-${jobId}`);
         return next;
       });
     }
+  };
+
+  // Check if candidate has been invited to all active jobs
+  const isFullyInvited = (candidateId) => {
+    if (jobs.length === 0) return false;
+    return jobs.every(job => sentInvites.has(`${candidateId}-${job.id}`));
   };
 
   if (loading && candidates.length === 0) {
@@ -181,7 +208,7 @@ export default function RecruiterSearch() {
         <div className="flex items-center justify-between mb-4">
           <div>
             <h1 className="text-2xl font-bold font-['Outfit']">Search Candidates</h1>
-            <p className="text-sm text-muted-foreground">Find and shortlist talent for your roles</p>
+            <p className="text-sm text-muted-foreground">Find and invite talent to apply for your roles</p>
           </div>
           <NotificationBell />
         </div>
@@ -360,9 +387,14 @@ export default function RecruiterSearch() {
               <CandidateRow
                 key={candidate.id}
                 candidate={candidate}
-                onShortlist={() => handleShortlist(candidate)}
-                shortlisting={shortlisting.has(candidate.id)}
-                navigate={navigate}
+                jobs={jobs}
+                sentInvites={sentInvites}
+                inviting={inviting}
+                onInvite={handleInvite}
+                onViewProfile={(c) => setViewingCandidate(c)}
+                isFullyInvited={isFullyInvited(candidate.id)}
+                jobSelectorOpen={jobSelectorFor === candidate.id}
+                onToggleJobSelector={(id) => setJobSelectorFor(prev => prev === id ? null : id)}
               />
             ))}
           </div>
@@ -385,7 +417,6 @@ export default function RecruiterSearch() {
           </div>
         )}
 
-        {/* Load more hint */}
         {candidates.length >= 50 && (
           <p className="text-center text-xs text-muted-foreground mt-4 pb-4">
             Showing top 50 results. Refine your search for more specific results.
@@ -393,16 +424,40 @@ export default function RecruiterSearch() {
         )}
       </main>
 
+      {/* Candidate Profile Bottom Sheet */}
+      <AnimatePresence>
+        {viewingCandidate && (
+          <CandidateDetailSheet
+            item={viewingCandidate}
+            mode="discover"
+            onClose={() => setViewingCandidate(null)}
+          />
+        )}
+      </AnimatePresence>
+
       <Navigation />
     </div>
   );
 }
 
-function CandidateRow({ candidate, onShortlist, shortlisting, navigate }) {
+function CandidateRow({ candidate, jobs, sentInvites, inviting, onInvite, onViewProfile, isFullyInvited, jobSelectorOpen, onToggleJobSelector }) {
   const fitScore = candidate.match_score || 0;
+  const rowRef = useRef(null);
+
+  // Close job selector when clicking outside
+  useEffect(() => {
+    if (!jobSelectorOpen) return;
+    const handleClick = (e) => {
+      if (rowRef.current && !rowRef.current.contains(e.target)) {
+        onToggleJobSelector(null);
+      }
+    };
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, [jobSelectorOpen, onToggleJobSelector]);
 
   return (
-    <div className="glass-card rounded-2xl p-4 hover:border-primary/30 transition-colors">
+    <div ref={rowRef} className="glass-card rounded-2xl p-4 hover:border-primary/30 transition-colors">
       <div className="flex items-start gap-3">
         {/* Avatar */}
         <div className="relative flex-shrink-0">
@@ -505,31 +560,108 @@ function CandidateRow({ candidate, onShortlist, shortlisting, navigate }) {
       )}
 
       {/* Actions */}
-      <div className="flex gap-2 mt-3 pt-3 border-t border-border/50">
+      <div className="flex gap-2 mt-3 pt-3 border-t border-border/50 relative">
         <Button
           variant="outline"
           size="sm"
           className="flex-1 rounded-lg text-xs h-9"
-          onClick={() => {/* TODO: profile view modal */}}
+          onClick={() => onViewProfile(candidate)}
         >
           <User className="w-3.5 h-3.5 mr-1" />
           View Profile
         </Button>
-        <Button
-          size="sm"
-          className="flex-1 rounded-lg text-xs h-9 bg-gradient-to-r from-primary to-secondary"
-          onClick={onShortlist}
-          disabled={shortlisting}
-        >
-          {shortlisting ? (
-            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-          ) : (
-            <>
-              <Star className="w-3.5 h-3.5 mr-1" />
-              Shortlist
-            </>
-          )}
-        </Button>
+
+        {/* Invite to Apply button */}
+        {jobs.length === 0 ? (
+          <Button
+            size="sm"
+            variant="outline"
+            className="flex-1 rounded-lg text-xs h-9 opacity-50"
+            disabled
+          >
+            <Briefcase className="w-3.5 h-3.5 mr-1" />
+            Post a Job First
+          </Button>
+        ) : isFullyInvited ? (
+          <Button
+            size="sm"
+            variant="outline"
+            className="flex-1 rounded-lg text-xs h-9 text-emerald-400 border-emerald-500/30"
+            disabled
+          >
+            <Check className="w-3.5 h-3.5 mr-1" />
+            Invited
+          </Button>
+        ) : jobs.length === 1 ? (
+          <Button
+            size="sm"
+            className="flex-1 rounded-lg text-xs h-9 bg-gradient-to-r from-primary to-secondary"
+            onClick={() => onInvite(candidate, jobs[0].id)}
+            disabled={inviting.has(`${candidate.id}-${jobs[0].id}`) || sentInvites.has(`${candidate.id}-${jobs[0].id}`)}
+          >
+            {inviting.has(`${candidate.id}-${jobs[0].id}`) ? (
+              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+            ) : sentInvites.has(`${candidate.id}-${jobs[0].id}`) ? (
+              <><Check className="w-3.5 h-3.5 mr-1" /> Invited</>
+            ) : (
+              <><Send className="w-3.5 h-3.5 mr-1" /> Invite to Apply</>
+            )}
+          </Button>
+        ) : (
+          <Button
+            size="sm"
+            className="flex-1 rounded-lg text-xs h-9 bg-gradient-to-r from-primary to-secondary"
+            onClick={() => onToggleJobSelector(candidate.id)}
+          >
+            <Send className="w-3.5 h-3.5 mr-1" />
+            Invite to Apply
+            <ChevronDown className={`w-3 h-3 ml-1 transition-transform ${jobSelectorOpen ? 'rotate-180' : ''}`} />
+          </Button>
+        )}
+
+        {/* Job Selector Dropdown */}
+        {jobSelectorOpen && jobs.length > 1 && (
+          <div className="absolute right-0 top-full mt-1 w-72 bg-card border border-border rounded-xl shadow-2xl z-50 overflow-hidden">
+            <div className="p-2 border-b border-border">
+              <p className="text-xs font-medium text-muted-foreground px-2">Select a job to invite for:</p>
+            </div>
+            <div className="max-h-48 overflow-y-auto p-1">
+              {jobs.map(job => {
+                const key = `${candidate.id}-${job.id}`;
+                const alreadySent = sentInvites.has(key);
+                const isSending = inviting.has(key);
+                return (
+                  <button
+                    key={job.id}
+                    onClick={() => !alreadySent && !isSending && onInvite(candidate, job.id)}
+                    disabled={alreadySent || isSending}
+                    className={`w-full flex items-center justify-between gap-2 px-3 py-2 rounded-lg text-left text-xs transition-colors ${
+                      alreadySent
+                        ? 'opacity-50 cursor-default'
+                        : 'hover:bg-accent cursor-pointer'
+                    }`}
+                  >
+                    <div className="flex-1 min-w-0">
+                      <div className="font-medium truncate">{job.title}</div>
+                      <div className="text-muted-foreground truncate">{job.location}</div>
+                    </div>
+                    {isSending ? (
+                      <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin flex-shrink-0" />
+                    ) : alreadySent ? (
+                      <span className="text-emerald-400 flex items-center gap-1 flex-shrink-0">
+                        <Check className="w-3 h-3" /> Invited
+                      </span>
+                    ) : (
+                      <span className="text-primary flex items-center gap-1 flex-shrink-0">
+                        <Send className="w-3 h-3" /> Invite
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
