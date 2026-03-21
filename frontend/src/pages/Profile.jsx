@@ -302,7 +302,7 @@ export default function Profile() {
     if (!referralData?.referral_code) return;
     const shareData = {
       title: 'Join Hireabble',
-      text: `Join Hireabble using my referral code ${referralData.referral_code} and help me earn Priority Picks!`,
+      text: `Join Hireabble using my referral code ${referralData.referral_code} and help me earn Candidate Invites!`,
       url: `${window.location.origin}/signup?ref=${referralData.referral_code}`,
     };
     if (navigator.share) {
@@ -1545,7 +1545,7 @@ export default function Profile() {
               <Gift className="w-5 h-5" /> Invite Friends
             </h3>
             <p className="text-sm text-muted-foreground mb-4">
-              Share your referral code — when someone joins, you get <strong className="text-foreground">5 Priority Picks</strong>!
+              Share your referral code — when someone joins, you get <strong className="text-foreground">5 Candidate Invites</strong>!
             </p>
             {referralLoading ? (
               <div className="flex items-center gap-2 text-muted-foreground">
@@ -1575,7 +1575,7 @@ export default function Profile() {
                 {referralData.referral_count > 0 && (
                   <p className="text-sm text-muted-foreground">
                     {referralData.referral_count} friend{referralData.referral_count !== 1 ? 's' : ''} joined
-                    {' '}· {referralData.total_swipes_earned} Priority Picks earned
+                    {' '}· {referralData.total_swipes_earned} Candidate Invites earned
                   </p>
                 )}
               </div>
