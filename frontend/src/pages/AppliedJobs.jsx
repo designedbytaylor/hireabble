@@ -18,19 +18,18 @@ const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
 const PIPELINE_STAGES = [
   { key: 'applied', label: 'Applied', icon: Briefcase, color: 'text-blue-500', bg: 'bg-blue-500' },
-  { key: 'reviewing', label: 'Viewed', icon: Eye, color: 'text-yellow-500', bg: 'bg-yellow-500' },
   { key: 'shortlisted', label: 'Shortlisted', icon: Star, color: 'text-purple-500', bg: 'bg-purple-500' },
   { key: 'interviewing', label: 'Interview', icon: Target, color: 'text-cyan-500', bg: 'bg-cyan-500' },
-  { key: 'offered', label: 'Moving Forward', icon: Rocket, color: 'text-green-500', bg: 'bg-green-500' },
   { key: 'hired', label: 'Hired', icon: CheckCircle, color: 'text-emerald-500', bg: 'bg-emerald-500' },
 ];
 
+// Map legacy stages to current stages
+const LEGACY_STAGE_MAP = { reviewing: 'applied', offered: 'shortlisted' };
+
 const STAGE_CONFIG = {
   applied: { label: 'Applied', color: 'bg-blue-500/10 text-blue-500', icon: Briefcase },
-  reviewing: { label: 'Viewed', color: 'bg-yellow-500/10 text-yellow-500', icon: Eye },
   shortlisted: { label: 'Shortlisted', color: 'bg-purple-500/10 text-purple-500', icon: Star },
   interviewing: { label: 'Interview', color: 'bg-cyan-500/10 text-cyan-500', icon: Target },
-  offered: { label: 'Moving Forward', color: 'bg-green-500/10 text-green-500', icon: Rocket },
   hired: { label: 'Hired', color: 'bg-emerald-500/10 text-emerald-500', icon: CheckCircle },
   declined: { label: 'Not Selected', color: 'bg-red-500/10 text-red-500', icon: XCircle },
 };
@@ -195,7 +194,10 @@ export default function AppliedJobs() {
     }
   };
 
-  const getStage = (app) => app.pipeline_stage || (app.status === 'matched' ? 'shortlisted' : app.status === 'declined' ? 'declined' : 'applied');
+  const getStage = (app) => {
+    const raw = app.pipeline_stage || (app.status === 'matched' ? 'shortlisted' : app.status === 'declined' ? 'declined' : 'applied');
+    return LEGACY_STAGE_MAP[raw] || raw;
+  };
 
   const filtered = filter === 'all'
     ? applications
@@ -262,10 +264,8 @@ export default function AppliedJobs() {
           {[
             { key: 'all', label: 'All' },
             { key: 'applied', label: 'Applied' },
-            { key: 'reviewing', label: 'Viewed' },
             { key: 'shortlisted', label: 'Shortlisted' },
             { key: 'interviewing', label: 'Interview' },
-            { key: 'offered', label: 'Moving Forward' },
             { key: 'hired', label: 'Hired' },
             { key: 'declined', label: 'Declined' },
           ].filter(tab => tab.key === 'all' || counts[tab.key] > 0).map(tab => (
@@ -386,7 +386,7 @@ export default function AppliedJobs() {
                           onClick={() => navigate('/matches')}
                           className="text-xs text-primary font-medium hover:underline flex items-center gap-1"
                         >
-                          <Zap className="w-3 h-3" /> View Match
+                          <Zap className="w-3 h-3" /> View Opportunity
                         </button>
                       )}
                     </div>

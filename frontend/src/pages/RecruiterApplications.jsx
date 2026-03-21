@@ -27,10 +27,8 @@ const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
 const PIPELINE_STAGES = [
   { key: 'applied', label: 'Applied', color: 'bg-blue-500/20 text-blue-500' },
-  { key: 'reviewing', label: 'Reviewing', color: 'bg-yellow-500/20 text-yellow-500' },
   { key: 'shortlisted', label: 'Shortlisted', color: 'bg-purple-500/20 text-purple-500' },
   { key: 'interviewing', label: 'Interview', color: 'bg-cyan-500/20 text-cyan-500' },
-  { key: 'offered', label: 'Offer Extended', color: 'bg-green-500/20 text-green-500' },
   { key: 'hired', label: 'Hired', color: 'bg-emerald-500/20 text-emerald-500' },
   { key: 'declined', label: 'Declined', color: 'bg-red-500/20 text-red-500' },
 ];
@@ -95,7 +93,11 @@ export default function RecruiterApplications() {
     navigate('/interviews', { state: { seekerId: app.seeker_id, seekerName: app.seeker_name } });
   };
 
-  const getStage = (app) => app.pipeline_stage || (app.is_matched ? 'shortlisted' : app.recruiter_action === 'reject' ? 'declined' : 'applied');
+  const getStage = (app) => {
+    const LEGACY = { reviewing: 'applied', offered: 'shortlisted' };
+    const raw = app.pipeline_stage || (app.is_matched ? 'shortlisted' : app.recruiter_action === 'reject' ? 'declined' : 'applied');
+    return LEGACY[raw] || raw;
+  };
 
   const updateStage = async (appId, newStage, e) => {
     if (e) e.stopPropagation();

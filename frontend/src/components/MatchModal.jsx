@@ -43,7 +43,7 @@ export default function MatchModal({ match, onClose, onMessage, userRole = 'seek
                 <Rocket className="w-5 h-5 text-green-500" />
               </div>
               <div>
-                <h2 className="text-lg font-bold font-['Outfit']">New Candidate Ready</h2>
+                <h2 className="text-lg font-bold font-['Outfit']">New Applicant</h2>
                 <p className="text-xs text-muted-foreground">{match.seeker_name || 'A candidate'} applied to your role</p>
               </div>
             </div>
@@ -205,7 +205,7 @@ export default function MatchModal({ match, onClose, onMessage, userRole = 'seek
             transition={{ delay: 0.3 }}
             className="text-3xl font-bold font-['Outfit'] mb-2 gradient-text"
           >
-            You've Been Selected!
+            Great News!
           </motion.h2>
 
           <motion.p
@@ -214,7 +214,7 @@ export default function MatchModal({ match, onClose, onMessage, userRole = 'seek
             transition={{ delay: 0.4 }}
             className="text-muted-foreground mb-4"
           >
-            A recruiter is interested in your profile
+            A recruiter has shortlisted your application
           </motion.p>
 
           {/* Ranking Badge (seeker only) */}

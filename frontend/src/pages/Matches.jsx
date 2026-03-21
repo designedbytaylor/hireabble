@@ -18,9 +18,9 @@ import useDocumentTitle from '../hooks/useDocumentTitle';
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
 export default function Matches() {
-  useDocumentTitle('Opportunities');
   const navigate = useNavigate();
   const { user, token } = useAuth();
+  useDocumentTitle(user?.role === 'recruiter' ? 'Pipeline' : 'Opportunities');
   const [matches, setMatches] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -157,7 +157,7 @@ export default function Matches() {
             onClick={() => setViewingProfile(null)}
             className="flex items-center gap-2 text-muted-foreground hover:text-foreground mb-4 transition-colors"
           >
-            <ArrowLeft className="w-4 h-4" /> Back to Opportunities
+            <ArrowLeft className="w-4 h-4" /> Back to {user?.role === 'recruiter' ? 'Pipeline' : 'Opportunities'}
           </button>
         </header>
 
@@ -445,8 +445,8 @@ export default function Matches() {
       </div>
 
       <header className="relative z-10 p-6 md:p-8">
-        <h1 className="text-2xl font-bold font-['Outfit']">Opportunities</h1>
-        <p className="text-muted-foreground">Your active connections</p>
+        <h1 className="text-2xl font-bold font-['Outfit']">{user?.role === 'recruiter' ? 'Pipeline' : 'Opportunities'}</h1>
+        <p className="text-muted-foreground">{user?.role === 'recruiter' ? 'Your shortlisted candidates' : 'Your active connections'}</p>
       </header>
 
       <main className="relative z-10 px-6 md:px-8">
@@ -550,11 +550,11 @@ export default function Matches() {
               <div className="w-20 h-20 rounded-full bg-primary/20 flex items-center justify-center mx-auto mb-6">
                 <Sparkles className="w-10 h-10 text-primary" />
               </div>
-              <h2 className="text-2xl font-bold font-['Outfit'] mb-3">No Opportunities Yet</h2>
+              <h2 className="text-2xl font-bold font-['Outfit'] mb-3">{user?.role === 'recruiter' ? 'No Candidates in Pipeline' : 'No Opportunities Yet'}</h2>
               <p className="text-muted-foreground max-w-xs mx-auto">
                 {user?.role === 'seeker'
                   ? "Keep applying! When a recruiter is interested, your opportunities will appear here."
-                  : "Accept applications from job seekers to create connections and start conversations."}
+                  : "Shortlist applicants from your dashboard to add them to your pipeline."}
               </p>
             </div>
           )}
