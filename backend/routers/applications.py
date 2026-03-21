@@ -321,6 +321,23 @@ async def invite_to_apply(data: InviteToApply, current_user: dict = Depends(get_
     if existing:
         raise HTTPException(status_code=400, detail="Already invited this candidate for this role")
 
+    # Check if candidate already applied to this job
+    existing_app = await db.applications.find_one({
+        "job_id": data.job_id,
+        "seeker_id": data.seeker_id,
+    })
+    if existing_app:
+        raise HTTPException(status_code=400, detail="Candidate already applied to this job")
+
+    # Rate limit: max 20 invites per day (prevents spam)
+    today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0).isoformat()
+    sent_today = await db.recruiter_invites.count_documents({
+        "recruiter_id": current_user["id"],
+        "created_at": {"$gte": today_start},
+    })
+    if sent_today >= 20:
+        raise HTTPException(status_code=429, detail="Daily invite limit reached (20/day)")
+
     invite_doc = {
         "id": str(uuid.uuid4()),
         "recruiter_id": current_user["id"],
@@ -357,6 +374,18 @@ async def get_sent_invites(current_user: dict = Depends(get_current_user)):
         {"_id": 0, "seeker_id": 1, "job_id": 1, "status": 1, "created_at": 1}
     ).to_list(500)
 
+    return invites
+
+
+@router.get("/invites")
+async def get_my_invites(current_user: dict = Depends(get_current_user)):
+    """Get pending invites for the current seeker."""
+    if current_user["role"] != "seeker":
+        raise HTTPException(status_code=403, detail="Seeker only")
+    invites = await db.recruiter_invites.find(
+        {"seeker_id": current_user["id"], "status": "pending"},
+        {"_id": 0}
+    ).sort("created_at", -1).to_list(50)
     return invites
 
 
