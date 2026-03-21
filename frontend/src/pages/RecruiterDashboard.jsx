@@ -119,11 +119,9 @@ export default function RecruiterDashboard() {
         { application_id: applicationId, action },
         { headers: { Authorization: `Bearer ${token}` } }
       );
-      // Sync with server in background (non-blocking)
-      fetchData();
-      if (selectedJob) {
-        handleViewApplications(selectedJob);
-      }
+      // No fetchData() here — optimistic state is already correct.
+      // Calling fetchData() would overwrite in-flight optimistic updates
+      // when multiple actions are taken quickly.
     } catch (error) {
       toast.error('Failed to respond — reverting');
       // Revert optimistic update
