@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import {
   ArrowLeft, Calendar, Clock, Video, Phone, MapPin,
-  Plus, Check, X, Send, RefreshCw, AlertCircle
+  Plus, Check, X, Send, RefreshCw, AlertCircle, Users
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -97,6 +97,22 @@ export default function InterviewScheduler() {
       fetchData();
     } catch (error) {
       toast.error('Failed to cancel interview');
+    }
+  };
+
+  const handleModify = async (interview) => {
+    // Cancel the old interview, then open create dialog with same match pre-selected
+    try {
+      await axios.put(`${API}/interviews/${interview.id}/cancel`, {}, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setSelectedInterview(null);
+      setResolvedMatchId(interview.match_id);
+      setShowCreate(true);
+      fetchData();
+      toast.info('Previous interview cancelled. Schedule a new time.');
+    } catch {
+      toast.error('Failed to modify interview');
     }
   };
 
@@ -253,6 +269,7 @@ export default function InterviewScheduler() {
         matches={matches}
         preselectedMatch={resolvedMatchId || preselectedMatch}
         token={token}
+        user={user}
         onSuccess={() => { setShowCreate(false); fetchData(); }}
       />
 
@@ -267,6 +284,7 @@ export default function InterviewScheduler() {
               interview={selectedInterview}
               user={user}
               onCancel={() => handleCancel(selectedInterview.id)}
+              onModify={() => handleModify(selectedInterview)}
             />
           )}
         </DialogContent>
@@ -289,8 +307,9 @@ export default function InterviewScheduler() {
 
 function InterviewCard({ interview, user, onClick, showRespond }) {
   const TypeIcon = TYPE_ICONS[interview.interview_type] || Video;
-  const isCreator = interview.created_by === user?.id;
-  const otherName = isCreator ? '' : interview.created_by_name;
+  const isRecruiter = user?.role === 'recruiter';
+  const candidateName = isRecruiter ? interview.seeker_name : interview.recruiter_name;
+  const candidatePhoto = isRecruiter ? interview.seeker_photo : interview.recruiter_photo;
   const selectedTime = interview.selected_time;
 
   return (
@@ -299,9 +318,13 @@ function InterviewCard({ interview, user, onClick, showRespond }) {
       className="glass-card rounded-2xl p-4 hover:border-primary/30 transition-colors cursor-pointer"
     >
       <div className="flex items-start gap-4">
-        <div className="w-12 h-12 rounded-xl bg-primary/20 flex items-center justify-center flex-shrink-0">
-          <TypeIcon className="w-6 h-6 text-primary" />
-        </div>
+        {candidatePhoto ? (
+          <img src={candidatePhoto} alt={candidateName} className="w-12 h-12 rounded-xl object-cover flex-shrink-0" />
+        ) : (
+          <div className="w-12 h-12 rounded-xl bg-primary/20 flex items-center justify-center flex-shrink-0">
+            <TypeIcon className="w-6 h-6 text-primary" />
+          </div>
+        )}
         <div className="flex-1 min-w-0">
           <div className="flex items-center justify-between mb-1">
             <h3 className="font-bold font-['Outfit'] truncate">{interview.title}</h3>
@@ -309,6 +332,9 @@ function InterviewCard({ interview, user, onClick, showRespond }) {
               {interview.status}
             </span>
           </div>
+          {candidateName && (
+            <p className="text-sm font-medium">{candidateName}</p>
+          )}
           <p className="text-sm text-muted-foreground">{interview.job_title} at {interview.company}</p>
           {selectedTime && (
             <p className="text-sm text-primary mt-1 flex items-center gap-1">
@@ -337,12 +363,32 @@ function InterviewCard({ interview, user, onClick, showRespond }) {
   );
 }
 
-function InterviewDetail({ interview, user, onCancel }) {
+function InterviewDetail({ interview, user, onCancel, onModify }) {
   const TypeIcon = TYPE_ICONS[interview.interview_type] || Video;
   const canCancel = interview.status !== 'cancelled' && interview.status !== 'declined';
+  const isRecruiter = user?.role === 'recruiter';
+  const candidateName = isRecruiter ? interview.seeker_name : interview.recruiter_name;
+  const candidatePhoto = isRecruiter ? interview.seeker_photo : interview.recruiter_photo;
 
   return (
     <div className="space-y-4">
+      {/* Candidate info */}
+      {candidateName && (
+        <div className="flex items-center gap-3 p-3 rounded-xl bg-background border border-border">
+          {candidatePhoto ? (
+            <img src={candidatePhoto} alt={candidateName} className="w-10 h-10 rounded-full object-cover" />
+          ) : (
+            <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center">
+              <Users className="w-5 h-5 text-primary" />
+            </div>
+          )}
+          <div>
+            <div className="font-medium">{candidateName}</div>
+            <div className="text-xs text-muted-foreground">{isRecruiter ? 'Candidate' : 'Recruiter'}</div>
+          </div>
+        </div>
+      )}
+
       <div className="flex items-center gap-3">
         <div className="w-10 h-10 rounded-lg bg-primary/20 flex items-center justify-center">
           <TypeIcon className="w-5 h-5 text-primary" />
@@ -409,25 +455,51 @@ function InterviewDetail({ interview, user, onCancel }) {
       )}
 
       {canCancel && (
-        <Button
-          variant="outline"
-          className="w-full border-red-500/30 text-red-500 hover:bg-red-500/10"
-          onClick={onCancel}
-        >
-          Cancel Interview
-        </Button>
+        <div className="space-y-2">
+          <Button
+            variant="outline"
+            className="w-full border-primary/30 text-primary hover:bg-primary/10"
+            onClick={onModify}
+          >
+            <Calendar className="w-4 h-4 mr-1.5" />
+            Modify Date / Time
+          </Button>
+          <Button
+            variant="outline"
+            className="w-full border-red-500/30 text-red-500 hover:bg-red-500/10"
+            onClick={onCancel}
+          >
+            Cancel Interview
+          </Button>
+        </div>
       )}
     </div>
   );
 }
 
-function CreateInterviewDialog({ open, onClose, matches, preselectedMatch, token, onSuccess }) {
+function getNextMonday() {
+  const today = new Date();
+  const day = today.getDay(); // 0=Sun, 1=Mon, ...
+  const daysUntilMonday = day === 0 ? 1 : day === 1 ? 7 : 8 - day;
+  const nextMon = new Date(today);
+  nextMon.setDate(today.getDate() + daysUntilMonday);
+  return nextMon.toISOString().split('T')[0]; // YYYY-MM-DD
+}
+
+function CreateInterviewDialog({ open, onClose, matches, preselectedMatch, token, onSuccess, user }) {
   const [loading, setLoading] = useState(false);
   const [matchId, setMatchId] = useState(preselectedMatch || '');
   const [description, setDescription] = useState('');
-  const [interviewType, setInterviewType] = useState('video');
-  const [location, setLocation] = useState('');
-  const [timeSlots, setTimeSlots] = useState([{ date: '', startTime: '' }]);
+  const [interviewType, setInterviewType] = useState('in_person');
+  const [location, setLocation] = useState(user?.location || user?.address || '');
+  const [timeSlots, setTimeSlots] = useState([{ date: getNextMonday(), startTime: '08:00' }]);
+
+  // Sync matchId when preselectedMatch changes (e.g. from modify flow)
+  useEffect(() => {
+    if (preselectedMatch && preselectedMatch !== matchId) {
+      setMatchId(preselectedMatch);
+    }
+  }, [preselectedMatch]);
 
   // Generate 15-min interval time options (6 AM to 9 PM)
   const timeOptions = [];
