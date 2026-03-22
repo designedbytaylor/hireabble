@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Users, Briefcase, Star, Check, X, Clock, ArrowLeft, Rocket,
   MapPin, GraduationCap, Building2, Heart, MessageSquare,
@@ -38,10 +38,15 @@ const STAGE_MAP = Object.fromEntries(PIPELINE_STAGES.map(s => [s.key, s]));
 export default function RecruiterApplications() {
   useDocumentTitle('Pipeline');
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { token } = useAuth();
   const [applications, setApplications] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState('all');
+  const initialStage = searchParams.get('stage');
+  const [filter, setFilter] = useState(
+    initialStage && ['applied', 'shortlisted', 'interviewing', 'hired', 'declined'].includes(initialStage)
+      ? initialStage : 'all'
+  );
   const [selectedApp, setSelectedApp] = useState(null);
   const [resume, setResume] = useState(null);
   const [loadingResume, setLoadingResume] = useState(false);
