@@ -751,6 +751,13 @@ function InterviewRequestMessage({ msg, user, isOwn, onRespond, navigate }) {
   const typeLine = lines.find(l => l.startsWith('Type:'));
   const timeLines = lines.filter(l => l.trim().startsWith('- '));
 
+  // Auto-select when there's only one time option
+  useEffect(() => {
+    if (timeLines.length === 1 && selectedTime === null && isRecipient) {
+      setSelectedTime(0);
+    }
+  }, [timeLines.length, selectedTime, isRecipient]);
+
   const handleAccept = async () => {
     if (selectedTime === null || !interviewId) return;
     await onRespond(interviewId, 'accept', selectedTime);
@@ -827,7 +834,7 @@ function InterviewRequestMessage({ msg, user, isOwn, onRespond, navigate }) {
                     onClick={handleDecline}
                     className="flex-1 py-2.5 rounded-xl border border-red-500/30 text-red-500 text-sm font-medium hover:bg-red-500/10 transition-colors flex items-center justify-center gap-1.5"
                   >
-                    <X className="w-4 h-4" /> Deny
+                    <X className="w-4 h-4" /> Decline
                   </button>
                   <button
                     onClick={handleAccept}
@@ -838,7 +845,7 @@ function InterviewRequestMessage({ msg, user, isOwn, onRespond, navigate }) {
                         : 'bg-muted text-muted-foreground cursor-not-allowed'
                     }`}
                   >
-                    <Check className="w-4 h-4" /> Approve
+                    <Check className="w-4 h-4" /> Accept
                   </button>
                 </div>
                 <button
