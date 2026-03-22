@@ -164,6 +164,24 @@ async def list_interviews(current_user: dict = Depends(get_current_user)):
         {"_id": 0}
     ).sort("created_at", -1).to_list(100)
 
+    # Enrich with participant names from matches
+    match_ids = list(set(i.get("match_id") for i in interviews if i.get("match_id")))
+    if match_ids:
+        matches = await db.matches.find(
+            {"id": {"$in": match_ids}},
+            {"_id": 0, "id": 1, "seeker_name": 1, "recruiter_name": 1,
+             "seeker_photo": 1, "recruiter_photo": 1,
+             "seeker_avatar": 1, "recruiter_avatar": 1}
+        ).to_list(len(match_ids))
+        match_map = {m["id"]: m for m in matches}
+        for interview in interviews:
+            m = match_map.get(interview.get("match_id"))
+            if m:
+                interview["seeker_name"] = m.get("seeker_name", "")
+                interview["recruiter_name"] = m.get("recruiter_name", "")
+                interview["seeker_photo"] = m.get("seeker_photo") or m.get("seeker_avatar")
+                interview["recruiter_photo"] = m.get("recruiter_photo") or m.get("recruiter_avatar")
+
     return interviews
 
 
