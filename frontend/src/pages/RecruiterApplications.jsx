@@ -4,7 +4,8 @@ import {
   Users, Briefcase, Star, Check, X, Clock, ArrowLeft, Rocket,
   MapPin, GraduationCap, Building2, Heart, MessageSquare,
   Calendar, FileText, ChevronRight, Award, Mail, Phone,
-  Eye, UserCheck, Trophy, ChevronDown
+  Eye, UserCheck, Trophy, ChevronDown, List, LayoutGrid,
+  Filter
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import {
@@ -22,6 +23,7 @@ import { SkeletonPageBackground, SkeletonListItem, SkeletonFilterTabs } from '..
 import CandidateNotes from '../components/CandidateNotes';
 import { Skeleton } from '../components/ui/skeleton';
 import useDocumentTitle from '../hooks/useDocumentTitle';
+import PipelineKanban from '../components/PipelineKanban';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -30,7 +32,7 @@ const PIPELINE_STAGES = [
   { key: 'shortlisted', label: 'Shortlisted', color: 'bg-purple-500/20 text-purple-500' },
   { key: 'interviewing', label: 'Interview', color: 'bg-cyan-500/20 text-cyan-500' },
   { key: 'hired', label: 'Hired', color: 'bg-emerald-500/20 text-emerald-500' },
-  { key: 'declined', label: 'Declined', color: 'bg-red-500/20 text-red-500' },
+  { key: 'declined', label: 'Rejected', color: 'bg-red-500/20 text-red-500' },
 ];
 
 const STAGE_MAP = Object.fromEntries(PIPELINE_STAGES.map(s => [s.key, s]));
@@ -43,19 +45,27 @@ export default function RecruiterApplications() {
   const [applications, setApplications] = useState([]);
   const [loading, setLoading] = useState(true);
   const initialStage = searchParams.get('stage');
+  const initialView = searchParams.get('view');
   const [filter, setFilter] = useState(
     initialStage && ['applied', 'shortlisted', 'interviewing', 'hired', 'declined'].includes(initialStage)
       ? initialStage : 'all'
   );
+  const [viewMode, setViewMode] = useState(initialView === 'kanban' ? 'kanban' : 'list');
   const [selectedApp, setSelectedApp] = useState(null);
   const [resume, setResume] = useState(null);
   const [loadingResume, setLoadingResume] = useState(false);
   const [interviews, setInterviews] = useState([]);
+  const [jobs, setJobs] = useState([]);
+  const [selectedJobId, setSelectedJobId] = useState('all');
 
   useEffect(() => {
     fetchApplications();
     axios.get(`${API}/interviews`, { headers: { Authorization: `Bearer ${token}` } })
       .then(res => setInterviews(res.data))
+      .catch(() => {});
+    // Fetch recruiter jobs for job filter
+    axios.get(`${API}/jobs/recruiter`, { headers: { Authorization: `Bearer ${token}` } })
+      .then(res => setJobs(res.data))
       .catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -98,11 +108,10 @@ export default function RecruiterApplications() {
   };
 
   const handleMessage = (app) => {
-    // Find the match for this application to navigate to chat
     if (app.match_id) {
       navigate(`/chat/${app.match_id}`);
     } else {
-      navigate('/matches');
+      navigate('/messages');
     }
   };
 
@@ -126,28 +135,26 @@ export default function RecruiterApplications() {
       setApplications(prev => prev.map(a =>
         a.id === appId ? { ...a, pipeline_stage: newStage } : a
       ));
-      toast.success(`Stage updated to ${STAGE_MAP[newStage]?.label || newStage}`);
+      toast.success(`Moved to ${STAGE_MAP[newStage]?.label || newStage}`);
     } catch (error) {
       toast.error(error.response?.data?.detail || 'Failed to update stage');
     }
   };
 
-  const getStageBadge = (stage) => {
-    const conf = STAGE_MAP[stage] || STAGE_MAP.applied;
-    return (
-      <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${conf.color}`}>
-        {conf.label}
-      </span>
-    );
-  };
+  // Filter by job first, then by stage
+  const jobFiltered = selectedJobId === 'all'
+    ? applications
+    : applications.filter(app => app.job_id === selectedJobId);
+
+  const showJobTitle = selectedJobId === 'all';
 
   const filtered = filter === 'all'
-    ? applications
-    : applications.filter(app => getStage(app) === filter);
+    ? jobFiltered
+    : jobFiltered.filter(app => getStage(app) === filter);
 
   const counts = {
-    all: applications.length,
-    ...Object.fromEntries(PIPELINE_STAGES.map(s => [s.key, applications.filter(a => getStage(a) === s.key).length])),
+    all: jobFiltered.length,
+    ...Object.fromEntries(PIPELINE_STAGES.map(s => [s.key, jobFiltered.filter(a => getStage(a) === s.key).length])),
   };
 
   if (loading) {
@@ -191,110 +198,190 @@ export default function RecruiterApplications() {
         >
           <ArrowLeft className="w-4 h-4" /> Back to Dashboard
         </button>
-        <h1 className="text-2xl font-bold font-['Outfit']">Pipeline</h1>
-        <p className="text-muted-foreground">{applications.length} total candidates</p>
-      </header>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold font-['Outfit']">Pipeline</h1>
+            <p className="text-muted-foreground">{jobFiltered.length} total candidates</p>
+          </div>
 
-      {/* Filter Tabs */}
-      <div className="relative z-10 px-6 md:px-8 mb-6">
-        <div className="flex gap-2 overflow-x-auto pb-2">
-          {[
-            { key: 'all', label: 'All' },
-            ...PIPELINE_STAGES.map(s => ({ key: s.key, label: s.label })),
-          ].filter(tab => tab.key === 'all' || counts[tab.key] > 0).map(({ key, label }) => (
+          {/* View Toggle */}
+          <div className="flex items-center gap-1 bg-card border border-border rounded-xl p-1">
             <button
-              key={key}
-              onClick={() => setFilter(key)}
-              className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-all ${
-                filter === key
+              onClick={() => setViewMode('list')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
+                viewMode === 'list'
                   ? 'bg-gradient-to-r from-primary to-secondary text-white'
-                  : 'bg-card border border-border text-muted-foreground hover:text-foreground'
+                  : 'text-muted-foreground hover:text-foreground'
               }`}
             >
-              {label} ({counts[key]})
+              <List className="w-4 h-4" />
+              <span className="hidden sm:inline">List</span>
             </button>
-          ))}
+            <button
+              onClick={() => setViewMode('kanban')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
+                viewMode === 'kanban'
+                  ? 'bg-gradient-to-r from-primary to-secondary text-white'
+                  : 'text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              <LayoutGrid className="w-4 h-4" />
+              <span className="hidden sm:inline">Board</span>
+            </button>
+          </div>
         </div>
+      </header>
+
+      {/* Job Filter + Stage Tabs */}
+      <div className="relative z-10 px-6 md:px-8 mb-6 space-y-3">
+        {/* Job Filter */}
+        {jobs.length > 1 && (
+          <div className="flex items-center gap-2">
+            <Filter className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+            <div className="flex gap-2 overflow-x-auto pb-1">
+              <button
+                onClick={() => setSelectedJobId('all')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-all ${
+                  selectedJobId === 'all'
+                    ? 'bg-primary/20 text-primary border border-primary/30'
+                    : 'bg-card border border-border text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                All Jobs
+              </button>
+              {jobs.map(job => (
+                <button
+                  key={job.id}
+                  onClick={() => setSelectedJobId(job.id)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-all ${
+                    selectedJobId === job.id
+                      ? 'bg-primary/20 text-primary border border-primary/30'
+                      : 'bg-card border border-border text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  {job.title}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Stage Filter Tabs - only for list view */}
+        {viewMode === 'list' && (
+          <div className="flex gap-2 overflow-x-auto pb-2">
+            {[
+              { key: 'all', label: 'All' },
+              ...PIPELINE_STAGES.map(s => ({ key: s.key, label: s.label })),
+            ].filter(tab => tab.key === 'all' || counts[tab.key] > 0).map(({ key, label }) => (
+              <button
+                key={key}
+                onClick={() => setFilter(key)}
+                className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-all ${
+                  filter === key
+                    ? 'bg-gradient-to-r from-primary to-secondary text-white'
+                    : 'bg-card border border-border text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                {label} ({counts[key]})
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
-      {/* Applications List */}
-      <main className="relative z-10 px-6 md:px-8">
-        <div className="max-w-2xl mx-auto space-y-3">
-          {filtered.length === 0 ? (
-            <div className="glass-card rounded-2xl p-12 text-center">
-              <div className="w-16 h-16 rounded-full bg-primary/20 flex items-center justify-center mx-auto mb-4">
-                <Users className="w-8 h-8 text-primary" />
+      {/* Main Content */}
+      {viewMode === 'list' ? (
+        /* LIST VIEW */
+        <main className="relative z-10 px-6 md:px-8">
+          <div className="max-w-2xl mx-auto space-y-3">
+            {filtered.length === 0 ? (
+              <div className="glass-card rounded-2xl p-12 text-center">
+                <div className="w-16 h-16 rounded-full bg-primary/20 flex items-center justify-center mx-auto mb-4">
+                  <Users className="w-8 h-8 text-primary" />
+                </div>
+                <h3 className="font-bold font-['Outfit'] text-lg mb-2">No candidates</h3>
+                <p className="text-muted-foreground text-sm">
+                  {filter === 'all' ? 'No applications yet. Post jobs to start receiving applicants!' : `No ${STAGE_MAP[filter]?.label || filter} candidates.`}
+                </p>
               </div>
-              <h3 className="font-bold font-['Outfit'] text-lg mb-2">No applications</h3>
-              <p className="text-muted-foreground text-sm">
-                {filter === 'all' ? 'No applications yet. Post jobs to start receiving applicants!' : `No ${filter} applications.`}
-              </p>
-            </div>
-          ) : (
-            filtered.map((app) => {
-              return (
-                <button
-                  key={app.id}
-                  onClick={() => handleOpenApplicant(app)}
-                  className="w-full glass-card rounded-2xl p-4 flex items-center gap-4 hover:border-primary/20 transition-colors cursor-pointer text-left"
-                >
-                  {/* Avatar */}
-                  <img
-                    src={getPhotoUrl(app.seeker_photo || app.seeker_avatar, app.seeker_name || app.seeker_id)}
-                    alt={app.seeker_name}
-                    className="w-14 h-14 rounded-full border-2 border-border object-cover flex-shrink-0"
-                    loading="lazy"
-                    decoding="async"
-                  />
+            ) : (
+              filtered.map((app) => {
+                return (
+                  <button
+                    key={app.id}
+                    onClick={() => handleOpenApplicant(app)}
+                    className="w-full glass-card rounded-2xl p-4 flex items-center gap-4 hover:border-primary/20 transition-colors cursor-pointer text-left"
+                  >
+                    {/* Avatar */}
+                    <img
+                      src={getPhotoUrl(app.seeker_photo || app.seeker_avatar, app.seeker_name || app.seeker_id)}
+                      alt={app.seeker_name}
+                      className="w-14 h-14 rounded-full border-2 border-border object-cover flex-shrink-0"
+                      loading="lazy"
+                      decoding="async"
+                    />
 
-                  {/* Info */}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className="font-medium truncate">{app.seeker_name}</span>
-                      {app.action === 'superlike' && (
-                        <Rocket className="w-4 h-4 text-secondary flex-shrink-0" />
-                      )}
+                    {/* Info */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium truncate">{app.seeker_name}</span>
+                        {app.action === 'superlike' && (
+                          <span className="px-1.5 py-0.5 rounded-full bg-secondary/20 text-secondary text-[10px] font-bold flex-shrink-0">
+                            Priority
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-sm text-primary truncate">{app.seeker_title || 'Candidate'}</div>
+                      <div className="flex items-center gap-3 text-xs text-muted-foreground mt-1">
+                        {showJobTitle && app.job_title && (
+                          <span className="flex items-center gap-1 truncate">
+                            <Briefcase className="w-3 h-3" /> {app.job_title}
+                          </span>
+                        )}
+                        {app.seeker_location && (
+                          <span className="flex items-center gap-1">
+                            <MapPin className="w-3 h-3" /> {app.seeker_location}
+                          </span>
+                        )}
+                        {app.seeker_experience && (
+                          <span>{app.seeker_experience}+ yrs</span>
+                        )}
+                      </div>
                     </div>
-                    <div className="text-sm text-primary truncate">{app.seeker_title || 'Job Seeker'}</div>
-                    <div className="flex items-center gap-3 text-xs text-muted-foreground mt-1">
-                      {app.job_title && (
-                        <span className="flex items-center gap-1 truncate">
-                          <Briefcase className="w-3 h-3" /> {app.job_title}
-                        </span>
-                      )}
-                      {app.seeker_location && (
-                        <span className="flex items-center gap-1">
-                          <MapPin className="w-3 h-3" /> {app.seeker_location}
-                        </span>
-                      )}
-                      {app.seeker_experience && (
-                        <span>{app.seeker_experience}+ yrs</span>
-                      )}
-                    </div>
-                  </div>
 
-                  {/* Stage Badge + Selector + Arrow */}
-                  <div className="flex items-center gap-2 flex-shrink-0">
-                    <div className="relative" onClick={e => e.stopPropagation()}>
-                      <select
-                        value={getStage(app)}
-                        onChange={(e) => updateStage(app.id, e.target.value, e)}
-                        className={`appearance-none pl-2.5 pr-6 py-1 rounded-full text-xs font-medium cursor-pointer border-0 outline-none ${STAGE_MAP[getStage(app)]?.color || 'bg-blue-500/20 text-blue-500'}`}
-                      >
-                        {PIPELINE_STAGES.map(s => (
-                          <option key={s.key} value={s.key}>{s.label}</option>
-                        ))}
-                      </select>
-                      <ChevronDown className="w-3 h-3 absolute right-1.5 top-1/2 -translate-y-1/2 pointer-events-none opacity-60" />
+                    {/* Stage Badge + Selector + Arrow */}
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <div className="relative" onClick={e => e.stopPropagation()}>
+                        <select
+                          value={getStage(app)}
+                          onChange={(e) => updateStage(app.id, e.target.value, e)}
+                          className={`appearance-none pl-2.5 pr-6 py-1 rounded-full text-xs font-medium cursor-pointer border-0 outline-none ${STAGE_MAP[getStage(app)]?.color || 'bg-blue-500/20 text-blue-500'}`}
+                        >
+                          {PIPELINE_STAGES.map(s => (
+                            <option key={s.key} value={s.key}>{s.label}</option>
+                          ))}
+                        </select>
+                        <ChevronDown className="w-3 h-3 absolute right-1.5 top-1/2 -translate-y-1/2 pointer-events-none opacity-60" />
+                      </div>
+                      <ChevronRight className="w-4 h-4 text-muted-foreground" />
                     </div>
-                    <ChevronRight className="w-4 h-4 text-muted-foreground" />
-                  </div>
-                </button>
-              );
-            })
-          )}
-        </div>
-      </main>
+                  </button>
+                );
+              })
+            )}
+          </div>
+        </main>
+      ) : (
+        /* KANBAN VIEW */
+        <PipelineKanban
+          applications={jobFiltered}
+          getStage={getStage}
+          updateStage={updateStage}
+          onViewProfile={handleOpenApplicant}
+          onMessage={handleMessage}
+          showJobTitle={showJobTitle}
+        />
+      )}
 
       {/* Applicant Detail Modal */}
       <Dialog open={!!selectedApp} onOpenChange={(open) => { if (!open) setSelectedApp(null); }}>
@@ -316,10 +403,12 @@ export default function RecruiterApplications() {
                   <div className="flex items-center gap-2">
                     <h2 className="text-lg font-bold font-['Outfit']">{selectedApp.seeker_name}</h2>
                     {selectedApp.action === 'superlike' && (
-                      <Rocket className="w-4 h-4 text-secondary" />
+                      <span className="px-1.5 py-0.5 rounded-full bg-secondary/20 text-secondary text-[10px] font-bold">
+                        Priority
+                      </span>
                     )}
                   </div>
-                  <p className="text-sm text-primary">{selectedApp.seeker_title || 'Job Seeker'}</p>
+                  <p className="text-sm text-primary">{selectedApp.seeker_title || 'Candidate'}</p>
                   <div className="flex items-center gap-3 text-xs text-muted-foreground mt-1">
                     {selectedApp.seeker_location && (
                       <span className="flex items-center gap-1">
@@ -401,6 +490,23 @@ export default function RecruiterApplications() {
                     <Calendar className="w-4 h-4 mr-1.5" /> Schedule Interview
                   </Button>
                 )}
+              </div>
+
+              {/* Stage selector in modal */}
+              <div className="flex items-center gap-2 mb-4">
+                <span className="text-xs text-muted-foreground">Stage:</span>
+                <select
+                  value={getStage(selectedApp)}
+                  onChange={(e) => {
+                    updateStage(selectedApp.id, e.target.value);
+                    setSelectedApp(prev => prev ? { ...prev, pipeline_stage: e.target.value } : null);
+                  }}
+                  className={`appearance-none pl-2.5 pr-6 py-1 rounded-full text-xs font-medium cursor-pointer border-0 outline-none ${STAGE_MAP[getStage(selectedApp)]?.color || 'bg-blue-500/20 text-blue-500'}`}
+                >
+                  {PIPELINE_STAGES.map(s => (
+                    <option key={s.key} value={s.key}>{s.label}</option>
+                  ))}
+                </select>
               </div>
 
               {/* Candidate Notes */}
