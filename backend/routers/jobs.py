@@ -964,7 +964,7 @@ async def get_saved_job_ids(current_user: dict = Depends(get_current_user)):
     return {"job_ids": [s["job_id"] for s in saved]}
 
 
-def _generate_poster_pdf(job: dict, qr_buffer: io.BytesIO) -> io.BytesIO:
+def _generate_poster_pdf(job: dict, qr_buffer: io.BytesIO, display_options: dict = None) -> io.BytesIO:
     """Generate poster PDF synchronously (CPU-bound)."""
     pdf_buffer = io.BytesIO()
     c = canvas.Canvas(pdf_buffer, pagesize=letter)
@@ -1040,14 +1040,15 @@ def _generate_poster_pdf(job: dict, qr_buffer: io.BytesIO) -> io.BytesIO:
     title_para.drawOn(c, 40, title_y)
 
     # -- Details line --
+    opts = display_options or {}
     details_parts = []
-    if job.get("location"):
+    if job.get("location") and opts.get("show_location", True):
         details_parts.append(job["location"])
-    if job.get("job_type"):
+    if job.get("job_type") and opts.get("show_job_type", True):
         details_parts.append(job["job_type"].replace("_", " ").title())
-    if job.get("employment_type"):
+    if job.get("employment_type") and opts.get("show_job_type", True):
         details_parts.append(job["employment_type"].replace("-", " ").title())
-    if job.get("experience_level"):
+    if job.get("experience_level") and opts.get("show_experience", True):
         details_parts.append(job["experience_level"].title() + " Level")
 
     cursor_y = title_y - 24
@@ -1060,7 +1061,7 @@ def _generate_poster_pdf(job: dict, qr_buffer: io.BytesIO) -> io.BytesIO:
     # -- Salary range --
     sal_min = job.get("salary_min")
     sal_max = job.get("salary_max")
-    if sal_min:
+    if sal_min and opts.get("show_salary", True):
         cursor_y -= 16
         c.setFillColor(HexColor(dark))
         c.setFont("Helvetica-Bold", 18)
@@ -1117,7 +1118,14 @@ def _generate_poster_pdf(job: dict, qr_buffer: io.BytesIO) -> io.BytesIO:
 
 
 @router.get("/{job_id}/poster")
-async def generate_job_poster(job_id: str, current_user: dict = Depends(get_current_user)):
+async def generate_job_poster(
+    job_id: str,
+    current_user: dict = Depends(get_current_user),
+    show_salary: bool = True,
+    show_location: bool = True,
+    show_job_type: bool = True,
+    show_experience: bool = True,
+):
     """Generate a printable 'We're Hiring' poster PDF with QR code for a job listing."""
     if current_user["role"] != "recruiter":
         raise HTTPException(status_code=403, detail="Only recruiters can generate posters")
@@ -1128,6 +1136,13 @@ async def generate_job_poster(job_id: str, current_user: dict = Depends(get_curr
     )
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
+
+    display_options = {
+        "show_salary": show_salary,
+        "show_location": show_location,
+        "show_job_type": show_job_type,
+        "show_experience": show_experience,
+    }
 
     # Generate QR code
     frontend_url = os.environ.get('FRONTEND_URL', 'https://hireabble.com')
@@ -1141,7 +1156,7 @@ async def generate_job_poster(job_id: str, current_user: dict = Depends(get_curr
     qr_buffer.seek(0)
 
     # Build poster PDF (CPU-bound, run in thread pool)
-    pdf_buffer = await asyncio.to_thread(_generate_poster_pdf, job, qr_buffer)
+    pdf_buffer = await asyncio.to_thread(_generate_poster_pdf, job, qr_buffer, display_options)
 
     safe_title = job.get("title", "Job").replace(" ", "_")[:40]
     filename = f"Hiring_Poster_{safe_title}.pdf"

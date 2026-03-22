@@ -37,11 +37,13 @@ export default function InterviewScheduler() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const preselectedMatch = searchParams.get('match');
+  const preselectedSeeker = searchParams.get('seeker');
   const { user, token } = useAuth();
   const [interviews, setInterviews] = useState([]);
   const [matches, setMatches] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [showCreate, setShowCreate] = useState(!!preselectedMatch);
+  const [showCreate, setShowCreate] = useState(!!preselectedMatch || !!preselectedSeeker);
+  const [resolvedMatchId, setResolvedMatchId] = useState(preselectedMatch || '');
   const [selectedInterview, setSelectedInterview] = useState(null);
   const [respondingTo, setRespondingTo] = useState(null);
 
@@ -58,6 +60,11 @@ export default function InterviewScheduler() {
       ]);
       setInterviews(interviewsRes.data);
       setMatches(matchesRes.data);
+      // Auto-resolve seeker query param to match_id
+      if (preselectedSeeker && !preselectedMatch) {
+        const found = matchesRes.data.find(m => m.seeker_id === preselectedSeeker);
+        if (found) setResolvedMatchId(found.id);
+      }
     } catch (error) {
       console.error('Failed to fetch:', error);
     } finally {
@@ -244,7 +251,7 @@ export default function InterviewScheduler() {
         open={showCreate}
         onClose={() => setShowCreate(false)}
         matches={matches}
-        preselectedMatch={preselectedMatch}
+        preselectedMatch={resolvedMatchId || preselectedMatch}
         token={token}
         onSuccess={() => { setShowCreate(false); fetchData(); }}
       />
