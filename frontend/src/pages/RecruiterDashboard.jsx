@@ -25,6 +25,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '../components/ui/select';
+import { Switch } from '../components/ui/switch';
 import { toast } from 'sonner';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
@@ -73,6 +74,9 @@ export default function RecruiterDashboard() {
   const [confirmPause, setConfirmPause] = useState(null); // job to pause/activate
   const [showPriorityApplies, setShowPriorityApplies] = useState(false);
   const [showAllApplicants, setShowAllApplicants] = useState(false);
+  const [interviews, setInterviews] = useState([]);
+  const [posterJob, setPosterJob] = useState(null);
+  const [posterOptions, setPosterOptions] = useState({ salary: true, location: true, jobType: true, experienceLevel: true });
 
   useEffect(() => {
     fetchData();
@@ -97,6 +101,10 @@ export default function RecruiterDashboard() {
         try { sessionStorage.setItem('unlockedAppIds', JSON.stringify(ids)); } catch {}
       }
       setSubscription(data.subscription);
+      // Fetch interviews in parallel (non-blocking)
+      axios.get(`${API}/interviews`, { headers: { Authorization: `Bearer ${token}` } })
+        .then(res => setInterviews(res.data))
+        .catch(() => {});
     } catch (error) {
       console.error('Failed to fetch data:', error);
     } finally {
@@ -233,10 +241,26 @@ export default function RecruiterDashboard() {
     }
   };
 
-  const handleGeneratePoster = async (jobId) => {
+  // Find the most relevant interview for a candidate
+  const getInterviewForCandidate = (app) => {
+    if (!app || !interviews.length) return null;
+    return interviews.find(i =>
+      i.seeker_id === app.seeker_id &&
+      (i.status === 'pending' || i.status === 'accepted' || i.status === 'rescheduled')
+    ) || null;
+  };
+
+  const handleGeneratePoster = async (jobId, options = {}) => {
     setGeneratingPoster(jobId);
+    setPosterJob(null);
     try {
-      const response = await axios.get(`${API}/jobs/${jobId}/poster`, {
+      const params = new URLSearchParams();
+      if (options.salary === false) params.append('show_salary', 'false');
+      if (options.location === false) params.append('show_location', 'false');
+      if (options.jobType === false) params.append('show_job_type', 'false');
+      if (options.experienceLevel === false) params.append('show_experience', 'false');
+      const qs = params.toString();
+      const response = await axios.get(`${API}/jobs/${jobId}/poster${qs ? `?${qs}` : ''}`, {
         headers: { Authorization: `Bearer ${token}` },
         responseType: 'blob'
       });
@@ -604,6 +628,47 @@ export default function RecruiterDashboard() {
                 </div>
               )}
 
+              {/* Interviewing */}
+              {applications.filter(a => a.pipeline_stage === 'interviewing').length > 0 && (
+                <div className="mb-6">
+                  <h2 className="text-xl font-bold font-['Outfit'] mb-4 flex items-center gap-2">
+                    🎯 Interviewing
+                    <span className="text-sm font-normal text-muted-foreground">({applications.filter(a => a.pipeline_stage === 'interviewing').length})</span>
+                  </h2>
+                  <div className="flex gap-4 overflow-x-auto pb-4">
+                    {applications.filter(a => a.pipeline_stage === 'interviewing').map((app) => (
+                      <div
+                        key={app.id}
+                        className="glass-card rounded-2xl p-4 min-w-[220px] flex-shrink-0 relative cursor-pointer hover:border-primary/30 transition-colors"
+                        onClick={() => setSelectedCandidate(app)}
+                      >
+                        <div className="flex items-center gap-3 mb-3">
+                          <img
+                            src={getPhotoUrl(app.seeker_photo || app.seeker_avatar, app.seeker_name || app.seeker_id)}
+                            alt={app.seeker_name}
+                            className="w-14 h-14 rounded-full border-2 border-purple-500/50 object-cover"
+                            loading="lazy"
+                          />
+                        </div>
+                        <div className="font-medium truncate">{app.seeker_name}</div>
+                        <div className="text-sm text-primary truncate">{app.seeker_title || 'Job Seeker'}</div>
+                        {app.seeker_experience && (
+                          <div className="text-xs text-muted-foreground mt-1">{app.seeker_experience}+ years exp</div>
+                        )}
+                        {app.job_title && (
+                          <div className="text-xs text-muted-foreground mt-1 flex items-center gap-1 truncate">
+                            <Briefcase className="w-3 h-3 flex-shrink-0" /> {app.job_title}
+                          </div>
+                        )}
+                        <div className="mt-3 py-2 rounded-lg text-center text-sm bg-purple-500/10 text-purple-400">
+                          Interviewing
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
             </>
           ) : (
             <div className="glass-card rounded-2xl p-8 text-center">
@@ -678,7 +743,7 @@ export default function RecruiterDashboard() {
                       <span className="hidden sm:inline">Copy</span>
                     </button>
                     <button
-                      onClick={(e) => { e.stopPropagation(); handleGeneratePoster(job.id); }}
+                      onClick={(e) => { e.stopPropagation(); setPosterJob(job); setPosterOptions({ salary: true, location: true, jobType: true, experienceLevel: true }); }}
                       className="flex-1 flex items-center justify-center gap-1.5 p-2 rounded-lg hover:bg-accent transition-colors text-xs text-muted-foreground"
                       title="Generate hiring poster"
                       disabled={generatingPoster === job.id}
@@ -934,15 +999,60 @@ export default function RecruiterDashboard() {
                 </div>
               ) : selectedCandidate.recruiter_action === 'accept' ? (
                 <div className="space-y-3">
-                  <div className="p-4 rounded-xl bg-green-500/10 border border-green-500/20">
-                    <div className="flex items-center gap-2 text-green-400 font-medium mb-1">
-                      <Rocket className="w-4 h-4" />
-                      Candidate shortlisted
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      This candidate applied and you shortlisted them. You can now message them or review their resume.
-                    </p>
-                  </div>
+                  {/* Interview Status */}
+                  {(() => {
+                    const interview = getInterviewForCandidate(selectedCandidate);
+                    if (interview?.status === 'accepted' && interview.selected_time) {
+                      const dt = new Date(interview.selected_time.start);
+                      return (
+                        <div className="p-4 rounded-xl bg-purple-500/10 border border-purple-500/20">
+                          <div className="flex items-center gap-2 text-purple-400 font-medium mb-1">
+                            <Calendar className="w-4 h-4" />
+                            Interview Scheduled
+                          </div>
+                          <p className="text-sm text-foreground">
+                            {dt.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })} at {dt.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}
+                          </p>
+                          <p className="text-xs text-muted-foreground mt-1 capitalize">{interview.interview_type?.replace('_', ' ') || 'Video'} call</p>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => {
+                              setSelectedCandidate(null);
+                              navigate('/interviews');
+                            }}
+                            className="mt-2 text-xs text-purple-400 hover:bg-purple-500/10 px-2 py-1 h-auto"
+                          >
+                            <Calendar className="w-3 h-3 mr-1" />
+                            Reschedule
+                          </Button>
+                        </div>
+                      );
+                    } else if (interview?.status === 'pending' || interview?.status === 'rescheduled') {
+                      return (
+                        <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/20">
+                          <div className="flex items-center gap-2 text-amber-400 font-medium mb-1">
+                            <Clock className="w-4 h-4" />
+                            Interview Pending
+                          </div>
+                          <p className="text-xs text-muted-foreground">
+                            Waiting for {selectedCandidate.seeker_name} to confirm the interview time.
+                          </p>
+                        </div>
+                      );
+                    }
+                    return (
+                      <div className="p-4 rounded-xl bg-green-500/10 border border-green-500/20">
+                        <div className="flex items-center gap-2 text-green-400 font-medium mb-1">
+                          <Rocket className="w-4 h-4" />
+                          Candidate shortlisted
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          This candidate applied and you shortlisted them. You can now message them or review their resume.
+                        </p>
+                      </div>
+                    );
+                  })()}
                   <Button
                     size="sm"
                     onClick={() => {
@@ -955,19 +1065,22 @@ export default function RecruiterDashboard() {
                     <MessageCircle className="w-4 h-4 mr-1.5" />
                     Message
                   </Button>
-                  <Button
-                    size="sm"
-                    onClick={() => {
-                      const app = selectedCandidate;
-                      setSelectedCandidate(null);
-                      navigate('/interviews', { state: { seekerId: app.seeker_id, seekerName: app.seeker_name } });
-                    }}
-                    className="w-full rounded-xl bg-purple-500/20 border border-purple-500/30 text-purple-400 hover:bg-purple-500/30"
-                    variant="outline"
-                  >
-                    <Calendar className="w-4 h-4 mr-1.5" />
-                    Schedule Interview
-                  </Button>
+                  {!getInterviewForCandidate(selectedCandidate) && (
+                    <Button
+                      size="sm"
+                      onClick={() => {
+                        const app = selectedCandidate;
+                        setSelectedCandidate(null);
+                        const params = app.match_id ? `?match=${app.match_id}` : `?seeker=${app.seeker_id}`;
+                        navigate(`/interviews${params}`);
+                      }}
+                      className="w-full rounded-xl bg-purple-500/20 border border-purple-500/30 text-purple-400 hover:bg-purple-500/30"
+                      variant="outline"
+                    >
+                      <Calendar className="w-4 h-4 mr-1.5" />
+                      Schedule Interview
+                    </Button>
+                  )}
                   <Button
                     size="sm"
                     variant="ghost"
@@ -1033,6 +1146,53 @@ export default function RecruiterDashboard() {
         variant={confirmPause?.is_active ? 'default' : 'default'}
         onConfirm={() => handleToggleJobStatus(confirmPause)}
       />
+
+      {/* Poster Options Dialog */}
+      <Dialog open={!!posterJob} onOpenChange={(open) => { if (!open) setPosterJob(null); }}>
+        <DialogContent className="max-w-sm bg-card border-border">
+          <DialogHeader>
+            <DialogTitle className="font-['Outfit'] flex items-center gap-2">
+              <Printer className="w-5 h-5" /> Customize Poster
+            </DialogTitle>
+          </DialogHeader>
+          {posterJob && (
+            <div className="space-y-4">
+              <p className="text-sm text-muted-foreground">Choose what to display on the hiring poster for <span className="font-medium text-foreground">{posterJob.title}</span>.</p>
+              <div className="space-y-3">
+                {[
+                  { key: 'salary', label: 'Salary Range', desc: posterJob.salary_min ? `$${Number(posterJob.salary_min).toLocaleString()}${posterJob.salary_max ? ` – $${Number(posterJob.salary_max).toLocaleString()}` : '+'}` : 'Not set' },
+                  { key: 'location', label: 'Location', desc: posterJob.location || 'Not set' },
+                  { key: 'jobType', label: 'Job Type', desc: posterJob.employment_type || posterJob.job_type || 'Not set' },
+                  { key: 'experienceLevel', label: 'Experience Level', desc: posterJob.experience_level || 'Not set' },
+                ].map(opt => (
+                  <div key={opt.key} className="flex items-center justify-between p-3 rounded-xl bg-background border border-border">
+                    <div>
+                      <div className="text-sm font-medium">{opt.label}</div>
+                      <div className="text-xs text-muted-foreground">{opt.desc}</div>
+                    </div>
+                    <Switch
+                      checked={posterOptions[opt.key]}
+                      onCheckedChange={(checked) => setPosterOptions(prev => ({ ...prev, [opt.key]: checked }))}
+                    />
+                  </div>
+                ))}
+              </div>
+              <Button
+                className="w-full rounded-xl bg-gradient-to-r from-primary to-secondary"
+                onClick={() => handleGeneratePoster(posterJob.id, posterOptions)}
+                disabled={generatingPoster === posterJob.id}
+              >
+                {generatingPoster === posterJob.id ? (
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
+                ) : (
+                  <Printer className="w-4 h-4 mr-2" />
+                )}
+                Generate Poster
+              </Button>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
 
       {/* Priority Applies Dialog */}
       <Dialog open={showPriorityApplies} onOpenChange={setShowPriorityApplies}>

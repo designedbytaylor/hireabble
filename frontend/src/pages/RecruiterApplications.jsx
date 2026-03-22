@@ -45,9 +45,13 @@ export default function RecruiterApplications() {
   const [selectedApp, setSelectedApp] = useState(null);
   const [resume, setResume] = useState(null);
   const [loadingResume, setLoadingResume] = useState(false);
+  const [interviews, setInterviews] = useState([]);
 
   useEffect(() => {
     fetchApplications();
+    axios.get(`${API}/interviews`, { headers: { Authorization: `Bearer ${token}` } })
+      .then(res => setInterviews(res.data))
+      .catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -62,6 +66,14 @@ export default function RecruiterApplications() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const getInterviewForCandidate = (app) => {
+    if (!app || !interviews.length) return null;
+    return interviews.find(i =>
+      i.seeker_id === app.seeker_id &&
+      (i.status === 'pending' || i.status === 'accepted' || i.status === 'rescheduled')
+    ) || null;
   };
 
   const handleOpenApplicant = async (app) => {
@@ -90,7 +102,8 @@ export default function RecruiterApplications() {
   };
 
   const handleScheduleInterview = (app) => {
-    navigate('/interviews', { state: { seekerId: app.seeker_id, seekerName: app.seeker_name } });
+    const params = app.match_id ? `?match=${app.match_id}` : `?seeker=${app.seeker_id}`;
+    navigate(`/interviews${params}`);
   };
 
   const getStage = (app) => {
@@ -325,6 +338,45 @@ export default function RecruiterApplications() {
                 </div>
               )}
 
+              {/* Interview Status */}
+              {(() => {
+                const interview = getInterviewForCandidate(selectedApp);
+                if (interview?.status === 'accepted' && interview.selected_time) {
+                  const dt = new Date(interview.selected_time.start);
+                  return (
+                    <div className="p-3 rounded-xl bg-purple-500/10 border border-purple-500/20 mb-4">
+                      <div className="flex items-center gap-2 text-purple-400 font-medium text-sm mb-1">
+                        <Calendar className="w-4 h-4" />
+                        Interview Scheduled
+                      </div>
+                      <p className="text-sm text-foreground">
+                        {dt.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })} at {dt.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}
+                      </p>
+                      <p className="text-xs text-muted-foreground capitalize">{interview.interview_type?.replace('_', ' ') || 'Video'} call</p>
+                      <button
+                        onClick={() => { setSelectedApp(null); navigate('/interviews'); }}
+                        className="mt-1 text-xs text-purple-400 hover:underline"
+                      >
+                        Reschedule
+                      </button>
+                    </div>
+                  );
+                } else if (interview?.status === 'pending' || interview?.status === 'rescheduled') {
+                  return (
+                    <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 mb-4">
+                      <div className="flex items-center gap-2 text-amber-400 font-medium text-sm mb-1">
+                        <Clock className="w-4 h-4" />
+                        Interview Pending
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        Waiting for {selectedApp.seeker_name} to confirm the interview time.
+                      </p>
+                    </div>
+                  );
+                }
+                return null;
+              })()}
+
               {/* Action Buttons */}
               <div className="flex gap-2 mb-5">
                 {selectedApp.is_matched && (
@@ -335,13 +387,15 @@ export default function RecruiterApplications() {
                     <MessageSquare className="w-4 h-4 mr-1.5" /> Message
                   </Button>
                 )}
-                <Button
-                  variant="outline"
-                  onClick={() => { setSelectedApp(null); handleScheduleInterview(selectedApp); }}
-                  className="flex-1 h-10 rounded-xl text-sm"
-                >
-                  <Calendar className="w-4 h-4 mr-1.5" /> Schedule Interview
-                </Button>
+                {!getInterviewForCandidate(selectedApp) && (
+                  <Button
+                    variant="outline"
+                    onClick={() => { setSelectedApp(null); handleScheduleInterview(selectedApp); }}
+                    className="flex-1 h-10 rounded-xl text-sm"
+                  >
+                    <Calendar className="w-4 h-4 mr-1.5" /> Schedule Interview
+                  </Button>
+                )}
               </div>
 
               {/* Candidate Notes */}
