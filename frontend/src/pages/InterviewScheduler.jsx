@@ -496,7 +496,7 @@ function CreateInterviewDialog({ open, onClose, matches, preselectedMatch, token
 
   // Sync matchId when preselectedMatch changes (e.g. from modify flow)
   useEffect(() => {
-    if (preselectedMatch && preselectedMatch !== matchId) {
+    if (preselectedMatch) {
       setMatchId(preselectedMatch);
     }
   }, [preselectedMatch]);
