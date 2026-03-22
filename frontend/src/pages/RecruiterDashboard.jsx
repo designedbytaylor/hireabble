@@ -126,6 +126,7 @@ export default function RecruiterDashboard() {
       pending_applications: Math.max(0, (prev.pending_applications || 0) - 1),
       pipeline_counts: {
         ...prev.pipeline_counts,
+        applied: Math.max(0, (prev.pipeline_counts?.applied || 0) - 1),
         shortlisted: action === 'accept' ? (prev.pipeline_counts?.shortlisted || 0) + 1 : (prev.pipeline_counts?.shortlisted || 0),
       },
     }));
@@ -496,14 +497,14 @@ export default function RecruiterDashboard() {
           {applications.length > 0 ? (
             <>
               {/* New Applied */}
-              {applications.filter(a => !a.recruiter_action).length > 0 && (
+              {applications.filter(a => !a.pipeline_stage || a.pipeline_stage === 'applied').length > 0 && (
                 <div className="mb-6">
                   <h2 className="text-xl font-bold font-['Outfit'] mb-4 flex items-center gap-2">
                     🆕 New Applied
-                    <span className="text-sm font-normal text-muted-foreground">({applications.filter(a => !a.recruiter_action).length})</span>
+                    <span className="text-sm font-normal text-muted-foreground">({applications.filter(a => !a.pipeline_stage || a.pipeline_stage === 'applied').length})</span>
                   </h2>
                   <div className="flex gap-4 overflow-x-auto pb-4">
-                    {applications.filter(a => !a.recruiter_action).slice(0, 10).map((app, appIndex) => (
+                    {applications.filter(a => !a.pipeline_stage || a.pipeline_stage === 'applied').slice(0, 10).map((app, appIndex) => (
                       <PremiumBlur
                         key={app.id}
                         isUnlocked={subscription?.subscribed || unlockedAppIds.current.has(app.id)}
@@ -1110,13 +1111,13 @@ export default function RecruiterDashboard() {
             </DialogTitle>
           </DialogHeader>
           <div className="flex-1 overflow-y-auto space-y-2">
-            {applications.filter(a => !a.recruiter_action).length === 0 ? (
+            {applications.filter(a => !a.pipeline_stage || a.pipeline_stage === 'applied').length === 0 ? (
               <div className="text-center py-8">
                 <Users className="w-10 h-10 text-muted-foreground mx-auto mb-3" />
                 <p className="text-muted-foreground text-sm">No pending applicants.</p>
               </div>
             ) : (
-              applications.filter(a => !a.recruiter_action).map(app => (
+              applications.filter(a => !a.pipeline_stage || a.pipeline_stage === 'applied').map(app => (
                 <div
                   key={app.id}
                   className="flex items-center gap-3 p-3 rounded-xl bg-background border border-border hover:border-primary/30 cursor-pointer transition-colors"
