@@ -63,6 +63,7 @@ class EmailPreferences(BaseModel):
     interviews: Optional[bool] = None
     messages: Optional[bool] = None
     status_updates: Optional[bool] = None
+    saved_job_reminders: Optional[bool] = None
     marketing_emails_opt_in: Optional[bool] = None
 
 @router.get("/preferences")
@@ -78,7 +79,7 @@ async def get_notification_preferences(current_user: dict = Depends(get_current_
 async def update_notification_preferences(data: EmailPreferences, current_user: dict = Depends(get_current_user)):
     """Update email notification preferences"""
     update = {}
-    for field in ("matches", "interviews", "messages", "status_updates"):
+    for field in ("matches", "interviews", "messages", "status_updates", "saved_job_reminders"):
         val = getattr(data, field)
         if val is not None:
             update[f"email_notifications.{field}"] = val
