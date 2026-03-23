@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   User, Briefcase, MapPin, GraduationCap, Building2, Calendar,
   DollarSign, Clock, ArrowRight, ArrowLeft, Camera, CheckCircle2,
-  Wrench, Upload, X, Globe, Navigation2, FileText, Loader2, Bell, BellOff
+  Wrench, Upload, X, Globe, Navigation2, FileText, Loader2, Bell, BellOff, Heart
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -38,6 +38,7 @@ const STEPS = [
   { id: 'employment', title: 'Work History', subtitle: 'Where have you worked?' },
   { id: 'education', title: 'Education', subtitle: 'Your educational background' },
   { id: 'skills', title: 'Skills', subtitle: 'What are you good at?' },
+  { id: 'interests', title: 'Your Interests', subtitle: 'Share what you\'re passionate about outside of work' },
   { id: 'job_type', title: 'What type of work?', subtitle: 'Tell us what you\'re looking for' },
   { id: 'preferences', title: 'Preferences', subtitle: 'What are you looking for?' },
   { id: 'notifications', title: 'Stay in the Loop', subtitle: 'Never miss a match or message' },
@@ -82,6 +83,7 @@ export default function Onboarding() {
     desired_salary: '80000',
     available_immediately: true,
     job_type_preference: [],
+    interests: '',
   });
 
   const handleChange = (field, value) => {
@@ -331,6 +333,7 @@ export default function Onboarding() {
         desired_salary: formData.desired_salary ? parseInt(formData.desired_salary) : null,
         available_immediately: formData.available_immediately,
         job_type_preference: formData.job_type_preference || [],
+        interests: formData.interests ? formData.interests.split(',').map(s => s.trim()).filter(Boolean) : [],
         onboarding_complete: true,
         // Structured data from resume parsing
         work_history: resumeWorkHistory.length > 0 ? resumeWorkHistory : [],
@@ -782,6 +785,31 @@ export default function Onboarding() {
                         className="h-12 rounded-xl bg-card border-border"
                         data-testid="certifications-input"
                       />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {step.id === 'interests' && (
+                <div className="space-y-6">
+                  <div className="w-16 h-16 rounded-2xl bg-pink-500/20 flex items-center justify-center mb-4">
+                    <Heart className="w-8 h-8 text-pink-500" />
+                  </div>
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <Label>What are your interests & hobbies?</Label>
+                      <Input
+                        placeholder="e.g., Hiking, Photography, Chess, Cooking"
+                        value={formData.interests}
+                        onChange={(e) => handleChange('interests', e.target.value)}
+                        className="h-12 rounded-xl bg-card border-border"
+                      />
+                      <p className="text-xs text-muted-foreground">Separate with commas</p>
+                    </div>
+                    <div className="p-4 rounded-xl bg-pink-500/5 border border-pink-500/20">
+                      <p className="text-sm text-muted-foreground">
+                        Interests give interviewers something to connect with you on — it makes you more than just a resume.
+                      </p>
                     </div>
                   </div>
                 </div>

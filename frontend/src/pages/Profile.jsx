@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { User, Mail, Briefcase, MapPin, Save, LogOut, Building2, Download, Upload, CheckCircle, AlertCircle, Lock, Eye, EyeOff, ChevronDown, Plus, Trash2, GraduationCap, Award, Clock, Navigation2, Bell, BellOff, CreditCard, Crown, ExternalLink, FileText, Loader2, HelpCircle, Shield, BadgeCheck, Gift, Copy, Share2 } from 'lucide-react';
+import { User, Mail, Briefcase, MapPin, Save, LogOut, Building2, Download, Upload, CheckCircle, AlertCircle, Lock, Eye, EyeOff, ChevronDown, Plus, Trash2, GraduationCap, Award, Clock, Navigation2, Bell, BellOff, CreditCard, Crown, ExternalLink, FileText, Loader2, HelpCircle, Shield, BadgeCheck, Gift, Copy, Share2, Heart } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -136,6 +136,7 @@ export default function Profile() {
   const [workHistory, setWorkHistory] = useState([]);
   const [education, setEducation] = useState([]);
   const [certifications, setCertifications] = useState([]);
+  const [interests, setInterests] = useState([]);
   const [references, setReferences] = useState([]);
   const [referencesHidden, setReferencesHidden] = useState(true);
   const [showContactOnResume, setShowContactOnResume] = useState(false);
@@ -164,6 +165,7 @@ export default function Profile() {
       setWorkHistory(user.work_history || []);
       setEducation(user.education || []);
       setCertifications(user.certifications || []);
+      setInterests(user.interests || []);
       setReferences(user.references || []);
       setReferencesHidden(user.references_hidden !== false);
       setShowContactOnResume(user.show_contact_on_resume === true);
@@ -475,6 +477,7 @@ export default function Profile() {
         work_history: workHistory,
         education: education,
         certifications: certifications.filter(Boolean),
+        interests: interests.filter(Boolean),
         references: references.filter(r => r.name),
         references_hidden: referencesHidden,
         show_contact_on_resume: showContactOnResume,
@@ -489,9 +492,12 @@ export default function Profile() {
     }
   };
 
-  const handleDownloadResume = async () => {
+  const [resumeTheme, setResumeTheme] = useState('classic');
+
+  const handleDownloadResume = async (theme) => {
+    const selectedTheme = theme || resumeTheme;
     try {
-      const response = await axios.get(`${API}/users/resume/download`, {
+      const response = await axios.get(`${API}/users/resume/download?theme=${selectedTheme}`, {
         headers: { Authorization: `Bearer ${token}` },
         responseType: 'blob'
       });
@@ -788,13 +794,38 @@ export default function Profile() {
               </Button>
               <Button
                 variant="outline"
-                onClick={handleDownloadResume}
+                onClick={() => handleDownloadResume()}
                 className="flex-1 h-12 rounded-xl border-primary/30 text-primary hover:bg-primary/10"
                 data-testid="download-resume-btn"
               >
                 <Download className="w-5 h-5 mr-2" />
                 Download Resume PDF
               </Button>
+            </div>
+            {/* Resume Theme Selector */}
+            <div className="glass-card rounded-2xl p-4 space-y-3">
+              <p className="text-sm font-medium">Resume Theme</p>
+              <div className="grid grid-cols-3 gap-3">
+                {[
+                  { key: 'classic', label: 'Classic', desc: 'Clean single column' },
+                  { key: 'modern', label: 'Modern', desc: 'Sidebar with photo' },
+                  { key: 'minimal', label: 'Minimal', desc: 'Elegant & refined' },
+                ].map(t => (
+                  <button
+                    key={t.key}
+                    type="button"
+                    onClick={() => { setResumeTheme(t.key); handleDownloadResume(t.key); }}
+                    className={`p-3 rounded-xl border text-center transition-all ${
+                      resumeTheme === t.key
+                        ? 'border-primary bg-primary/10'
+                        : 'border-border hover:border-primary/30'
+                    }`}
+                  >
+                    <div className="text-sm font-medium">{t.label}</div>
+                    <div className="text-[11px] text-muted-foreground">{t.desc}</div>
+                  </button>
+                ))}
+              </div>
             </div>
           )}
 
@@ -1051,6 +1082,42 @@ export default function Profile() {
                   ))}
                   {certifications.length === 0 && (
                     <p className="text-sm text-muted-foreground text-center py-2">No certifications added yet</p>
+                  )}
+                </div>
+
+                {/* Interests */}
+                <div className="pt-4 border-t border-border space-y-3">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-base font-semibold flex items-center gap-2"><Heart className="w-4 h-4" /> Interests</Label>
+                    <button
+                      type="button"
+                      onClick={() => setInterests([...interests, ''])}
+                      className="flex items-center gap-1 text-sm text-primary hover:text-primary/80"
+                    >
+                      <Plus className="w-4 h-4" /> Add
+                    </button>
+                  </div>
+                  <p className="text-xs text-muted-foreground">Share hobbies and interests — it helps interviewers connect with you beyond the resume.</p>
+                  {interests.map((interest, i) => (
+                    <div key={i} className="flex items-center gap-2">
+                      <Heart className="w-4 h-4 text-muted-foreground shrink-0" />
+                      <Input
+                        value={interest}
+                        onChange={(e) => { const c = [...interests]; c[i] = e.target.value; setInterests(c); }}
+                        placeholder="e.g., Hiking, Photography, Chess"
+                        className="h-10 rounded-lg bg-background border-border"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setInterests(interests.filter((_, idx) => idx !== i))}
+                        className="text-destructive hover:text-destructive/80 shrink-0"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ))}
+                  {interests.length === 0 && (
+                    <p className="text-sm text-muted-foreground text-center py-2">No interests added yet</p>
                   )}
                 </div>
 
