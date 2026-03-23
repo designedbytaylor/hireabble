@@ -866,13 +866,13 @@ export default function RecruiterDashboard() {
 
       {/* Candidate Detail Dialog */}
       <Dialog open={!!selectedCandidate} onOpenChange={() => setSelectedCandidate(null)}>
-        <DialogContent className="max-w-md bg-card border-border max-h-[85vh] overflow-y-auto">
-          <DialogHeader>
+        <DialogContent className="max-w-md bg-card border-border p-0 max-h-[90vh] flex flex-col">
+          <DialogHeader className="p-6 pb-0 flex-shrink-0">
             <DialogTitle className="font-['Outfit']">Candidate Profile</DialogTitle>
           </DialogHeader>
-          
+
           {selectedCandidate && (
-            <div className="space-y-6">
+            <div className="overflow-y-auto flex-1 p-6 pt-4 space-y-6" style={{ WebkitOverflowScrolling: 'touch' }}>
               {/* Photo and Basic Info */}
               <div className="flex items-center gap-4">
                 <img 
