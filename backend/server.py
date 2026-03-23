@@ -550,4 +550,111 @@ async def startup():
         pass  # TTL indexes may already exist
 
     logger.info("Database indexes created")
+
+    # Start background saved-job reminder scheduler
+    asyncio.create_task(_saved_job_reminder_loop())
+
     logger.info("Hireabble API started successfully!")
+
+
+async def _saved_job_reminder_loop():
+    """Background task: send daily saved-job reminders via email & push."""
+    import random
+    # Stagger start across workers to avoid duplicate sends
+    await asyncio.sleep(60 + random.randint(0, 120))
+    while True:
+        try:
+            await _send_saved_job_reminders()
+        except Exception as e:
+            logger.error(f"Saved job reminder error: {e}")
+        # Run once every 24 hours (with jitter)
+        await asyncio.sleep(86400 + random.randint(0, 3600))
+
+
+async def _send_saved_job_reminders():
+    """Find users with saved jobs and send reminder notifications."""
+    from database import db, send_email_notification, send_web_push, get_user_email_prefs
+    from datetime import datetime, timezone, timedelta
+
+    three_days_ago = (datetime.now(timezone.utc) - timedelta(days=3)).isoformat()
+    now = datetime.now(timezone.utc).isoformat()
+
+    # Find users who saved jobs 3+ days ago and haven't been reminded recently
+    pipeline = [
+        {"$match": {"created_at": {"$lte": three_days_ago}}},
+        {"$group": {"_id": "$user_id", "saved_count": {"$sum": 1}, "oldest_save": {"$min": "$created_at"}}},
+        {"$match": {"saved_count": {"$gte": 1}}},
+        {"$limit": 200},
+    ]
+
+    user_saves = await db.saved_jobs.aggregate(pipeline).to_list(200)
+
+    for entry in user_saves:
+        user_id = entry["_id"]
+        saved_count = entry["saved_count"]
+
+        # Check if we already sent a reminder recently (within 7 days)
+        last_reminder = await db.notifications.find_one(
+            {"user_id": user_id, "type": "saved_job_reminder", "created_at": {"$gte": (datetime.now(timezone.utc) - timedelta(days=7)).isoformat()}},
+            {"_id": 1}
+        )
+        if last_reminder:
+            continue
+
+        # Check user preferences
+        user = await db.users.find_one({"id": user_id}, {"_id": 0, "email": 1, "name": 1, "email_notifications": 1})
+        if not user:
+            continue
+
+        prefs = user.get("email_notifications", {})
+        if prefs.get("saved_job_reminders") is False:
+            continue
+
+        # Check how many saved jobs are still active
+        saved_jobs = await db.saved_jobs.find({"user_id": user_id}, {"_id": 0, "job_id": 1}).to_list(50)
+        job_ids = [s["job_id"] for s in saved_jobs]
+        active_count = await db.jobs.count_documents({"id": {"$in": job_ids}, "is_active": True})
+
+        if active_count == 0:
+            continue
+
+        # Create in-app notification
+        import uuid
+        notif_id = str(uuid.uuid4())
+        message = f"You have {active_count} saved job{'s' if active_count != 1 else ''} still open. Don't miss out!"
+        await db.notifications.insert_one({
+            "id": notif_id,
+            "user_id": user_id,
+            "type": "saved_job_reminder",
+            "message": message,
+            "is_read": False,
+            "created_at": now,
+        })
+
+        # Send email
+        name = user.get("name", "there")
+        html = f"""
+        <div style="font-family: sans-serif; max-width: 500px; margin: 0 auto;">
+            <h2 style="color: #6366f1;">Don't forget your saved jobs!</h2>
+            <p>Hi {name},</p>
+            <p>You have <strong>{active_count} saved job{'s' if active_count != 1 else ''}</strong> that {'are' if active_count != 1 else 'is'} still open and accepting applications.</p>
+            <p>Don't let great opportunities slip away — review and apply before they close.</p>
+            <a href="https://hireabble.com/saved" style="display: inline-block; padding: 12px 24px; background: linear-gradient(135deg, #6366f1, #22d3ee); color: white; text-decoration: none; border-radius: 12px; font-weight: bold; margin-top: 10px;">
+                View Saved Jobs
+            </a>
+            <p style="color: #888; font-size: 12px; margin-top: 20px;">
+                You're receiving this because you saved jobs on Hireabble.
+                You can update your notification preferences in your profile settings.
+            </p>
+        </div>
+        """
+        if user.get("email"):
+            await send_email_notification(user["email"], f"You have {active_count} saved job{'s' if active_count != 1 else ''} still open", html)
+
+        # Send push notification
+        await send_web_push(
+            user_id,
+            title="Saved jobs still open",
+            body=f"You have {active_count} saved job{'s' if active_count != 1 else ''} waiting for you",
+            push_data={"type": "saved_job_reminder", "url": "/saved"}
+        )

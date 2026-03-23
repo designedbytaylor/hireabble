@@ -140,6 +140,7 @@ export default function Profile() {
   const [references, setReferences] = useState([]);
   const [referencesHidden, setReferencesHidden] = useState(true);
   const [showContactOnResume, setShowContactOnResume] = useState(false);
+  const [includePhotoOnResume, setIncludePhotoOnResume] = useState(true);
   const [referenceRequests, setReferenceRequests] = useState([]);
   const [subscription, setSubscription] = useState(undefined); // undefined = loading, null = no subscription
   const [parsingResume, setParsingResume] = useState(false);
@@ -169,6 +170,7 @@ export default function Profile() {
       setReferences(user.references || []);
       setReferencesHidden(user.references_hidden !== false);
       setShowContactOnResume(user.show_contact_on_resume === true);
+      setIncludePhotoOnResume(user.include_photo_on_resume !== false);
       fetchCompleteness();
       fetchReferenceRequests();
       fetchSubscription();
@@ -481,6 +483,7 @@ export default function Profile() {
         references: references.filter(r => r.name),
         references_hidden: referencesHidden,
         show_contact_on_resume: showContactOnResume,
+        include_photo_on_resume: includePhotoOnResume,
       };
       await updateProfile(updates);
       toast.success('Profile updated!');
@@ -1189,6 +1192,30 @@ export default function Profile() {
                   <p className="text-xs text-muted-foreground px-1">
                     Turning this on will allow recruiters you have matched with to see your contact details on your downloaded resume.
                   </p>
+
+                  {/* Resume Photo Toggle */}
+                  <button
+                    type="button"
+                    onClick={() => setIncludePhotoOnResume(!includePhotoOnResume)}
+                    className={`w-full flex items-center gap-3 p-3 rounded-xl border transition-all mt-3 ${
+                      includePhotoOnResume
+                        ? 'bg-primary/10 border-primary/40'
+                        : 'bg-background border-border'
+                    }`}
+                  >
+                    {includePhotoOnResume ? <Eye className="w-4 h-4 text-primary" /> : <EyeOff className="w-4 h-4 text-muted-foreground" />}
+                    <div className="flex-1 text-left">
+                      <div className="text-sm font-medium">{includePhotoOnResume ? 'Photo on Resume' : 'No Photo on Resume'}</div>
+                      <div className="text-xs text-muted-foreground">
+                        {includePhotoOnResume
+                          ? 'Your profile photo is included on your resume'
+                          : 'Your resume will not include a photo'}
+                      </div>
+                    </div>
+                    <div className={`w-10 h-6 rounded-full transition-colors ${includePhotoOnResume ? 'bg-primary' : 'bg-muted'}`}>
+                      <div className={`w-5 h-5 rounded-full bg-white mt-0.5 transition-transform ${includePhotoOnResume ? 'translate-x-[18px]' : 'translate-x-0.5'}`} />
+                    </div>
+                  </button>
                 </div>
 
                 {/* References */}
