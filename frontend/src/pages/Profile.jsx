@@ -709,7 +709,7 @@ export default function Profile() {
             </span>
             {user?.role === 'seeker' && (
               <p className="text-xs text-muted-foreground mt-3">
-                This is your swipe card photo — recruiters see it when browsing candidates. Use a professional, well-lit vertical photo.
+                This is your profile photo. Recruiters see it when browsing candidates. Use a professional, well-lit vertical photo.
               </p>
             )}
           </div>
@@ -763,12 +763,19 @@ export default function Profile() {
                 </span>
               </div>
               <Progress value={completeness.percentage} className="h-2 mb-3" />
-              {completeness.missing_fields.length > 0 && (
-                <p className="text-xs text-muted-foreground">
-                  Add {completeness.missing_fields.slice(0, 2).join(', ')} to improve visibility
-                </p>
+              {completeness.missing_fields?.length > 0 && (
+                <div className="mt-3 space-y-1.5">
+                  <p className="text-xs font-medium text-muted-foreground">Complete these to improve visibility:</p>
+                  {completeness.missing_fields.map((field, i) => (
+                    <div key={i} className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <div className="w-4 h-4 rounded-full border border-border flex items-center justify-center flex-shrink-0">
+                        <Plus className="w-2.5 h-2.5" />
+                      </div>
+                      <span>Add {field.toLowerCase()}</span>
+                    </div>
+                  ))}
+                </div>
               )}
-              
             </div>
           )}
 
@@ -880,6 +887,10 @@ export default function Profile() {
 
           {/* Edit Form */}
           <form onSubmit={handleSubmit} className="glass-card rounded-3xl p-8 space-y-6">
+            {/* ── Basic Info ── */}
+            <div>
+              <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-4">Basic Info</h3>
+            </div>
             <div className="space-y-2">
               <Label htmlFor="name">Full Name</Label>
               <div className="relative">
@@ -911,6 +922,10 @@ export default function Profile() {
                   </div>
                 </div>
 
+                {/* ── Skills & Experience ── */}
+                <div className="pt-2">
+                  <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-4">Skills & Experience</h3>
+                </div>
                 <div className="space-y-2">
                   <Label htmlFor="skills">Skills (comma-separated)</Label>
                   <Input
@@ -954,6 +969,10 @@ export default function Profile() {
                   </div>
                 </div>
 
+                {/* ── Education ── */}
+                <div className="pt-2">
+                  <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-4">Education</h3>
+                </div>
                 <div className="space-y-2">
                   <Label htmlFor="school">School</Label>
                   <div className="relative">
@@ -1170,8 +1189,9 @@ export default function Profile() {
                   )}
                 </div>
 
-                {/* Resume Contact Info Toggle */}
+                {/* ── Resume Settings ── */}
                 <div className="pt-4 border-t border-border space-y-3">
+                  <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-2">Resume Settings</h3>
                   <Label className="text-base font-semibold flex items-center gap-2"><Mail className="w-4 h-4" /> Resume Contact Info</Label>
                   <button
                     type="button"
@@ -1425,8 +1445,13 @@ export default function Profile() {
             </Button>
           </form>
 
+          {/* ── Privacy & Security ── */}
+          <div className="mt-8 mb-2">
+            <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Privacy & Security</h3>
+          </div>
+
           {/* Change Password Section */}
-          <div className="glass-card rounded-3xl p-6 mt-6">
+          <div className="glass-card rounded-3xl p-6 mt-3">
             <button
               onClick={() => setShowChangePassword(!showChangePassword)}
               className="w-full flex items-center justify-between text-left"
@@ -1607,6 +1632,11 @@ export default function Profile() {
             </div>
           )}
 
+          {/* ── Notifications ── */}
+          <div className="mt-8 mb-2">
+            <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Notifications</h3>
+          </div>
+
           {/* Push Notifications */}
           {pushSupported && (
             <div className="glass-card rounded-2xl p-5 mt-6">
@@ -1679,8 +1709,13 @@ export default function Profile() {
             </div>
           )}
 
+          {/* ── Account ── */}
+          <div className="mt-8 mb-2">
+            <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Account</h3>
+          </div>
+
           {/* Referral Program */}
-          <div className="glass-card rounded-2xl p-5 mt-6">
+          <div className="glass-card rounded-2xl p-5 mt-3">
             <h3 className="text-lg font-bold font-['Outfit'] mb-3 flex items-center gap-2">
               <Gift className="w-5 h-5" /> Invite Friends
             </h3>

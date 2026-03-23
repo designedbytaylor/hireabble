@@ -15,10 +15,34 @@ from reportlab.lib.enums import TA_LEFT, TA_CENTER
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.platypus import (
     SimpleDocTemplate, Paragraph, Spacer, HRFlowable, Image,
-    Table, TableStyle
+    Table, TableStyle, Flowable
 )
 from reportlab.lib.utils import ImageReader
 from xml.sax.saxutils import escape as xml_escape
+
+
+class RoundedImage(Flowable):
+    """Image with rounded corners using a clipping path."""
+    def __init__(self, image_data, width, height, radius=6, hAlign='CENTER'):
+        Flowable.__init__(self)
+        self.image_data = image_data
+        self.img_width = width
+        self.img_height = height
+        self.radius = radius
+        self.width = width
+        self.height = height
+        self.hAlign = hAlign
+
+    def draw(self):
+        c = self.canv
+        w, h, r = self.img_width, self.img_height, self.radius
+        c.saveState()
+        # Draw rounded rectangle clipping path
+        p = c.beginPath()
+        p.roundRect(0, 0, w, h, r)
+        c.clipPath(p, stroke=0)
+        c.drawImage(ImageReader(self.image_data), 0, 0, w, h)
+        c.restoreState()
 
 
 def esc(val):
@@ -92,7 +116,7 @@ def generate_classic(user, include_photo=True, for_recruiter=False):
     light_gray = colors.HexColor('#999999')
 
     name_style = ParagraphStyle('Name', parent=styles['Heading1'],
-        fontSize=26, textColor=primary, spaceAfter=2, fontName='Helvetica-Bold', alignment=TA_LEFT)
+        fontSize=26, textColor=primary, spaceAfter=6, fontName='Helvetica-Bold', alignment=TA_LEFT, leading=30)
     title_style = ParagraphStyle('Title', parent=styles['Normal'],
         fontSize=14, textColor=accent, spaceAfter=4, fontName='Helvetica')
     contact_style = ParagraphStyle('Contact', parent=styles['Normal'],
@@ -115,8 +139,7 @@ def generate_classic(user, include_photo=True, for_recruiter=False):
     photo_buf = _fetch_photo(user.get('photo_url')) if include_photo else None
     if photo_buf:
         # Photo + name side by side
-        photo_img = Image(photo_buf, width=60, height=60)
-        photo_img.hAlign = 'LEFT'
+        photo_img = RoundedImage(photo_buf, width=60, height=60, radius=8, hAlign='LEFT')
         name_parts = []
         name_parts.append(Paragraph(esc(user.get('name', 'Job Seeker')), name_style))
         if user.get('title'):
@@ -243,8 +266,7 @@ def generate_modern(user, include_photo=True, for_recruiter=False):
     # Photo
     photo_buf = _fetch_photo(user.get('photo_url')) if include_photo else None
     if photo_buf:
-        photo_img = Image(photo_buf, width=100, height=100)
-        photo_img.hAlign = 'CENTER'
+        photo_img = RoundedImage(photo_buf, width=100, height=100, radius=12, hAlign='CENTER')
         sidebar_elements.append(Spacer(1, 8))
         sidebar_elements.append(photo_img)
         sidebar_elements.append(Spacer(1, 8))
@@ -430,8 +452,7 @@ def generate_minimal(user, include_photo=True, for_recruiter=False):
     # Optional centered photo
     photo_buf = _fetch_photo(user.get('photo_url')) if include_photo else None
     if photo_buf:
-        photo_img = Image(photo_buf, width=55, height=55)
-        photo_img.hAlign = 'CENTER'
+        photo_img = RoundedImage(photo_buf, width=55, height=55, radius=8, hAlign='CENTER')
         elements.append(photo_img)
         elements.append(Spacer(1, 6))
 

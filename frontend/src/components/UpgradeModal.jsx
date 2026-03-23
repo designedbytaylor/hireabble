@@ -234,14 +234,14 @@ export default function UpgradeModal({ open, onClose, onSubscribed, trigger, hig
                       onClick={() => setSelectedTier(tier.id)}
                       className={`flex-1 py-3 px-4 rounded-2xl border-2 transition-all ${
                         isSelected
-                          ? `${tc.border} ${tc.bg} shadow-lg`
+                          ? `${tc.border} ${tc.bg} shadow-lg ring-1 ${tc.border}`
                           : 'border-border bg-card hover:border-primary/20'
                       }`}
                     >
-                      <p className={`font-bold text-sm font-['Outfit'] ${isSelected ? tc.text : 'text-foreground'}`}>
+                      <p className={`font-bold text-sm font-['Outfit'] ${isSelected ? 'text-white' : 'text-foreground'}`}>
                         {tier.name}
                       </p>
-                      <p className="text-xs text-muted-foreground">
+                      <p className={`text-xs ${isSelected ? 'text-white/70' : 'text-muted-foreground'}`}>
                         {isCurrent ? 'Current' : `From ${formatPrice(Math.round(tier.prices['6month'] / 6))}/mo`}
                       </p>
                     </button>
