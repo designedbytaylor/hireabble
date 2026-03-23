@@ -492,7 +492,7 @@ export default function Profile() {
     }
   };
 
-  const [resumeTheme, setResumeTheme] = useState('classic');
+  const [resumeTheme, setResumeTheme] = useState(user?.resume_theme || 'classic');
 
   const handleDownloadResume = async (theme) => {
     const selectedTheme = theme || resumeTheme;
@@ -770,7 +770,7 @@ export default function Profile() {
           )}
 
           {/* Resume Upload & Download (Seeker Only) */}
-          {user?.role === 'seeker' && (
+          {user?.role === 'seeker' && (<>
             <div className="flex flex-col sm:flex-row gap-3 mb-6">
               <input
                 ref={resumeInputRef}
@@ -805,6 +805,7 @@ export default function Profile() {
             {/* Resume Theme Selector */}
             <div className="glass-card rounded-2xl p-4 space-y-3">
               <p className="text-sm font-medium">Resume Theme</p>
+              <p className="text-xs text-muted-foreground">Choose how your resume looks when recruiters download it. Click to select, then preview or download.</p>
               <div className="grid grid-cols-3 gap-3">
                 {[
                   { key: 'classic', label: 'Classic', desc: 'Clean single column' },
@@ -814,20 +815,59 @@ export default function Profile() {
                   <button
                     key={t.key}
                     type="button"
-                    onClick={() => { setResumeTheme(t.key); handleDownloadResume(t.key); }}
+                    onClick={async () => {
+                      setResumeTheme(t.key);
+                      try {
+                        await updateProfile({ resume_theme: t.key });
+                        toast.success(`Resume theme set to ${t.label}`);
+                      } catch { /* ignore */ }
+                    }}
                     className={`p-3 rounded-xl border text-center transition-all ${
                       resumeTheme === t.key
-                        ? 'border-primary bg-primary/10'
+                        ? 'border-primary bg-primary/10 ring-1 ring-primary/30'
                         : 'border-border hover:border-primary/30'
                     }`}
                   >
                     <div className="text-sm font-medium">{t.label}</div>
                     <div className="text-[11px] text-muted-foreground">{t.desc}</div>
+                    {resumeTheme === t.key && (
+                      <div className="text-[10px] text-primary font-medium mt-1">Active</div>
+                    )}
                   </button>
                 ))}
               </div>
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    // Preview: open in new tab
+                    axios.get(`${API}/users/resume/download?theme=${resumeTheme}`, {
+                      headers: { Authorization: `Bearer ${token}` },
+                      responseType: 'blob'
+                    }).then(res => {
+                      const url = window.URL.createObjectURL(new Blob([res.data], { type: 'application/pdf' }));
+                      window.open(url, '_blank');
+                      setTimeout(() => window.URL.revokeObjectURL(url), 10000);
+                    }).catch(() => toast.error('Failed to preview'));
+                  }}
+                  className="flex-1 rounded-xl text-xs"
+                >
+                  <Eye className="w-3.5 h-3.5 mr-1.5" /> Preview
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleDownloadResume()}
+                  className="flex-1 rounded-xl text-xs"
+                >
+                  <Download className="w-3.5 h-3.5 mr-1.5" /> Download
+                </Button>
+              </div>
             </div>
-          )}
+          </>)}
 
           {/* Edit Form */}
           <form onSubmit={handleSubmit} className="glass-card rounded-3xl p-8 space-y-6">
