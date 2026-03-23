@@ -684,194 +684,28 @@ async def get_profile_completeness(current_user: dict = Depends(get_current_user
 # ==================== RESUME PDF ====================
 
 @router.get("/users/resume/download")
-async def download_resume(current_user: dict = Depends(get_current_user)):
-    """Download user profile as a professionally formatted PDF resume"""
+async def download_resume(
+    current_user: dict = Depends(get_current_user),
+    theme: str = "classic",
+    include_photo: bool = True,
+):
+    """Download user profile as a professionally formatted PDF resume.
+
+    Query params:
+      - theme: 'classic', 'modern', or 'minimal' (default: classic)
+      - include_photo: whether to include profile photo (default: true)
+    """
     if current_user["role"] != "seeker":
         raise HTTPException(status_code=403, detail="Only job seekers can download resumes")
 
-    # Fetch full user data (profile may have work_history, education, references)
     user = await db.users.find_one({"id": current_user["id"]}, {"_id": 0, "password": 0})
     if not user:
         user = current_user
 
-    buffer = io.BytesIO()
-    doc = SimpleDocTemplate(
-        buffer, pagesize=letter,
-        topMargin=0.5 * inch, bottomMargin=0.5 * inch,
-        leftMargin=0.65 * inch, rightMargin=0.65 * inch
-    )
-    styles = getSampleStyleSheet()
+    from routers.resume_themes import generate_resume_pdf
+    buffer = await asyncio.to_thread(generate_resume_pdf, user, theme=theme, include_photo=include_photo, for_recruiter=False)
 
-    # Color scheme
-    primary = colors.HexColor('#1a1a2e')
-    accent = colors.HexColor('#6366f1')
-    dark_gray = colors.HexColor('#333333')
-    med_gray = colors.HexColor('#666666')
-    light_gray = colors.HexColor('#999999')
-
-    # Custom styles
-    name_style = ParagraphStyle('Name', parent=styles['Heading1'],
-        fontSize=26, textColor=primary, spaceAfter=2, fontName='Helvetica-Bold', alignment=TA_LEFT)
-    title_style = ParagraphStyle('Title', parent=styles['Normal'],
-        fontSize=14, textColor=accent, spaceAfter=4, fontName='Helvetica')
-    contact_style = ParagraphStyle('Contact', parent=styles['Normal'],
-        fontSize=9, textColor=med_gray, spaceAfter=2, fontName='Helvetica')
-    section_style = ParagraphStyle('Section', parent=styles['Heading2'],
-        fontSize=12, textColor=accent, spaceBefore=14, spaceAfter=6,
-        fontName='Helvetica-Bold', borderWidth=0, leading=16)
-    job_title_style = ParagraphStyle('JobTitle', parent=styles['Normal'],
-        fontSize=11, textColor=primary, fontName='Helvetica-Bold', spaceAfter=1)
-    company_style = ParagraphStyle('Company', parent=styles['Normal'],
-        fontSize=10, textColor=med_gray, fontName='Helvetica', spaceAfter=2)
-    body_style = ParagraphStyle('Body', parent=styles['Normal'],
-        fontSize=10, textColor=dark_gray, spaceAfter=4, fontName='Helvetica', leading=14)
-    bullet_style = ParagraphStyle('Bullet', parent=styles['Normal'],
-        fontSize=10, textColor=dark_gray, leftIndent=12, fontName='Helvetica', leading=13, spaceAfter=2)
-
-    elements = []
-
-    # ===== HEADER =====
-    elements.append(Paragraph(user.get('name', 'Job Seeker'), name_style))
-    if user.get('title'):
-        elements.append(Paragraph(user['title'], title_style))
-
-    # Contact line
-    contact_parts = []
-    if user.get('email'):
-        contact_parts.append(user['email'])
-    if user.get('location'):
-        contact_parts.append(user['location'])
-    if user.get('work_preference'):
-        pref_labels = {'remote': 'Remote', 'onsite': 'On-site', 'hybrid': 'Hybrid', 'flexible': 'Flexible'}
-        contact_parts.append(pref_labels.get(user['work_preference'], user['work_preference']))
-    if contact_parts:
-        elements.append(Paragraph("  |  ".join(contact_parts), contact_style))
-
-    elements.append(Spacer(1, 4))
-    elements.append(HRFlowable(width="100%", thickness=1, color=colors.HexColor('#e0e0e0'), spaceAfter=8))
-
-    # ===== PROFESSIONAL SUMMARY =====
-    if user.get('bio'):
-        elements.append(Paragraph("PROFESSIONAL SUMMARY", section_style))
-        elements.append(Paragraph(user['bio'], body_style))
-
-    # ===== EXPERIENCE =====
-    work_history = user.get('work_history', [])
-    has_experience = work_history or user.get('current_employer')
-
-    if has_experience:
-        elements.append(Paragraph("EXPERIENCE", section_style))
-        elements.append(HRFlowable(width="100%", thickness=0.5, color=colors.HexColor('#e0e0e0'), spaceAfter=6))
-
-        if work_history:
-            for job in work_history:
-                title_text = job.get('title', 'Role')
-                elements.append(Paragraph(title_text, job_title_style))
-                company_line = job.get('company', '')
-                dates = ""
-                if job.get('start_date'):
-                    dates = job['start_date']
-                    if job.get('end_date'):
-                        dates += f" - {job['end_date']}"
-                    else:
-                        dates += " - Present"
-                if company_line and dates:
-                    company_line += f"  |  {dates}"
-                elements.append(Paragraph(company_line, company_style))
-                if job.get('description'):
-                    for line in job['description'].split('\n'):
-                        line = line.strip()
-                        if line:
-                            elements.append(Paragraph(f"• {line}", bullet_style))
-                elements.append(Spacer(1, 6))
-        else:
-            if user.get('current_employer'):
-                elements.append(Paragraph(user.get('title', 'Professional'), job_title_style))
-                exp_str = f"{user.get('experience_years', 0)}+ years" if user.get('experience_years') else ""
-                elements.append(Paragraph(f"{user['current_employer']}  |  {exp_str}", company_style))
-
-    # ===== EDUCATION =====
-    edu_list = user.get('education', [])
-    has_edu = edu_list or user.get('school')
-
-    if has_edu:
-        elements.append(Paragraph("EDUCATION", section_style))
-        elements.append(HRFlowable(width="100%", thickness=0.5, color=colors.HexColor('#e0e0e0'), spaceAfter=6))
-
-        if edu_list:
-            for edu in edu_list:
-                degree_text = edu.get('degree', '')
-                if edu.get('field'):
-                    degree_text += f" in {edu['field']}" if degree_text else edu['field']
-                if degree_text:
-                    elements.append(Paragraph(degree_text, job_title_style))
-                school_line = edu.get('school', '')
-                if edu.get('year'):
-                    school_line += f"  |  {edu['year']}"
-                if school_line:
-                    elements.append(Paragraph(school_line, company_style))
-                elements.append(Spacer(1, 4))
-        else:
-            degree_map = {
-                'high_school': 'High School Diploma', 'some_college': 'Some College',
-                'associates': "Associate's Degree", 'bachelors': "Bachelor's Degree",
-                'masters': "Master's Degree", 'phd': 'PhD / Doctorate',
-                'bootcamp': 'Bootcamp / Certification', 'self_taught': 'Self-taught',
-            }
-            degree_display = degree_map.get(user.get('degree', ''), user.get('degree', ''))
-            if degree_display:
-                elements.append(Paragraph(degree_display, job_title_style))
-            if user.get('school'):
-                elements.append(Paragraph(user['school'], company_style))
-
-    # ===== SKILLS =====
-    if user.get('skills'):
-        elements.append(Paragraph("SKILLS", section_style))
-        elements.append(HRFlowable(width="100%", thickness=0.5, color=colors.HexColor('#e0e0e0'), spaceAfter=6))
-        # Display as skill chips in rows
-        skills_text = "  •  ".join(user['skills'])
-        elements.append(Paragraph(skills_text, body_style))
-
-    # ===== CERTIFICATIONS =====
-    if user.get('certifications'):
-        elements.append(Paragraph("CERTIFICATIONS", section_style))
-        elements.append(HRFlowable(width="100%", thickness=0.5, color=colors.HexColor('#e0e0e0'), spaceAfter=6))
-        for cert in user['certifications']:
-            if isinstance(cert, str) and cert.strip():
-                elements.append(Paragraph(f"• {cert}", bullet_style))
-
-    # ===== REFERENCES =====
-    refs = user.get('references', [])
-    if refs and not user.get('references_hidden', True):
-        elements.append(Paragraph("REFERENCES", section_style))
-        elements.append(HRFlowable(width="100%", thickness=0.5, color=colors.HexColor('#e0e0e0'), spaceAfter=6))
-        for ref in refs:
-            ref_name = ref.get('name', '')
-            ref_title = ref.get('title', '')
-            ref_company = ref.get('company', '')
-            ref_contact = ref.get('email') or ref.get('phone', '')
-            line = f"<b>{ref_name}</b>"
-            if ref_title:
-                line += f" - {ref_title}"
-            if ref_company:
-                line += f" at {ref_company}"
-            if ref_contact:
-                line += f"  |  {ref_contact}"
-            elements.append(Paragraph(line, body_style))
-    elif refs:
-        elements.append(Spacer(1, 10))
-        elements.append(Paragraph("References available upon request", ParagraphStyle(
-            'RefNote', parent=styles['Normal'], fontSize=9, textColor=light_gray, alignment=TA_CENTER
-        )))
-
-    # Footer
-    elements.append(Spacer(1, 20))
-
-    doc.build(elements)
-    buffer.seek(0)
-
-    import re as _re
-    safe_name = _re.sub(r'[^\w\s-]', '', user.get('name', 'resume')).strip().replace(' ', '_') or 'resume'
+    safe_name = re.sub(r'[^\w\s-]', '', user.get('name', 'resume')).strip().replace(' ', '_') or 'resume'
     filename = f"{safe_name}_Resume.pdf"
 
     return StreamingResponse(
@@ -886,14 +720,12 @@ async def download_applicant_resume_pdf(seeker_id: str, current_user: dict = Dep
     if current_user["role"] != "recruiter":
         raise HTTPException(status_code=403, detail="Only recruiters can download applicant resumes")
 
-    # Verify there's an application or match between this seeker and recruiter
     app = await db.applications.find_one({
         "seeker_id": seeker_id,
         "recruiter_id": current_user["id"],
         "action": {"$in": ["like", "superlike"]}
     })
     if not app:
-        # Also allow if there's a match (e.g. recruiter swiped right first)
         match = await db.matches.find_one({
             "seeker_id": seeker_id,
             "recruiter_id": current_user["id"]
@@ -905,134 +737,9 @@ async def download_applicant_resume_pdf(seeker_id: str, current_user: dict = Dep
     if not user:
         raise HTTPException(status_code=404, detail="Seeker not found")
 
-    # Escape XML special characters for ReportLab Paragraph
-    from xml.sax.saxutils import escape as xml_escape
-    def esc(val):
-        if not val or not isinstance(val, str):
-            return val or ""
-        return xml_escape(val)
-
     try:
-        buffer = io.BytesIO()
-        doc = SimpleDocTemplate(
-            buffer, pagesize=letter,
-            topMargin=0.5 * inch, bottomMargin=0.5 * inch,
-            leftMargin=0.65 * inch, rightMargin=0.65 * inch
-        )
-        styles = getSampleStyleSheet()
-
-        primary = colors.HexColor('#1a1a2e')
-        accent = colors.HexColor('#6366f1')
-        dark_gray = colors.HexColor('#333333')
-        med_gray = colors.HexColor('#666666')
-
-        name_style = ParagraphStyle('Name', parent=styles['Heading1'],
-            fontSize=26, textColor=primary, spaceAfter=2, fontName='Helvetica-Bold', alignment=TA_LEFT)
-        title_style = ParagraphStyle('Title', parent=styles['Normal'],
-            fontSize=14, textColor=accent, spaceAfter=4, fontName='Helvetica')
-        contact_style = ParagraphStyle('Contact', parent=styles['Normal'],
-            fontSize=9, textColor=med_gray, spaceAfter=2, fontName='Helvetica')
-        section_style = ParagraphStyle('Section', parent=styles['Heading2'],
-            fontSize=12, textColor=accent, spaceBefore=14, spaceAfter=6,
-            fontName='Helvetica-Bold', borderWidth=0, leading=16)
-        job_title_style = ParagraphStyle('JobTitle', parent=styles['Normal'],
-            fontSize=11, textColor=primary, fontName='Helvetica-Bold', spaceAfter=1)
-        company_style = ParagraphStyle('Company', parent=styles['Normal'],
-            fontSize=10, textColor=med_gray, fontName='Helvetica', spaceAfter=2)
-        body_style = ParagraphStyle('Body', parent=styles['Normal'],
-            fontSize=10, textColor=dark_gray, spaceAfter=4, fontName='Helvetica', leading=14)
-        bullet_style = ParagraphStyle('Bullet', parent=styles['Normal'],
-            fontSize=10, textColor=dark_gray, leftIndent=12, fontName='Helvetica', leading=13, spaceAfter=2)
-
-        elements = []
-        elements.append(Paragraph(esc(user.get('name', 'Job Seeker')), name_style))
-        if user.get('title'):
-            elements.append(Paragraph(esc(user['title']), title_style))
-
-        # Contact line — show full contact info only if seeker opted in, otherwise generic
-        contact_parts = []
-        if user.get('show_contact_on_resume'):
-            if user.get('email'):
-                contact_parts.append(esc(user['email']))
-            if user.get('location'):
-                contact_parts.append(esc(user['location']))
-        else:
-            if user.get('location'):
-                contact_parts.append(esc(user['location']))
-            contact_parts.append("Contact via Hireabble")
-        elements.append(Paragraph("  |  ".join(contact_parts), contact_style))
-
-        elements.append(Spacer(1, 4))
-        elements.append(HRFlowable(width="100%", thickness=1, color=colors.HexColor('#e0e0e0'), spaceAfter=8))
-
-        if user.get('bio'):
-            elements.append(Paragraph("PROFESSIONAL SUMMARY", section_style))
-            elements.append(Paragraph(esc(user['bio']), body_style))
-
-        work_history = user.get('work_history', [])
-        if work_history or user.get('current_employer'):
-            elements.append(Paragraph("EXPERIENCE", section_style))
-            elements.append(HRFlowable(width="100%", thickness=0.5, color=colors.HexColor('#e0e0e0'), spaceAfter=6))
-            if work_history:
-                for job in work_history:
-                    elements.append(Paragraph(esc(job.get('title', 'Role')), job_title_style))
-                    cl = esc(job.get('company', ''))
-                    dates = ""
-                    if job.get('start_date'):
-                        dates = esc(job['start_date'])
-                        dates += f" - {esc(job.get('end_date', 'Present'))}"
-                    if cl and dates:
-                        cl += f"  |  {dates}"
-                    elements.append(Paragraph(cl, company_style))
-                    if job.get('description'):
-                        for line in job['description'].split('\n'):
-                            line = line.strip()
-                            if line:
-                                elements.append(Paragraph(f"• {esc(line)}", bullet_style))
-                    elements.append(Spacer(1, 6))
-            elif user.get('current_employer'):
-                elements.append(Paragraph(esc(user.get('title', 'Professional')), job_title_style))
-                exp_str = f"{user.get('experience_years', 0)}+ years" if user.get('experience_years') else ""
-                elements.append(Paragraph(f"{esc(user['current_employer'])}  |  {exp_str}", company_style))
-
-        edu_list = user.get('education', [])
-        if edu_list or user.get('school'):
-            elements.append(Paragraph("EDUCATION", section_style))
-            elements.append(HRFlowable(width="100%", thickness=0.5, color=colors.HexColor('#e0e0e0'), spaceAfter=6))
-            if edu_list:
-                for edu in edu_list:
-                    dt = esc(edu.get('degree', ''))
-                    if edu.get('field'):
-                        dt += f" in {esc(edu['field'])}" if dt else esc(edu['field'])
-                    if dt:
-                        elements.append(Paragraph(dt, job_title_style))
-                    sl = esc(edu.get('school', ''))
-                    if edu.get('year'):
-                        sl += f"  |  {esc(str(edu['year']))}"
-                    if sl:
-                        elements.append(Paragraph(sl, company_style))
-                    elements.append(Spacer(1, 4))
-            elif user.get('school'):
-                if user.get('degree'):
-                    elements.append(Paragraph(esc(user['degree']), job_title_style))
-                elements.append(Paragraph(esc(user['school']), company_style))
-
-        if user.get('skills'):
-            elements.append(Paragraph("SKILLS", section_style))
-            elements.append(HRFlowable(width="100%", thickness=0.5, color=colors.HexColor('#e0e0e0'), spaceAfter=6))
-            elements.append(Paragraph("  •  ".join(esc(s) for s in user['skills']), body_style))
-
-        if user.get('certifications'):
-            elements.append(Paragraph("CERTIFICATIONS", section_style))
-            elements.append(HRFlowable(width="100%", thickness=0.5, color=colors.HexColor('#e0e0e0'), spaceAfter=6))
-            for cert in user['certifications']:
-                if isinstance(cert, str) and cert.strip():
-                    elements.append(Paragraph(f"• {esc(cert)}", bullet_style))
-
-        # No references section on recruiter-downloaded resumes — contact through Hireabble only
-        elements.append(Spacer(1, 20))
-        doc.build(elements)
-        buffer.seek(0)
+        from routers.resume_themes import generate_resume_pdf
+        buffer = await asyncio.to_thread(generate_resume_pdf, user, theme='classic', include_photo=True, for_recruiter=True)
     except Exception as e:
         import logging
         logging.getLogger(__name__).error(f"Resume PDF generation failed for {seeker_id}: {type(e).__name__}: {e}")
