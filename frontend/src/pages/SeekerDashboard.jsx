@@ -405,7 +405,6 @@ export default function SeekerDashboard() {
         await axios.delete(`${API}/jobs/${jobId}/save`, { headers: { Authorization: `Bearer ${tokenRef.current}` } });
       } else {
         await axios.post(`${API}/jobs/${jobId}/save`, {}, { headers: { Authorization: `Bearer ${tokenRef.current}` } });
-        toast.success('Job saved!');
       }
     } catch {
       // Revert on error
@@ -416,6 +415,37 @@ export default function SeekerDashboard() {
       });
     }
   }, [savedJobIds]);
+
+  // Save and advance: saves the job AND animates the card out like a swipe
+  const saveAndAdvance = useCallback((jobId) => {
+    if (currentIndex >= jobs.length) return;
+    const job = jobs[currentIndex];
+    if (!job || job.id !== jobId) return;
+
+    // Mark as swiped so it doesn't reappear
+    swipedIdsRef.current.add(job.id);
+    saveSwipedIds(swipedIdsRef.current, uidRef.current);
+
+    // Advance index
+    setCurrentIndex(prev => prev + 1);
+    setExpandedCard(false);
+
+    // Track for undo
+    const exitDirection = { x: 0, y: 800 };
+    lastSwipedRef.current = { job, action: 'save', exitDirection };
+
+    // Animate card downward
+    setExitingCards(prev => [...prev, { job, action: 'save', exitDirection, id: job.id, startX: 0, startY: 0 }]);
+    setTimeout(() => {
+      setExitingCards(prev => prev.filter(c => c.id !== job.id));
+    }, 500);
+
+    // Save via API (fire and forget)
+    setSavedJobIds(prev => { const next = new Set(prev); next.add(jobId); return next; });
+    axios.post(`${API}/jobs/${jobId}/save`, {}, { headers: { Authorization: `Bearer ${tokenRef.current}` } }).catch(() => {});
+    toast.success('Saved for later');
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentIndex, jobs]);
 
   // WebSocket listener for async match notifications (matches are detected in background)
   useEffect(() => {
@@ -1105,16 +1135,12 @@ export default function SeekerDashboard() {
                   <CheckCircle className="w-7 h-7 text-green-500" />
                 </button>
                 <button
-                  onClick={() => currentJob && toggleSaveJob(currentJob.id)}
-                  className={`w-12 h-12 rounded-full flex items-center justify-center transition-all duration-300 ${
-                    currentJob && savedJobIds.has(currentJob.id)
-                      ? 'bg-primary/20 border border-primary/40 text-primary'
-                      : 'bg-muted/10 border border-muted/20 text-muted-foreground hover:scale-110'
-                  }`}
+                  onClick={() => currentJob && saveAndAdvance(currentJob.id)}
+                  className="w-12 h-12 rounded-full flex items-center justify-center transition-all duration-300 bg-muted/10 border border-muted/20 text-muted-foreground hover:scale-110 hover:border-primary/40 hover:text-primary"
                   title="Save for later"
-                  aria-label={currentJob && savedJobIds.has(currentJob.id) ? 'Unsave this job' : 'Save this job for later'}
+                  aria-label="Save this job for later"
                 >
-                  <Bookmark className={`w-5 h-5 ${currentJob && savedJobIds.has(currentJob.id) ? 'fill-current' : ''}`} />
+                  <Bookmark className="w-5 h-5" />
                 </button>
               </div>
               {/* Priority Apply Note (Premium) */}
@@ -1655,8 +1681,10 @@ function ExitingCard({ card }) {
         x: exitDirection.x > 0 ? Math.min(exitDirection.x, window.innerWidth + 100) : Math.max(exitDirection.x, -(window.innerWidth + 100)),
         y: exitDirection.y > 0 ? Math.min(exitDirection.y, window.innerHeight + 100) : Math.max(exitDirection.y, -(window.innerHeight + 100)),
         rotate: exitDirection.x > 0 ? 20 : exitDirection.x < 0 ? -20 : 0,
+        scale: action === 'save' ? 0.85 : 1,
+        opacity: action === 'save' ? 0 : 1,
       }}
-      transition={{ duration: window.innerWidth < 640 ? 0.15 : 0.25, ease: 'easeIn' }}
+      transition={{ duration: action === 'save' ? 0.3 : (window.innerWidth < 640 ? 0.15 : 0.25), ease: action === 'save' ? 'easeOut' : 'easeIn' }}
     >
       <div className="w-full h-full rounded-3xl overflow-hidden relative gradient-border">
         <div className="absolute inset-0">
@@ -1672,6 +1700,9 @@ function ExitingCard({ card }) {
         )}
         {action === 'superlike' && (
           <div className="absolute top-8 left-1/2 -translate-x-1/2 px-6 py-2 rounded-full bg-secondary border-2 border-secondary font-bold text-white z-20">PRIORITY APPLY</div>
+        )}
+        {action === 'save' && (
+          <div className="absolute top-8 left-1/2 -translate-x-1/2 px-6 py-2 rounded-full bg-primary border-2 border-primary font-bold text-white z-20">SAVED</div>
         )}
         <div className="absolute inset-0 flex flex-col justify-end p-6 z-10">
           <h2 className="text-2xl font-bold font-['Outfit'] mb-3">{card.job.title}</h2>
