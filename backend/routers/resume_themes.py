@@ -37,16 +37,27 @@ def _fetch_photo(photo_url):
     """Download profile photo and return as BytesIO, or None on failure."""
     if not photo_url:
         return None
+    import logging
+    logger = logging.getLogger(__name__)
     try:
-        req = urllib.request.Request(photo_url, headers={'User-Agent': 'Hireabble/1.0'})
-        with urllib.request.urlopen(req, timeout=5) as resp:
+        # Some Supabase/CDN URLs need standard browser-like headers
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (compatible; Hireabble/1.0)',
+            'Accept': 'image/*,*/*',
+        }
+        req = urllib.request.Request(photo_url, headers=headers)
+        with urllib.request.urlopen(req, timeout=8) as resp:
             ct = resp.headers.get('Content-Type', '')
-            if ct.startswith('image'):
-                buf = io.BytesIO(resp.read())
-                buf.seek(0)
-                return buf
-    except Exception:
-        pass
+            if ct.startswith('image') or ct.startswith('application/octet-stream'):
+                data = resp.read()
+                if len(data) > 100:  # Sanity check — not an error page
+                    buf = io.BytesIO(data)
+                    buf.seek(0)
+                    return buf
+            logger.warning(f"Photo fetch got unexpected content-type: {ct} for {photo_url[:80]}")
+    except Exception as e:
+        logger.warning(f"Photo fetch failed for {photo_url[:80]}: {e}")
+    # Fallback: try the avatar URL if it looks like a dicebear/generated avatar
     return None
 
 

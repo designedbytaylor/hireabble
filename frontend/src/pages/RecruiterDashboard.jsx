@@ -401,6 +401,13 @@ export default function RecruiterDashboard() {
             >
               <BarChart3 className="w-5 h-5 text-muted-foreground" />
             </button>
+            <img
+              src={getPhotoUrl(user?.photo_url, user?.name || user?.id) || user?.avatar}
+              alt="Profile"
+              onClick={() => navigate('/profile')}
+              className="w-8 h-8 rounded-full border-2 border-primary/50 object-cover cursor-pointer hover:opacity-80 transition-opacity"
+              onError={(e) => { e.target.src = `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(user?.name || 'R')}`; }}
+            />
             <Button
               onClick={() => setShowNewJob(true)}
               className="bg-gradient-to-r from-primary to-secondary rounded-full sm:px-5 px-3"

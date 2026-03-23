@@ -702,6 +702,9 @@ async def download_resume(
     if not user:
         user = current_user
 
+    # Use the user's saved preference if include_photo wasn't explicitly set to false
+    if include_photo and user.get('include_photo_on_resume') is False:
+        include_photo = False
     from routers.resume_themes import generate_resume_pdf
     buffer = await asyncio.to_thread(generate_resume_pdf, user, theme=theme, include_photo=include_photo, for_recruiter=False)
 
@@ -742,7 +745,8 @@ async def download_applicant_resume_pdf(seeker_id: str, current_user: dict = Dep
         seeker_theme = user.get('resume_theme', 'classic')
         if seeker_theme not in ('classic', 'modern', 'minimal'):
             seeker_theme = 'classic'
-        buffer = await asyncio.to_thread(generate_resume_pdf, user, theme=seeker_theme, include_photo=True, for_recruiter=True)
+        show_photo = user.get('include_photo_on_resume', True) is not False
+        buffer = await asyncio.to_thread(generate_resume_pdf, user, theme=seeker_theme, include_photo=show_photo, for_recruiter=True)
     except Exception as e:
         import logging
         logging.getLogger(__name__).error(f"Resume PDF generation failed for {seeker_id}: {type(e).__name__}: {e}")
