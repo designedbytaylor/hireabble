@@ -845,13 +845,19 @@ export default function Profile() {
                   variant="outline"
                   size="sm"
                   onClick={() => {
-                    // Preview: open in new tab
+                    // Preview: open PDF via anchor click (works on mobile Safari which blocks window.open)
                     axios.get(`${API}/users/resume/download?theme=${resumeTheme}`, {
                       headers: { Authorization: `Bearer ${token}` },
                       responseType: 'blob'
                     }).then(res => {
                       const url = window.URL.createObjectURL(new Blob([res.data], { type: 'application/pdf' }));
-                      window.open(url, '_blank');
+                      const link = document.createElement('a');
+                      link.href = url;
+                      link.target = '_blank';
+                      link.rel = 'noopener noreferrer';
+                      document.body.appendChild(link);
+                      link.click();
+                      document.body.removeChild(link);
                       setTimeout(() => window.URL.revokeObjectURL(url), 10000);
                     }).catch(() => toast.error('Failed to preview'));
                   }}

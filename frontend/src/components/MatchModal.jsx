@@ -248,7 +248,7 @@ export default function MatchModal({ match, onClose, onMessage, userRole = 'seek
             initial={{ y: 20, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             transition={{ delay: 0.6 }}
-            className="flex gap-3"
+            className="flex flex-col-reverse sm:flex-row gap-3 w-full"
           >
             <Button
               variant="outline"
