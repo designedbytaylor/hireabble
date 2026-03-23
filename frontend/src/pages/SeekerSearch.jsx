@@ -1,0 +1,474 @@
+import { useState, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
+import {
+  Search, MapPin, DollarSign, Briefcase, Filter, X, ChevronDown,
+  CheckCircle, Bookmark, Zap, Building2, ArrowRight, Loader2
+} from 'lucide-react';
+import { Button } from '../components/ui/button';
+import { Input } from '../components/ui/input';
+import axios from 'axios';
+import { useAuth } from '../context/AuthContext';
+import { toast } from 'sonner';
+import Navigation from '../components/Navigation';
+import useDocumentTitle from '../hooks/useDocumentTitle';
+
+const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
+
+function formatSalary(min, max) {
+  if (!min && !max) return null;
+  const fmt = (n) => n >= 1000 ? `$${Math.round(n / 1000)}k` : `$${n}`;
+  if (min && max) return `${fmt(min)} – ${fmt(max)}`;
+  if (min) return `${fmt(min)}+`;
+  return `Up to ${fmt(max)}`;
+}
+
+const WORK_TYPES = [
+  { key: 'remote', label: 'Remote' },
+  { key: 'hybrid', label: 'Hybrid' },
+  { key: 'onsite', label: 'On-site' },
+];
+
+const EXPERIENCE_LEVELS = [
+  { key: 'entry', label: 'Entry Level' },
+  { key: 'mid', label: 'Mid Level' },
+  { key: 'senior', label: 'Senior' },
+  { key: 'lead', label: 'Lead / Manager' },
+];
+
+const EMPLOYMENT_TYPES = [
+  { key: 'full-time', label: 'Full-time' },
+  { key: 'part-time', label: 'Part-time' },
+  { key: 'contract', label: 'Contract' },
+];
+
+const SALARY_RANGES = [
+  { key: '50000', label: '$50k+' },
+  { key: '80000', label: '$80k+' },
+  { key: '100000', label: '$100k+' },
+  { key: '120000', label: '$120k+' },
+  { key: '150000', label: '$150k+' },
+  { key: '200000', label: '$200k+' },
+];
+
+export default function SeekerSearch() {
+  useDocumentTitle('Search Jobs');
+  const navigate = useNavigate();
+  const { token } = useAuth();
+
+  const [keyword, setKeyword] = useState('');
+  const [location, setLocation] = useState('');
+  const [jobType, setJobType] = useState('');
+  const [experienceLevel, setExperienceLevel] = useState('');
+  const [employmentType, setEmploymentType] = useState('');
+  const [salaryMin, setSalaryMin] = useState('');
+  const [showFilters, setShowFilters] = useState(false);
+
+  const [results, setResults] = useState(null); // null = not searched yet
+  const [loading, setLoading] = useState(false);
+  const [hasSearched, setHasSearched] = useState(false);
+
+  const activeFilterCount = [jobType, experienceLevel, employmentType, salaryMin, location].filter(Boolean).length;
+
+  const handleSearch = useCallback(async () => {
+    setLoading(true);
+    setHasSearched(true);
+    try {
+      const params = new URLSearchParams();
+      if (keyword.trim()) params.append('search', keyword.trim());
+      if (location.trim()) params.append('location', location.trim());
+      if (jobType) params.append('job_type', jobType);
+      if (experienceLevel) params.append('experience_level', experienceLevel);
+      if (employmentType) params.append('employment_type', employmentType);
+      if (salaryMin) params.append('salary_min', salaryMin);
+      params.append('include_swiped', 'true'); // Show all matching jobs in search
+      params.append('limit', '50');
+
+      const res = await axios.get(`${API}/jobs?${params.toString()}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setResults(res.data);
+    } catch {
+      toast.error('Search failed. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  }, [keyword, location, jobType, experienceLevel, employmentType, salaryMin, token]);
+
+  const clearFilters = () => {
+    setJobType('');
+    setExperienceLevel('');
+    setEmploymentType('');
+    setSalaryMin('');
+    setLocation('');
+  };
+
+  const handleSwipeResults = () => {
+    // Navigate to dashboard with search filters applied
+    const params = new URLSearchParams();
+    if (keyword.trim()) params.append('keyword', keyword.trim());
+    if (location.trim()) params.append('location', location.trim());
+    if (jobType) params.append('job_type', jobType);
+    if (experienceLevel) params.append('experience_level', experienceLevel);
+    if (employmentType) params.append('employment_type', employmentType);
+    if (salaryMin) params.append('salary_min', salaryMin);
+    navigate(`/dashboard?${params.toString()}`);
+  };
+
+  const handleApply = async (jobId) => {
+    try {
+      await axios.post(`${API}/swipe`, { job_id: jobId, action: 'like' }, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setResults(prev => prev?.map(j => j.id === jobId ? { ...j, _applied: true } : j));
+      toast.success('Applied!');
+    } catch (err) {
+      const detail = err.response?.data?.detail || '';
+      if (detail.toLowerCase().includes('already swiped')) {
+        setResults(prev => prev?.map(j => j.id === jobId ? { ...j, _applied: true } : j));
+        toast.info('Already applied');
+      } else {
+        toast.error(detail || 'Failed to apply');
+      }
+    }
+  };
+
+  const handleSave = async (jobId) => {
+    try {
+      await axios.post(`${API}/jobs/${jobId}/save`, {}, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setResults(prev => prev?.map(j => j.id === jobId ? { ...j, _saved: true } : j));
+      toast.success('Saved for later');
+    } catch {
+      toast.error('Failed to save');
+    }
+  };
+
+  // Build active filter summary
+  const filterSummary = [];
+  if (keyword.trim()) filterSummary.push(keyword.trim());
+  if (jobType) filterSummary.push(WORK_TYPES.find(w => w.key === jobType)?.label);
+  if (experienceLevel) filterSummary.push(EXPERIENCE_LEVELS.find(e => e.key === experienceLevel)?.label);
+  if (employmentType) filterSummary.push(EMPLOYMENT_TYPES.find(e => e.key === employmentType)?.label);
+  if (salaryMin) filterSummary.push(SALARY_RANGES.find(s => s.key === salaryMin)?.label);
+  if (location.trim()) filterSummary.push(location.trim());
+
+  return (
+    <div className="min-h-screen bg-background pb-24">
+      {/* Background */}
+      <div className="fixed inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute top-0 left-1/4 w-64 h-64 sm:w-96 sm:h-96 bg-primary/10 rounded-full blur-3xl" />
+        <div className="absolute bottom-0 right-1/4 w-64 h-64 sm:w-96 sm:h-96 bg-secondary/10 rounded-full blur-3xl" />
+      </div>
+
+      <main className="relative z-10 max-w-lg mx-auto px-4 pt-14">
+        {/* Header */}
+        <div className="mb-6">
+          <h1 className="text-2xl font-bold font-['Outfit'] mb-1">Search Jobs</h1>
+          <p className="text-sm text-muted-foreground">Find specific roles that match what you're looking for</p>
+        </div>
+
+        {/* Search Bar */}
+        <div className="flex gap-2 mb-4">
+          <div className="flex-1 relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Input
+              value={keyword}
+              onChange={(e) => setKeyword(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+              placeholder="Job title, company, or keyword..."
+              className="pl-10 h-12 rounded-xl bg-card border-border"
+            />
+          </div>
+          <Button
+            onClick={handleSearch}
+            disabled={loading}
+            className="h-12 px-5 rounded-xl bg-gradient-to-r from-primary to-secondary"
+          >
+            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
+          </Button>
+        </div>
+
+        {/* Filter Toggle */}
+        <div className="flex items-center gap-2 mb-4">
+          <button
+            onClick={() => setShowFilters(!showFilters)}
+            className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium transition-all ${
+              showFilters || activeFilterCount > 0
+                ? 'bg-primary/20 text-primary border border-primary/30'
+                : 'bg-card border border-border text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            <Filter className="w-3.5 h-3.5" />
+            Filters {activeFilterCount > 0 && `(${activeFilterCount})`}
+          </button>
+
+          {activeFilterCount > 0 && (
+            <button
+              onClick={clearFilters}
+              className="flex items-center gap-1 px-2 py-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <X className="w-3 h-3" /> Clear all
+            </button>
+          )}
+
+          {/* Active filter chips */}
+          {filterSummary.length > 0 && !showFilters && (
+            <div className="flex gap-1.5 overflow-x-auto">
+              {filterSummary.map((f, i) => (
+                <span key={i} className="px-2 py-1 rounded-full bg-primary/10 text-primary text-[11px] whitespace-nowrap">
+                  {f}
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Filters Panel */}
+        {showFilters && (
+          <div className="glass-card rounded-2xl p-4 mb-4 space-y-4">
+            {/* Location */}
+            <div className="space-y-1.5">
+              <label className="text-xs text-muted-foreground font-medium">Location</label>
+              <div className="relative">
+                <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+                <Input
+                  value={location}
+                  onChange={(e) => setLocation(e.target.value)}
+                  placeholder="City, state, or remote..."
+                  className="pl-9 h-10 rounded-xl bg-background border-border text-sm"
+                />
+              </div>
+            </div>
+
+            {/* Work Type */}
+            <div className="space-y-1.5">
+              <label className="text-xs text-muted-foreground font-medium">Work Type</label>
+              <div className="flex gap-2">
+                {WORK_TYPES.map(wt => (
+                  <button
+                    key={wt.key}
+                    onClick={() => setJobType(jobType === wt.key ? '' : wt.key)}
+                    className={`flex-1 py-2 rounded-xl text-xs font-medium transition-all ${
+                      jobType === wt.key
+                        ? 'bg-primary/20 text-primary border border-primary/30'
+                        : 'bg-background border border-border text-muted-foreground hover:text-foreground'
+                    }`}
+                  >
+                    {wt.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Experience Level */}
+            <div className="space-y-1.5">
+              <label className="text-xs text-muted-foreground font-medium">Experience Level</label>
+              <div className="flex gap-2 flex-wrap">
+                {EXPERIENCE_LEVELS.map(el => (
+                  <button
+                    key={el.key}
+                    onClick={() => setExperienceLevel(experienceLevel === el.key ? '' : el.key)}
+                    className={`px-3 py-2 rounded-xl text-xs font-medium transition-all ${
+                      experienceLevel === el.key
+                        ? 'bg-primary/20 text-primary border border-primary/30'
+                        : 'bg-background border border-border text-muted-foreground hover:text-foreground'
+                    }`}
+                  >
+                    {el.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Employment Type */}
+            <div className="space-y-1.5">
+              <label className="text-xs text-muted-foreground font-medium">Employment Type</label>
+              <div className="flex gap-2">
+                {EMPLOYMENT_TYPES.map(et => (
+                  <button
+                    key={et.key}
+                    onClick={() => setEmploymentType(employmentType === et.key ? '' : et.key)}
+                    className={`flex-1 py-2 rounded-xl text-xs font-medium transition-all ${
+                      employmentType === et.key
+                        ? 'bg-primary/20 text-primary border border-primary/30'
+                        : 'bg-background border border-border text-muted-foreground hover:text-foreground'
+                    }`}
+                  >
+                    {et.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Salary Min */}
+            <div className="space-y-1.5">
+              <label className="text-xs text-muted-foreground font-medium">Minimum Salary</label>
+              <div className="flex gap-2 flex-wrap">
+                {SALARY_RANGES.map(sr => (
+                  <button
+                    key={sr.key}
+                    onClick={() => setSalaryMin(salaryMin === sr.key ? '' : sr.key)}
+                    className={`px-3 py-2 rounded-xl text-xs font-medium transition-all ${
+                      salaryMin === sr.key
+                        ? 'bg-green-500/20 text-green-400 border border-green-500/30'
+                        : 'bg-background border border-border text-muted-foreground hover:text-foreground'
+                    }`}
+                  >
+                    {sr.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <Button
+              onClick={() => { setShowFilters(false); handleSearch(); }}
+              className="w-full h-10 rounded-xl bg-gradient-to-r from-primary to-secondary text-sm"
+            >
+              <Search className="w-4 h-4 mr-1.5" /> Search with Filters
+            </Button>
+          </div>
+        )}
+
+        {/* Results */}
+        {loading ? (
+          <div className="flex flex-col items-center justify-center py-20">
+            <Loader2 className="w-8 h-8 text-primary animate-spin mb-3" />
+            <p className="text-sm text-muted-foreground">Searching jobs...</p>
+          </div>
+        ) : results === null && !hasSearched ? (
+          /* Initial state — suggestions */
+          <div className="text-center py-16">
+            <Search className="w-16 h-16 text-muted-foreground/20 mx-auto mb-4" />
+            <h3 className="text-lg font-semibold mb-2">Find your next role</h3>
+            <p className="text-sm text-muted-foreground mb-6">Search by job title, company, skills, or location</p>
+            <div className="flex flex-wrap gap-2 justify-center">
+              {['Software Engineer', 'Marketing', 'Remote', 'Design', 'Data Science'].map(s => (
+                <button
+                  key={s}
+                  onClick={() => { setKeyword(s); }}
+                  className="px-3 py-1.5 rounded-full bg-card border border-border text-xs text-muted-foreground hover:text-primary hover:border-primary/30 transition-colors"
+                >
+                  {s}
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : results?.length === 0 ? (
+          /* No results */
+          <div className="text-center py-16">
+            <Search className="w-16 h-16 text-muted-foreground/20 mx-auto mb-4" />
+            <h3 className="text-lg font-semibold mb-2">No jobs found</h3>
+            <p className="text-sm text-muted-foreground mb-4">Try adjusting your filters or broadening your search</p>
+            <div className="flex gap-3 justify-center">
+              <Button variant="outline" onClick={clearFilters} className="rounded-xl text-sm">
+                Clear Filters
+              </Button>
+              <Button onClick={() => navigate('/dashboard')} className="rounded-xl text-sm bg-gradient-to-r from-primary to-secondary">
+                Browse All Jobs
+              </Button>
+            </div>
+          </div>
+        ) : results?.length > 0 ? (
+          <>
+            {/* Results header */}
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-sm text-muted-foreground">
+                {results.length} result{results.length !== 1 ? 's' : ''} found
+              </p>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleSwipeResults}
+                className="rounded-xl text-xs border-primary/30 text-primary hover:bg-primary/10"
+              >
+                <ArrowRight className="w-3.5 h-3.5 mr-1" /> Swipe Results
+              </Button>
+            </div>
+
+            {/* Results list */}
+            <div className="space-y-3">
+              {results.map(job => (
+                <div key={job.id} className="glass-card rounded-2xl p-4 hover:border-primary/20 transition-colors">
+                  <div className="flex items-start gap-3">
+                    <div className="w-12 h-12 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center shrink-0 overflow-hidden">
+                      {job.company_logo ? (
+                        <img src={job.company_logo} alt="" className="w-full h-full object-cover" />
+                      ) : (
+                        <Building2 className="w-5 h-5 text-primary" />
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-semibold text-foreground truncate">{job.title}</h3>
+                      <p className="text-sm text-muted-foreground">{job.company}</p>
+                      <div className="flex flex-wrap gap-x-3 gap-y-1 mt-1.5">
+                        {job.location && (
+                          <span className="text-xs text-muted-foreground flex items-center gap-1">
+                            <MapPin className="w-3 h-3" /> {job.location}
+                          </span>
+                        )}
+                        {formatSalary(job.salary_min, job.salary_max) && (
+                          <span className="text-xs text-green-500 flex items-center gap-1">
+                            <DollarSign className="w-3 h-3" /> {formatSalary(job.salary_min, job.salary_max)}
+                          </span>
+                        )}
+                        {job.job_type && (
+                          <span className="text-xs text-muted-foreground capitalize">{job.job_type}</span>
+                        )}
+                        {job.employment_type && (
+                          <span className="text-xs text-muted-foreground capitalize">{job.employment_type}</span>
+                        )}
+                      </div>
+                      {job.match_score > 0 && (
+                        <div className="mt-1.5">
+                          <span className={`text-[11px] font-medium px-2 py-0.5 rounded-full ${
+                            job.match_score >= 75 ? 'bg-green-500/10 text-green-400'
+                            : job.match_score >= 50 ? 'bg-primary/10 text-primary'
+                            : 'bg-muted text-muted-foreground'
+                          }`}>
+                            Fit Score: {job.match_score}%
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Actions */}
+                  <div className="flex items-center gap-2 mt-3 pt-3 border-t border-border">
+                    {job._applied ? (
+                      <span className="flex-1 flex items-center justify-center gap-1.5 text-xs text-success font-medium py-2 rounded-xl bg-success/10">
+                        <CheckCircle className="w-3.5 h-3.5" /> Applied
+                      </span>
+                    ) : (
+                      <button
+                        onClick={() => handleApply(job.id)}
+                        className="flex-1 flex items-center justify-center gap-1.5 text-xs font-medium py-2 rounded-xl bg-gradient-to-r from-primary to-secondary text-white hover:opacity-90 transition-opacity"
+                      >
+                        <CheckCircle className="w-3.5 h-3.5" /> Apply
+                      </button>
+                    )}
+                    {job._saved ? (
+                      <span className="p-2 rounded-xl bg-primary/10 text-primary">
+                        <Bookmark className="w-3.5 h-3.5 fill-current" />
+                      </span>
+                    ) : (
+                      <button
+                        onClick={() => handleSave(job.id)}
+                        className="p-2 rounded-xl border border-border text-muted-foreground hover:text-primary hover:border-primary/30 transition-colors"
+                        title="Save for later"
+                      >
+                        <Bookmark className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </>
+        ) : null}
+      </main>
+
+      <Navigation />
+    </div>
+  );
+}

@@ -31,6 +31,8 @@ const prefetchRoute = (path, token) => {
     axios.get(`${API}/matches`, opts).catch(() => {});
   } else if (path === '/applied') {
     axios.get(`${API}/applications/seeker`, opts).catch(() => {});
+  } else if (path === '/search') {
+    // No prefetch needed — search is on-demand
   } else if (path === '/saved') {
     axios.get(`${API}/jobs/saved`, opts).catch(() => {});
   }
@@ -77,9 +79,9 @@ export default memo(function Navigation() {
       path: isSeeker ? '/dashboard' : '/recruiter'
     },
     ...(isSeeker ? [{
-      icon: Bookmark,
-      label: 'Saved',
-      path: '/saved'
+      icon: Search,
+      label: 'Search',
+      path: '/search'
     }, {
       icon: Briefcase,
       label: 'Applied',

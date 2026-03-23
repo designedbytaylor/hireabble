@@ -33,6 +33,7 @@ const InterviewScheduler = React.lazy(() => import("./pages/InterviewScheduler")
 const RecruiterAnalytics = React.lazy(() => import("./pages/RecruiterAnalytics"));
 const AppliedJobs = React.lazy(() => import("./pages/AppliedJobs"));
 const SavedJobs = React.lazy(() => import("./pages/SavedJobs"));
+const SeekerSearch = React.lazy(() => import("./pages/SeekerSearch"));
 // SearchJobs removed — search replaced by swipe filters on dashboard
 const RecruiterApplications = React.lazy(() => import("./pages/RecruiterApplications"));
 const Messages = React.lazy(() => import("./pages/Messages"));
@@ -376,7 +377,14 @@ function AppRoutes() {
           </ProtectedRoute>
         }
       />
-      {/* /search route removed — swipe dashboard filters replace search */}
+      <Route
+        path="/search"
+        element={
+          <ProtectedRoute allowedRoles={['seeker']}>
+            <SeekerSearch />
+          </ProtectedRoute>
+        }
+      />
       <Route
         path="/profile-viewers"
         element={
