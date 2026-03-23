@@ -48,7 +48,7 @@ def get_match_email_html(job_title: str, company: str, other_name: str, is_seeke
     safe_other_name = escape_html(other_name)
     if is_seeker:
         message = f"Great news! {safe_company} is interested in your application for the {safe_job_title} position."
-        cta_text = "View Match"
+        cta_text = "View Connection"
     else:
         message = f"{safe_other_name} has applied to your {safe_job_title} position at {safe_company}."
         cta_text = "View Applicant"

@@ -860,11 +860,13 @@ export default function RecruiterDashboard() {
         jobApplications={jobApplications}
         onViewCandidate={(app) => { setSelectedJob(null); setSelectedCandidate(app); }}
         onRespond={handleRespondToApplication}
+        subscription={subscription}
+        unlockedAppIds={unlockedAppIds.current}
       />
 
       {/* Candidate Detail Dialog */}
       <Dialog open={!!selectedCandidate} onOpenChange={() => setSelectedCandidate(null)}>
-        <DialogContent className="max-w-md bg-card border-border">
+        <DialogContent className="max-w-md bg-card border-border max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="font-['Outfit']">Candidate Profile</DialogTitle>
           </DialogHeader>
@@ -1964,7 +1966,7 @@ function JobFormDialog({ open, onClose, onSuccess, token, company, job = null, i
   );
 }
 
-function JobApplicationsDialog({ selectedJob, onClose, jobApplications, onViewCandidate, onRespond }) {
+function JobApplicationsDialog({ selectedJob, onClose, jobApplications, onViewCandidate, onRespond, subscription, unlockedAppIds }) {
   const [filter, setFilter] = useState('all'); // 'all', 'pending', 'superlike', 'matched', 'declined'
   const [bulkConfirm, setBulkConfirm] = useState(null); // 'accept' | 'decline' | null
 
@@ -2051,9 +2053,16 @@ function JobApplicationsDialog({ selectedJob, onClose, jobApplications, onViewCa
 
         <div className="max-h-[55vh] overflow-y-auto space-y-3">
           {filteredApps.length > 0 ? (
-            filteredApps.map((app) => (
-              <div
+            filteredApps.map((app) => {
+              const isLocked = !app.recruiter_action && !subscription?.subscribed && unlockedAppIds && !unlockedAppIds.has(app.id);
+              return (
+              <PremiumBlur
                 key={app.id}
+                isUnlocked={!isLocked}
+                tierHint="recruiter_pro"
+                trigger="blurred"
+              >
+              <div
                 className="p-4 rounded-xl bg-background border border-border cursor-pointer hover:border-primary/30 transition-colors"
                 onClick={() => onViewCandidate(app)}
               >
@@ -2118,7 +2127,9 @@ function JobApplicationsDialog({ selectedJob, onClose, jobApplications, onViewCa
                   )}
                 </div>
               </div>
-            ))
+              </PremiumBlur>
+              );
+            })
           ) : (
             <div className="text-center py-8">
               <Users className="w-12 h-12 text-muted-foreground mx-auto mb-3" />
