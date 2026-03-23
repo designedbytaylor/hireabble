@@ -188,6 +188,20 @@ export default function SeekerDashboard() {
   const uidRef = useRef(uid);
   uidRef.current = uid;
   const [filters, setFilters] = useState(() => {
+    // Check URL params first (from Search page "Swipe Results")
+    const urlKw = searchParams.get('keyword');
+    const urlLoc = searchParams.get('location');
+    const urlJt = searchParams.get('job_type');
+    const urlEl = searchParams.get('experience_level');
+    const urlEt = searchParams.get('employment_type');
+    const urlSm = searchParams.get('salary_min');
+    if (urlKw || urlLoc || urlJt || urlEl || urlEt || urlSm) {
+      return {
+        job_type: urlJt || '', experience_level: urlEl || '', salary_min: urlSm || '',
+        location: urlLoc || '', remote_only: false, category: '', employment_type: urlEt || '',
+        keyword: urlKw || ''
+      };
+    }
     try {
       const saved = localStorage.getItem(storageKey(uid, 'job_filters'));
       return saved ? JSON.parse(saved) : {
@@ -202,6 +216,8 @@ export default function SeekerDashboard() {
   const [activeFiltersCount, setActiveFiltersCount] = useState(0);
   const [detectingLocation, setDetectingLocation] = useState(false);
   const [filterKeyword, setFilterKeyword] = useState(() => {
+    const urlKw = searchParams.get('keyword');
+    if (urlKw) return urlKw;
     try {
       const saved = localStorage.getItem(storageKey(uid, 'job_filters'));
       return saved ? JSON.parse(saved).keyword || '' : '';
