@@ -637,30 +637,36 @@ async def get_profile_completeness(current_user: dict = Depends(get_current_user
         return cached
 
     fields_to_check = {
-        "name": 10,
-        "title": 15,
+        "photo_url": 12,
+        "name": 8,
+        "title": 12,
         "bio": 10,
-        "skills": 15,
-        "experience_years": 10,
-        "location": 10,
-        "photo_url": 15,
+        "skills": 12,
+        "experience_years": 8,
+        "location": 8,
         "school": 5,
         "degree": 5,
-        "current_employer": 5
+        "current_employer": 5,
+        "work_history": 5,
+        "interests": 5,
+        "certifications": 5,
     }
 
     # Friendly display names for missing fields
     field_labels = {
-        "name": "name",
-        "title": "job title",
-        "bio": "bio",
-        "skills": "skills",
-        "experience_years": "experience",
-        "location": "location",
-        "photo_url": "photo",
-        "school": "education",
-        "degree": "degree",
-        "current_employer": "employer"
+        "photo_url": "Profile photo",
+        "name": "Full name",
+        "title": "Job title",
+        "bio": "Professional summary",
+        "skills": "Skills",
+        "experience_years": "Years of experience",
+        "location": "Location",
+        "school": "School",
+        "degree": "Degree",
+        "current_employer": "Current employer",
+        "work_history": "Work history",
+        "interests": "Interests",
+        "certifications": "Certifications",
     }
 
     total = 0
@@ -672,7 +678,10 @@ async def get_profile_completeness(current_user: dict = Depends(get_current_user
             total += weight
         else:
             missing.append(field_labels.get(field, field))
-    
+
+    # Cap at 100
+    total = min(total, 100)
+
     result = {
         "percentage": total,
         "missing_fields": missing,
