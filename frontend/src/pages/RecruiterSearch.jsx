@@ -153,6 +153,7 @@ export default function RecruiterSearch() {
       const detail = error.response?.data?.detail || '';
       if (error.response?.status === 429) {
         setJobSelectorFor(null);
+        toast.error('Daily invite limit reached. Upgrade for more!');
         setShowUpgradeModal(true);
       } else if (detail.toLowerCase().includes('already')) {
         toast.info('Already invited this candidate for this role');
@@ -442,12 +443,12 @@ export default function RecruiterSearch() {
 
       <Navigation />
 
-      {showUpgradeModal && (
-        <UpgradeModal
-          trigger="super_swipes"
-          onClose={() => setShowUpgradeModal(false)}
-        />
-      )}
+      <UpgradeModal
+        open={showUpgradeModal}
+        trigger="invite_limit"
+        highlightTier="recruiter_pro"
+        onClose={() => setShowUpgradeModal(false)}
+      />
     </div>
   );
 }
