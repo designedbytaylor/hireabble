@@ -1,20 +1,16 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import {
   DndContext,
   DragOverlay,
   PointerSensor,
   useSensor,
   useSensors,
-  closestCorners,
+  useDroppable,
+  useDraggable,
+  rectIntersection,
 } from '@dnd-kit/core';
 import {
-  SortableContext,
-  verticalListSortingStrategy,
-  useSortable,
-} from '@dnd-kit/sortable';
-import { CSS } from '@dnd-kit/utilities';
-import {
-  Briefcase, MapPin, Rocket, MessageSquare, Calendar,
+  Briefcase, MapPin, MessageSquare,
   Eye, X, ChevronDown, ChevronUp,
 } from 'lucide-react';
 import { getPhotoUrl } from '../utils/helpers';
@@ -30,28 +26,14 @@ const REJECTED_STAGE = { key: 'declined', label: 'Rejected', color: 'border-red-
 
 // Draggable candidate card
 function DraggableCard({ app, onViewProfile, onMessage, onReject, getStage, showJobTitle }) {
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({ id: app.id, data: { stage: getStage(app) } });
-
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-    opacity: isDragging ? 0.4 : 1,
-  };
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: app.id });
 
   return (
     <div
       ref={setNodeRef}
-      style={style}
       {...attributes}
       {...listeners}
-      className="glass-card rounded-xl p-3 cursor-grab active:cursor-grabbing hover:border-primary/20 transition-colors group"
+      className={`glass-card rounded-xl p-3 cursor-grab active:cursor-grabbing hover:border-primary/20 transition-colors group touch-none ${isDragging ? 'opacity-30' : ''}`}
     >
       <div className="flex items-start gap-3">
         <img
@@ -133,7 +115,7 @@ function DraggableCard({ app, onViewProfile, onMessage, onReject, getStage, show
 // Static card for the drag overlay
 function CardOverlay({ app, showJobTitle }) {
   return (
-    <div className="glass-card rounded-xl p-3 border-primary/40 shadow-lg shadow-primary/10 w-[260px]">
+    <div className="glass-card rounded-xl p-3 border-primary/40 shadow-lg shadow-primary/10 w-[260px] rotate-2">
       <div className="flex items-start gap-3">
         <img
           src={getPhotoUrl(app.seeker_photo || app.seeker_avatar, app.seeker_name || app.seeker_id)}
@@ -161,12 +143,15 @@ function CardOverlay({ app, showJobTitle }) {
   );
 }
 
-// Kanban column - acts as droppable container
-function KanbanColumn({ stage, apps, getStage, onViewProfile, onMessage, onReject, showJobTitle }) {
-  const appIds = apps.map(a => a.id);
+// Droppable column
+function KanbanColumn({ stage, apps, getStage, onViewProfile, onMessage, onReject, showJobTitle, isOver }) {
+  const { setNodeRef } = useDroppable({ id: stage.key });
 
   return (
-    <div className={`flex flex-col min-w-[280px] max-w-[300px] rounded-2xl border ${stage.color} bg-card/50 flex-shrink-0`}>
+    <div
+      ref={setNodeRef}
+      className={`flex flex-col min-w-[280px] max-w-[300px] rounded-2xl border ${stage.color} bg-card/50 flex-shrink-0 transition-colors ${isOver ? 'border-primary/60 bg-primary/5' : ''}`}
+    >
       {/* Column header */}
       <div className={`px-4 py-3 rounded-t-2xl ${stage.headerBg} flex items-center gap-2`}>
         <div className={`w-2 h-2 rounded-full ${stage.dotColor}`} />
@@ -175,27 +160,25 @@ function KanbanColumn({ stage, apps, getStage, onViewProfile, onMessage, onRejec
       </div>
 
       {/* Cards container */}
-      <SortableContext items={appIds} strategy={verticalListSortingStrategy}>
-        <div className="flex-1 p-2 space-y-2 overflow-y-auto max-h-[calc(100vh-320px)] min-h-[100px]">
-          {apps.length === 0 ? (
-            <div className="py-8 text-center text-xs text-muted-foreground">
-              No candidates
-            </div>
-          ) : (
-            apps.map(app => (
-              <DraggableCard
-                key={app.id}
-                app={app}
-                getStage={getStage}
-                onViewProfile={onViewProfile}
-                onMessage={onMessage}
-                onReject={onReject}
-                showJobTitle={showJobTitle}
-              />
-            ))
-          )}
-        </div>
-      </SortableContext>
+      <div className="flex-1 p-2 space-y-2 overflow-y-auto max-h-[calc(100vh-320px)] min-h-[100px]">
+        {apps.length === 0 ? (
+          <div className={`py-8 text-center text-xs text-muted-foreground ${isOver ? 'text-primary' : ''}`}>
+            {isOver ? 'Drop here' : 'No candidates'}
+          </div>
+        ) : (
+          apps.map(app => (
+            <DraggableCard
+              key={app.id}
+              app={app}
+              getStage={getStage}
+              onViewProfile={onViewProfile}
+              onMessage={onMessage}
+              onReject={onReject}
+              showJobTitle={showJobTitle}
+            />
+          ))
+        )}
+      </div>
     </div>
   );
 }
@@ -210,14 +193,16 @@ export default function PipelineKanban({
 }) {
   const [showRejected, setShowRejected] = useState(false);
   const [activeId, setActiveId] = useState(null);
+  const [overColumnId, setOverColumnId] = useState(null);
 
   const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 8 } })
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
   );
 
   // Group apps by stage
   const columns = {};
-  for (const stage of [...KANBAN_STAGES, REJECTED_STAGE]) {
+  const allStages = [...KANBAN_STAGES, REJECTED_STAGE];
+  for (const stage of allStages) {
     columns[stage.key] = [];
   }
   for (const app of applications) {
@@ -231,47 +216,53 @@ export default function PipelineKanban({
 
   const activeApp = activeId ? applications.find(a => a.id === activeId) : null;
 
-  const handleDragStart = (event) => {
-    setActiveId(event.active.id);
-  };
+  const resolveDropColumn = useCallback((overId) => {
+    if (!overId) return null;
+    // Direct column drop
+    if (allStages.some(s => s.key === overId)) return overId;
+    // Dropped on a card — find which column it belongs to
+    for (const [stageKey, apps] of Object.entries(columns)) {
+      if (apps.some(a => a.id === overId)) return stageKey;
+    }
+    return null;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [applications]);
 
-  const handleDragEnd = (event) => {
-    setActiveId(null);
+  const handleDragStart = useCallback((event) => {
+    setActiveId(event.active.id);
+  }, []);
+
+  const handleDragOver = useCallback((event) => {
+    const col = resolveDropColumn(event.over?.id);
+    setOverColumnId(col);
+  }, [resolveDropColumn]);
+
+  const handleDragEnd = useCallback((event) => {
     const { active, over } = event;
+    setActiveId(null);
+    setOverColumnId(null);
     if (!over) return;
 
     const activeAppItem = applications.find(a => a.id === active.id);
     if (!activeAppItem) return;
 
-    // Determine the target stage
-    let targetStage = null;
-
-    // Check if dropped over a card — get that card's stage
-    const overApp = applications.find(a => a.id === over.id);
-    if (overApp) {
-      targetStage = getStage(overApp);
-    }
-
-    // If dropped over a column container (the SortableContext id matches a stage key)
-    if (!targetStage && KANBAN_STAGES.concat(REJECTED_STAGE).some(s => s.key === over.id)) {
-      targetStage = over.id;
-    }
-
+    const targetStage = resolveDropColumn(over.id);
     if (!targetStage) return;
 
     const currentStage = getStage(activeAppItem);
     if (currentStage === targetStage) return;
 
     updateStage(active.id, targetStage);
-  };
+  }, [applications, getStage, updateStage, resolveDropColumn]);
 
-  const handleDragOver = (event) => {
-    // Allow items to be dragged between columns
-  };
+  const handleDragCancel = useCallback(() => {
+    setActiveId(null);
+    setOverColumnId(null);
+  }, []);
 
-  const handleReject = (app) => {
+  const handleReject = useCallback((app) => {
     updateStage(app.id, 'declined');
-  };
+  }, [updateStage]);
 
   const visibleStages = showRejected ? [...KANBAN_STAGES, REJECTED_STAGE] : KANBAN_STAGES;
   const rejectedCount = columns.declined?.length || 0;
@@ -280,10 +271,11 @@ export default function PipelineKanban({
     <div className="relative z-10">
       <DndContext
         sensors={sensors}
-        collisionDetection={closestCorners}
+        collisionDetection={rectIntersection}
         onDragStart={handleDragStart}
-        onDragEnd={handleDragEnd}
         onDragOver={handleDragOver}
+        onDragEnd={handleDragEnd}
+        onDragCancel={handleDragCancel}
       >
         <div className="flex gap-4 overflow-x-auto pb-4 px-6 md:px-8">
           {visibleStages.map(stage => (
@@ -296,11 +288,12 @@ export default function PipelineKanban({
               onMessage={onMessage}
               onReject={handleReject}
               showJobTitle={showJobTitle}
+              isOver={overColumnId === stage.key}
             />
           ))}
         </div>
 
-        <DragOverlay>
+        <DragOverlay dropAnimation={null}>
           {activeApp ? <CardOverlay app={activeApp} showJobTitle={showJobTitle} /> : null}
         </DragOverlay>
       </DndContext>
