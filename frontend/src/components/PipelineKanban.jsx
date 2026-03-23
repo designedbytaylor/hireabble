@@ -14,6 +14,7 @@ import {
   Eye, X, ChevronDown, ChevronUp,
 } from 'lucide-react';
 import { getPhotoUrl } from '../utils/helpers';
+import { PremiumBlur } from './UpgradeModal';
 
 const KANBAN_STAGES = [
   { key: 'applied', label: 'Applied', color: 'border-blue-500/40', headerBg: 'bg-blue-500/10', headerText: 'text-blue-400', dotColor: 'bg-blue-500' },
@@ -144,7 +145,7 @@ function CardOverlay({ app, showJobTitle }) {
 }
 
 // Droppable column
-function KanbanColumn({ stage, apps, getStage, onViewProfile, onMessage, onReject, showJobTitle, isOver }) {
+function KanbanColumn({ stage, apps, getStage, onViewProfile, onMessage, onReject, showJobTitle, isOver, subscription, unlockedAppIds }) {
   const { setNodeRef } = useDroppable({ id: stage.key });
 
   return (
@@ -166,17 +167,26 @@ function KanbanColumn({ stage, apps, getStage, onViewProfile, onMessage, onRejec
             {isOver ? 'Drop here' : 'No candidates'}
           </div>
         ) : (
-          apps.map(app => (
-            <DraggableCard
-              key={app.id}
-              app={app}
-              getStage={getStage}
-              onViewProfile={onViewProfile}
-              onMessage={onMessage}
-              onReject={onReject}
-              showJobTitle={showJobTitle}
-            />
-          ))
+          apps.map(app => {
+            const isLocked = stage.key === 'applied' && !subscription?.subscribed && unlockedAppIds && !unlockedAppIds.has(app.id);
+            return (
+              <PremiumBlur
+                key={app.id}
+                isUnlocked={!isLocked}
+                tierHint="recruiter_pro"
+                trigger="pipeline_blur"
+              >
+                <DraggableCard
+                  app={app}
+                  getStage={getStage}
+                  onViewProfile={onViewProfile}
+                  onMessage={onMessage}
+                  onReject={onReject}
+                  showJobTitle={showJobTitle}
+                />
+              </PremiumBlur>
+            );
+          })
         )}
       </div>
     </div>
@@ -190,6 +200,8 @@ export default function PipelineKanban({
   onViewProfile,
   onMessage,
   showJobTitle,
+  subscription,
+  unlockedAppIds,
 }) {
   const [showRejected, setShowRejected] = useState(false);
   const [activeId, setActiveId] = useState(null);
@@ -289,6 +301,8 @@ export default function PipelineKanban({
               onReject={handleReject}
               showJobTitle={showJobTitle}
               isOver={overColumnId === stage.key}
+              subscription={subscription}
+              unlockedAppIds={unlockedAppIds}
             />
           ))}
         </div>

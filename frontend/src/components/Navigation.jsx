@@ -30,7 +30,8 @@ const prefetchRoute = (path, token) => {
   } else if (path === '/messages') {
     axios.get(`${API}/matches`, opts).catch(() => {});
   } else if (path === '/applied') {
-    axios.get(`${API}/applications/seeker`, opts).catch(() => {});
+    axios.get(`${API}/applications/mine`, opts).catch(() => {});
+    axios.get(`${API}/jobs/saved/list`, opts).catch(() => {});
   } else if (path === '/search') {
     // No prefetch needed — search is on-demand
   } else if (path === '/saved') {
@@ -84,7 +85,7 @@ export default memo(function Navigation() {
       path: '/search'
     }, {
       icon: Briefcase,
-      label: 'Applied',
+      label: 'Jobs',
       path: '/applied'
     }] : [{
       icon: Search,
