@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Users, Briefcase, Star, Check, X, Clock, ArrowLeft, Rocket,
@@ -24,6 +24,7 @@ import CandidateNotes from '../components/CandidateNotes';
 import { Skeleton } from '../components/ui/skeleton';
 import useDocumentTitle from '../hooks/useDocumentTitle';
 import PipelineKanban from '../components/PipelineKanban';
+import { PremiumBlur } from '../components/UpgradeModal';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -57,6 +58,16 @@ export default function RecruiterApplications() {
   const [interviews, setInterviews] = useState([]);
   const [jobs, setJobs] = useState([]);
   const [selectedJobId, setSelectedJobId] = useState('all');
+  const [subscription, setSubscription] = useState(null);
+  const unlockedAppIds = useRef(() => {
+    try {
+      const stored = sessionStorage.getItem('unlockedAppIds');
+      return stored ? new Set(JSON.parse(stored)) : new Set();
+    } catch { return new Set(); }
+  });
+  if (typeof unlockedAppIds.current === 'function') {
+    unlockedAppIds.current = unlockedAppIds.current();
+  }
 
   useEffect(() => {
     fetchApplications();
@@ -66,6 +77,19 @@ export default function RecruiterApplications() {
     // Fetch recruiter jobs for job filter
     axios.get(`${API}/jobs/recruiter`, { headers: { Authorization: `Bearer ${token}` } })
       .then(res => setJobs(res.data))
+      .catch(() => {});
+    // Fetch subscription status
+    axios.get(`${API}/recruiter/dashboard-data`, { headers: { Authorization: `Bearer ${token}` } })
+      .then(res => {
+        setSubscription(res.data.subscription);
+        // Snapshot first 3 unlocked IDs if we don't have any persisted
+        if (unlockedAppIds.current.size === 0) {
+          const pending = (res.data.applications || []).filter(a => !a.recruiter_action);
+          const ids = pending.slice(0, 3).map(a => a.id);
+          unlockedAppIds.current = new Set(ids);
+          try { sessionStorage.setItem('unlockedAppIds', JSON.stringify(ids)); } catch {}
+        }
+      })
       .catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -306,9 +330,17 @@ export default function RecruiterApplications() {
               </div>
             ) : (
               filtered.map((app) => {
+                const isAppliedStage = getStage(app) === 'applied';
+                const isLocked = isAppliedStage && !subscription?.subscribed && !unlockedAppIds.current.has(app.id);
+
                 return (
-                  <button
+                  <PremiumBlur
                     key={app.id}
+                    isUnlocked={!isLocked}
+                    tierHint="recruiter_pro"
+                    trigger="pipeline_blur"
+                  >
+                  <button
                     onClick={() => handleOpenApplicant(app)}
                     className="w-full glass-card rounded-2xl p-4 flex items-center gap-4 hover:border-primary/20 transition-colors cursor-pointer text-left"
                   >
@@ -366,6 +398,7 @@ export default function RecruiterApplications() {
                       <ChevronRight className="w-4 h-4 text-muted-foreground" />
                     </div>
                   </button>
+                  </PremiumBlur>
                 );
               })
             )}
@@ -380,6 +413,8 @@ export default function RecruiterApplications() {
           onViewProfile={handleOpenApplicant}
           onMessage={handleMessage}
           showJobTitle={showJobTitle}
+          subscription={subscription}
+          unlockedAppIds={unlockedAppIds.current}
         />
       )}
 

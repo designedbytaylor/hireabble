@@ -125,9 +125,14 @@ export default function RecruiterDashboard() {
   };
 
   const handleRespondToApplication = async (applicationId, action) => {
+    const optimisticUpdate = { recruiter_action: action === 'accept' ? 'accept' : 'reject', pipeline_stage: action === 'accept' ? 'shortlisted' : 'declined' };
     // Optimistic UI: update state immediately so the card moves/disappears instantly
     setApplications(prev => prev.map(a =>
-      a.id === applicationId ? { ...a, recruiter_action: action === 'accept' ? 'accept' : 'reject', pipeline_stage: action === 'accept' ? 'shortlisted' : 'declined' } : a
+      a.id === applicationId ? { ...a, ...optimisticUpdate } : a
+    ));
+    // Also update jobApplications so the job detail modal reflects changes instantly
+    setJobApplications(prev => prev.map(a =>
+      a.id === applicationId ? { ...a, ...optimisticUpdate } : a
     ));
     setStats(prev => ({
       ...prev,
@@ -158,6 +163,9 @@ export default function RecruiterDashboard() {
       toast.error('Failed to respond — reverting');
       // Revert optimistic update
       setApplications(prev => prev.map(a =>
+        a.id === applicationId ? { ...a, recruiter_action: null, pipeline_stage: 'applied' } : a
+      ));
+      setJobApplications(prev => prev.map(a =>
         a.id === applicationId ? { ...a, recruiter_action: null, pipeline_stage: 'applied' } : a
       ));
       setStats(prev => ({
