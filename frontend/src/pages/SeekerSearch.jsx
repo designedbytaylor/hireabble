@@ -1,9 +1,11 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Search, MapPin, DollarSign, Briefcase, Filter, X, ChevronDown,
-  CheckCircle, Bookmark, Zap, Building2, ArrowRight, Loader2
+  CheckCircle, Bookmark, Zap, Building2, ArrowRight, Loader2, Clock,
+  Sparkles, GraduationCap
 } from 'lucide-react';
+import { motion, AnimatePresence, useMotionValue, useTransform } from 'framer-motion';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import axios from 'axios';
@@ -66,6 +68,7 @@ export default function SeekerSearch() {
   const [results, setResults] = useState(null); // null = not searched yet
   const [loading, setLoading] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
+  const [selectedJob, setSelectedJob] = useState(null);
 
   const activeFilterCount = [jobType, experienceLevel, employmentType, salaryMin, location].filter(Boolean).length;
 
@@ -389,7 +392,11 @@ export default function SeekerSearch() {
             {/* Results list */}
             <div className="space-y-3">
               {results.map(job => (
-                <div key={job.id} className="glass-card rounded-2xl p-4 hover:border-primary/20 transition-colors">
+                <div
+                  key={job.id}
+                  className="glass-card rounded-2xl p-4 hover:border-primary/20 transition-colors cursor-pointer"
+                  onClick={() => setSelectedJob(job)}
+                >
                   <div className="flex items-start gap-3">
                     <div className="w-12 h-12 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center shrink-0 overflow-hidden">
                       {job.company_logo ? (
@@ -441,7 +448,7 @@ export default function SeekerSearch() {
                       </span>
                     ) : (
                       <button
-                        onClick={() => handleApply(job.id)}
+                        onClick={(e) => { e.stopPropagation(); handleApply(job.id); }}
                         className="flex-1 flex items-center justify-center gap-1.5 text-xs font-medium py-2 rounded-xl bg-gradient-to-r from-primary to-secondary text-white hover:opacity-90 transition-opacity"
                       >
                         <CheckCircle className="w-3.5 h-3.5" /> Apply
@@ -453,7 +460,7 @@ export default function SeekerSearch() {
                       </span>
                     ) : (
                       <button
-                        onClick={() => handleSave(job.id)}
+                        onClick={(e) => { e.stopPropagation(); handleSave(job.id); }}
                         className="p-2 rounded-xl border border-border text-muted-foreground hover:text-primary hover:border-primary/30 transition-colors"
                         title="Save for later"
                       >
@@ -468,7 +475,209 @@ export default function SeekerSearch() {
         ) : null}
       </main>
 
+      {/* Job Detail Modal */}
+      <AnimatePresence>
+        {selectedJob && (
+          <JobDetailModal
+            job={selectedJob}
+            onClose={() => setSelectedJob(null)}
+            onApply={(jobId) => { handleApply(jobId); setSelectedJob(s => s ? { ...s, _applied: true } : null); }}
+            onSave={(jobId) => { handleSave(jobId); setSelectedJob(s => s ? { ...s, _saved: true } : null); }}
+          />
+        )}
+      </AnimatePresence>
+
       <Navigation />
     </div>
+  );
+}
+
+function JobDetailModal({ job, onClose, onApply, onSave }) {
+  const scrollRef = useRef(null);
+  const [canDragDown, setCanDragDown] = useState(true);
+  const sheetY = useMotionValue(0);
+  const sheetOpacity = useTransform(sheetY, [0, 300], [1, 0]);
+
+  const handleScroll = () => {
+    if (scrollRef.current) {
+      setCanDragDown(scrollRef.current.scrollTop <= 0);
+    }
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 z-[100]"
+    >
+      {/* Backdrop */}
+      <motion.div
+        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+        onClick={onClose}
+      />
+
+      {/* Sheet */}
+      <motion.div
+        className="absolute bottom-0 left-0 right-0 bg-card rounded-t-3xl overflow-hidden"
+        style={{ y: sheetY, opacity: sheetOpacity, maxHeight: '90vh' }}
+        initial={{ y: '100%' }}
+        animate={{ y: 0 }}
+        exit={{ y: '100%' }}
+        transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+        drag={canDragDown ? "y" : false}
+        dragConstraints={{ top: 0, bottom: 300 }}
+        dragElastic={{ top: 0, bottom: 0.4 }}
+        onDragEnd={(_, info) => {
+          if (info.offset.y > 80 || info.velocity.y > 300) {
+            onClose();
+          }
+        }}
+      >
+        {/* Drag Handle */}
+        <div className="flex justify-center pt-3 pb-2 cursor-grab active:cursor-grabbing touch-none"
+          onPointerDown={() => setCanDragDown(true)}
+        >
+          <div className="w-10 h-1.5 rounded-full bg-muted-foreground/40" />
+        </div>
+
+        {/* Scrollable Content */}
+        <div ref={scrollRef} onScroll={handleScroll} className="overflow-y-auto px-6 pb-8" style={{ maxHeight: 'calc(90vh - 28px)' }}>
+          {/* Header */}
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-12 h-12 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center shrink-0 overflow-hidden">
+              {job.company_logo ? (
+                <img src={job.company_logo} alt={job.company} className="w-full h-full object-cover" />
+              ) : (
+                <Building2 className="w-5 h-5 text-primary" />
+              )}
+            </div>
+            <div>
+              <div className="text-sm text-muted-foreground">{job.company}</div>
+              {job.created_at && (
+                <div className="text-xs text-muted-foreground flex items-center gap-1">
+                  <Clock className="w-3 h-3" />
+                  Posted {new Date(job.created_at).toLocaleDateString()}
+                </div>
+              )}
+            </div>
+            {job.match_score > 0 && (
+              <span className={`ml-auto px-3 py-1 rounded-full text-sm font-bold flex items-center gap-1 ${
+                job.match_score >= 75 ? 'bg-green-500/20 text-green-400' :
+                job.match_score >= 50 ? 'bg-primary/20 text-primary' :
+                'bg-muted text-muted-foreground'
+              }`}>
+                <Sparkles className="w-3.5 h-3.5" />
+                {job.match_score}%
+              </span>
+            )}
+          </div>
+
+          <h2 className="text-2xl font-bold font-['Outfit'] mb-4">{job.title}</h2>
+
+          {/* Tags */}
+          <div className="flex flex-wrap gap-2 mb-5">
+            {formatSalary(job.salary_min, job.salary_max) && (
+              <span className="px-3 py-1.5 rounded-full bg-primary/20 text-primary text-sm flex items-center gap-1">
+                <DollarSign className="w-3.5 h-3.5" />
+                {formatSalary(job.salary_min, job.salary_max)}
+              </span>
+            )}
+            {job.location && (
+              <span className="px-3 py-1.5 rounded-full bg-secondary/20 text-secondary text-sm flex items-center gap-1">
+                <MapPin className="w-3.5 h-3.5" />
+                {job.location}
+              </span>
+            )}
+            {job.job_type && (
+              <span className="px-3 py-1.5 rounded-full bg-accent text-accent-foreground text-sm capitalize">
+                {job.job_type}
+              </span>
+            )}
+            {job.experience_level && (
+              <span className="px-3 py-1.5 rounded-full bg-accent text-accent-foreground text-sm capitalize flex items-center gap-1">
+                <GraduationCap className="w-3.5 h-3.5" />
+                {job.experience_level}
+              </span>
+            )}
+            {job.employment_type && job.employment_type !== 'full-time' && (
+              <span className="px-3 py-1.5 rounded-full bg-secondary/10 text-secondary text-sm capitalize">
+                {job.employment_type}
+              </span>
+            )}
+            {job.category && job.category !== 'other' && (
+              <span className="px-3 py-1.5 rounded-full bg-primary/10 text-primary text-sm capitalize">
+                {job.category}
+              </span>
+            )}
+          </div>
+
+          {/* Description */}
+          {job.description && (
+            <div className="mb-5">
+              <h3 className="text-sm font-bold font-['Outfit'] mb-2 text-foreground">About this role</h3>
+              <p className="text-sm text-muted-foreground leading-relaxed whitespace-pre-line">{job.description}</p>
+            </div>
+          )}
+
+          {/* Requirements */}
+          {job.requirements?.length > 0 && (
+            <div className="mb-5">
+              <h3 className="text-sm font-bold font-['Outfit'] mb-2 text-foreground">Requirements</h3>
+              <div className="flex flex-wrap gap-2">
+                {job.requirements.map((req, i) => (
+                  <span key={i} className="px-3 py-1.5 rounded-lg bg-white/5 border border-border text-sm text-muted-foreground">
+                    {req}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Benefits */}
+          {job.benefits?.length > 0 && (
+            <div className="mb-5">
+              <h3 className="text-sm font-bold font-['Outfit'] mb-2 text-foreground">Benefits</h3>
+              <div className="flex flex-wrap gap-2">
+                {job.benefits.map((b, i) => (
+                  <span key={i} className="px-3 py-1.5 rounded-lg bg-success/10 border border-success/20 text-sm text-success">
+                    {b}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Action Buttons */}
+          <div className="flex items-center gap-3 mt-6 pt-4 border-t border-border pb-4">
+            {job._applied ? (
+              <span className="flex-1 flex items-center justify-center gap-2 text-sm text-success font-medium py-3 rounded-xl bg-success/10">
+                <CheckCircle className="w-4 h-4" /> Applied
+              </span>
+            ) : (
+              <button
+                onClick={() => onApply(job.id)}
+                className="flex-1 flex items-center justify-center gap-2 text-sm font-medium py-3 rounded-xl bg-gradient-to-r from-primary to-secondary text-white hover:opacity-90 transition-opacity"
+              >
+                <CheckCircle className="w-4 h-4" /> Apply Now
+              </button>
+            )}
+            {job._saved ? (
+              <span className="p-3 rounded-xl bg-primary/10 text-primary">
+                <Bookmark className="w-4 h-4 fill-current" />
+              </span>
+            ) : (
+              <button
+                onClick={() => onSave(job.id)}
+                className="p-3 rounded-xl border border-border text-muted-foreground hover:text-primary hover:border-primary/30 transition-colors"
+                title="Save for later"
+              >
+                <Bookmark className="w-4 h-4" />
+              </button>
+            )}
+          </div>
+        </div>
+      </motion.div>
+    </motion.div>
   );
 }
