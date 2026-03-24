@@ -387,8 +387,8 @@ export default function Profile() {
     const img = new window.Image();
     img.onload = () => {
       URL.revokeObjectURL(img.src);
-      if (img.width < 200 || img.height < 200) {
-        toast.error('Logo is too small. Please upload an image at least 200x200 pixels.');
+      if (img.width < 400 || img.height < 400) {
+        toast.error('Logo is too small. Please upload an image at least 400x400 pixels for best quality.');
         return;
       }
       const reader = new FileReader();
