@@ -79,6 +79,8 @@ export default function LocationAutocomplete({
           return {
             label: label || item.display_name.split(',').slice(0, 2).join(',').trim(),
             fullLabel: item.display_name,
+            lat: parseFloat(item.lat),
+            lng: parseFloat(item.lon),
           };
         })
         // Remove duplicates
@@ -94,7 +96,7 @@ export default function LocationAutocomplete({
 
   const handleInputChange = (e) => {
     const val = e.target.value;
-    onChange(val);
+    onChange(val, null);
 
     // Debounce API calls
     if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -105,7 +107,7 @@ export default function LocationAutocomplete({
   };
 
   const handleSelect = (suggestion) => {
-    onChange(suggestion.label);
+    onChange(suggestion.label, { lat: suggestion.lat, lng: suggestion.lng });
     setShowSuggestions(false);
     setSuggestions([]);
   };
@@ -129,7 +131,7 @@ export default function LocationAutocomplete({
           let locationStr = city;
           if (state) locationStr += `, ${state}`;
           if (locationStr) {
-            onChange(locationStr);
+            onChange(locationStr, { lat: latitude, lng: longitude });
             toast.success(`Location detected: ${locationStr}`);
           } else {
             toast.error('Could not determine your city. Please enter manually.');

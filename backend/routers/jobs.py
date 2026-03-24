@@ -13,6 +13,7 @@ import base64
 import logging
 import io
 import re
+import math
 import qrcode
 from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import letter
@@ -70,6 +71,15 @@ def auto_categorize_job(title: str, requirements: list, description: str) -> str
     return best if scores[best] > 0 else "other"
 
 
+def haversine_km(lat1, lon1, lat2, lon2):
+    """Calculate distance between two points in km using Haversine formula."""
+    R = 6371  # Earth radius in km
+    dlat = math.radians(lat2 - lat1)
+    dlon = math.radians(lon2 - lon1)
+    a = math.sin(dlat / 2) ** 2 + math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) * math.sin(dlon / 2) ** 2
+    return R * 2 * math.asin(math.sqrt(a))
+
+
 def calculate_job_match_score(seeker: dict, job: dict) -> int:
     """Calculate how well a job matches a seeker's profile (0-100)"""
     score = 0
@@ -99,6 +109,17 @@ def calculate_job_match_score(seeker: dict, job: dict) -> int:
     max_score += 20
     if job.get("job_type") == "remote":
         score += 20
+    elif seeker.get("location_lat") and job.get("location_lat"):
+        dist = haversine_km(seeker["location_lat"], seeker["location_lng"],
+                            job["location_lat"], job["location_lng"])
+        if dist <= 25:
+            score += 20
+        elif dist <= 50:
+            score += 15
+        elif dist <= 100:
+            score += 10
+        elif dist <= 200:
+            score += 5
     elif job.get("location") and seeker.get("location"):
         job_loc = job["location"].lower().split(",")[0].strip()
         user_loc = seeker["location"].lower().split(",")[0].strip()
@@ -230,6 +251,8 @@ async def create_job(job: JobCreate, request: Request, current_user: dict = Depe
             else current_user.get("photo_url") if job.listing_photo == "profile"
             else job.listing_photo if job.listing_photo else None
         ),
+        "location_lat": job.location_lat or current_user.get("company_address_lat") or current_user.get("location_lat"),
+        "location_lng": job.location_lng or current_user.get("company_address_lng") or current_user.get("location_lng"),
         "location_restriction": job.location_restriction,
         "category": category,
         "employment_type": job.employment_type or "full-time",
@@ -313,6 +336,7 @@ async def get_jobs(
     employment_type: Optional[str] = None,
     search: Optional[str] = None,
     include_swiped: bool = False,
+    sort: Optional[str] = None,  # 'distance', 'newest', or None (default = match score)
     skip: int = 0,
     limit: int = 100
 ):
@@ -391,6 +415,8 @@ async def get_jobs(
                     recruiter_subs[r["id"]] = sub.get("tier_id", "")
 
         swiped_set = set(swiped_job_ids)
+        seeker_lat = current_user.get("location_lat")
+        seeker_lng = current_user.get("location_lng")
         for job in jobs:
             job["match_score"] = calculate_job_match_score(current_user, job)
             # Check if job is actively boosted
@@ -403,11 +429,27 @@ async def get_jobs(
             # Mark already-applied jobs for search page
             if include_swiped:
                 job["already_applied"] = job["id"] in swiped_set
+            # Distance calculation
+            if job.get("job_type") == "remote":
+                job["distance_km"] = None
+                job["distance_label"] = "Remote"
+            elif seeker_lat and seeker_lng and job.get("location_lat") and job.get("location_lng"):
+                dist = haversine_km(seeker_lat, seeker_lng, job["location_lat"], job["location_lng"])
+                job["distance_km"] = round(dist, 1)
+                job["distance_label"] = f"{round(dist)} km" if dist >= 1 else "<1 km"
+            else:
+                job["distance_km"] = None
+                job["distance_label"] = None
 
-        # Sort: boosted jobs first (interleaved), then premium listings get priority, then by match score
+        # Sort based on sort param
         boosted = [j for j in jobs if j.get("is_boosted")]
         regular = [j for j in jobs if not j.get("is_boosted")]
-        regular.sort(key=lambda j: (1 if j.get("is_premium_listing") else 0, j["match_score"]), reverse=True)
+        if sort == "distance":
+            regular.sort(key=lambda j: (j["distance_km"] if j["distance_km"] is not None else 999999,))
+        elif sort == "newest":
+            regular.sort(key=lambda j: j.get("created_at", ""), reverse=True)
+        else:
+            regular.sort(key=lambda j: (1 if j.get("is_premium_listing") else 0, j["match_score"]), reverse=True)
 
         # Interleave boosted jobs at positions 0, 3, 7, etc. for natural feel
         result = list(regular)

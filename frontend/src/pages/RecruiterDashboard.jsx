@@ -1485,6 +1485,7 @@ function JobFormDialog({ open, onClose, onSuccess, token, company, job = null, i
   const [customPhotoFile, setCustomPhotoFile] = useState(null);
   const [customPhotoPreview, setCustomPhotoPreview] = useState(null);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [jobLocationCoords, setJobLocationCoords] = useState(null);
   const [formData, setFormData] = useState({
     title: '',
     company: company || '',
@@ -1649,6 +1650,7 @@ function JobFormDialog({ open, onClose, onSuccess, token, company, job = null, i
         salary_max: formData.salary_max ? parseInt(formData.salary_max) : null,
         location_restriction: formData.location_restriction || 'any',
         listing_photo: listingPhoto,
+        ...(jobLocationCoords ? { location_lat: jobLocationCoords.lat, location_lng: jobLocationCoords.lng } : {}),
       };
 
       if (isEditing && job) {
@@ -1879,7 +1881,7 @@ function JobFormDialog({ open, onClose, onSuccess, token, company, job = null, i
             <Label>Location *</Label>
             <LocationAutocomplete
               value={formData.location}
-              onChange={(val) => setFormData({ ...formData, location: val })}
+              onChange={(val, coords) => { setFormData(prev => ({ ...prev, location: val })); if (coords) setJobLocationCoords(coords); }}
               placeholder="e.g., San Francisco, CA or Remote"
               allowRemote
               data-testid="job-location-input"

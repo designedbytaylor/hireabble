@@ -451,6 +451,8 @@ class JobCreate(BaseModel):
     category: Optional[str] = None  # 'technology', 'healthcare', 'finance', 'marketing', 'design', 'sales', 'engineering', 'education', 'other'
     employment_type: Optional[str] = "full-time"  # 'full-time', 'part-time', 'contract', 'internship'
     listing_photo: Optional[str] = None  # URL to custom listing photo or 'profile' to use recruiter's photo
+    location_lat: Optional[float] = None
+    location_lng: Optional[float] = None
 
 class JobResponse(BaseModel):
     model_config = ConfigDict(extra="ignore")
@@ -476,6 +478,10 @@ class JobResponse(BaseModel):
     is_active: bool = True
     listing_photo: Optional[str] = None
     already_applied: Optional[bool] = None
+    location_lat: Optional[float] = None
+    location_lng: Optional[float] = None
+    distance_km: Optional[float] = None
+    distance_label: Optional[str] = None
 
 class SwipeAction(BaseModel):
     job_id: str
