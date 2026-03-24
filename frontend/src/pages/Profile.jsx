@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { User, Mail, Briefcase, MapPin, Save, LogOut, Building2, Download, Upload, CheckCircle, AlertCircle, Lock, Eye, EyeOff, ChevronDown, Plus, Trash2, GraduationCap, Award, Clock, Navigation2, Bell, BellOff, CreditCard, Crown, ExternalLink, FileText, Loader2, HelpCircle, Shield, BadgeCheck, Gift, Copy, Share2, Heart } from 'lucide-react';
+import { User, Mail, Briefcase, MapPin, Save, LogOut, Building2, Download, Upload, CheckCircle, AlertCircle, Lock, Eye, EyeOff, ChevronDown, Plus, Trash2, GraduationCap, Award, Clock, Navigation2, Bell, BellOff, CreditCard, Crown, ExternalLink, FileText, Loader2, HelpCircle, Shield, BadgeCheck, Gift, Copy, Share2, Heart, Globe, Users, Hash } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -136,8 +136,12 @@ export default function Profile() {
     school: '',
     degree: '',
   });
+  const [companyInfo, setCompanyInfo] = useState({
+    company_address: '', company_website: '', company_about: '',
+    company_size: '', company_industry: '',
+  });
+  const [savingCompany, setSavingCompany] = useState(false);
   const [workHistory, setWorkHistory] = useState([]);
-  const [education, setEducation] = useState([]);
   const [certifications, setCertifications] = useState([]);
   const [interests, setInterests] = useState([]);
   const [references, setReferences] = useState([]);
@@ -165,6 +169,13 @@ export default function Profile() {
         experience_years: user.experience_years || '',
         school: user.school || '',
         degree: user.degree || '',
+      });
+      setCompanyInfo({
+        company_address: user.company_address || '',
+        company_website: user.company_website || '',
+        company_about: user.company_about || '',
+        company_size: user.company_size || '',
+        company_industry: user.company_industry || '',
       });
       setWorkHistory(user.work_history || []);
       setEducation(user.education || []);
@@ -1530,6 +1541,131 @@ export default function Profile() {
               )}
             </Button>
           </form>
+
+          {/* ── Company Info (Recruiter Only) ── */}
+          {user?.role === 'recruiter' && (
+            <>
+              <div className="mt-8 mb-2">
+                <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Company Info</h3>
+              </div>
+              <div className="glass-card rounded-3xl p-6 space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="company_address">Company Address</Label>
+                  <div className="relative">
+                    <MapPin className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+                    <Input
+                      id="company_address"
+                      value={companyInfo.company_address}
+                      onChange={(e) => setCompanyInfo(prev => ({ ...prev, company_address: e.target.value }))}
+                      placeholder="e.g., 123 Main St, San Francisco, CA"
+                      className="pl-12 h-12 rounded-xl bg-background border-border"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="company_website">Company Website</Label>
+                  <div className="relative">
+                    <Globe className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+                    <Input
+                      id="company_website"
+                      value={companyInfo.company_website}
+                      onChange={(e) => setCompanyInfo(prev => ({ ...prev, company_website: e.target.value }))}
+                      placeholder="e.g., https://yourcompany.com"
+                      className="pl-12 h-12 rounded-xl bg-background border-border"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-2">
+                    <Label htmlFor="company_size">Company Size</Label>
+                    <div className="relative">
+                      <Users className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+                      <select
+                        id="company_size"
+                        value={companyInfo.company_size}
+                        onChange={(e) => setCompanyInfo(prev => ({ ...prev, company_size: e.target.value }))}
+                        className="w-full h-12 pl-12 pr-4 rounded-xl bg-background border border-border text-sm focus:border-primary/50 outline-none appearance-none"
+                      >
+                        <option value="">Select size</option>
+                        <option value="1-10">1-10</option>
+                        <option value="11-50">11-50</option>
+                        <option value="51-200">51-200</option>
+                        <option value="201-500">201-500</option>
+                        <option value="501-1000">501-1,000</option>
+                        <option value="1001-5000">1,001-5,000</option>
+                        <option value="5001+">5,001+</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="company_industry">Industry</Label>
+                    <div className="relative">
+                      <Hash className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+                      <select
+                        id="company_industry"
+                        value={companyInfo.company_industry}
+                        onChange={(e) => setCompanyInfo(prev => ({ ...prev, company_industry: e.target.value }))}
+                        className="w-full h-12 pl-12 pr-4 rounded-xl bg-background border border-border text-sm focus:border-primary/50 outline-none appearance-none"
+                      >
+                        <option value="">Select industry</option>
+                        <option value="technology">Technology</option>
+                        <option value="finance">Finance</option>
+                        <option value="healthcare">Healthcare</option>
+                        <option value="education">Education</option>
+                        <option value="retail">Retail</option>
+                        <option value="manufacturing">Manufacturing</option>
+                        <option value="consulting">Consulting</option>
+                        <option value="media">Media & Entertainment</option>
+                        <option value="real_estate">Real Estate</option>
+                        <option value="nonprofit">Non-profit</option>
+                        <option value="government">Government</option>
+                        <option value="other">Other</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="company_about">About the Company</Label>
+                  <Textarea
+                    id="company_about"
+                    value={companyInfo.company_about}
+                    onChange={(e) => setCompanyInfo(prev => ({ ...prev, company_about: e.target.value }))}
+                    placeholder="Tell candidates about your company culture, mission, and what makes it a great place to work..."
+                    className="min-h-[100px] rounded-xl bg-background border-border resize-none"
+                  />
+                </div>
+
+                <Button
+                  type="button"
+                  disabled={savingCompany}
+                  onClick={async () => {
+                    setSavingCompany(true);
+                    try {
+                      await updateProfile(companyInfo);
+                      toast.success('Company info updated!');
+                    } catch {
+                      toast.error('Failed to update company info');
+                    } finally {
+                      setSavingCompany(false);
+                    }
+                  }}
+                  className="w-full h-12 rounded-xl bg-gradient-to-r from-primary to-secondary hover:opacity-90"
+                >
+                  {savingCompany ? (
+                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  ) : (
+                    <>
+                      <Save className="w-5 h-5 mr-2" />
+                      Save Company Info
+                    </>
+                  )}
+                </Button>
+              </div>
+            </>
+          )}
 
           {/* ── Privacy & Security ── */}
           <div className="mt-8 mb-2">
