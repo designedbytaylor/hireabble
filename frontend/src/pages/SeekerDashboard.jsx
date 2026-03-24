@@ -183,6 +183,7 @@ export default function SeekerDashboard() {
   // Seed from localStorage so swiped jobs stay excluded even after F5
   const swipedIdsRef = useRef(loadSwipedIds(uid));
   const pendingSwipesRef = useRef(globalPendingSwipes); // track in-flight swipe API calls
+  const hasLoadedOnce = useRef(false); // prevents flash of "No More Jobs" before first fetch
   const tokenRef = useRef(token); // stable ref for sendBeacon / beforeunload
   tokenRef.current = token;
   const uidRef = useRef(uid);
@@ -329,6 +330,7 @@ export default function SeekerDashboard() {
         console.error('Fallback fetch also failed:', fallbackErr);
       }
     } finally {
+      hasLoadedOnce.current = true;
       setLoading(false);
     }
   }, []);
@@ -985,7 +987,7 @@ export default function SeekerDashboard() {
 
   const currentJob = jobs[currentIndex];
 
-  if (loading) {
+  if (loading || !hasLoadedOnce.current) {
     return (
       <div className="h-[100dvh] bg-background flex flex-col overflow-hidden">
         <SkeletonPageBackground />
