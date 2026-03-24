@@ -101,6 +101,9 @@ export default function RecruiterSearch() {
         results.sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''));
       } else if (sortBy === 'most_experience') {
         results.sort((a, b) => (b.experience_years || 0) - (a.experience_years || 0));
+      } else {
+        // best_fit — sort by match_score descending
+        results.sort((a, b) => (b.match_score || 0) - (a.match_score || 0));
       }
 
       setCandidates(results);
@@ -116,6 +119,24 @@ export default function RecruiterSearch() {
     fetchCandidates();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Re-sort candidates client-side when sortBy changes (no re-fetch needed)
+  useEffect(() => {
+    if (candidates.length === 0) return;
+    setCandidates(prev => {
+      const sorted = [...prev];
+      if (sortBy === 'most_recent') {
+        sorted.sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''));
+      } else if (sortBy === 'most_experience') {
+        sorted.sort((a, b) => (b.experience_years || 0) - (a.experience_years || 0));
+      } else {
+        // best_fit — sort by match_score descending
+        sorted.sort((a, b) => (b.match_score || 0) - (a.match_score || 0));
+      }
+      return sorted;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sortBy]);
 
   const handleSearch = (e) => {
     e.preventDefault();
@@ -210,7 +231,7 @@ export default function RecruiterSearch() {
       </div>
 
       {/* Header */}
-      <header className="relative z-10 p-6 md:p-8">
+      <header className="relative z-30 p-6 md:p-8">
         <div className="flex items-center justify-between mb-4">
           <div>
             <h1 className="text-2xl font-bold font-['Outfit']">Search Candidates</h1>
@@ -258,7 +279,7 @@ export default function RecruiterSearch() {
           <div className="flex items-center gap-2">
             <select
               value={sortBy}
-              onChange={(e) => { setSortBy(e.target.value); fetchCandidates(); }}
+              onChange={(e) => setSortBy(e.target.value)}
               className="h-8 px-2 pr-6 rounded-lg bg-card border border-border text-xs focus:border-primary/50 outline-none appearance-none"
             >
               {SORT_OPTIONS.map(opt => (
