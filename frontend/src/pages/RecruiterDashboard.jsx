@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Plus, Briefcase, Users, Star, Heart, X, Check, Rocket, MessageCircle,
@@ -45,7 +45,8 @@ const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 export default function RecruiterDashboard() {
   useDocumentTitle('Dashboard');
   const navigate = useNavigate();
-  const { user, token } = useAuth();
+  const { user, token, refreshUser } = useAuth();
+  const [searchParams] = useSearchParams();
   const [stats, setStats] = useState({ active_jobs: 0, total_applications: 0, super_likes: 0, matches: 0 });
   const [jobs, setJobs] = useState([]);
   const [applications, setApplications] = useState([]);
@@ -79,7 +80,40 @@ export default function RecruiterDashboard() {
   const [posterOptions, setPosterOptions] = useState({ salary: true, location: true, jobType: true, experienceLevel: true });
 
   useEffect(() => {
-    fetchData();
+    const isPaymentReturn = searchParams.get('payment') === 'success' && searchParams.get('session_id');
+    if (!isPaymentReturn) fetchData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Verify Stripe payment on return from checkout
+  useEffect(() => {
+    const sessionId = searchParams.get('session_id');
+    if (searchParams.get('payment') === 'success' && sessionId && token) {
+      window.history.replaceState({}, '', window.location.pathname);
+      const verifyPayment = async (retries = 3) => {
+        try {
+          const res = await axios.get(`${API}/payments/verify-session/${sessionId}`, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          if (res.data.status === 'paid') {
+            toast.success('Payment successful! Your subscription is now active.');
+            await refreshUser();
+            fetchData();
+          } else if (retries > 0) {
+            setTimeout(() => verifyPayment(retries - 1), 2000);
+          }
+        } catch {
+          if (retries > 0) {
+            setTimeout(() => verifyPayment(retries - 1), 2000);
+          } else {
+            toast.success('Payment received! Your subscription will activate shortly.');
+            await refreshUser();
+            fetchData();
+          }
+        }
+      };
+      verifyPayment();
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
