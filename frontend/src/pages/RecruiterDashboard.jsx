@@ -457,7 +457,7 @@ export default function RecruiterDashboard() {
         <button
           onClick={() => setShowNewJob(true)}
           data-testid="post-job-btn"
-          className="w-full flex items-center justify-center gap-2 py-3 mb-6 rounded-2xl bg-gradient-to-r from-primary to-secondary text-white font-medium text-sm hover:opacity-90 transition-opacity active:scale-[0.98]"
+          className="w-full md:w-auto md:px-8 flex items-center justify-center gap-2 py-3 mb-6 rounded-2xl bg-gradient-to-r from-primary to-secondary text-white font-medium text-sm hover:opacity-90 transition-opacity active:scale-[0.98]"
         >
           <Plus className="w-5 h-5" />
           Post a New Job
@@ -670,9 +670,22 @@ export default function RecruiterDashboard() {
                             <Briefcase className="w-3 h-3 flex-shrink-0" /> {app.job_title}
                           </div>
                         )}
-                        <div className="mt-3 py-2 rounded-lg text-center text-sm bg-amber-500/10 text-amber-400">
-                          Shortlisted
-                        </div>
+                        {(() => {
+                          const interview = getInterviewForCandidate(app);
+                          if (interview?.status === 'pending' || interview?.status === 'rescheduled') {
+                            return (
+                              <div className="mt-3 py-2 rounded-lg text-center text-sm bg-purple-500/10 text-purple-400 flex items-center justify-center gap-1.5">
+                                <Clock className="w-3.5 h-3.5" />
+                                Interview Pending
+                              </div>
+                            );
+                          }
+                          return (
+                            <div className="mt-3 py-2 rounded-lg text-center text-sm bg-amber-500/10 text-amber-400">
+                              Shortlisted
+                            </div>
+                          );
+                        })()}
                       </div>
                     ))}
                   </div>
@@ -1118,20 +1131,54 @@ export default function RecruiterDashboard() {
                     <MessageCircle className="w-4 h-4 mr-1.5" />
                     Message
                   </Button>
-                  <Button
-                    size="sm"
-                    onClick={() => {
-                      const app = selectedCandidate;
-                      setSelectedCandidate(null);
-                      const params = app.match_id ? `?match=${app.match_id}` : `?seeker=${app.seeker_id}`;
-                      navigate(`/interviews${params}`);
-                    }}
-                    className="w-full rounded-xl bg-purple-500/20 border border-purple-500/30 text-purple-400 hover:bg-purple-500/30"
-                    variant="outline"
-                  >
-                    <Calendar className="w-4 h-4 mr-1.5" />
-                    {getInterviewForCandidate(selectedCandidate) ? 'Edit Interview' : 'Schedule Interview'}
-                  </Button>
+                  {(() => {
+                    const interview = getInterviewForCandidate(selectedCandidate);
+                    if (interview?.status === 'pending' || interview?.status === 'rescheduled') {
+                      return (
+                        <>
+                          <Button
+                            size="sm"
+                            disabled
+                            className="w-full rounded-xl bg-amber-500/20 border border-amber-500/30 text-amber-400 opacity-80 cursor-not-allowed"
+                            variant="outline"
+                          >
+                            <Clock className="w-4 h-4 mr-1.5" />
+                            Interview Pending
+                          </Button>
+                          <Button
+                            size="sm"
+                            onClick={() => {
+                              const app = selectedCandidate;
+                              setSelectedCandidate(null);
+                              const params = app.match_id ? `?match=${app.match_id}` : `?seeker=${app.seeker_id}`;
+                              navigate(`/interviews${params}`);
+                            }}
+                            className="w-full rounded-xl bg-purple-500/20 border border-purple-500/30 text-purple-400 hover:bg-purple-500/30"
+                            variant="outline"
+                          >
+                            <Calendar className="w-4 h-4 mr-1.5" />
+                            Request Reschedule
+                          </Button>
+                        </>
+                      );
+                    }
+                    return (
+                      <Button
+                        size="sm"
+                        onClick={() => {
+                          const app = selectedCandidate;
+                          setSelectedCandidate(null);
+                          const params = app.match_id ? `?match=${app.match_id}` : `?seeker=${app.seeker_id}`;
+                          navigate(`/interviews${params}`);
+                        }}
+                        className="w-full rounded-xl bg-purple-500/20 border border-purple-500/30 text-purple-400 hover:bg-purple-500/30"
+                        variant="outline"
+                      >
+                        <Calendar className="w-4 h-4 mr-1.5" />
+                        {interview ? 'Edit Interview' : 'Schedule Interview'}
+                      </Button>
+                    );
+                  })()}
                   {selectedCandidate.pipeline_stage !== 'hired' && (
                     <Button
                       size="sm"
