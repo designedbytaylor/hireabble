@@ -6,7 +6,7 @@ import {
   MapPin, DollarSign, Building2, ChevronRight, Clock,
   Edit, GraduationCap, Trash2, BarChart3, Calendar, Globe,
   FileText, Send, Info, Copy, Upload, Sparkles, Wand2, Image as ImageIcon, Printer, Zap,
-  Pause, Play
+  Pause, Play, Share2
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -39,6 +39,7 @@ import { Skeleton } from '../components/ui/skeleton';
 import ConfirmDialog from '../components/ConfirmDialog';
 import LocationAutocomplete from '../components/LocationAutocomplete';
 import useDocumentTitle from '../hooks/useDocumentTitle';
+import ShareJobModal from '../components/ShareJobModal';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -78,6 +79,7 @@ export default function RecruiterDashboard() {
   const [interviews, setInterviews] = useState([]);
   const [posterJob, setPosterJob] = useState(null);
   const [posterOptions, setPosterOptions] = useState({ salary: true, location: true, jobType: true, experienceLevel: true });
+  const [shareJob, setShareJob] = useState(null);
 
   useEffect(() => {
     const isPaymentReturn = searchParams.get('payment') === 'success' && searchParams.get('session_id');
@@ -807,6 +809,14 @@ export default function RecruiterDashboard() {
                       <span className="hidden sm:inline">Copy</span>
                     </button>
                     <button
+                      onClick={(e) => { e.stopPropagation(); setShareJob(job); }}
+                      className="flex-1 flex items-center justify-center gap-1.5 p-2 rounded-lg hover:bg-accent transition-colors text-xs text-muted-foreground"
+                      title="Share job"
+                    >
+                      <Share2 className="w-4 h-4" />
+                      <span className="hidden sm:inline">Share</span>
+                    </button>
+                    <button
                       onClick={(e) => { e.stopPropagation(); setPosterJob(job); setPosterOptions({ salary: true, location: true, jobType: true, experienceLevel: true }); }}
                       className="flex-1 flex items-center justify-center gap-1.5 p-2 rounded-lg hover:bg-accent transition-colors text-xs text-muted-foreground"
                       title="Generate hiring poster"
@@ -878,9 +888,10 @@ export default function RecruiterDashboard() {
       <JobFormDialog 
         open={showNewJob}
         onClose={() => setShowNewJob(false)}
-        onSuccess={() => {
+        onSuccess={(newJob) => {
           setShowNewJob(false);
           fetchData();
+          if (newJob) setShareJob(newJob);
         }}
         token={token}
         company={user?.company}
@@ -1329,6 +1340,18 @@ export default function RecruiterDashboard() {
         </DialogContent>
       </Dialog>
 
+      {/* Share Job Modal */}
+      <ShareJobModal
+        job={shareJob}
+        open={!!shareJob}
+        onClose={() => setShareJob(null)}
+        onPrintPoster={(job) => {
+          setShareJob(null);
+          setPosterJob(job);
+          setPosterOptions({ salary: true, location: true, jobType: true, experienceLevel: true });
+        }}
+      />
+
       {/* Priority Applies Dialog */}
       <Dialog open={showPriorityApplies} onOpenChange={setShowPriorityApplies}>
         <DialogContent className="max-w-lg bg-card border-border max-h-[80vh] flex flex-col">
@@ -1658,14 +1681,14 @@ function JobFormDialog({ open, onClose, onSuccess, token, company, job = null, i
           headers: { Authorization: `Bearer ${token}` }
         });
         toast.success('Job updated successfully!');
+        onSuccess();
       } else {
-        await axios.post(`${API}/jobs`, payload, {
+        const res = await axios.post(`${API}/jobs`, payload, {
           headers: { Authorization: `Bearer ${token}` }
         });
         toast.success('Job posted successfully!');
+        onSuccess(res.data);
       }
-
-      onSuccess();
     } catch (error) {
       toast.error(error.response?.data?.detail || 'Failed to save job');
     } finally {
