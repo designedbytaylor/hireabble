@@ -31,7 +31,7 @@ async function getCroppedBlob(imageSrc, pixelCrop) {
   });
 }
 
-export default function PhotoCropModal({ imageSrc, onCropDone, onCancel }) {
+export default function PhotoCropModal({ imageSrc, onCropDone, onCancel, aspect = 3 / 4, cropLabel }) {
   const [crop, setCrop] = useState({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);
   const [croppedAreaPixels, setCroppedAreaPixels] = useState(null);
@@ -67,16 +67,16 @@ export default function PhotoCropModal({ imageSrc, onCropDone, onCancel }) {
       {/* Header */}
       <div className="text-center mb-4 px-4">
         <h3 className="text-lg font-bold text-white font-['Outfit']">Crop your photo</h3>
-        <p className="text-sm text-gray-400">Drag and zoom to fit a vertical frame (3:4)</p>
+        <p className="text-sm text-gray-400">{cropLabel || (aspect === 1 ? 'Drag and zoom to fit a square frame' : 'Drag and zoom to fit a vertical frame (3:4)')}</p>
       </div>
 
       {/* Cropper */}
-      <div className="relative w-full max-w-md aspect-[3/4] mx-4">
+      <div className="relative w-full max-w-md mx-4" style={{ aspectRatio: aspect < 1 ? `${aspect}` : aspect === 1 ? '1' : '3/4' }}>
         <Cropper
           image={imageSrc}
           crop={crop}
           zoom={zoom}
-          aspect={3 / 4}
+          aspect={aspect}
           onCropChange={setCrop}
           onZoomChange={setZoom}
           onCropComplete={onCropComplete}

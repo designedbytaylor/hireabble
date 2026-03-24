@@ -105,6 +105,7 @@ export default function Profile() {
   const [loading, setLoading] = useState(false);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [uploadingLogo, setUploadingLogo] = useState(false);
+  const [cropLogoSrc, setCropLogoSrc] = useState(null);
   const [completeness, setCompleteness] = useState({ percentage: 0, missing_fields: [], is_complete: false });
   const fileInputRef = useRef(null);
   const logoInputRef = useRef(null);
@@ -376,16 +377,33 @@ export default function Profile() {
     }
   };
 
-  const handleLogoUpload = async (e) => {
+  const handleLogoUpload = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
     e.target.value = '';
     if (!file.type.startsWith('image/')) { toast.error('Please select an image file'); return; }
     if (file.size > 5 * 1024 * 1024) { toast.error('Image must be less than 5MB'); return; }
+    // Check minimum dimensions
+    const img = new window.Image();
+    img.onload = () => {
+      URL.revokeObjectURL(img.src);
+      if (img.width < 200 || img.height < 200) {
+        toast.error('Logo is too small. Please upload an image at least 200x200 pixels.');
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = () => setCropLogoSrc(reader.result);
+      reader.readAsDataURL(file);
+    };
+    img.src = URL.createObjectURL(file);
+  };
+
+  const handleCroppedLogo = async (blob) => {
+    setCropLogoSrc(null);
     setUploadingLogo(true);
     try {
       const fd = new FormData();
-      fd.append('file', file);
+      fd.append('file', new File([blob], 'logo.jpg', { type: 'image/jpeg' }));
       const res = await axios.post(`${API}/upload/photo`, fd, {
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'multipart/form-data' },
       });
@@ -1926,6 +1944,17 @@ export default function Profile() {
           imageSrc={cropImageSrc}
           onCropDone={handleCroppedPhoto}
           onCancel={() => setCropImageSrc(null)}
+        />
+      )}
+
+      {/* Logo Crop Modal */}
+      {cropLogoSrc && (
+        <PhotoCropModal
+          imageSrc={cropLogoSrc}
+          aspect={1}
+          cropLabel="Drag and zoom to crop your company logo"
+          onCropDone={handleCroppedLogo}
+          onCancel={() => setCropLogoSrc(null)}
         />
       )}
     </div>
