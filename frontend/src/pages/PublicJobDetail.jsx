@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams, useSearchParams, useNavigate, Link } from 'react-router-dom';
-import { MapPin, Briefcase, Clock, DollarSign, Building2, ArrowLeft, ChevronRight, GraduationCap, Download } from 'lucide-react';
+import { MapPin, Briefcase, Clock, DollarSign, Building2, ArrowLeft, ChevronRight, GraduationCap, Download, Share2, Copy, Check } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { useAuth } from '../context/AuthContext';
 import useDocumentTitle from '../hooks/useDocumentTitle';
@@ -47,8 +47,23 @@ export default function PublicJobDetail() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const platform = getPlatform();
+  const [copied, setCopied] = useState(false);
 
   useDocumentTitle(job ? `${job.title} at ${job.company}` : 'Job Detail');
+
+  const handleShare = useCallback(async () => {
+    const url = window.location.href;
+    const text = job ? `${job.title} at ${job.company} — Apply now on Hireabble` : 'Check out this job on Hireabble';
+    if (navigator.share) {
+      try { await navigator.share({ title: text, url }); } catch {}
+    } else {
+      try {
+        await navigator.clipboard.writeText(url);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+      } catch {}
+    }
+  }, [job]);
 
   // Fetch public job data
   useEffect(() => {
@@ -181,14 +196,23 @@ export default function PublicJobDetail() {
             )}
 
             {/* Job header */}
-            <div>
-              <h1 className="text-2xl md:text-3xl font-bold font-['Outfit']">{job.title}</h1>
-              <div className="flex items-center gap-2 mt-2">
-                {job.company_logo && (
-                  <img src={job.company_logo} alt={job.company} className="w-6 h-6 rounded-full object-cover" />
-                )}
-                <span className="text-muted-foreground font-medium">{job.company}</span>
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h1 className="text-2xl md:text-3xl font-bold font-['Outfit']">{job.title}</h1>
+                <div className="flex items-center gap-2 mt-2">
+                  {job.company_logo && (
+                    <img src={job.company_logo} alt={job.company} className="w-6 h-6 rounded-full object-cover" />
+                  )}
+                  <span className="text-muted-foreground font-medium">{job.company}</span>
+                </div>
               </div>
+              <button
+                onClick={handleShare}
+                className="shrink-0 mt-1 p-2.5 rounded-xl border border-border/50 hover:bg-accent transition-colors"
+                title={copied ? 'Copied!' : 'Share this job'}
+              >
+                {copied ? <Check className="w-4.5 h-4.5 text-green-500" /> : <Share2 className="w-4.5 h-4.5 text-muted-foreground" />}
+              </button>
             </div>
 
             {/* Metadata badges */}
