@@ -1968,11 +1968,20 @@ function JobFormDialog({ open, onClose, onSuccess, token, company, job = null, i
                       className="hidden"
                       onChange={(e) => {
                         const file = e.target.files?.[0];
-                        if (file) {
+                        if (!file) return;
+                        e.target.value = '';
+                        if (file.size > 10 * 1024 * 1024) { toast.error('Image must be less than 10MB'); return; }
+                        const img = new window.Image();
+                        img.onload = () => {
+                          URL.revokeObjectURL(img.src);
+                          if (img.width < 800 || img.height < 400) {
+                            toast.error('Image is too small. Please upload at least 800x400 pixels for a sharp listing photo.');
+                            return;
+                          }
                           setCustomPhotoFile(file);
                           setCustomPhotoPreview(URL.createObjectURL(file));
-                        }
-                        e.target.value = '';
+                        };
+                        img.src = URL.createObjectURL(file);
                       }}
                     />
                   </label>
