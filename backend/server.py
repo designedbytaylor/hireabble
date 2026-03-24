@@ -186,21 +186,21 @@ async def add_cache_headers(request: Request, call_next):
     # Read-only API data that changes infrequently — browser can reuse for 30s
     elif path in ("/api/oauth/config",):
         response.headers["Cache-Control"] = "public, max-age=30"
-    # Batched dashboard endpoints — short cache for snappy back-nav
+    # Batched dashboard endpoints — no-cache so browser always revalidates
     elif path in ("/api/dashboard", "/api/recruiter/dashboard-data"):
-        response.headers["Cache-Control"] = "private, max-age=10, stale-while-revalidate=30"
-    # User-specific data — private cache, short TTL to reduce refetches on back-nav
+        response.headers["Cache-Control"] = "private, no-cache"
+    # User-specific data — no-cache to avoid stale data after mutations
     elif path.startswith("/api/stats") or path.startswith("/api/profile/completeness") or path.startswith("/api/superlikes/remaining"):
-        response.headers["Cache-Control"] = "private, max-age=15, stale-while-revalidate=30"
+        response.headers["Cache-Control"] = "private, no-cache"
     # Auth check — very short cache to avoid re-calling on every navigation
     elif path == "/api/auth/me":
         response.headers["Cache-Control"] = "no-store"
     # Notifications — short cache
     elif path.startswith("/api/notifications"):
-        response.headers["Cache-Control"] = "private, max-age=5, stale-while-revalidate=15"
-    # Jobs/matches listing — stale-while-revalidate for snappy back-nav
+        response.headers["Cache-Control"] = "private, no-cache"
+    # Jobs/matches listing — private, no stale data
     elif request.method == "GET" and (path.startswith("/api/jobs") or path.startswith("/api/matches")):
-        response.headers["Cache-Control"] = "private, max-age=10, stale-while-revalidate=30"
+        response.headers["Cache-Control"] = "private, no-cache"
     return response
 
 # Include all routers with /api prefix
