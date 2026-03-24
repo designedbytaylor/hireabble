@@ -121,7 +121,7 @@ export default function RecruiterDashboard() {
     try {
       // Single batched call replaces 4 separate API requests
       const response = await axios.get(`${API}/recruiter/dashboard-data`, {
-        headers: { Authorization: `Bearer ${token}`, 'Cache-Control': 'no-cache' }
+        headers: { Authorization: `Bearer ${token}` }
       });
       const data = response.data;
       setStats(data.stats);

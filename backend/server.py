@@ -84,7 +84,7 @@ app.add_middleware(
     allow_origin_regex=r"https://(hireabble[a-z0-9-]*\.vercel\.app|hireabble[a-z0-9-]*\.up\.railway\.app|(www\.)?hireabble\.com)",
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allow_headers=["Authorization", "Content-Type"],
+    allow_headers=["Authorization", "Content-Type", "Cache-Control"],
 )
 
 
