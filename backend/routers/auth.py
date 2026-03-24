@@ -986,7 +986,9 @@ async def update_profile(updates: dict, current_user: dict = Depends(get_current
         "onboarding_complete", "push_subscription",
         "job_type_preference", "work_history", "education",
         "references", "references_hidden", "show_contact_on_resume",
-        "interests", "resume_theme", "include_photo_on_resume"
+        "interests", "resume_theme", "include_photo_on_resume",
+        "company_logo", "company_address", "company_website", "company_about",
+        "company_size", "company_industry",
     ]
     
     update_data = {k: v for k, v in updates.items() if k in allowed_fields}
@@ -1005,6 +1007,8 @@ async def update_profile(updates: dict, current_user: dict = Depends(get_current
         "interests": list,
         "resume_theme": str,
         "include_photo_on_resume": bool,
+        "company_logo": str, "company_address": str, "company_website": str,
+        "company_about": str, "company_size": str, "company_industry": str,
     }
     for field, expected_type in _FIELD_TYPES.items():
         if field in update_data and update_data[field] is not None:

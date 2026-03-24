@@ -1412,11 +1412,18 @@ export default function RecruiterDashboard() {
                 <p className="text-muted-foreground text-sm">No pending applicants.</p>
               </div>
             ) : (
-              applications.filter(a => !a.pipeline_stage || a.pipeline_stage === 'applied').map(app => (
-                <div
+              applications.filter(a => !a.pipeline_stage || a.pipeline_stage === 'applied').map(app => {
+                const isUnlocked = subscription?.subscribed || unlockedAppIds.current.has(app.id);
+                return (
+                <PremiumBlur
                   key={app.id}
+                  isUnlocked={isUnlocked}
+                  tierHint="recruiter_pro"
+                  trigger="blurred"
+                >
+                <div
                   className="flex items-center gap-3 p-3 rounded-xl bg-background border border-border hover:border-primary/30 cursor-pointer transition-colors"
-                  onClick={() => { setShowAllApplicants(false); setSelectedCandidate(app); }}
+                  onClick={() => { if (isUnlocked) { setShowAllApplicants(false); setSelectedCandidate(app); } }}
                 >
                   <img
                     src={getPhotoUrl(app.seeker_photo || app.seeker_avatar, app.seeker_name || app.seeker_id)}
@@ -1438,6 +1445,7 @@ export default function RecruiterDashboard() {
                       </div>
                     )}
                   </div>
+                  {isUnlocked && (
                   <div className="flex gap-1 flex-shrink-0">
                     <button
                       onClick={(e) => { e.stopPropagation(); handleRespondToApplication(app.id, 'reject'); }}
@@ -1452,8 +1460,11 @@ export default function RecruiterDashboard() {
                       <Check className="w-4 h-4" />
                     </button>
                   </div>
+                  )}
                 </div>
-              ))
+                </PremiumBlur>
+                );
+              })
             )}
           </div>
         </DialogContent>
@@ -1481,11 +1492,11 @@ function JobFormDialog({ open, onClose, onSuccess, token, company, job = null, i
     requirements: '',
     salary_min: '',
     salary_max: '',
-    location: '',
+    location: user?.company_address || user?.location || '',
     job_type: 'remote',
     experience_level: 'mid',
     location_restriction: 'any',
-    category: '',
+    category: user?.company_industry || '',
     employment_type: 'full-time'
   });
 
@@ -1522,11 +1533,11 @@ function JobFormDialog({ open, onClose, onSuccess, token, company, job = null, i
         requirements: '',
         salary_min: '',
         salary_max: '',
-        location: '',
+        location: user?.company_address || user?.location || '',
         job_type: 'remote',
         experience_level: 'mid',
         location_restriction: 'any',
-        category: '',
+        category: user?.company_industry || '',
         employment_type: 'full-time'
       });
       setScreenshots([]);
