@@ -1542,7 +1542,7 @@ function JobFormDialog({ open, onClose, onSuccess, token, company, job = null, i
       });
       setScreenshots([]);
     }
-  }, [job, isEditing, company, user?.company_logo]);
+  }, [job, isEditing, company, user?.company_logo, user?.company_address, user?.location, user?.company_industry]);
 
   const handleScreenshotSelect = (e) => {
     const newFiles = Array.from(e.target.files || []);
