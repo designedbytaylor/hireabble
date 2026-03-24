@@ -1354,7 +1354,7 @@ function JobFormDialog({ open, onClose, onSuccess, token, company, job = null, i
   const [screenshots, setScreenshots] = useState([]);
   const [parsingScreenshots, setParsingScreenshots] = useState(false);
   const [aiAssisting, setAiAssisting] = useState(null); // 'generate' | 'improve' | null
-  const [photoOption, setPhotoOption] = useState('none'); // 'none' | 'profile' | 'custom'
+  const [photoOption, setPhotoOption] = useState('none'); // 'none' | 'logo' | 'custom'
   const [customPhotoFile, setCustomPhotoFile] = useState(null);
   const [customPhotoPreview, setCustomPhotoPreview] = useState(null);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
@@ -1390,9 +1390,9 @@ function JobFormDialog({ open, onClose, onSuccess, token, company, job = null, i
         employment_type: job.employment_type || 'full-time'
       });
       // Restore photo option from existing job data
-      if (job.listing_photo === 'profile') {
-        setPhotoOption('profile');
-      } else if (job.listing_photo && job.listing_photo !== 'profile') {
+      if (job.listing_photo && job.listing_photo === user?.company_logo) {
+        setPhotoOption('logo');
+      } else if (job.listing_photo) {
         setPhotoOption('custom');
         setCustomPhotoPreview(job.listing_photo);
       } else {
@@ -1501,8 +1501,8 @@ function JobFormDialog({ open, onClose, onSuccess, token, company, job = null, i
     try {
       // Upload custom photo first if selected
       let listingPhoto = null;
-      if (photoOption === 'profile') {
-        listingPhoto = 'profile';
+      if (photoOption === 'logo') {
+        listingPhoto = 'logo';
       } else if (photoOption === 'custom' && customPhotoFile) {
         const photoFd = new FormData();
         photoFd.append('file', customPhotoFile);
@@ -1882,15 +1882,15 @@ function JobFormDialog({ open, onClose, onSuccess, token, company, job = null, i
               >
                 None
               </button>
-              {user?.photo_url && (
+              {user?.company_logo && (
                 <button
                   type="button"
-                  onClick={() => { setPhotoOption('profile'); setCustomPhotoFile(null); setCustomPhotoPreview(null); }}
+                  onClick={() => { setPhotoOption('logo'); setCustomPhotoFile(null); setCustomPhotoPreview(null); }}
                   className={`flex-1 py-2.5 px-3 rounded-xl text-sm font-medium border-2 transition-all ${
-                    photoOption === 'profile' ? 'border-primary bg-primary/10 text-primary' : 'border-border bg-card hover:border-primary/20'
+                    photoOption === 'logo' ? 'border-primary bg-primary/10 text-primary' : 'border-border bg-card hover:border-primary/20'
                   }`}
                 >
-                  Profile Photo
+                  Company Logo
                 </button>
               )}
               <button
@@ -1903,10 +1903,10 @@ function JobFormDialog({ open, onClose, onSuccess, token, company, job = null, i
                 Custom Photo
               </button>
             </div>
-            {photoOption === 'profile' && user?.photo_url && (
+            {photoOption === 'logo' && user?.company_logo && (
               <div className="flex items-center gap-3 p-3 rounded-xl bg-muted/50">
-                <img src={user.photo_url} alt="Profile" className="w-12 h-12 rounded-lg object-cover" />
-                <span className="text-sm text-muted-foreground">Your profile photo will be shown on this listing</span>
+                <img src={user.company_logo} alt="Company Logo" className="w-12 h-12 rounded-lg object-cover" />
+                <span className="text-sm text-muted-foreground">Your company logo will be shown on this listing</span>
               </div>
             )}
             {photoOption === 'custom' && (
