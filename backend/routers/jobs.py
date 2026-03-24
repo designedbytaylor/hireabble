@@ -225,7 +225,11 @@ async def create_job(job: JobCreate, request: Request, current_user: dict = Depe
         "company_logo": current_user.get("company_logo") or f"https://api.dicebear.com/7.x/identicon/svg?seed={job.company}",
         "background_image": backgrounds[hash(job_id) % len(backgrounds)],
         "created_at": datetime.now(timezone.utc).isoformat(),
-        "listing_photo": job.listing_photo if job.listing_photo and job.listing_photo != "profile" else (current_user.get("photo_url") if job.listing_photo == "profile" else None),
+        "listing_photo": (
+            current_user.get("company_logo") if job.listing_photo == "logo"
+            else current_user.get("photo_url") if job.listing_photo == "profile"
+            else job.listing_photo if job.listing_photo else None
+        ),
         "location_restriction": job.location_restriction,
         "category": category,
         "employment_type": job.employment_type or "full-time",
@@ -488,6 +492,13 @@ async def update_job(job_id: str, updates: dict, current_user: dict = Depends(ge
                       "experience_level", "is_active", "location_restriction", "category", "employment_type",
                       "listing_photo"]
     update_data = {k: v for k, v in updates.items() if k in allowed_fields}
+
+    # Resolve listing_photo markers
+    lp = update_data.get("listing_photo")
+    if lp == "logo":
+        update_data["listing_photo"] = current_user.get("company_logo")
+    elif lp == "profile":
+        update_data["listing_photo"] = current_user.get("photo_url")
 
     # Content moderation on text fields being updated
     text_fields = {k: v for k, v in update_data.items() if k in ("title", "company", "description", "requirements")}

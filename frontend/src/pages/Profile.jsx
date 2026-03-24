@@ -104,8 +104,10 @@ export default function Profile() {
   const { user, token, updateProfile, logout, refreshUser, patchUser } = useAuth();
   const [loading, setLoading] = useState(false);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [uploadingLogo, setUploadingLogo] = useState(false);
   const [completeness, setCompleteness] = useState({ percentage: 0, missing_fields: [], is_complete: false });
   const fileInputRef = useRef(null);
+  const logoInputRef = useRef(null);
   const [showChangePassword, setShowChangePassword] = useState(false);
   const [passwordData, setPasswordData] = useState({
     currentPassword: '',
@@ -371,6 +373,28 @@ export default function Profile() {
       toast.error(error.response?.data?.detail || 'Failed to upload photo');
     } finally {
       setUploadingPhoto(false);
+    }
+  };
+
+  const handleLogoUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    e.target.value = '';
+    if (!file.type.startsWith('image/')) { toast.error('Please select an image file'); return; }
+    if (file.size > 5 * 1024 * 1024) { toast.error('Image must be less than 5MB'); return; }
+    setUploadingLogo(true);
+    try {
+      const fd = new FormData();
+      fd.append('file', file);
+      const res = await axios.post(`${API}/upload/photo`, fd, {
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'multipart/form-data' },
+      });
+      await updateProfile({ company_logo: res.data.photo_url });
+      toast.success('Company logo updated!');
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Failed to upload logo');
+    } finally {
+      setUploadingLogo(false);
     }
   };
 
@@ -712,7 +736,51 @@ export default function Profile() {
                 This is your profile photo. Recruiters see it when browsing candidates. Use a professional, well-lit vertical photo.
               </p>
             )}
+            {user?.role === 'recruiter' && (
+              <p className="text-xs text-muted-foreground mt-3">
+                This is your personal profile photo. It appears in messages and your recruiter profile.
+              </p>
+            )}
           </div>
+
+          {/* Company Logo (Recruiter Only) */}
+          {user?.role === 'recruiter' && (
+            <div className="glass-card rounded-2xl p-5 mb-6">
+              <div className="flex items-center gap-4">
+                <div className="relative">
+                  <img
+                    src={user?.company_logo || `https://api.dicebear.com/7.x/identicon/svg?seed=${encodeURIComponent(user?.company || user?.name || 'company')}`}
+                    alt="Company Logo"
+                    className="w-16 h-16 rounded-xl border-2 border-border object-cover bg-background"
+                  />
+                  <button
+                    onClick={() => logoInputRef.current?.click()}
+                    disabled={uploadingLogo}
+                    className="absolute -bottom-1 -right-1 w-7 h-7 rounded-full bg-gradient-to-r from-primary to-secondary flex items-center justify-center hover:scale-110 transition-transform"
+                  >
+                    {uploadingLogo ? (
+                      <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    ) : (
+                      <Upload className="w-3 h-3 text-white" />
+                    )}
+                  </button>
+                  <input
+                    ref={logoInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={handleLogoUpload}
+                    className="hidden"
+                  />
+                </div>
+                <div className="flex-1">
+                  <h3 className="font-semibold text-sm">Company Logo</h3>
+                  <p className="text-xs text-muted-foreground">
+                    Appears on all your job listings. Use a square logo for best results.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Subscription Management */}
           {subscription?.subscribed && (
