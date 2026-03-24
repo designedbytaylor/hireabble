@@ -270,7 +270,7 @@ export default function SeekerDashboard() {
     setLoading(true);
     try {
       const response = await axios.get(`${API}/dashboard`, {
-        headers: { Authorization: `Bearer ${tokenRef.current}`, 'Cache-Control': 'no-cache' },
+        headers: { Authorization: `Bearer ${tokenRef.current}` },
         timeout: 15000,
       });
       const data = response.data;
