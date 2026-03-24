@@ -1084,20 +1084,53 @@ export default function RecruiterDashboard() {
                     <MessageCircle className="w-4 h-4 mr-1.5" />
                     Message
                   </Button>
-                  {!getInterviewForCandidate(selectedCandidate) && (
+                  <Button
+                    size="sm"
+                    onClick={() => {
+                      const app = selectedCandidate;
+                      setSelectedCandidate(null);
+                      const params = app.match_id ? `?match=${app.match_id}` : `?seeker=${app.seeker_id}`;
+                      navigate(`/interviews${params}`);
+                    }}
+                    className="w-full rounded-xl bg-purple-500/20 border border-purple-500/30 text-purple-400 hover:bg-purple-500/30"
+                    variant="outline"
+                  >
+                    <Calendar className="w-4 h-4 mr-1.5" />
+                    {getInterviewForCandidate(selectedCandidate) ? 'Edit Interview' : 'Schedule Interview'}
+                  </Button>
+                  {selectedCandidate.pipeline_stage !== 'hired' && (
                     <Button
                       size="sm"
-                      onClick={() => {
+                      onClick={async () => {
                         const app = selectedCandidate;
-                        setSelectedCandidate(null);
-                        const params = app.match_id ? `?match=${app.match_id}` : `?seeker=${app.seeker_id}`;
-                        navigate(`/interviews${params}`);
+                        try {
+                          await axios.put(`${API}/applications/${app.id}/stage`,
+                            { stage: 'hired' },
+                            { headers: { Authorization: `Bearer ${token}` } }
+                          );
+                          setApplications(prev => prev.map(a =>
+                            a.id === app.id ? { ...a, pipeline_stage: 'hired' } : a
+                          ));
+                          setStats(prev => ({
+                            ...prev,
+                            pipeline_counts: {
+                              ...prev.pipeline_counts,
+                              hired: (prev.pipeline_counts?.hired || 0) + 1,
+                              ...(app.pipeline_stage === 'interviewing' ? { interviewing: Math.max(0, (prev.pipeline_counts?.interviewing || 0) - 1) } : {}),
+                              ...(app.pipeline_stage === 'shortlisted' ? { shortlisted: Math.max(0, (prev.pipeline_counts?.shortlisted || 0) - 1) } : {}),
+                            },
+                          }));
+                          setSelectedCandidate(null);
+                          toast.success(`${app.seeker_name} marked as hired!`);
+                        } catch {
+                          toast.error('Failed to update candidate');
+                        }
                       }}
-                      className="w-full rounded-xl bg-purple-500/20 border border-purple-500/30 text-purple-400 hover:bg-purple-500/30"
+                      className="w-full rounded-xl bg-success/20 border border-success/30 text-success hover:bg-success/30"
                       variant="outline"
                     >
-                      <Calendar className="w-4 h-4 mr-1.5" />
-                      Schedule Interview
+                      <Check className="w-4 h-4 mr-1.5" />
+                      Mark as Hired
                     </Button>
                   )}
                   <Button
@@ -1117,7 +1150,9 @@ export default function RecruiterDashboard() {
                           ...prev,
                           pipeline_counts: {
                             ...prev.pipeline_counts,
-                            shortlisted: Math.max(0, (prev.pipeline_counts?.shortlisted || 0) - 1),
+                            ...(app.pipeline_stage === 'interviewing' ? { interviewing: Math.max(0, (prev.pipeline_counts?.interviewing || 0) - 1) } : {}),
+                            ...(app.pipeline_stage === 'shortlisted' ? { shortlisted: Math.max(0, (prev.pipeline_counts?.shortlisted || 0) - 1) } : {}),
+                            ...(app.pipeline_stage === 'hired' ? { hired: Math.max(0, (prev.pipeline_counts?.hired || 0) - 1) } : {}),
                           },
                         }));
                         setSelectedCandidate(null);
