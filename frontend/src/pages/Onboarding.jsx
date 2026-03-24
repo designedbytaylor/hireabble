@@ -55,6 +55,7 @@ export default function Onboarding() {
   const fileInputRef = useRef(null);
   
   const [detectingLocation, setDetectingLocation] = useState(false);
+  const [locationCoords, setLocationCoords] = useState(null);
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
   const [enablingNotifications, setEnablingNotifications] = useState(false);
   const [parsingResume, setParsingResume] = useState(false);
@@ -112,6 +113,7 @@ export default function Onboarding() {
           else if (country) locationStr += `, ${country}`;
           if (locationStr) {
             handleChange('location', locationStr);
+            setLocationCoords({ lat: latitude, lng: longitude });
             toast.success(`Location detected: ${locationStr}`);
           } else {
             toast.error('Could not determine your city. Please enter manually.');
@@ -329,6 +331,7 @@ export default function Onboarding() {
           ? resumeCertifications
           : formData.certifications ? formData.certifications.split(',').map(c => c.trim()).filter(Boolean) : [],
         location: formData.location || null,
+        ...(locationCoords ? { location_lat: locationCoords.lat, location_lng: locationCoords.lng } : {}),
         work_preference: formData.work_preference,
         desired_salary: formData.desired_salary ? parseInt(formData.desired_salary) : null,
         available_immediately: formData.available_immediately,
@@ -874,7 +877,7 @@ export default function Onboarding() {
                       </Label>
                       <LocationAutocomplete
                         value={formData.location}
-                        onChange={(val) => handleChange('location', val)}
+                        onChange={(val, coords) => { handleChange('location', val); if (coords) setLocationCoords(coords); }}
                         placeholder="Start typing your city..."
                         showDetectButton
                         data-testid="location-input"

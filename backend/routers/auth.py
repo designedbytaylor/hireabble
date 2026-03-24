@@ -989,6 +989,8 @@ async def update_profile(updates: dict, current_user: dict = Depends(get_current
         "interests", "resume_theme", "include_photo_on_resume",
         "company_logo", "company_address", "company_website", "company_about",
         "company_size", "company_industry",
+        "location_lat", "location_lng",
+        "company_address_lat", "company_address_lng",
     ]
     
     update_data = {k: v for k, v in updates.items() if k in allowed_fields}
@@ -1009,6 +1011,10 @@ async def update_profile(updates: dict, current_user: dict = Depends(get_current
         "include_photo_on_resume": bool,
         "company_logo": str, "company_address": str, "company_website": str,
         "company_about": str, "company_size": str, "company_industry": str,
+        "location_lat": (float, int, type(None)),
+        "location_lng": (float, int, type(None)),
+        "company_address_lat": (float, int, type(None)),
+        "company_address_lng": (float, int, type(None)),
     }
     for field, expected_type in _FIELD_TYPES.items():
         if field in update_data and update_data[field] is not None:

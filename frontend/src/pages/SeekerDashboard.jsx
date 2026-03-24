@@ -1568,7 +1568,7 @@ function JobDetailSheet({ job, onClose }) {
             )}
             <span className="px-3 py-1.5 rounded-full bg-secondary/20 text-secondary text-sm flex items-center gap-1">
               <MapPin className="w-3.5 h-3.5" />
-              {job.location}
+              {job.location}{job.distance_label && ` · ${job.distance_label}`}
             </span>
             <span className="px-3 py-1.5 rounded-full bg-accent text-accent-foreground text-sm capitalize">
               {job.job_type}
@@ -1906,7 +1906,7 @@ function SwipeCard({ job, onSwipe, expanded, setExpanded }) {
             )}
             <span className="px-3 py-1.5 rounded-full bg-secondary/20 text-secondary text-sm flex items-center gap-1">
               <MapPin className="w-3.5 h-3.5" />
-              {job.location}
+              {job.location}{job.distance_label && ` · ${job.distance_label}`}
             </span>
             <span className="px-3 py-1.5 rounded-full bg-accent text-accent-foreground text-sm capitalize">
               {job.job_type}

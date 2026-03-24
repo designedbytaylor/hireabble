@@ -141,6 +141,8 @@ export default function Profile() {
     company_size: '', company_industry: '',
   });
   const [savingCompany, setSavingCompany] = useState(false);
+  const [locationCoords, setLocationCoords] = useState(null);
+  const [companyAddressCoords, setCompanyAddressCoords] = useState(null);
   const [workHistory, setWorkHistory] = useState([]);
   const [certifications, setCertifications] = useState([]);
   const [interests, setInterests] = useState([]);
@@ -537,6 +539,7 @@ export default function Profile() {
         references_hidden: referencesHidden,
         show_contact_on_resume: showContactOnResume,
         include_photo_on_resume: includePhotoOnResume,
+        ...(locationCoords ? { location_lat: locationCoords.lat, location_lng: locationCoords.lng } : {}),
       };
       await updateProfile(updates);
       toast.success('Profile updated!');
@@ -645,6 +648,7 @@ export default function Profile() {
           else if (country) locationStr += `, ${country}`;
           if (locationStr) {
             setFormData(prev => ({ ...prev, location: locationStr }));
+            setLocationCoords({ lat: latitude, lng: longitude });
             toast.success(`Location detected: ${locationStr}`);
           } else {
             toast.error('Could not determine your city');
@@ -1506,7 +1510,7 @@ export default function Profile() {
               <Label htmlFor="location">Location</Label>
               <LocationAutocomplete
                 value={formData.location}
-                onChange={(val) => setFormData({ ...formData, location: val })}
+                onChange={(val, coords) => { setFormData({ ...formData, location: val }); if (coords) setLocationCoords(coords); }}
                 placeholder="e.g., San Francisco, CA"
                 showDetectButton
                 data-testid="profile-location-input"
@@ -1551,16 +1555,12 @@ export default function Profile() {
               <div className="glass-card rounded-3xl p-6 space-y-4">
                 <div className="space-y-2">
                   <Label htmlFor="company_address">Company Address</Label>
-                  <div className="relative">
-                    <MapPin className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-                    <Input
-                      id="company_address"
-                      value={companyInfo.company_address}
-                      onChange={(e) => setCompanyInfo(prev => ({ ...prev, company_address: e.target.value }))}
-                      placeholder="e.g., 123 Main St, San Francisco, CA"
-                      className="pl-12 h-12 rounded-xl bg-background border-border"
-                    />
-                  </div>
+                  <LocationAutocomplete
+                    value={companyInfo.company_address}
+                    onChange={(val, coords) => { setCompanyInfo(prev => ({ ...prev, company_address: val })); if (coords) setCompanyAddressCoords(coords); }}
+                    placeholder="e.g., 123 Main St, San Francisco, CA"
+                    showDetectButton
+                  />
                 </div>
 
                 <div className="space-y-2">
@@ -1644,7 +1644,10 @@ export default function Profile() {
                   onClick={async () => {
                     setSavingCompany(true);
                     try {
-                      await updateProfile(companyInfo);
+                      await updateProfile({
+                        ...companyInfo,
+                        ...(companyAddressCoords ? { company_address_lat: companyAddressCoords.lat, company_address_lng: companyAddressCoords.lng } : {}),
+                      });
                       toast.success('Company info updated!');
                     } catch {
                       toast.error('Failed to update company info');
