@@ -144,6 +144,7 @@ export default function Profile() {
   const [locationCoords, setLocationCoords] = useState(null);
   const [companyAddressCoords, setCompanyAddressCoords] = useState(null);
   const [workHistory, setWorkHistory] = useState([]);
+  const [education, setEducation] = useState([]);
   const [certifications, setCertifications] = useState([]);
   const [interests, setInterests] = useState([]);
   const [references, setReferences] = useState([]);
