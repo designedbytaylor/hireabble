@@ -90,6 +90,7 @@ function mergeStatsWithCache(serverStats, userId) {
       applications_sent: serverStats.applications_sent || 0,
       super_likes_used: serverStats.super_likes_used || 0,
       matches: serverStats.matches || 0,
+      profile_views: serverStats.profile_views || 0,
       _pending: { applications_sent: 0, super_likes_used: 0, matches: 0 },
       _serverBaseline: { ...serverStats },
     };
@@ -104,6 +105,7 @@ function mergeStatsWithCache(serverStats, userId) {
     applications_sent: serverStats.applications_sent || 0,
     super_likes_used: serverStats.super_likes_used || 0,
     matches: serverStats.matches || 0,
+    profile_views: serverStats.profile_views || 0,
     _pending: { applications_sent: 0, super_likes_used: 0, matches: 0 },
     _serverBaseline: { ...serverStats },
   };
@@ -1027,6 +1029,18 @@ export default function SeekerDashboard() {
         </div>
         <div className="flex items-center gap-1">
           <NotificationBell />
+          <button
+            onClick={() => navigate('/profile-viewers')}
+            className="relative p-2 rounded-xl hover:bg-accent transition-colors"
+            title="Profile Views"
+          >
+            <Eye className="w-5 h-5 text-muted-foreground" />
+            {(stats.profile_views || 0) > 0 && (
+              <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] rounded-full bg-amber-500 text-white text-[10px] font-bold flex items-center justify-center px-1">
+                {stats.profile_views > 99 ? '99+' : stats.profile_views}
+              </span>
+            )}
+          </button>
           <button
             onClick={() => navigate('/interviews')}
             className="p-2 rounded-xl hover:bg-accent transition-colors"
