@@ -180,6 +180,9 @@ export default function Profile() {
         company_size: user.company_size || '',
         company_industry: user.company_industry || '',
       });
+      if (user.location_lat && user.location_lng) {
+        setLocationCoords({ lat: user.location_lat, lng: user.location_lng });
+      }
       setWorkHistory(user.work_history || []);
       setEducation(user.education || []);
       setCertifications(user.certifications || []);
