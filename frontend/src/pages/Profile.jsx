@@ -529,8 +529,23 @@ export default function Profile() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
-    
+
     try {
+      // If location text changed but no coords selected from autocomplete, geocode it
+      let finalCoords = locationCoords;
+      if (formData.location && !finalCoords) {
+        try {
+          const geoRes = await fetch(
+            `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(formData.location)}&format=json&limit=1&addressdetails=0`
+          );
+          const geoData = await geoRes.json();
+          if (geoData.length > 0) {
+            finalCoords = { lat: parseFloat(geoData[0].lat), lng: parseFloat(geoData[0].lon) };
+            setLocationCoords(finalCoords);
+          }
+        } catch { /* geocode failed, save without coords */ }
+      }
+
       const updates = {
         ...formData,
         skills: formData.skills.split(',').map(s => s.trim()).filter(Boolean),
@@ -543,7 +558,7 @@ export default function Profile() {
         references_hidden: referencesHidden,
         show_contact_on_resume: showContactOnResume,
         include_photo_on_resume: includePhotoOnResume,
-        ...(locationCoords ? { location_lat: locationCoords.lat, location_lng: locationCoords.lng } : {}),
+        ...(finalCoords ? { location_lat: finalCoords.lat, location_lng: finalCoords.lng } : {}),
       };
       await updateProfile(updates);
       toast.success('Profile updated!');
@@ -1514,7 +1529,7 @@ export default function Profile() {
               <Label htmlFor="location">Location</Label>
               <LocationAutocomplete
                 value={formData.location}
-                onChange={(val, coords) => { setFormData({ ...formData, location: val }); if (coords) setLocationCoords(coords); }}
+                onChange={(val, coords) => { setFormData({ ...formData, location: val }); setLocationCoords(coords || null); }}
                 placeholder="e.g., San Francisco, CA"
                 showDetectButton
                 data-testid="profile-location-input"
