@@ -1620,6 +1620,20 @@ _SEEKER_PROFILES = [
     {"title": "Android Developer", "bio": "Building modern Android apps with Kotlin and Jetpack Compose. Material Design expert.", "skills": ["Kotlin", "Jetpack Compose", "Android SDK", "Room", "Retrofit", "Coroutines"], "experience_years": 5, "school": "Georgia Tech", "degree": "bachelors", "current_employer": "Google"},
 ]
 _LOCATIONS = ["San Francisco, CA", "New York, NY", "Seattle, WA", "Austin, TX", "Denver, CO", "Chicago, IL", "Los Angeles, CA", "Portland, OR", "Remote", "Boston, MA", "Miami, FL", "Atlanta, GA"]
+
+_LOCATION_COORDS = {
+    "San Francisco, CA": (37.7749, -122.4194),
+    "New York, NY": (40.7128, -74.0060),
+    "Seattle, WA": (47.6062, -122.3321),
+    "Austin, TX": (30.2672, -97.7431),
+    "Denver, CO": (39.7392, -104.9903),
+    "Chicago, IL": (41.8781, -87.6298),
+    "Los Angeles, CA": (34.0522, -118.2437),
+    "Portland, OR": (45.5152, -122.6784),
+    "Boston, MA": (42.3601, -71.0589),
+    "Miami, FL": (25.7617, -80.1918),
+    "Atlanta, GA": (33.7490, -84.3880),
+}
 _COMPANY_NAMES = [
     "TechVision", "CloudScale", "GreenStack", "FinFlow", "HealthBridge",
     "DataPulse", "NovaSoft", "Quantum", "SkyLabs", "CodeForge",
@@ -1981,12 +1995,14 @@ async def seed_test_data(body: dict = {}, admin: dict = Depends(get_current_admi
 
         photo_url = shuffled_headshots[i]
         avatar = f"https://api.dicebear.com/7.x/initials/svg?seed={user_id}"
+        seeker_location = random.choice(_LOCATIONS)
+        seeker_coords = _LOCATION_COORDS.get(seeker_location)
         user_doc = {
             "id": user_id, "email": email, "password": password,
             "name": name, "role": "seeker", "company": None,
             "avatar": avatar, "photo_url": photo_url, "video_url": None,
             "title": profile["title"], "bio": profile["bio"], "skills": profile["skills"],
-            "experience_years": profile["experience_years"], "location": random.choice(_LOCATIONS),
+            "experience_years": profile["experience_years"], "location": seeker_location,
             "current_employer": profile.get("current_employer"),
             "previous_employers": [], "school": profile.get("school"),
             "degree": profile.get("degree"), "certifications": [],
@@ -1996,6 +2012,9 @@ async def seed_test_data(body: dict = {}, admin: dict = Depends(get_current_admi
             "onboarding_complete": True, "push_subscription": None,
             "created_at": (datetime.now(timezone.utc) - timedelta(days=random.randint(1, 60))).isoformat(),
         }
+        if seeker_coords:
+            user_doc["location_lat"] = seeker_coords[0]
+            user_doc["location_lng"] = seeker_coords[1]
         seeker_docs.append(user_doc)
 
     recruiter_docs = []
@@ -2008,13 +2027,15 @@ async def seed_test_data(body: dict = {}, admin: dict = Depends(get_current_admi
         brand_color = _BRAND_COLORS[i % len(_BRAND_COLORS)]
         rec_photo = shuffled_rec_headshots[i]
         avatar = f"https://api.dicebear.com/7.x/initials/svg?seed={user_id}"
+        rec_location = random.choice(["San Francisco, CA", "New York, NY", "Remote"])
+        rec_coords = _LOCATION_COORDS.get(rec_location)
         user_doc = {
             "id": user_id, "email": email, "password": password,
             "name": recruiter_name, "role": "recruiter",
             "company": company["name"], "avatar": avatar,
             "photo_url": rec_photo, "video_url": None, "title": "Talent Acquisition",
             "bio": company["description"], "skills": [], "experience_years": None,
-            "location": random.choice(["San Francisco, CA", "New York, NY", "Remote"]),
+            "location": rec_location,
             "current_employer": None, "previous_employers": [],
             "school": None, "degree": None, "certifications": [],
             "work_preference": None, "desired_salary": None,
@@ -2022,6 +2043,9 @@ async def seed_test_data(body: dict = {}, admin: dict = Depends(get_current_admi
             "push_subscription": None,
             "created_at": (datetime.now(timezone.utc) - timedelta(days=random.randint(1, 90))).isoformat(),
         }
+        if rec_coords:
+            user_doc["location_lat"] = rec_coords[0]
+            user_doc["location_lng"] = rec_coords[1]
         user_doc["_brand_color"] = brand_color  # in-memory only, for job logo generation
         recruiter_docs.append(user_doc)
 
@@ -2066,6 +2090,10 @@ async def seed_test_data(body: dict = {}, admin: dict = Depends(get_current_admi
                 "is_active": True,
                 "created_at": (datetime.now(timezone.utc) - timedelta(days=random.randint(0, 30))).isoformat(),
             }
+            job_coords = _LOCATION_COORDS.get(job_data.get("location", ""))
+            if job_coords:
+                job_doc["location_lat"] = job_coords[0]
+                job_doc["location_lng"] = job_coords[1]
             job_docs.append(job_doc)
     if job_docs:
         await db.jobs.insert_many(job_docs)
