@@ -421,7 +421,7 @@ export default function Profile() {
     try {
       const fd = new FormData();
       fd.append('file', new File([blob], 'logo.jpg', { type: 'image/jpeg' }));
-      const res = await axios.post(`${API}/upload/photo`, fd, {
+      const res = await axios.post(`${API}/upload/photo?purpose=company_logo`, fd, {
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'multipart/form-data' },
       });
       await updateProfile({ company_logo: res.data.photo_url });
@@ -804,6 +804,7 @@ export default function Profile() {
                     src={user?.company_logo || `https://api.dicebear.com/7.x/identicon/svg?seed=${encodeURIComponent(user?.company || user?.name || 'company')}`}
                     alt="Company Logo"
                     className="w-16 h-16 rounded-xl border-2 border-border object-cover bg-background"
+                    onError={(e) => { e.target.src = `https://api.dicebear.com/7.x/identicon/svg?seed=${encodeURIComponent(user?.company || user?.name || 'company')}`; }}
                   />
                   <button
                     onClick={() => logoInputRef.current?.click()}

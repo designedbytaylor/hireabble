@@ -495,7 +495,8 @@ async def _track_upload(user_id: str, user_name: str, media_type: str, category:
 async def upload_file(
     request: Request,
     file: UploadFile = File(...),
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_current_user),
+    purpose: str = "profile_photo",
 ):
     """Upload a profile photo (Supabase Storage or local fallback)"""
     if file.content_type not in ALLOWED_IMAGE_TYPES:
@@ -557,11 +558,12 @@ async def upload_file(
         # Local fallback
         photo_url = _save_local("photos", filename, contents)
 
-    await db.users.update_one(
-        {"id": current_user["id"]},
-        {"$set": {"photo_url": photo_url}}
-    )
-    invalidate_user(current_user["id"])
+    if purpose == "profile_photo":
+        await db.users.update_one(
+            {"id": current_user["id"]},
+            {"$set": {"photo_url": photo_url}}
+        )
+        invalidate_user(current_user["id"])
 
     # Track upload
     await _track_upload(
