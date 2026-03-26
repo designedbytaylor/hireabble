@@ -39,6 +39,7 @@ export default function RecruiterOnboarding() {
     try {
       const fd = new FormData();
       fd.append('file', file);
+      fd.append('purpose', 'company_logo');
       const response = await axios.post(`${API}/upload/photo`, fd, {
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'multipart/form-data' },
       });
