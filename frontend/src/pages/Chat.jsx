@@ -348,6 +348,21 @@ export default function Chat() {
       : { name: match.seeker_name, subtitle: match.job_title, photo: getPhotoUrl(match.seeker_photo || match.seeker_avatar, match.seeker_name || match.seeker_id) }
   ) : null;
 
+  // Group messages by date (memoized — must be before early returns to satisfy Rules of Hooks)
+  const groupedMessages = useMemo(() => {
+    const grouped = [];
+    let lastDate = '';
+    messages.forEach(msg => {
+      const msgDate = new Date(msg.created_at).toLocaleDateString();
+      if (msgDate !== lastDate) {
+        grouped.push({ type: 'date', date: msgDate, id: `date-${msgDate}` });
+        lastDate = msgDate;
+      }
+      grouped.push({ type: 'message', ...msg });
+    });
+    return grouped;
+  }, [messages]);
+
   if (loading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -366,21 +381,6 @@ export default function Chat() {
       </div>
     );
   }
-
-  // Group messages by date (memoized to avoid recalc every render)
-  const groupedMessages = useMemo(() => {
-    const grouped = [];
-    let lastDate = '';
-    messages.forEach(msg => {
-      const msgDate = new Date(msg.created_at).toLocaleDateString();
-      if (msgDate !== lastDate) {
-        grouped.push({ type: 'date', date: msgDate, id: `date-${msgDate}` });
-        lastDate = msgDate;
-      }
-      grouped.push({ type: 'message', ...msg });
-    });
-    return grouped;
-  }, [messages]);
 
   return (
     <div className="h-screen bg-background flex flex-col" role="main" aria-label="Chat">
