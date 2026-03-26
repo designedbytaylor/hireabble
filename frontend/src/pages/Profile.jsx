@@ -425,6 +425,7 @@ export default function Profile() {
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'multipart/form-data' },
       });
       await updateProfile({ company_logo: res.data.photo_url });
+      patchUser({ company_logo: res.data.photo_url });
       toast.success('Company logo updated!');
     } catch (error) {
       toast.error(error.response?.data?.detail || 'Failed to upload logo');
@@ -801,6 +802,7 @@ export default function Profile() {
               <div className="flex items-center gap-4">
                 <div className="relative">
                   <img
+                    key={user?.company_logo || 'default-logo'}
                     src={user?.company_logo || `https://api.dicebear.com/7.x/identicon/svg?seed=${encodeURIComponent(user?.company || user?.name || 'company')}`}
                     alt="Company Logo"
                     className="w-16 h-16 rounded-xl border-2 border-border object-cover bg-background"

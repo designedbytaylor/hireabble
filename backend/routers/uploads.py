@@ -534,14 +534,15 @@ async def upload_file(
     if _USE_SUPABASE:
         supabase = _get_supabase()
 
-        # Remove old photo if it exists in the bucket
-        user = await db.users.find_one({"id": current_user["id"]})
-        if user and user.get("photo_url") and SUPABASE_URL in (user.get("photo_url") or ""):
-            old_path = user["photo_url"].split(f"/{PHOTO_BUCKET}/")[-1]
-            try:
-                supabase.storage.from_(PHOTO_BUCKET).remove([old_path])
-            except Exception:
-                pass
+        # Remove old file if it exists in the bucket (only for profile photos, not company logos)
+        if purpose == "profile_photo":
+            user = await db.users.find_one({"id": current_user["id"]})
+            if user and user.get("photo_url") and SUPABASE_URL in (user.get("photo_url") or ""):
+                old_path = user["photo_url"].split(f"/{PHOTO_BUCKET}/")[-1]
+                try:
+                    supabase.storage.from_(PHOTO_BUCKET).remove([old_path])
+                except Exception:
+                    pass
 
         try:
             supabase.storage.from_(PHOTO_BUCKET).upload(

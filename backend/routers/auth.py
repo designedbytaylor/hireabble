@@ -1023,7 +1023,7 @@ async def update_profile(updates: dict, current_user: dict = Depends(get_current
 
     # Validate URL fields — must be valid HTTPS URLs from trusted domains
     _TRUSTED_URL_DOMAINS = {"supabase.co", "dicebear.com", "googleapis.com", "hireabble.com", "localhost"}
-    for url_field in ("photo_url", "video_url", "avatar"):
+    for url_field in ("photo_url", "video_url", "avatar", "company_logo"):
         if url_field in update_data and update_data[url_field]:
             url_val = str(update_data[url_field])
             if not (url_val.startswith("https://") or url_val.startswith("http://")):
