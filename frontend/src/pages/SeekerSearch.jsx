@@ -16,6 +16,22 @@ import useDocumentTitle from '../hooks/useDocumentTitle';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
+// Sync applied job IDs to the swipe page's localStorage cache so
+// jobs applied via search are filtered out of the swipe deck.
+function addToSwipedIds(jobId) {
+  try {
+    const cached = localStorage.getItem('cached_user');
+    const userId = cached ? JSON.parse(cached).id : null;
+    const key = userId ? `hireabble_swiped_ids_${userId}` : 'hireabble_swiped_ids';
+    const raw = localStorage.getItem(key);
+    const ids = raw ? JSON.parse(raw) : [];
+    if (!ids.includes(jobId)) {
+      ids.push(jobId);
+      localStorage.setItem(key, JSON.stringify(ids));
+    }
+  } catch { /* ignore */ }
+}
+
 function formatSalary(min, max) {
   if (!min && !max) return null;
   const fmt = (n) => n >= 1000 ? `$${Math.round(n / 1000)}k` : `$${n}`;
@@ -91,7 +107,8 @@ export default function SeekerSearch() {
       const res = await axios.get(`${API}/jobs?${params.toString()}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      setResults(res.data);
+      // Map backend's already_applied flag to _applied for UI state
+      setResults(res.data.map(j => j.already_applied ? { ...j, _applied: true } : j));
     } catch {
       toast.error('Search failed. Please try again.');
     } finally {
@@ -134,11 +151,13 @@ export default function SeekerSearch() {
         headers: { Authorization: `Bearer ${token}` },
       });
       setResults(prev => prev?.map(j => j.id === jobId ? { ...j, _applied: true } : j));
+      addToSwipedIds(jobId);
       toast.success('Applied!');
     } catch (err) {
       const detail = err.response?.data?.detail || '';
       if (detail.toLowerCase().includes('already swiped')) {
         setResults(prev => prev?.map(j => j.id === jobId ? { ...j, _applied: true } : j));
+        addToSwipedIds(jobId);
         toast.info('Already applied');
       } else {
         toast.error(detail || 'Failed to apply');
