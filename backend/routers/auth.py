@@ -1021,11 +1021,14 @@ async def update_profile(updates: dict, current_user: dict = Depends(get_current
             if not isinstance(update_data[field], expected_type):
                 del update_data[field]
 
-    # Validate URL fields — must be valid HTTPS URLs from trusted domains
+    # Validate URL fields — must be valid HTTPS URLs from trusted domains (or relative paths from local uploads)
     _TRUSTED_URL_DOMAINS = {"supabase.co", "dicebear.com", "googleapis.com", "hireabble.com", "localhost"}
     for url_field in ("photo_url", "video_url", "avatar", "company_logo"):
         if url_field in update_data and update_data[url_field]:
             url_val = str(update_data[url_field])
+            # Allow relative paths from local uploads (e.g. /uploads/photos/...)
+            if url_val.startswith("/uploads/"):
+                continue
             if not (url_val.startswith("https://") or url_val.startswith("http://")):
                 del update_data[url_field]
             else:
