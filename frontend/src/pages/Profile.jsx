@@ -424,7 +424,7 @@ export default function Profile() {
       const res = await axios.post(`${API}/upload/photo?purpose=company_logo`, fd, {
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'multipart/form-data' },
       });
-      await updateProfile({ company_logo: res.data.photo_url });
+      // Backend sets company_logo directly on the user doc, just update local state
       patchUser({ company_logo: res.data.photo_url });
       toast.success('Company logo updated!');
     } catch (error) {
