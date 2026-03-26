@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Send, Briefcase, User, Flag, ShieldBan, Calendar, CheckCheck, Check, Image, X, Video, Square, Loader2, Clock, Phone, MapPin, FileText } from 'lucide-react';
 import { getPhotoUrl, handleImgError } from '../utils/helpers';
@@ -61,7 +61,15 @@ export default function Chat() {
 
   // WebSocket connection
   const connectWebSocket = useCallback(() => {
-    if (!token || wsRef.current?.readyState === WebSocket.OPEN) return;
+    if (!token) return;
+    // Prevent duplicate connections: skip if already open OR still connecting
+    if (wsRef.current?.readyState === WebSocket.OPEN || wsRef.current?.readyState === WebSocket.CONNECTING) return;
+
+    // Close any existing socket before opening a new one
+    if (wsRef.current) {
+      wsRef.current.onclose = null; // prevent reconnect loop from old socket
+      wsRef.current.close();
+    }
 
     try {
       wsRef.current = new WebSocket(`${WS_URL}/ws`, [`access_token.${token}`]);
@@ -74,14 +82,15 @@ export default function Chat() {
       wsRef.current.onclose = () => {
         setWsConnected(false);
         setWsReconnectCount(prev => {
-          const next = prev + 1;
-          if (next >= 5) {
+          const nextCount = prev + 1;
+          if (nextCount >= 5) {
             toast.error('Connection lost. Check your internet and try refreshing.', { id: 'ws-error' });
           }
-          return next;
+          // Schedule reconnect with exponential backoff using the updated count
+          const delay = Math.min(3000 * Math.pow(1.5, nextCount), 30000);
+          reconnectTimeoutRef.current = setTimeout(connectWebSocket, delay);
+          return nextCount;
         });
-        const delay = Math.min(3000 * Math.pow(1.5, next), 30000);
-        reconnectTimeoutRef.current = setTimeout(connectWebSocket, delay);
       };
 
       wsRef.current.onerror = () => {};
@@ -358,17 +367,20 @@ export default function Chat() {
     );
   }
 
-  // Group messages by date
-  const groupedMessages = [];
-  let lastDate = '';
-  messages.forEach(msg => {
-    const msgDate = new Date(msg.created_at).toLocaleDateString();
-    if (msgDate !== lastDate) {
-      groupedMessages.push({ type: 'date', date: msgDate, id: `date-${msgDate}` });
-      lastDate = msgDate;
-    }
-    groupedMessages.push({ type: 'message', ...msg });
-  });
+  // Group messages by date (memoized to avoid recalc every render)
+  const groupedMessages = useMemo(() => {
+    const grouped = [];
+    let lastDate = '';
+    messages.forEach(msg => {
+      const msgDate = new Date(msg.created_at).toLocaleDateString();
+      if (msgDate !== lastDate) {
+        grouped.push({ type: 'date', date: msgDate, id: `date-${msgDate}` });
+        lastDate = msgDate;
+      }
+      grouped.push({ type: 'message', ...msg });
+    });
+    return grouped;
+  }, [messages]);
 
   return (
     <div className="h-screen bg-background flex flex-col" role="main" aria-label="Chat">
@@ -457,7 +469,7 @@ export default function Chat() {
       />
 
       {/* Messages */}
-      <main className="flex-1 overflow-y-auto p-4 space-y-2">
+      <main className="flex-1 overflow-y-auto p-4 space-y-2" aria-label="Messages" aria-live="polite">
         {messages.length === 0 ? (
           <div className="h-full flex flex-col items-center justify-center text-center">
             <div className="w-16 h-16 rounded-full bg-primary/20 flex items-center justify-center mb-4">
@@ -547,9 +559,9 @@ export default function Chat() {
 
         {/* Typing indicator */}
         {otherTyping && (
-          <div className="flex justify-start">
+          <div className="flex justify-start" role="status" aria-label={`${otherPerson?.name || 'User'} is typing`}>
             <div className="px-4 py-3 rounded-2xl bg-card border border-border rounded-bl-md">
-              <div className="flex gap-1">
+              <div className="flex gap-1" aria-hidden="true">
                 <span className="w-2 h-2 rounded-full bg-muted-foreground animate-bounce" style={{ animationDelay: '0ms' }} />
                 <span className="w-2 h-2 rounded-full bg-muted-foreground animate-bounce" style={{ animationDelay: '150ms' }} />
                 <span className="w-2 h-2 rounded-full bg-muted-foreground animate-bounce" style={{ animationDelay: '300ms' }} />

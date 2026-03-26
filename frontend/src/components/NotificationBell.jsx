@@ -29,9 +29,18 @@ export default function NotificationBell() {
         setIsOpen(false);
       }
     };
+    const handleEscapeKey = (event) => {
+      if (event.key === 'Escape' && isOpen) {
+        setIsOpen(false);
+      }
+    };
     document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
+    document.addEventListener('keydown', handleEscapeKey);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleEscapeKey);
+    };
+  }, [isOpen]);
 
   const fetchUnreadCount = async () => {
     if (!token) return;
@@ -151,6 +160,9 @@ export default function NotificationBell() {
         onClick={handleBellClick}
         className="relative p-2 rounded-xl hover:bg-accent transition-colors"
         data-testid="notification-bell"
+        aria-label={unreadCount > 0 ? `Notifications (${unreadCount} unread)` : 'Notifications'}
+        aria-expanded={isOpen}
+        aria-haspopup="true"
       >
         <Bell className="w-5 h-5" />
         {unreadCount > 0 && (

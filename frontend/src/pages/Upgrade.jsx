@@ -79,6 +79,7 @@ export default function Upgrade() {
   const [purchasing, setPurchasing] = useState(null);
   const [addOns, setAddOns] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState(false);
 
   const isSeeker = user?.role === 'seeker';
   const preselect = searchParams.get('tier');
@@ -202,6 +203,7 @@ export default function Upgrade() {
       setCurrentDuration(res.data.current_duration);
     } catch (err) {
       console.error('Failed to fetch tiers:', err);
+      setFetchError(true);
     } finally {
       setLoading(false);
     }
@@ -287,6 +289,21 @@ export default function Upgrade() {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="w-10 h-10 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (fetchError && tiers.length === 0) {
+    return (
+      <div className="min-h-screen bg-background flex flex-col items-center justify-center p-8 text-center">
+        <p className="text-lg font-semibold mb-2">Failed to load pricing</p>
+        <p className="text-muted-foreground mb-6">Please check your connection and try again.</p>
+        <button
+          onClick={() => { setFetchError(false); setLoading(true); fetchTiers(); fetchAddOns(); }}
+          className="px-6 py-3 rounded-xl bg-primary text-white font-medium hover:opacity-90 transition-opacity"
+        >
+          Retry
+        </button>
       </div>
     );
   }

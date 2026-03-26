@@ -339,12 +339,61 @@ Categories to use: nudity, sexual, violence, gore, hate, drugs, weapons, suggest
         logger.info(f"AI content moderation verdict: {result['verdict']} — {result['reason']}")
 
     except Exception as e:
-        logger.error(f"AI content moderation failed: {type(e).__name__}: {e} — defaulting to safe")
-        # Fail open: don't block uploads if AI is unavailable
-        result["verdict"] = _VERDICT_SAFE
-        result["reason"] = f"Moderation unavailable: {type(e).__name__}"
+        logger.error(f"AI content moderation failed: {type(e).__name__}: {e} — running lightweight fallback checks")
+        # Lightweight fallback when AI is unavailable:
+        # Let normal uploads through but flag suspicious ones for manual review.
+        # This avoids flooding the moderation queue if AI goes down at scale.
+        is_suspicious = _lightweight_image_check(contents, content_type)
+        if is_suspicious:
+            result["verdict"] = _VERDICT_FLAGGED
+            result["reason"] = f"AI unavailable — flagged by fallback heuristics for admin review"
+        else:
+            result["verdict"] = _VERDICT_SAFE
+            result["reason"] = f"AI unavailable — passed lightweight checks"
 
     return result
+
+
+def _lightweight_image_check(contents: bytes, content_type: str) -> bool:
+    """
+    Basic heuristic checks when AI moderation is unavailable.
+    Returns True if the image looks suspicious and should be queued for manual review.
+    Only flags outliers — most normal uploads pass through without review.
+    """
+    # Flag excessively large images (>10MB raw — unusual for profile photos)
+    if len(contents) > 10 * 1024 * 1024:
+        return True
+
+    # Validate that the file is actually an image (not a renamed executable/script)
+    valid_headers = {
+        b'\xff\xd8\xff': 'jpeg',      # JPEG
+        b'\x89PNG': 'png',             # PNG
+        b'GIF8': 'gif',                # GIF
+        b'RIFF': 'webp',               # WebP (RIFF container)
+    }
+    header = contents[:4]
+    if not any(header.startswith(sig) for sig in valid_headers):
+        return True  # Not a recognized image format
+
+    # Try to detect anomalous image properties with PIL if available
+    try:
+        from PIL import Image
+        img = Image.open(io.BytesIO(contents))
+        w, h = img.size
+        # Flag extremely unusual aspect ratios (>6:1) — often spam/banner ads
+        if w > 0 and h > 0:
+            ratio = max(w, h) / min(w, h)
+            if ratio > 6:
+                return True
+        # Flag tiny images (<32px) — often tracking pixels or placeholder spam
+        if w < 32 or h < 32:
+            return True
+    except Exception:
+        # If PIL can't open it, the file header check above already passed
+        # so this is likely a valid image format PIL just can't decode
+        pass
+
+    return False
 
 
 async def _check_video_content(contents: bytes, content_type: str) -> dict:

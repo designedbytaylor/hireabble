@@ -303,7 +303,7 @@ async def browse_jobs_public(
     limit: int = 20
 ):
     """Browse active jobs without authentication — limited fields for App Store compliance."""
-    query = {"is_active": True}
+    query = {"is_active": True, "is_flagged": {"$ne": True}}
     if job_type:
         query["job_type"] = job_type
     if experience_level:
@@ -356,7 +356,7 @@ async def get_jobs(
         ).to_list(1000)
         swiped_job_ids = [s["job_id"] for s in swiped_jobs]
 
-        query = {"is_active": True}
+        query = {"is_active": True, "is_flagged": {"$ne": True}}
 
         # Search page passes include_swiped=true so seekers can find any active job
         if not include_swiped:
@@ -498,7 +498,7 @@ async def get_company_jobs(recruiter_id: str, current_user: dict = Depends(get_c
 async def get_job_public(job_id: str):
     """Get basic public info for a job (no auth required) — used by QR code download page."""
     job = await db.jobs.find_one(
-        {"id": job_id, "is_active": True},
+        {"id": job_id, "is_active": True, "is_flagged": {"$ne": True}},
         {"_id": 0, "id": 1, "title": 1, "company": 1, "location": 1, "job_type": 1,
          "description": 1, "requirements": 1, "salary_min": 1, "salary_max": 1,
          "experience_level": 1, "employment_type": 1, "category": 1,
