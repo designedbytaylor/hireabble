@@ -2,7 +2,7 @@
 File uploads routes for Hireabble API — Supabase Storage
 Includes media tracking and automatic content moderation.
 """
-from fastapi import APIRouter, HTTPException, Depends, UploadFile, File, Request, Query
+from fastapi import APIRouter, HTTPException, Depends, UploadFile, File, Request, Query, Form
 from fastapi.responses import RedirectResponse
 from slowapi import Limiter
 from slowapi.util import get_remote_address
@@ -496,7 +496,7 @@ async def upload_file(
     request: Request,
     file: UploadFile = File(...),
     current_user: dict = Depends(get_current_user),
-    purpose: str = Query(default="profile_photo"),
+    purpose: str = Form(default="profile_photo"),
 ):
     """Upload a profile photo (Supabase Storage or local fallback)"""
     if file.content_type not in ALLOWED_IMAGE_TYPES:
