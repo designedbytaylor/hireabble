@@ -2802,6 +2802,46 @@ async def ai_generate_text(
         raise HTTPException(status_code=500, detail="An internal error occurred. Please try again.")
 
 
+# ==================== LAUNCH CHECKLIST ====================
+
+LAUNCH_CHECKLIST_KEY = "launch_checklist"
+
+
+@router.get("/admin/launch-checklist")
+async def get_launch_checklist(admin=Depends(get_current_admin)):
+    """Get launch checklist data (checklist items and notes)."""
+    doc = await db.site_settings.find_one({"key": LAUNCH_CHECKLIST_KEY})
+    data = doc.get("value", {}) if doc else {}
+    return {
+        "checklist": data.get("checklist", []),
+        "notes": data.get("notes", ""),
+    }
+
+
+@router.put("/admin/launch-checklist")
+async def update_launch_checklist(
+    body: dict = Body(...),
+    admin=Depends(get_current_admin),
+):
+    """Update launch checklist data. Accepts any subset of: checklist, notes."""
+    allowed_keys = {"checklist", "notes"}
+    updates = {k: v for k, v in body.items() if k in allowed_keys}
+    if not updates:
+        raise HTTPException(status_code=400, detail="No valid fields provided")
+
+    doc = await db.site_settings.find_one({"key": LAUNCH_CHECKLIST_KEY})
+    current = doc.get("value", {}) if doc else {}
+    current.update(updates)
+
+    await db.site_settings.update_one(
+        {"key": LAUNCH_CHECKLIST_KEY},
+        {"$set": {"key": LAUNCH_CHECKLIST_KEY, "value": current, "updated_at": datetime.now(timezone.utc)}},
+        upsert=True,
+    )
+
+    return {"message": "Launch checklist saved"}
+
+
 # ==================== APP HEALTH MONITORING ====================
 
 # Server start time for uptime tracking
