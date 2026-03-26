@@ -1022,7 +1022,7 @@ async def update_profile(updates: dict, current_user: dict = Depends(get_current
                 del update_data[field]
 
     # Validate URL fields — must be valid HTTPS URLs from trusted domains (or relative paths from local uploads)
-    _TRUSTED_URL_DOMAINS = {"supabase.co", "dicebear.com", "googleapis.com", "hireabble.com", "localhost"}
+    _TRUSTED_URL_DOMAINS = {"dicebear.com", "googleapis.com", "hireabble.com", "localhost"}
     for url_field in ("photo_url", "video_url", "avatar", "company_logo"):
         if url_field in update_data and update_data[url_field]:
             url_val = str(update_data[url_field])

@@ -112,7 +112,7 @@ This has been fixed MULTIPLE times. The root causes are always cache-related.
 
 ### Disaster Recovery Checklist
 1. MongoDB: Restore from Atlas snapshot or `mongodump` backup
-2. Supabase (file storage): Supabase handles its own backups; uploaded files are durable
+2. File storage: Uploaded files are stored on Railway volume — ensure volume is attached and persistent
 3. Backend: Redeploy from git on Railway (`railway up` or push to main)
 4. Frontend: Redeploy from git on Vercel (auto-deploys on push)
 5. Environment variables: Stored in Railway/Vercel dashboards — keep an encrypted copy offline

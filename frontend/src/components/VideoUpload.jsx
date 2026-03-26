@@ -16,7 +16,7 @@ export default function VideoUpload({ token, currentVideoUrl, onVideoChange }) {
 
   const getFullVideoUrl = (url) => {
     if (!url) return null;
-    // Supabase returns full URLs; legacy relative paths fall back to backend
+    // Full URLs are returned as-is; relative paths get the backend URL prepended
     if (url.startsWith('http')) return url;
     return `${BACKEND_URL}${url}`;
   };

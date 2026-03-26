@@ -73,10 +73,6 @@ def decrypt_value(ciphertext: str) -> str:
 RESEND_API_KEY = os.environ.get('RESEND_API_KEY')
 SENDER_EMAIL = os.environ.get('SENDER_EMAIL', 'onboarding@resend.dev')
 
-# Supabase Storage Configuration
-SUPABASE_URL = os.environ.get('SUPABASE_URL', '')
-SUPABASE_KEY = os.environ.get('SUPABASE_KEY', '')  # service_role key for storage uploads
-
 # Security
 security = HTTPBearer()
 
