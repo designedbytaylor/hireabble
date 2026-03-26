@@ -565,6 +565,12 @@ async def upload_file(
             {"$set": {"photo_url": photo_url}}
         )
         invalidate_user(current_user["id"])
+    elif purpose == "company_logo":
+        await db.users.update_one(
+            {"id": current_user["id"]},
+            {"$set": {"company_logo": photo_url}}
+        )
+        invalidate_user(current_user["id"])
 
     # Track upload
     await _track_upload(
