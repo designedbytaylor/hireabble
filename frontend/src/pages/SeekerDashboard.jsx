@@ -462,7 +462,7 @@ export default function SeekerDashboard() {
 
     // Save via API (fire and forget)
     setSavedJobIds(prev => { const next = new Set(prev); next.add(jobId); return next; });
-    axios.post(`${API}/jobs/${jobId}/save`, {}, { headers: { Authorization: `Bearer ${tokenRef.current}` } }).catch(() => {});
+    axios.post(`${API}/jobs/${jobId}/save`, {}, { headers: { Authorization: `Bearer ${tokenRef.current}` } }).catch(() => toast.error('Failed to save job'));
     toast.success('Saved for later');
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentIndex, jobs]);

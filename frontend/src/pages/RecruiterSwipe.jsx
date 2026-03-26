@@ -745,7 +745,7 @@ export default function RecruiterSwipe() {
             axios.put(`${API}/applications/${matchData.application_id}/stage`,
               { stage: 'shortlisted' },
               { headers: { Authorization: `Bearer ${token}` } }
-            ).then(() => toast.success('Candidate shortlisted!')).catch(() => {});
+            ).then(() => toast.success('Candidate shortlisted!')).catch(() => toast.error('Failed to shortlist candidate'));
           } : undefined}
         />
       )}

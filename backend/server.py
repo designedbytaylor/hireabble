@@ -507,6 +507,9 @@ async def startup():
     # Candidate notes
     await ensure_index(db.candidate_notes, [("recruiter_id", 1), ("seeker_id", 1)], unique=True)
 
+    # Stripe session idempotency (prevents duplicate webhook fulfillment)
+    await ensure_index(db.transactions, "stripe_session_id", unique=True, sparse=True)
+
     # Apple IAP transaction lock (prevents duplicate fulfillment)
     await ensure_index(db.apple_txn_locks, "apple_transaction_id", unique=True)
 

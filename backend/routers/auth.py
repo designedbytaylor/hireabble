@@ -592,16 +592,28 @@ async def reset_password(body: ResetPasswordRequest, request: Request):
         await db.password_reset_tokens.delete_one({"token": token_hash})
         raise HTTPException(status_code=400, detail="Reset token has expired")
 
+    # Validate password strength (same rules as change-password)
+    import re as _re
+    if len(body.password) < 8:
+        raise HTTPException(status_code=400, detail="Password must be at least 8 characters")
+    if not _re.search(r'[A-Z]', body.password):
+        raise HTTPException(status_code=400, detail="Password must contain at least one uppercase letter")
+    if not _re.search(r'[0-9]', body.password):
+        raise HTTPException(status_code=400, detail="Password must contain at least one number")
+    if not _re.search(r'[^A-Za-z0-9]', body.password):
+        raise HTTPException(status_code=400, detail="Password must contain at least one special character")
+
     # Update password
     hashed_password = hash_password(body.password)
     await db.users.update_one(
         {"id": token_doc["user_id"]},
-        {"$set": {"password": hashed_password}}
+        {"$set": {"password": hashed_password, "password_changed_at": datetime.now(timezone.utc).isoformat()}}
     )
 
-    # Delete used token
+    # Delete used token and invalidate 2FA backup codes (force re-setup for security)
     await db.password_reset_tokens.delete_one({"token": token_hash})
-    
+    await db.totp_backup_codes.delete_many({"user_id": token_doc["user_id"]})
+
     return {"message": "Password has been reset successfully"}
 
 # ==================== CHANGE PASSWORD ====================
@@ -629,13 +641,16 @@ async def change_password(request: ChangePasswordRequest, current_user: dict = D
     if not _re.search(r'[^A-Za-z0-9]', request.new_password):
         raise HTTPException(status_code=400, detail="Password must contain at least one special character")
     
-    # Update password
+    # Update password and record change timestamp for token invalidation
     hashed_password = hash_password(request.new_password)
     await db.users.update_one(
         {"id": current_user["id"]},
-        {"$set": {"password": hashed_password}}
+        {"$set": {"password": hashed_password, "password_changed_at": datetime.now(timezone.utc).isoformat()}}
     )
-    
+
+    # Invalidate 2FA backup codes (force re-generation for security)
+    await db.totp_backup_codes.delete_many({"user_id": current_user["id"]})
+
     return {"message": "Password changed successfully"}
 
 # ==================== TWO-FACTOR AUTHENTICATION ====================
@@ -1573,11 +1588,20 @@ async def delete_account(current_user: dict = Depends(get_current_user)):
         await db.password_reset_tokens.delete_many({"user_id": user_id})
         await db.email_verification_tokens.delete_many({"user_id": user_id})
         await db.moderation_queue.delete_many({"user_id": user_id})
-        await db.candidate_notes.delete_many({"recruiter_id": user_id})
+        await db.candidate_notes.delete_many({"$or": [{"recruiter_id": user_id}, {"seeker_id": user_id}]})
         await db.saved_jobs.delete_many({"user_id": user_id})
         await db.transactions.delete_many({"user_id": user_id})
         await db.boosts.delete_many({"user_id": user_id})
         await db.profile_views.delete_many({"$or": [{"viewer_id": user_id}, {"viewed_id": user_id}]})
+        # Clean up auth tokens, 2FA, referrals, promos, and verification data
+        await db.email_change_tokens.delete_many({"user_id": user_id})
+        await db.user_2fa_codes.delete_many({"user_id": user_id})
+        await db.totp_backup_codes.delete_many({"user_id": user_id})
+        await db.referrals.delete_many({"$or": [{"referrer_id": user_id}, {"referred_id": user_id}]})
+        await db.promo_redemptions.delete_many({"user_id": user_id})
+        await db.verification_requests.delete_many({"user_id": user_id})
+        await db.recruiter_invites.delete_many({"$or": [{"recruiter_id": user_id}, {"seeker_id": user_id}]})
+        await db.reference_requests.delete_many({"$or": [{"requester_id": user_id}, {"referee_id": user_id}]})
 
         if user_role == "seeker":
             # Delete seeker-specific data

@@ -26,10 +26,9 @@ BANNED_WORDS = {
         "drug lord", "cartel", "mdma dealer", "ecstasy dealer", "lsd dealer",
         "mushroom dealer", "ketamine dealer", "drug smuggl",
     ],
-    "alcohol": [
-        "bartending", "bartender", "liquor store", "wine shop", "brewery",
-        "distillery", "beer garden", "cocktail bar", "pub manager",
-        "sommelier", "mixologist", "taproom",
+    "alcohol_illegal": [
+        "moonshine dealer", "bootleg liquor", "illegal distill",
+        "underage drinking", "sell alcohol to minors",
     ],
     "violence": [
         "hitman", "hit man", "assassin", "murder for hire", "gun for hire",

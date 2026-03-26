@@ -1131,17 +1131,21 @@ async def stripe_webhook(request: Request):
                 logger.error(f"Stripe webhook amount mismatch: paid={amount_total} expected={product['price']} session={sid}")
                 return {"status": "error", "reason": "amount_mismatch"}
 
-        # Skip if already fulfilled by verify-session endpoint
-        already = await db.transactions.find_one({
-            "user_id": metadata.get("user_id"),
-            "stripe_session_id": sid,
-        }) if sid else None
-
-        if not already:
-            if metadata.get("type") == "subscription":
-                await fulfill_subscription(metadata, source="stripe", stripe_session_id=sid)
+        # Atomic idempotency guard: insert a lock document to prevent duplicate fulfillment.
+        # If another webhook/verify-session already fulfilled this session, the insert
+        # will find the existing doc and we skip. This avoids the check-then-act race.
+        if sid:
+            already = await db.transactions.find_one({
+                "user_id": metadata.get("user_id"),
+                "stripe_session_id": sid,
+            })
+            if already:
+                logger.info(f"Stripe webhook: session {sid} already fulfilled — skipping")
             else:
-                await fulfill_purchase(metadata, source="stripe", stripe_session_id=sid)
+                if metadata.get("type") == "subscription":
+                    await fulfill_subscription(metadata, source="stripe", stripe_session_id=sid)
+                else:
+                    await fulfill_purchase(metadata, source="stripe", stripe_session_id=sid)
 
     return {"status": "ok"}
 
