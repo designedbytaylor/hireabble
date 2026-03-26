@@ -1,5 +1,5 @@
 """
-File uploads routes for Hireabble API — Supabase Storage
+File uploads routes for Hireabble API — Railway Volume Storage
 Includes media tracking and automatic content moderation.
 """
 from fastapi import APIRouter, HTTPException, Depends, UploadFile, File, Request, Query, Form
@@ -8,7 +8,6 @@ from slowapi import Limiter
 from slowapi.util import get_remote_address
 
 limiter = Limiter(key_func=get_remote_address)
-from supabase import create_client
 from datetime import datetime, timezone
 import uuid
 import os
@@ -18,7 +17,7 @@ import base64
 import asyncio
 
 from database import (
-    db, get_current_user, SUPABASE_URL, SUPABASE_KEY, UPLOADS_DIR, logger
+    db, get_current_user, UPLOADS_DIR, logger
 )
 from cache import invalidate_user
 
@@ -51,22 +50,6 @@ def _validate_file_magic(contents: bytes, expected_types: list) -> bool:
             return True
     return False
 
-PHOTO_BUCKET = "photos"
-VIDEO_BUCKET = "videos"
-
-# Whether Supabase storage is configured
-_USE_SUPABASE = bool(SUPABASE_URL and SUPABASE_KEY)
-
-
-def _get_supabase():
-    if not _USE_SUPABASE:
-        raise HTTPException(status_code=500, detail="Storage not configured")
-    return create_client(SUPABASE_URL, SUPABASE_KEY)
-
-
-def _public_url(bucket: str, path: str) -> str:
-    """Build the public URL for a stored object."""
-    return f"{SUPABASE_URL}/storage/v1/object/public/{bucket}/{path}"
 
 
 MAX_PHOTO_DIMENSION = 1600  # Max width or height in pixels
@@ -498,7 +481,7 @@ async def upload_file(
     current_user: dict = Depends(get_current_user),
     purpose: str = Form(default="profile_photo"),
 ):
-    """Upload a profile photo (Supabase Storage or local fallback)"""
+    """Upload a profile photo or company logo to local storage"""
     if file.content_type not in ALLOWED_IMAGE_TYPES:
         raise HTTPException(status_code=400, detail="Only image files are allowed")
 
@@ -531,33 +514,7 @@ async def upload_file(
     contents, content_type = _optimize_image(contents)
     filename = f"{current_user['id']}_{uuid.uuid4().hex[:8]}.jpg"
 
-    if _USE_SUPABASE:
-        supabase = _get_supabase()
-
-        # Remove old file if it exists in the bucket (only for profile photos, not company logos)
-        if purpose == "profile_photo":
-            user = await db.users.find_one({"id": current_user["id"]})
-            if user and user.get("photo_url") and SUPABASE_URL in (user.get("photo_url") or ""):
-                old_path = user["photo_url"].split(f"/{PHOTO_BUCKET}/")[-1]
-                try:
-                    supabase.storage.from_(PHOTO_BUCKET).remove([old_path])
-                except Exception:
-                    pass
-
-        try:
-            supabase.storage.from_(PHOTO_BUCKET).upload(
-                filename,
-                contents,
-                file_options={"content-type": content_type}
-            )
-        except Exception as e:
-            logger.error(f"Supabase upload failed: {e}")
-            raise HTTPException(status_code=500, detail="Failed to upload photo")
-
-        photo_url = _public_url(PHOTO_BUCKET, filename)
-    else:
-        # Local fallback
-        photo_url = _save_local("photos", filename, contents)
+    photo_url = _save_local("photos", filename, contents)
 
     if purpose == "profile_photo":
         await db.users.update_one(
@@ -596,7 +553,7 @@ async def upload_video(
     file: UploadFile = File(...),
     current_user: dict = Depends(get_current_user)
 ):
-    """Upload a video introduction to Supabase Storage"""
+    """Upload a video introduction"""
     if current_user["role"] != "seeker":
         raise HTTPException(status_code=403, detail="Only job seekers can upload video intros")
 
@@ -626,30 +583,7 @@ async def upload_video(
     ext = file.filename.split('.')[-1] if '.' in file.filename else 'mp4'
     filename = f"video_{current_user['id']}_{uuid.uuid4().hex[:8]}.{ext}"
 
-    if _USE_SUPABASE:
-        supabase = _get_supabase()
-
-        user = await db.users.find_one({"id": current_user["id"]})
-        if user and user.get("video_url") and SUPABASE_URL in (user.get("video_url") or ""):
-            old_path = user["video_url"].split(f"/{VIDEO_BUCKET}/")[-1]
-            try:
-                supabase.storage.from_(VIDEO_BUCKET).remove([old_path])
-            except Exception:
-                pass
-
-        try:
-            supabase.storage.from_(VIDEO_BUCKET).upload(
-                filename,
-                contents,
-                file_options={"content-type": file.content_type}
-            )
-        except Exception as e:
-            logger.error(f"Supabase video upload failed: {e}")
-            raise HTTPException(status_code=500, detail="Failed to upload video")
-
-        video_url = _public_url(VIDEO_BUCKET, filename)
-    else:
-        video_url = _save_local("videos", filename, contents)
+    video_url = _save_local("videos", filename, contents)
 
     await db.users.update_one(
         {"id": current_user["id"]},
@@ -676,20 +610,21 @@ async def upload_video(
 
 @router.delete("/upload/video")
 async def delete_video(current_user: dict = Depends(get_current_user)):
-    """Delete video introduction from Supabase Storage"""
+    """Delete video introduction"""
     if current_user["role"] != "seeker":
         raise HTTPException(status_code=403, detail="Only job seekers can manage video intros")
 
     user = await db.users.find_one({"id": current_user["id"]})
     if user and user.get("video_url"):
-        # Delete from Supabase if it's a Supabase URL
-        if SUPABASE_URL and SUPABASE_URL in (user.get("video_url") or ""):
-            old_path = user["video_url"].split(f"/{VIDEO_BUCKET}/")[-1]
-            try:
-                supabase = _get_supabase()
-                supabase.storage.from_(VIDEO_BUCKET).remove([old_path])
-            except Exception:
-                pass
+        # Delete the local file if it exists
+        video_path = user.get("video_url", "")
+        if video_path.startswith("/uploads/"):
+            local_file = UPLOADS_DIR / video_path[len("/uploads/"):]
+            if local_file.exists():
+                try:
+                    local_file.unlink()
+                except Exception:
+                    pass
 
         await db.users.update_one(
             {"id": current_user["id"]},
@@ -743,20 +678,7 @@ async def upload_chat_image(
     contents, content_type = _optimize_image(contents)
     filename = f"chat_{current_user['id']}_{uuid.uuid4().hex[:8]}.jpg"
 
-    if _USE_SUPABASE:
-        supabase = _get_supabase()
-        try:
-            supabase.storage.from_(PHOTO_BUCKET).upload(
-                filename,
-                contents,
-                file_options={"content-type": content_type}
-            )
-        except Exception as e:
-            logger.error(f"Supabase chat image upload failed: {e}")
-            raise HTTPException(status_code=500, detail="Failed to upload image")
-        image_url = _public_url(PHOTO_BUCKET, filename)
-    else:
-        image_url = _save_local("photos", filename, contents)
+    image_url = _save_local("photos", filename, contents)
 
     # Track upload
     await _track_upload(
@@ -804,20 +726,7 @@ async def upload_chat_video(
     ext = file.filename.split('.')[-1] if '.' in file.filename else 'webm'
     filename = f"chat_{current_user['id']}_{uuid.uuid4().hex[:8]}.{ext}"
 
-    if _USE_SUPABASE:
-        supabase = _get_supabase()
-        try:
-            supabase.storage.from_(VIDEO_BUCKET).upload(
-                filename,
-                contents,
-                file_options={"content-type": file.content_type}
-            )
-        except Exception as e:
-            logger.error(f"Supabase chat video upload failed: {e}")
-            raise HTTPException(status_code=500, detail="Failed to upload video")
-        video_url = _public_url(VIDEO_BUCKET, filename)
-    else:
-        video_url = _save_local("videos", filename, contents)
+    video_url = _save_local("videos", filename, contents)
 
     # Track upload with AI moderation analysis
     await _track_upload(

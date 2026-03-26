@@ -3066,7 +3066,7 @@ _SCALE_PROJECTIONS = [
             "Separate WebSocket service from API service on Railway",
             "Add MongoDB read replicas for dashboard/analytics queries",
             "Implement background job processing (BullMQ or Celery) for emails and notifications",
-            "Add CDN for file storage (resumes, images) — move off direct Supabase serving",
+            "Add CDN for file storage (resumes, images) — serve via CDN instead of direct Railway volume",
             "Implement database query optimization and add compound indexes",
             "Set up APM monitoring (Datadog or New Relic) for performance tracking",
         ],

@@ -64,7 +64,7 @@ def _fetch_photo(photo_url):
     import logging
     logger = logging.getLogger(__name__)
     try:
-        # Some Supabase/CDN URLs need standard browser-like headers
+        # Some CDN/external URLs need standard browser-like headers
         headers = {
             'User-Agent': 'Mozilla/5.0 (compatible; Hireabble/1.0)',
             'Accept': 'image/*,*/*',
