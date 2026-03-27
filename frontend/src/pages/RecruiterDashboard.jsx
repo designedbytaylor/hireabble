@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Plus, Briefcase, Users, Star, Heart, X, Check, Rocket, MessageCircle,
@@ -32,7 +32,7 @@ import { useAuth } from '../context/AuthContext';
 import Navigation from '../components/Navigation';
 import NotificationBell from '../components/NotificationBell';
 import LocationInput from '../components/LocationInput';
-import { getPhotoUrl } from '../utils/helpers';
+import { getPhotoUrl, handleImgError } from '../utils/helpers';
 import { UpgradePrompt, PremiumBlur } from '../components/UpgradeModal';
 import { SkeletonPageBackground, SkeletonStatCard, SkeletonListItem, SkeletonApplicantCard } from '../components/skeletons';
 import { Skeleton } from '../components/ui/skeleton';
@@ -761,10 +761,11 @@ export default function RecruiterDashboard() {
                     onClick={() => handleViewApplications(job)}
                   >
                     <img
-                      src={job.company_logo}
+                      src={getPhotoUrl(job.company_logo, job.company)}
                       alt={job.company}
                       className="w-14 h-14 rounded-xl object-cover shrink-0"
                       loading="lazy"
+                      onError={handleImgError(job.company)}
                     />
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
@@ -2034,17 +2035,15 @@ function JobFormDialog({ open, onClose, onSuccess, token, company, job = null, i
               >
                 None
               </button>
-              {user?.company_logo && (
-                <button
-                  type="button"
-                  onClick={() => { setPhotoOption('logo'); setCustomPhotoFile(null); setCustomPhotoPreview(null); }}
-                  className={`flex-1 py-2.5 px-3 rounded-xl text-sm font-medium border-2 transition-all ${
-                    photoOption === 'logo' ? 'border-primary bg-primary/10 text-primary' : 'border-border bg-card hover:border-primary/20'
-                  }`}
-                >
-                  Company Logo
-                </button>
-              )}
+              <button
+                type="button"
+                onClick={() => { setPhotoOption('logo'); setCustomPhotoFile(null); setCustomPhotoPreview(null); }}
+                className={`flex-1 py-2.5 px-3 rounded-xl text-sm font-medium border-2 transition-all ${
+                  photoOption === 'logo' ? 'border-primary bg-primary/10 text-primary' : 'border-border bg-card hover:border-primary/20'
+                }`}
+              >
+                Company Logo
+              </button>
               <button
                 type="button"
                 onClick={() => setPhotoOption('custom')}
@@ -2055,11 +2054,25 @@ function JobFormDialog({ open, onClose, onSuccess, token, company, job = null, i
                 Custom Photo
               </button>
             </div>
-            {photoOption === 'logo' && user?.company_logo && (
-              <div className="flex items-center gap-3 p-3 rounded-xl bg-muted/50">
-                <img src={user.company_logo} alt="Company Logo" className="w-12 h-12 rounded-lg object-cover" />
-                <span className="text-sm text-muted-foreground">Your company logo will be shown on this listing</span>
-              </div>
+            {photoOption === 'logo' && (
+              user?.company_logo ? (
+                <div className="flex items-center gap-3 p-3 rounded-xl bg-muted/50">
+                  <img src={user.company_logo} alt="Company Logo" className="w-12 h-12 rounded-lg object-cover" />
+                  <span className="text-sm text-muted-foreground">Your company logo will be shown on this listing</span>
+                </div>
+              ) : (
+                <div className="flex items-center gap-3 p-3 rounded-xl bg-amber-500/10 border border-amber-500/20">
+                  <Building2 className="w-8 h-8 text-amber-400 shrink-0" />
+                  <div className="flex-1">
+                    <p className="text-sm text-amber-300 font-medium">No company logo uploaded yet</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Upload a logo on your{' '}
+                      <Link to="/profile" className="text-primary underline hover:text-primary/80">Profile page</Link>
+                      {' '}to use it on job listings.
+                    </p>
+                  </div>
+                </div>
+              )
             )}
             {photoOption === 'custom' && (
               <div>

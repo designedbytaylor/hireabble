@@ -247,9 +247,10 @@ async def create_job(job: JobCreate, request: Request, current_user: dict = Depe
         "background_image": backgrounds[hash(job_id) % len(backgrounds)],
         "created_at": datetime.now(timezone.utc).isoformat(),
         "listing_photo": (
-            current_user.get("company_logo") if job.listing_photo == "logo"
+            current_user.get("company_logo") if job.listing_photo == "logo" and current_user.get("company_logo")
             else current_user.get("photo_url") if job.listing_photo == "profile"
-            else job.listing_photo if job.listing_photo else None
+            else job.listing_photo if job.listing_photo and job.listing_photo not in ("logo", "profile", "none")
+            else None
         ),
         "location_lat": job.location_lat or current_user.get("company_address_lat") or current_user.get("location_lat"),
         "location_lng": job.location_lng or current_user.get("company_address_lng") or current_user.get("location_lng"),
@@ -538,7 +539,7 @@ async def update_job(job_id: str, updates: dict, current_user: dict = Depends(ge
     # Resolve listing_photo markers
     lp = update_data.get("listing_photo")
     if lp == "logo":
-        update_data["listing_photo"] = current_user.get("company_logo")
+        update_data["listing_photo"] = current_user.get("company_logo") or None
     elif lp == "profile":
         update_data["listing_photo"] = current_user.get("photo_url")
 
