@@ -5,6 +5,7 @@ import { Button } from '../components/ui/button';
 import { useAuth } from '../context/AuthContext';
 import useDocumentTitle from '../hooks/useDocumentTitle';
 import axios from 'axios';
+import { getPhotoUrl, handleImgError, handleBgImgError } from '../utils/helpers';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -191,7 +192,7 @@ export default function PublicJobDetail() {
             {/* Listing photo */}
             {job.listing_photo && (
               <div className="rounded-xl overflow-hidden">
-                <img src={job.listing_photo} alt={job.title} className="w-full h-48 object-cover" />
+                <img src={getPhotoUrl(job.listing_photo)} alt={job.title} className="w-full h-48 object-cover" onError={handleBgImgError} />
               </div>
             )}
 
@@ -201,7 +202,7 @@ export default function PublicJobDetail() {
                 <h1 className="text-2xl md:text-3xl font-bold font-['Outfit']">{job.title}</h1>
                 <div className="flex items-center gap-2 mt-2">
                   {job.company_logo && (
-                    <img src={job.company_logo} alt={job.company} className="w-6 h-6 rounded-full object-cover" />
+                    <img src={getPhotoUrl(job.company_logo, job.company)} alt={job.company} className="w-6 h-6 rounded-full object-cover" onError={handleImgError(job.company)} />
                   )}
                   <span className="text-muted-foreground font-medium">{job.company}</span>
                 </div>
