@@ -100,6 +100,9 @@ export default function AdminLaunchChecklist() {
   const [showAddCategory, setShowAddCategory] = useState(false);
   const [modalItem, setModalItem] = useState(null);
   const [modalNotes, setModalNotes] = useState("");
+  const [modalEditingText, setModalEditingText] = useState(false);
+  const [modalTextDraft, setModalTextDraft] = useState("");
+  const [modalConfirmDelete, setModalConfirmDelete] = useState(false);
   const saveTimer = useRef(null);
   const notesTimer = useRef(null);
   const modalNotesTimer = useRef(null);
@@ -196,11 +199,13 @@ export default function AdminLaunchChecklist() {
   const openItemModal = (item) => {
     setModalItem(item);
     setModalNotes(item.notes || "");
+    setModalEditingText(false);
+    setModalTextDraft("");
+    setModalConfirmDelete(false);
   };
 
   // Close item modal
   const closeItemModal = () => {
-    // Save any pending notes before closing
     if (modalItem) {
       const currentItem = checklist.find(i => i.id === modalItem.id);
       if (currentItem && (currentItem.notes || "") !== modalNotes) {
@@ -209,6 +214,9 @@ export default function AdminLaunchChecklist() {
     }
     setModalItem(null);
     setModalNotes("");
+    setModalEditingText(false);
+    setModalTextDraft("");
+    setModalConfirmDelete(false);
   };
 
   // Add new category
@@ -417,7 +425,29 @@ export default function AdminLaunchChecklist() {
                 <div onClick={() => toggleItem(liveItem.id)} style={{ width: 22, height: 22, borderRadius: 6, border: `2px solid ${liveItem.done ? catColor : "#2E3550"}`, background: liveItem.done ? catColor : "transparent", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, cursor: "pointer", transition: "all 0.15s", marginTop: 2 }}>
                   {liveItem.done && <span style={{ color: "#fff", fontSize: 12, fontWeight: 900 }}>✓</span>}
                 </div>
-                <span style={{ fontSize: 16, fontWeight: 600, color: liveItem.done ? TEXT_DIM : TEXT_BRIGHT, textDecoration: liveItem.done ? "line-through" : "none", lineHeight: 1.5 }}>{liveItem.text}</span>
+                {modalEditingText ? (
+                  <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 8 }}>
+                    <input
+                      autoFocus
+                      value={modalTextDraft}
+                      onChange={e => setModalTextDraft(e.target.value)}
+                      onKeyDown={e => {
+                        if (e.key === "Enter") { editItem(liveItem.id, modalTextDraft); setModalEditingText(false); }
+                        if (e.key === "Escape") { setModalEditingText(false); setModalTextDraft(""); }
+                      }}
+                      style={{ width: "100%", background: "#0D1020", border: `1px solid ${TEAL}66`, borderRadius: 7, padding: "8px 12px", color: TEXT_BRIGHT, fontSize: 15, fontWeight: 600, outline: "none", boxSizing: "border-box" }}
+                    />
+                    <div style={{ display: "flex", gap: 6 }}>
+                      <Btn onClick={() => { editItem(liveItem.id, modalTextDraft); setModalEditingText(false); }}>Save</Btn>
+                      <Btn secondary onClick={() => { setModalEditingText(false); setModalTextDraft(""); }}>Cancel</Btn>
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{ flex: 1, display: "flex", alignItems: "flex-start", gap: 8 }}>
+                    <span style={{ flex: 1, fontSize: 16, fontWeight: 600, color: liveItem.done ? TEXT_DIM : TEXT_BRIGHT, textDecoration: liveItem.done ? "line-through" : "none", lineHeight: 1.5 }}>{liveItem.text}</span>
+                    <button onClick={() => { setModalEditingText(true); setModalTextDraft(liveItem.text); }} style={{ background: "none", border: "none", cursor: "pointer", color: TEXT_DIM, fontSize: 14, padding: "2px 5px", flexShrink: 0 }} title="Edit task text">✏️</button>
+                  </div>
+                )}
               </div>
 
               {/* Notes textarea */}
@@ -438,9 +468,22 @@ export default function AdminLaunchChecklist() {
 
               {/* Actions */}
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <button onClick={() => { toggleItem(liveItem.id); }} style={{ background: liveItem.done ? "#1A2035" : `${TEAL}15`, border: `1px solid ${liveItem.done ? BORDER : TEAL + "44"}`, borderRadius: 7, padding: "8px 16px", cursor: "pointer", color: liveItem.done ? TEXT_MID : TEAL, fontSize: 13, fontWeight: 700, transition: "all 0.15s" }}>
-                  {liveItem.done ? "Mark Incomplete" : "Mark Complete"}
-                </button>
+                <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                  <button onClick={() => { toggleItem(liveItem.id); }} style={{ background: liveItem.done ? "#1A2035" : `${TEAL}15`, border: `1px solid ${liveItem.done ? BORDER : TEAL + "44"}`, borderRadius: 7, padding: "8px 16px", cursor: "pointer", color: liveItem.done ? TEXT_MID : TEAL, fontSize: 13, fontWeight: 700, transition: "all 0.15s" }}>
+                    {liveItem.done ? "Mark Incomplete" : "Mark Complete"}
+                  </button>
+                  {!modalConfirmDelete ? (
+                    <button onClick={() => setModalConfirmDelete(true)} style={{ background: "none", border: `1px solid #EF444444`, borderRadius: 7, padding: "8px 14px", cursor: "pointer", color: "#EF4444", fontSize: 13, fontWeight: 600, transition: "all 0.15s" }}>
+                      Delete
+                    </button>
+                  ) : (
+                    <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                      <span style={{ fontSize: 12, color: "#EF4444", fontWeight: 600 }}>Sure?</span>
+                      <Btn onClick={() => { deleteItem(liveItem.id); setModalItem(null); }} style={{ background: "#EF4444", padding: "6px 12px", fontSize: 12 }}>Yes, Delete</Btn>
+                      <Btn secondary onClick={() => setModalConfirmDelete(false)} style={{ padding: "6px 12px", fontSize: 12 }}>No</Btn>
+                    </div>
+                  )}
+                </div>
                 <Btn secondary onClick={closeItemModal}>Close</Btn>
               </div>
             </div>
