@@ -1546,7 +1546,7 @@ function JobFormDialog({ open, onClose, onSuccess, token, company, job = null, i
         setPhotoOption('logo');
       } else if (job.listing_photo) {
         setPhotoOption('custom');
-        setCustomPhotoPreview(job.listing_photo);
+        setCustomPhotoPreview(getPhotoUrl(job.listing_photo));
       } else {
         setPhotoOption('none');
       }
@@ -2057,7 +2057,7 @@ function JobFormDialog({ open, onClose, onSuccess, token, company, job = null, i
             {photoOption === 'logo' && (
               user?.company_logo ? (
                 <div className="flex items-center gap-3 p-3 rounded-xl bg-muted/50">
-                  <img src={user.company_logo} alt="Company Logo" className="w-12 h-12 rounded-lg object-cover" />
+                  <img src={getPhotoUrl(user.company_logo)} alt="Company Logo" className="w-12 h-12 rounded-lg object-cover" />
                   <span className="text-sm text-muted-foreground">Your company logo will be shown on this listing</span>
                 </div>
               ) : (
