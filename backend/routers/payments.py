@@ -52,23 +52,23 @@ except ImportError:
 
 PRODUCTS = {
     # Recruiter Boosts (Consumable IAP)
-    "boost_1day": {"name": "Job Boost - 1 Day", "price": 499, "days": 1,
+    "boost_1day": {"name": "Job Boost - 1 Day", "price": 799, "days": 1,
                    "apple_product_id": "com.hireabble.boost.1day",
                    "google_product_id": "com.hireabble.boost.1day"},
-    "boost_3day": {"name": "Job Boost - 3 Days", "price": 1199, "days": 3,
+    "boost_3day": {"name": "Job Boost - 3 Days", "price": 1999, "days": 3,
                    "apple_product_id": "com.hireabble.boost.3day",
                    "google_product_id": "com.hireabble.boost.3day"},
-    "boost_7day": {"name": "Job Boost - 7 Days", "price": 1999, "days": 7,
+    "boost_7day": {"name": "Job Boost - 7 Days", "price": 3499, "days": 7,
                    "apple_product_id": "com.hireabble.boost.7day",
                    "google_product_id": "com.hireabble.boost.7day"},
     # Recruiter Candidate Invites (Consumable IAP)
-    "super_swipes_5": {"name": "5 Candidate Invites", "price": 999, "count": 5,
+    "super_swipes_5": {"name": "5 Candidate Invites", "price": 1499, "count": 5,
                        "apple_product_id": "com.hireabble.recruiter.superswipes.5",
                        "google_product_id": "com.hireabble.recruiter.superswipes.5"},
-    "super_swipes_15": {"name": "15 Candidate Invites", "price": 1999, "count": 15,
+    "super_swipes_15": {"name": "15 Candidate Invites", "price": 3499, "count": 15,
                         "apple_product_id": "com.hireabble.recruiter.superswipes.15",
                         "google_product_id": "com.hireabble.recruiter.superswipes.15"},
-    "super_swipes_30": {"name": "30 Candidate Invites", "price": 2999, "count": 30,
+    "super_swipes_30": {"name": "30 Candidate Invites", "price": 5499, "count": 30,
                         "apple_product_id": "com.hireabble.recruiter.superswipes.30",
                         "google_product_id": "com.hireabble.recruiter.superswipes.30"},
     # Seeker Priority Applies (Consumable IAP)
@@ -92,7 +92,7 @@ SUBSCRIPTION_TIERS = {
         "role": "seeker",
         "tier_level": 1,
         "prices": {
-            "weekly": 499,    # $4.99/week
+            "weekly": 399,    # $3.99/week
             "monthly": 1499,  # $14.99/month
             "6month": 5999,   # $9.99/month billed as $59.99
         },
@@ -156,9 +156,9 @@ SUBSCRIPTION_TIERS = {
         "role": "recruiter",
         "tier_level": 1,
         "prices": {
-            "weekly": 999,    # $9.99/week
-            "monthly": 2999,  # $29.99/month
-            "6month": 11999,  # $19.99/month billed as $119.99
+            "weekly": 2499,   # $24.99/week
+            "monthly": 7999,  # $79.99/month
+            "6month": 39999,  # $66.67/month billed as $399.99
         },
         "apple_product_ids": {
             "weekly": "com.hireabble.recruiter.pro.weekly",
@@ -186,9 +186,9 @@ SUBSCRIPTION_TIERS = {
         "role": "recruiter",
         "tier_level": 2,
         "prices": {
-            "weekly": 1999,   # $19.99/week
-            "monthly": 5999,  # $59.99/month
-            "6month": 23999,  # $39.99/month billed as $239.99
+            "weekly": 4499,   # $44.99/week
+            "monthly": 14999, # $149.99/month
+            "6month": 74999,  # $125.00/month billed as $749.99
         },
         "apple_product_ids": {
             "weekly": "com.hireabble.recruiter.enterprise.weekly",
