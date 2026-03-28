@@ -98,7 +98,7 @@ export default function RecruiterDashboard() {
             headers: { Authorization: `Bearer ${token}` },
           });
           if (res.data.status === 'paid') {
-            toast.success('Payment successful! Your subscription is now active.');
+            toast.success('Payment successful!');
             await refreshUser();
             fetchData();
           } else if (retries > 0) {
@@ -137,10 +137,13 @@ export default function RecruiterDashboard() {
         try { sessionStorage.setItem('unlockedAppIds', JSON.stringify(ids)); } catch {}
       }
       setSubscription(data.subscription);
-      // Fetch interviews in parallel (non-blocking)
+      // Fetch interviews and free boost count in parallel (non-blocking)
       axios.get(`${API}/interviews`, { headers: { Authorization: `Bearer ${token}` } })
         .then(res => setInterviews(res.data))
         .catch(() => {});
+      axios.get(`${API}/payments/boosts/free/remaining`, { headers: { Authorization: `Bearer ${token}` } })
+        .then(res => setFreeBoosts(res.data))
+        .catch(() => setFreeBoosts({ monthly_limit: 0, used: 0, remaining: 0 }));
     } catch (error) {
       console.error('Failed to fetch data:', error);
     } finally {
@@ -268,6 +271,10 @@ export default function RecruiterDashboard() {
 
   const [generatingPoster, setGeneratingPoster] = useState(null);
   const [boostingJob, setBoostingJob] = useState(null);
+  const [freeBoosts, setFreeBoosts] = useState(null);
+  const [boostConfirmJob, setBoostConfirmJob] = useState(null);
+  const [boostPurchaseJob, setBoostPurchaseJob] = useState(null);
+  const [purchasingBoost, setPurchasingBoost] = useState(null);
 
   const handleFreeBoost = async (jobId) => {
     setBoostingJob(jobId);
@@ -282,6 +289,35 @@ export default function RecruiterDashboard() {
       toast.error(err.response?.data?.detail || 'Failed to boost');
     } finally {
       setBoostingJob(null);
+    }
+  };
+
+  const handleBoostClick = (job) => {
+    if (job.is_boosted && job.boost_until && new Date(job.boost_until) > new Date()) return;
+    if (freeBoosts && freeBoosts.remaining > 0) {
+      setBoostConfirmJob(job);
+    } else {
+      setBoostPurchaseJob(job);
+    }
+  };
+
+  const handlePurchaseBoost = async (productId, jobId) => {
+    setPurchasingBoost(productId);
+    try {
+      const res = await axios.post(
+        `${API}/payments/create-checkout-session`,
+        { product_id: productId, job_id: jobId },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      if (res.data.checkout_url) {
+        window.location.href = res.data.checkout_url;
+        return;
+      }
+      toast.error('Unable to start checkout. Please try again.');
+    } catch (err) {
+      toast.error(err.response?.data?.detail || 'Failed to purchase boost');
+    } finally {
+      setPurchasingBoost(null);
     }
   };
 
@@ -773,6 +809,11 @@ export default function RecruiterDashboard() {
                         {!job.is_active && (
                           <span className="px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-400 text-[10px] font-bold shrink-0">PAUSED</span>
                         )}
+                        {job.is_boosted && job.boost_until && new Date(job.boost_until) > new Date() && (
+                          <span className="px-2 py-0.5 rounded-full bg-secondary/20 text-secondary text-[10px] font-bold shrink-0 flex items-center gap-1">
+                            <Zap className="w-3 h-3" />BOOSTED
+                          </span>
+                        )}
                       </div>
                       <div className="flex flex-wrap gap-2 mt-2">
                         <span className="px-2 py-1 rounded-lg bg-accent text-xs text-muted-foreground flex items-center gap-1">
@@ -830,21 +871,29 @@ export default function RecruiterDashboard() {
                       )}
                       <span className="hidden sm:inline">Poster</span>
                     </button>
-                    {subscription?.subscribed && (
-                      <button
-                        onClick={(e) => { e.stopPropagation(); handleFreeBoost(job.id); }}
-                        className="flex-1 flex items-center justify-center gap-1.5 p-2 rounded-lg hover:bg-secondary/10 transition-colors text-xs text-secondary"
-                        disabled={boostingJob === job.id}
-                        title="Use free monthly boost"
-                      >
-                        {boostingJob === job.id ? (
-                          <div className="w-4 h-4 border-2 border-secondary border-t-transparent rounded-full animate-spin" />
-                        ) : (
-                          <Zap className="w-4 h-4" />
-                        )}
-                        <span className="hidden sm:inline">Boost</span>
-                      </button>
-                    )}
+                    <button
+                      onClick={(e) => { e.stopPropagation(); handleBoostClick(job); }}
+                      className={`flex-1 flex items-center justify-center gap-1.5 p-2 rounded-lg transition-colors text-xs ${
+                        job.is_boosted && job.boost_until && new Date(job.boost_until) > new Date()
+                          ? 'text-secondary/50 cursor-default'
+                          : 'text-secondary hover:bg-secondary/10'
+                      }`}
+                      disabled={boostingJob === job.id || (job.is_boosted && job.boost_until && new Date(job.boost_until) > new Date())}
+                      title={job.is_boosted && job.boost_until && new Date(job.boost_until) > new Date() ? 'Already boosted' : 'Boost this job'}
+                    >
+                      {boostingJob === job.id ? (
+                        <div className="w-4 h-4 border-2 border-secondary border-t-transparent rounded-full animate-spin" />
+                      ) : (
+                        <Zap className="w-4 h-4" />
+                      )}
+                      <span className="hidden sm:inline">
+                        {job.is_boosted && job.boost_until && new Date(job.boost_until) > new Date()
+                          ? 'Boosted'
+                          : freeBoosts?.remaining > 0
+                            ? `Boost (${freeBoosts.remaining} left)`
+                            : 'Boost'}
+                      </span>
+                    </button>
                     <button
                       onClick={(e) => { e.stopPropagation(); setConfirmPause(job); }}
                       className={`flex-1 flex items-center justify-center gap-1.5 p-2 rounded-lg transition-colors text-xs ${
@@ -1293,6 +1342,70 @@ export default function RecruiterDashboard() {
         variant={confirmPause?.is_active ? 'default' : 'default'}
         onConfirm={() => handleToggleJobStatus(confirmPause)}
       />
+
+      {/* Boost Confirmation Modal (free boosts) */}
+      <ConfirmDialog
+        open={!!boostConfirmJob}
+        onOpenChange={(open) => { if (!open) setBoostConfirmJob(null); }}
+        title={`Boost "${boostConfirmJob?.title}"?`}
+        description={`This will boost your job listing for 1 day, making it appear more prominently to candidates. You have ${freeBoosts?.remaining || 0} free boost(s) remaining this month.`}
+        confirmLabel="Boost Now"
+        variant="default"
+        onConfirm={() => {
+          const jobId = boostConfirmJob.id;
+          setBoostConfirmJob(null);
+          handleFreeBoost(jobId);
+        }}
+      />
+
+      {/* Boost Purchase Modal (paid boosts) */}
+      <Dialog open={!!boostPurchaseJob} onOpenChange={(open) => { if (!open) setBoostPurchaseJob(null); }}>
+        <DialogContent className="max-w-sm bg-card border-border mx-4">
+          <DialogHeader>
+            <DialogTitle className="font-['Outfit'] flex items-center gap-2">
+              <Zap className="w-5 h-5 text-secondary" />
+              Boost "{boostPurchaseJob?.title}"
+            </DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            {subscription?.subscribed
+              ? "You've used all your free boosts this month. Purchase a boost to increase visibility."
+              : 'Purchase a boost to get your job in front of more candidates.'}
+          </p>
+          <div className="space-y-3 mt-2">
+            {[
+              { id: 'boost_1day', label: '1 Day Boost', price: '$7.99' },
+              { id: 'boost_3day', label: '3 Day Boost', price: '$19.99' },
+              { id: 'boost_7day', label: '7 Day Boost', price: '$34.99', badge: 'Best Value' },
+            ].map((option) => (
+              <button
+                key={option.id}
+                onClick={() => handlePurchaseBoost(option.id, boostPurchaseJob?.id)}
+                disabled={!!purchasingBoost}
+                className="w-full flex items-center justify-between p-4 rounded-xl border border-border hover:border-secondary/50 hover:bg-secondary/5 transition-colors disabled:opacity-50"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-purple-500 to-pink-400 flex items-center justify-center">
+                    <Zap className="w-4 h-4 text-white" />
+                  </div>
+                  <div className="text-left">
+                    <span className="font-medium text-sm">{option.label}</span>
+                    {option.badge && (
+                      <span className="ml-2 px-1.5 py-0.5 rounded-full bg-secondary/20 text-secondary text-[9px] font-bold">{option.badge}</span>
+                    )}
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="font-bold text-secondary">{option.price}</span>
+                  {purchasingBoost === option.id && (
+                    <div className="w-4 h-4 border-2 border-secondary border-t-transparent rounded-full animate-spin" />
+                  )}
+                </div>
+              </button>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Poster Options Dialog */}
       <Dialog open={!!posterJob} onOpenChange={(open) => { if (!open) setPosterJob(null); }}>
