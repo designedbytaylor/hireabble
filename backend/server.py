@@ -402,7 +402,7 @@ async def websocket_endpoint_secure(websocket: WebSocket):
 
 # ==================== HEALTH CHECK ====================
 
-@app.get("/api/health")
+@app.api_route("/api/health", methods=["GET", "HEAD"])
 async def health_check():
     """Health check endpoint"""
     return {"status": "healthy", "service": "Hireabble API"}
