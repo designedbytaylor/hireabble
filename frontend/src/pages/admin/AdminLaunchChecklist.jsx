@@ -150,6 +150,34 @@ const INITIAL_CHECKLIST = [
 ];
 
 // ─── MAIN COMPONENT ──────────────────────────────────────────────────────────
+
+// Items verified as complete (one-time auto-check migration)
+const AUTO_COMPLETE_ITEMS = new Set([
+  "Write and host Privacy Policy at a public URL",
+  "Write and host Terms of Service at a public URL",
+  "Add privacy policy URL to app settings and store listings",
+  "Implement in-app account deletion flow (required by both Apple and Google)",
+  "Verify Sign in with Apple is offered alongside other social login options",
+  "Set up SSL certificate for custom domain (if not auto-managed)",
+  "Configure CDN/caching for static assets",
+  "Configure production environment variables on Railway",
+  "Set up external uptime monitoring (UptimeRobot/BetterUptime) on /api/health",
+  "Load test backend endpoints for expected traffic",
+  "Write App Store description (max 4000 chars)",
+  "Write short description for Google Play (max 80 chars)",
+  "Write promotional text for App Store (max 170 chars)",
+  "Choose app category and keywords for ASO",
+  "Add NSUsageDescription strings for camera, photo library, and any other permissions",
+  "Add iOS Privacy Manifest file (PrivacyInfo.xcprivacy) — required since Spring 2024",
+  "Remove all test/debug code and console.log statements",
+  "Ensure no placeholder content, broken links, or lorem ipsum text anywhere",
+  "Verify CORS whitelist includes all production domains (hireabble.com, app subdomains)",
+  "Set up Stripe webhook endpoint for production URL",
+  "Upgrade Stripe from test mode to live mode — enter real bank/payout details",
+  "Update backend environment variables with live Stripe keys",
+  "Set up production MongoDB instance (upgrade from free tier if needed)",
+]);
+
 export default function AdminLaunchChecklist() {
   const { token } = useAdminAuth();
   const [checklist, setChecklist] = useState(INITIAL_CHECKLIST);
@@ -209,6 +237,25 @@ export default function AdminLaunchChecklist() {
             saveToApi({ checklist: merged });
           } else {
             setChecklist(data.checklist);
+          }
+
+          // One-time auto-check migration for verified items
+          const migrationKey = "launch_checklist_autocheck_v1";
+          if (!localStorage.getItem(migrationKey)) {
+            const currentList = data.checklist;
+            let changed = false;
+            const updated = currentList.map(item => {
+              if (!item.done && AUTO_COMPLETE_ITEMS.has(item.text)) {
+                changed = true;
+                return { ...item, done: true };
+              }
+              return item;
+            });
+            if (changed) {
+              setChecklist(updated);
+              saveToApi({ checklist: updated });
+            }
+            localStorage.setItem(migrationKey, "1");
           }
         }
         if (data.notes !== undefined) setNotes(data.notes);
