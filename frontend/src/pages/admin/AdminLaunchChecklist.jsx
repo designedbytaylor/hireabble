@@ -116,6 +116,37 @@ const INITIAL_CHECKLIST = [
   { id: uid(), category: "Post-Launch", text: "Set up Google Play pre-launch report (automated device testing)", done: false },
   { id: uid(), category: "Post-Launch", text: "Plan staged rollout strategy (e.g., 10% → 50% → 100% on Google Play)", done: false },
   { id: uid(), category: "Post-Launch", text: "Prepare customer support workflow for app store reviews and feedback", done: false },
+
+  // ── Items added from code audit ──
+
+  { id: uid(), category: "Payments & Subscriptions", text: "Set Apple IAP production environment variables (APPLE_ENVIRONMENT, APPLE_BUNDLE_ID, APPLE_SHARED_SECRET)", done: false },
+  { id: uid(), category: "Payments & Subscriptions", text: "Configure App Store Server Notifications URL in App Store Connect", done: false },
+  { id: uid(), category: "Payments & Subscriptions", text: "Test Apple IAP subscription purchase end-to-end on a real iOS device", done: false },
+  { id: uid(), category: "Payments & Subscriptions", text: "Test Google Play subscription purchase end-to-end on a real Android device", done: false },
+
+  { id: uid(), category: "Native App Configuration", text: "Set up Capacitor project with correct bundle ID (com.hireabble.app or similar)", done: false },
+  { id: uid(), category: "Native App Configuration", text: "Configure iOS project in Xcode (capabilities, entitlements, launch screen)", done: false },
+  { id: uid(), category: "Native App Configuration", text: "Configure Android project in Android Studio (permissions, icons, splash screen)", done: false },
+  { id: uid(), category: "Native App Configuration", text: "Add push notification entitlement in Xcode project", done: false },
+  { id: uid(), category: "Native App Configuration", text: "Set Capacitor app version and build number to match store submissions", done: false },
+  { id: uid(), category: "Native App Configuration", text: "Configure iOS App Transport Security (ATS) settings", done: false },
+  { id: uid(), category: "Native App Configuration", text: "Ensure Android target SDK is API 34+ (Google Play requirement for 2024+)", done: false },
+  { id: uid(), category: "Native App Configuration", text: "Test Capacitor native bridge (camera, photo library, secure storage) on real devices", done: false },
+
+  { id: uid(), category: "Pre-Submission Final Checks", text: "Test account deletion flow end-to-end on both platforms", done: false },
+  { id: uid(), category: "Pre-Submission Final Checks", text: "Test subscription restore purchases flow on both platforms", done: false },
+  { id: uid(), category: "Pre-Submission Final Checks", text: "Verify app binary size is under store limits (200MB iOS cellular, 150MB Android base)", done: false },
+  { id: uid(), category: "Pre-Submission Final Checks", text: "Test on multiple iOS versions (iOS 16, 17, 18) and Android versions (12, 13, 14)", done: false },
+  { id: uid(), category: "Pre-Submission Final Checks", text: "Provide demo account credentials in App Store Connect and Google Play review notes", done: false },
+
+  { id: uid(), category: "Production Readiness", text: "Verify CORS whitelist includes all production domains (hireabble.com, app subdomains)", done: false },
+  { id: uid(), category: "Production Readiness", text: "Set ENVIRONMENT=production in Railway (controls security headers, CSRF, rate limiting)", done: false },
+
+  { id: uid(), category: "Marketing & Launch", text: "Create App Store Connect app listing (name, subtitle, description, screenshots)", done: false },
+  { id: uid(), category: "Marketing & Launch", text: "Create Google Play Console app listing (title, descriptions, graphics, screenshots)", done: false },
+  { id: uid(), category: "Marketing & Launch", text: "Prepare launch announcement (social media, website, email)", done: false },
+  { id: uid(), category: "Marketing & Launch", text: "Set up app store rating prompt (SKStoreReviewController on iOS)", done: false },
+  { id: uid(), category: "Marketing & Launch", text: "Create a marketing website landing page or update hireabble.com with store badges", done: false },
 ];
 
 // ─── MAIN COMPONENT ──────────────────────────────────────────────────────────
