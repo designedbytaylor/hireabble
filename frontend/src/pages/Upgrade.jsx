@@ -10,15 +10,24 @@ import useDocumentTitle from '../hooks/useDocumentTitle';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
-/** Detect if running as installed PWA on iOS (StoreKit required) */
-function isIOSInstalled() {
-  return window.navigator.standalone === true ||
-    (window.matchMedia?.('(display-mode: standalone)').matches && /iPhone|iPad|iPod/.test(navigator.userAgent));
+/** Detect if running inside native iOS Capacitor shell (StoreKit required) */
+function isIOSNativeApp() {
+  try {
+    const { Capacitor } = require('@capacitor/core');
+    return Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'ios';
+  } catch {
+    return false;
+  }
 }
 
-/** Detect if running as installed PWA on Android (Google Play Billing may apply) */
-function isAndroidInstalled() {
-  return window.matchMedia?.('(display-mode: standalone)').matches && /Android/.test(navigator.userAgent);
+/** Detect if running inside native Android Capacitor shell (Google Play Billing may apply) */
+function isAndroidNativeApp() {
+  try {
+    const { Capacitor } = require('@capacitor/core');
+    return Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android';
+  } catch {
+    return false;
+  }
 }
 
 const DURATION_LABELS = { weekly: 'Weekly', monthly: 'Monthly', '6month': '6 Months' };
@@ -83,8 +92,8 @@ export default function Upgrade() {
 
   const isSeeker = user?.role === 'seeker';
   const preselect = searchParams.get('tier');
-  const isIOS = useMemo(() => isIOSInstalled(), []);
-  const isAndroid = useMemo(() => isAndroidInstalled(), []);
+  const isIOS = useMemo(() => isIOSNativeApp(), []);
+  const isAndroid = useMemo(() => isAndroidNativeApp(), []);
   const isNativeStore = isIOS || isAndroid;
 
   useEffect(() => {
@@ -268,6 +277,45 @@ export default function Upgrade() {
       toast.error('Unable to start checkout. Please try again.');
     } catch (err) {
       toast.error(err.response?.data?.detail || 'Failed to subscribe');
+    } finally {
+      setPurchasing(null);
+    }
+  };
+
+  const handleAddOnPurchase = async (addon) => {
+    setPurchasing(addon.id);
+    try {
+      if (isIOS && window.webkit?.messageHandlers?.storeKit) {
+        window.webkit.messageHandlers.storeKit.postMessage({
+          action: 'purchase',
+          productId: addon.apple_product_id || addon.id,
+          product_id: addon.id,
+        });
+        return;
+      }
+
+      if (isAndroid && window.Android?.purchase) {
+        window.Android.purchase(addon.google_product_id || addon.id, addon.id);
+        return;
+      }
+
+      // Web — use Stripe checkout
+      const body = { product_id: addon.id };
+      if (addon.id.startsWith('boost_') && addon.job_id) {
+        body.job_id = addon.job_id;
+      }
+      const res = await axios.post(
+        `${API}/payments/create-checkout-session`,
+        body,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      if (res.data.checkout_url) {
+        window.location.href = res.data.checkout_url;
+        return;
+      }
+      toast.error('Unable to start checkout. Please try again.');
+    } catch (err) {
+      toast.error(err.response?.data?.detail || 'Failed to purchase');
     } finally {
       setPurchasing(null);
     }
@@ -503,6 +551,8 @@ export default function Upgrade() {
                   icon={isSeeker ? Star : Zap}
                   color={isSeeker ? 'from-blue-500 to-cyan-400' : 'from-purple-500 to-pink-400'}
                   badge={idx === addOns.length - 1 ? 'Best Value' : idx === 1 ? 'Popular' : undefined}
+                  onClick={() => handleAddOnPurchase(addon)}
+                  disabled={purchasing === addon.id}
                 />
               ))}
             </div>
@@ -608,9 +658,9 @@ function PromoCodeSection({ token, onRedeemed }) {
   );
 }
 
-function AddOnCard({ title, price, icon: Icon, color, badge }) {
+function AddOnCard({ title, price, icon: Icon, color, badge, onClick, disabled }) {
   return (
-    <button className="relative p-3 rounded-2xl border border-border bg-card hover:border-primary/30 transition-all text-center">
+    <button onClick={onClick} disabled={disabled} className="relative p-3 rounded-2xl border border-border bg-card hover:border-primary/30 transition-all text-center disabled:opacity-50">
       {badge && (
         <span className={`absolute -top-2 left-1/2 -translate-x-1/2 px-2 py-0.5 rounded-full text-[9px] font-bold bg-gradient-to-r ${color} text-white whitespace-nowrap`}>
           {badge}
