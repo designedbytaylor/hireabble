@@ -81,6 +81,41 @@ const INITIAL_CHECKLIST = [
   { id: uid(), category: "Pre-Submission Final Checks", text: "Submit app for Apple App Review", done: false },
   { id: uid(), category: "Pre-Submission Final Checks", text: "Submit app to Google Play review", done: false },
   { id: uid(), category: "Pre-Submission Final Checks", text: "Prepare v1.0 release notes", done: false },
+
+  // ── Additional items (added for completeness) ──
+
+  { id: uid(), category: "Developer Accounts & Credentials", text: "Set up Sign in with Apple credentials (required if you offer any social login)", done: false },
+  { id: uid(), category: "Developer Accounts & Credentials", text: "Set up Google OAuth credentials (client ID + secret) for Sign in with Google", done: false },
+  { id: uid(), category: "Developer Accounts & Credentials", text: "Configure OAuth redirect URLs for all providers in production", done: false },
+
+  { id: uid(), category: "App Store Assets & Metadata", text: "Write App Store subtitle (max 30 chars)", done: false },
+  { id: uid(), category: "App Store Assets & Metadata", text: "Add support URL for App Store listing", done: false },
+  { id: uid(), category: "App Store Assets & Metadata", text: "Set age rating via App Store Connect questionnaire", done: false },
+  { id: uid(), category: "App Store Assets & Metadata", text: "Set content rating via Google Play IARC questionnaire", done: false },
+  { id: uid(), category: "App Store Assets & Metadata", text: "Add copyright text (e.g., '2026 Hireabble') in App Store Connect", done: false },
+
+  { id: uid(), category: "Legal & Compliance", text: "Implement in-app account deletion flow (required by both Apple and Google)", done: false },
+  { id: uid(), category: "Legal & Compliance", text: "Add iOS Privacy Manifest file (PrivacyInfo.xcprivacy) — required since Spring 2024", done: false },
+  { id: uid(), category: "Legal & Compliance", text: "Answer export compliance questions in App Store Connect (HTTPS = uses encryption)", done: false },
+  { id: uid(), category: "Legal & Compliance", text: "Add NSUsageDescription strings for camera, photo library, and any other permissions", done: false },
+  { id: uid(), category: "Legal & Compliance", text: "Verify Sign in with Apple is offered alongside other social login options", done: false },
+
+  { id: uid(), category: "App Review Preparation", text: "Create a demo/test account with pre-populated data for Apple reviewers", done: false },
+  { id: uid(), category: "App Review Preparation", text: "Create a demo/test account for Google Play reviewers", done: false },
+  { id: uid(), category: "App Review Preparation", text: "Write review notes explaining app features and any non-obvious flows", done: false },
+  { id: uid(), category: "App Review Preparation", text: "Ensure no placeholder content, broken links, or lorem ipsum text anywhere", done: false },
+  { id: uid(), category: "App Review Preparation", text: "Verify all screenshots accurately reflect current app UI", done: false },
+
+  { id: uid(), category: "Deep Links & App Links", text: "Host apple-app-site-association file at /.well-known/ on hireabble.com", done: false },
+  { id: uid(), category: "Deep Links & App Links", text: "Host assetlinks.json at /.well-known/ on hireabble.com for Android App Links", done: false },
+  { id: uid(), category: "Deep Links & App Links", text: "Test universal links open the app correctly on iOS", done: false },
+  { id: uid(), category: "Deep Links & App Links", text: "Test App Links open the app correctly on Android", done: false },
+
+  { id: uid(), category: "Post-Launch", text: "Set up App Store Connect notifications for review status changes", done: false },
+  { id: uid(), category: "Post-Launch", text: "Monitor crash reports in App Store Connect and Google Play Console", done: false },
+  { id: uid(), category: "Post-Launch", text: "Set up Google Play pre-launch report (automated device testing)", done: false },
+  { id: uid(), category: "Post-Launch", text: "Plan staged rollout strategy (e.g., 10% → 50% → 100% on Google Play)", done: false },
+  { id: uid(), category: "Post-Launch", text: "Prepare customer support workflow for app store reviews and feedback", done: false },
 ];
 
 // ─── MAIN COMPONENT ──────────────────────────────────────────────────────────
@@ -122,7 +157,29 @@ export default function AdminLaunchChecklist() {
       try {
         const res = await axios.get(`${API}/admin/launch-checklist`, { headers: { Authorization: `Bearer ${token}` } });
         const data = res.data;
-        if (data.checklist && data.checklist.length > 0) setChecklist(data.checklist);
+        if (data.checklist && data.checklist.length > 0) {
+          // Merge any new INITIAL_CHECKLIST items that don't exist in saved data
+          const savedTexts = new Set(data.checklist.map(i => i.text));
+          const newItems = INITIAL_CHECKLIST.filter(i => !savedTexts.has(i.text));
+          if (newItems.length > 0) {
+            // Group new items by category and append them after existing items in that category, or at the end
+            const merged = [...data.checklist];
+            const mergedTexts = new Set(merged.map(i => i.text));
+            for (const item of newItems) {
+              if (mergedTexts.has(item.text)) continue; // skip duplicates
+              mergedTexts.add(item.text);
+              // Find last item in same category
+              const lastIdx = merged.map((m, idx) => m.category === item.category ? idx : -1).filter(i => i !== -1);
+              const insertAt = lastIdx.length > 0 ? lastIdx[lastIdx.length - 1] + 1 : merged.length;
+              merged.splice(insertAt, 0, { ...item, id: uid() });
+            }
+            setChecklist(merged);
+            // Save the merged list
+            saveToApi({ checklist: merged });
+          } else {
+            setChecklist(data.checklist);
+          }
+        }
         if (data.notes !== undefined) setNotes(data.notes);
       } catch {
         // First load — use defaults
