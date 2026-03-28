@@ -101,7 +101,7 @@ async def csrf_protection(request: Request, call_next):
     if request.method in ("POST", "PUT", "DELETE", "PATCH"):
         # Skip for webhooks and health checks
         path = request.url.path
-        if path.startswith("/api/payments/stripe/webhook") or path == "/api/health":
+        if path.startswith("/api/payments/webhook") or path == "/api/health":
             return await call_next(request)
 
         origin = request.headers.get("origin") or ""
