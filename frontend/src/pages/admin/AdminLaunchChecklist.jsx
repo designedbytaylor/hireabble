@@ -103,6 +103,8 @@ export default function AdminLaunchChecklist() {
   const [modalEditingText, setModalEditingText] = useState(false);
   const [modalTextDraft, setModalTextDraft] = useState("");
   const [modalConfirmDelete, setModalConfirmDelete] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef(null);
   const saveTimer = useRef(null);
   const notesTimer = useRef(null);
   const modalNotesTimer = useRef(null);
@@ -193,6 +195,57 @@ export default function AdminLaunchChecklist() {
       modalNotesTimer.current = setTimeout(() => saveToApi({ checklist: updated }), 800);
       return updated;
     });
+  };
+
+  // Upload attachment
+  const uploadAttachment = async (itemId, file) => {
+    setUploading(true);
+    try {
+      const form = new FormData();
+      form.append("file", file);
+      form.append("item_id", itemId);
+      const res = await axios.post(`${API}/admin/launch-checklist/upload`, form, {
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "multipart/form-data" },
+      });
+      // Add attachment to local state
+      setChecklist(prev => {
+        const updated = prev.map(item => {
+          if (item.id === itemId) {
+            return { ...item, attachments: [...(item.attachments || []), res.data] };
+          }
+          return item;
+        });
+        return updated;
+      });
+      toast.success("File uploaded");
+    } catch (err) {
+      toast.error(err.response?.data?.detail || "Upload failed");
+    } finally {
+      setUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
+
+  // Delete attachment
+  const deleteAttachment = async (itemId, attachmentId) => {
+    try {
+      await axios.delete(`${API}/admin/launch-checklist/attachment`, {
+        headers: { Authorization: `Bearer ${token}` },
+        data: { item_id: itemId, attachment_id: attachmentId },
+      });
+      setChecklist(prev => {
+        const updated = prev.map(item => {
+          if (item.id === itemId) {
+            return { ...item, attachments: (item.attachments || []).filter(a => a.id !== attachmentId) };
+          }
+          return item;
+        });
+        return updated;
+      });
+      toast.success("Attachment removed");
+    } catch {
+      toast.error("Failed to delete attachment");
+    }
   };
 
   // Open item modal
@@ -413,7 +466,7 @@ export default function AdminLaunchChecklist() {
         const catColor = CATEGORY_COLORS[catIndex >= 0 ? catIndex % CATEGORY_COLORS.length : 0];
         return (
           <div onClick={closeItemModal} style={{ position: "fixed", inset: 0, background: "#000b", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 999 }}>
-            <div onClick={e => e.stopPropagation()} style={{ background: "#161B28", border: `1px solid ${BORDER}`, borderRadius: 14, padding: "28px 30px", maxWidth: 720, width: "92%", maxHeight: "85vh", display: "flex", flexDirection: "column" }}>
+            <div onClick={e => e.stopPropagation()} style={{ background: "#161B28", border: `1px solid ${BORDER}`, borderRadius: 14, padding: "28px 30px", maxWidth: 720, width: "92%", maxHeight: "85vh", display: "flex", flexDirection: "column", overflowY: "auto" }}>
               {/* Category badge */}
               <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
                 <div style={{ width: 8, height: 8, borderRadius: 3, background: catColor, flexShrink: 0 }} />
@@ -464,6 +517,45 @@ export default function AdminLaunchChecklist() {
                   onFocus={e => e.target.style.borderColor = TEAL + "66"}
                   onBlur={e => e.target.style.borderColor = BORDER}
                 />
+              </div>
+
+              {/* Attachments */}
+              <div style={{ marginBottom: 20 }}>
+                <label style={{ fontSize: 12, fontWeight: 700, color: TEXT_MID, textTransform: "uppercase", letterSpacing: 1, display: "block", marginBottom: 8 }}>Attachments</label>
+                {(liveItem.attachments || []).length > 0 && (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 12 }}>
+                    {(liveItem.attachments || []).map(att => {
+                      const isImage = att.content_type?.startsWith("image/");
+                      const sizeStr = att.size < 1024 ? `${att.size}B` : att.size < 1048576 ? `${(att.size/1024).toFixed(0)}KB` : `${(att.size/1048576).toFixed(1)}MB`;
+                      return (
+                        <div key={att.id} style={{ display: "flex", alignItems: "center", gap: 10, background: "#0D1020", border: `1px solid ${BORDER}`, borderRadius: 8, padding: "8px 12px" }}>
+                          {isImage && (
+                            <img src={`${process.env.REACT_APP_BACKEND_URL}${att.url}`} alt="" style={{ width: 40, height: 40, borderRadius: 6, objectFit: "cover", flexShrink: 0 }} />
+                          )}
+                          {!isImage && (
+                            <div style={{ width: 40, height: 40, borderRadius: 6, background: "#1A2035", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, fontSize: 16 }}>
+                              📎
+                            </div>
+                          )}
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontSize: 13, fontWeight: 600, color: TEXT_BRIGHT, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{att.filename}</div>
+                            <div style={{ fontSize: 11, color: TEXT_DIM }}>{sizeStr}</div>
+                          </div>
+                          <a href={`${process.env.REACT_APP_BACKEND_URL}${att.url}`} download={att.filename} target="_blank" rel="noopener noreferrer" style={{ background: `${TEAL}15`, border: `1px solid ${TEAL}44`, borderRadius: 6, padding: "5px 10px", color: TEAL, fontSize: 11, fontWeight: 700, textDecoration: "none", flexShrink: 0 }}>
+                            Download
+                          </a>
+                          <button onClick={() => deleteAttachment(liveItem.id, att.id)} style={{ background: "none", border: "none", cursor: "pointer", color: "#EF4444", fontSize: 14, padding: "4px", flexShrink: 0 }} title="Remove attachment">
+                            ✕
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+                <input ref={fileInputRef} type="file" style={{ display: "none" }} onChange={e => { if (e.target.files?.[0]) uploadAttachment(liveItem.id, e.target.files[0]); }} />
+                <button onClick={() => fileInputRef.current?.click()} disabled={uploading} style={{ background: "#1A2035", border: `1px dashed ${BORDER}`, borderRadius: 8, padding: "10px 16px", cursor: uploading ? "wait" : "pointer", color: TEXT_MID, fontSize: 13, fontWeight: 600, width: "100%", transition: "all 0.15s" }}>
+                  {uploading ? "Uploading..." : "+ Add file (photos, screenshots, PDFs — max 10MB)"}
+                </button>
               </div>
 
               {/* Actions */}

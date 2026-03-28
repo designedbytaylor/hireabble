@@ -4,7 +4,7 @@ Admin routes for Hireabble API.
 Separate auth flow, user management, content moderation,
 reports review, and platform analytics.
 """
-from fastapi import APIRouter, HTTPException, Depends, Body
+from fastapi import APIRouter, HTTPException, Depends, Body, UploadFile, File, Form
 from typing import Optional
 from datetime import datetime, timezone, timedelta
 import uuid
@@ -2840,6 +2840,102 @@ async def update_launch_checklist(
     )
 
     return {"message": "Launch checklist saved"}
+
+
+@router.post("/admin/launch-checklist/upload")
+async def upload_checklist_attachment(
+    file: UploadFile = File(...),
+    item_id: str = Form(...),
+    admin=Depends(get_current_admin),
+):
+    """Upload a file attachment for a launch checklist item."""
+    MAX_SIZE = 10 * 1024 * 1024  # 10MB
+    contents = await file.read()
+    if len(contents) > MAX_SIZE:
+        raise HTTPException(status_code=400, detail="File size exceeds 10MB limit")
+
+    # Sanitize filename
+    from pathlib import Path as _Path
+    original_name = file.filename or "attachment"
+    safe_name = re.sub(r'[^\w\-.]', '_', original_name)
+    ext = _Path(safe_name).suffix or ""
+    stored_name = f"checklist_{item_id[:12]}_{uuid.uuid4().hex[:8]}{ext}"
+
+    uploads_dir = _Path(os.environ.get("UPLOADS_PATH", "uploads")) / "checklist"
+    uploads_dir.mkdir(parents=True, exist_ok=True)
+    (uploads_dir / stored_name).write_bytes(contents)
+
+    attachment = {
+        "id": uuid.uuid4().hex[:12],
+        "filename": original_name,
+        "url": f"/uploads/checklist/{stored_name}",
+        "size": len(contents),
+        "content_type": file.content_type or "application/octet-stream",
+        "uploaded_at": datetime.now(timezone.utc).isoformat(),
+    }
+
+    # Add attachment to the checklist item
+    doc = await db.site_settings.find_one({"key": LAUNCH_CHECKLIST_KEY})
+    if doc:
+        current = doc.get("value", {})
+        items = current.get("checklist", [])
+        for item in items:
+            if item.get("id") == item_id:
+                if "attachments" not in item:
+                    item["attachments"] = []
+                item["attachments"].append(attachment)
+                break
+        current["checklist"] = items
+        await db.site_settings.update_one(
+            {"key": LAUNCH_CHECKLIST_KEY},
+            {"$set": {"value": current, "updated_at": datetime.now(timezone.utc)}},
+        )
+
+    return attachment
+
+
+@router.delete("/admin/launch-checklist/attachment")
+async def delete_checklist_attachment(
+    body: dict = Body(...),
+    admin=Depends(get_current_admin),
+):
+    """Delete a file attachment from a launch checklist item."""
+    item_id = body.get("item_id")
+    attachment_id = body.get("attachment_id")
+    if not item_id or not attachment_id:
+        raise HTTPException(status_code=400, detail="item_id and attachment_id required")
+
+    doc = await db.site_settings.find_one({"key": LAUNCH_CHECKLIST_KEY})
+    if not doc:
+        raise HTTPException(status_code=404, detail="Checklist not found")
+
+    current = doc.get("value", {})
+    items = current.get("checklist", [])
+    deleted_url = None
+    for item in items:
+        if item.get("id") == item_id:
+            attachments = item.get("attachments", [])
+            for att in attachments:
+                if att.get("id") == attachment_id:
+                    deleted_url = att.get("url")
+                    break
+            item["attachments"] = [a for a in attachments if a.get("id") != attachment_id]
+            break
+
+    current["checklist"] = items
+    await db.site_settings.update_one(
+        {"key": LAUNCH_CHECKLIST_KEY},
+        {"$set": {"value": current, "updated_at": datetime.now(timezone.utc)}},
+    )
+
+    # Delete file from disk
+    if deleted_url:
+        from pathlib import Path as _Path
+        file_path = _Path(os.environ.get("UPLOADS_PATH", "uploads")) / deleted_url.lstrip("/uploads/")
+        if file_path.exists():
+            file_path.unlink(missing_ok=True)
+
+    return {"message": "Attachment deleted"}
 
 
 # ==================== APP HEALTH MONITORING ====================
