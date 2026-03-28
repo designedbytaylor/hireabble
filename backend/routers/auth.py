@@ -1502,6 +1502,12 @@ async def apple_oauth(body: dict, request: Request):
         if not email:
             raise HTTPException(status_code=400, detail="Could not retrieve email from Apple")
 
+        # Validate redirect_uri against allowed origins
+        allowed_origins = [FRONTEND_URL]
+        redirect_uri = body.get("redirect_uri", "")
+        if redirect_uri and not any(redirect_uri.startswith(origin) for origin in allowed_origins):
+            raise HTTPException(status_code=400, detail="Invalid redirect URI")
+
         # Exchange authorization code for refresh token (needed for account deletion revocation per Apple guideline 5.1.1)
         apple_refresh_token = None
         if code and APPLE_PRIVATE_KEY and APPLE_TEAM_ID and APPLE_KEY_ID:
@@ -1561,23 +1567,25 @@ async def delete_account(current_user: dict = Depends(get_current_user)):
                     from database import decrypt_value
                     try:
                         apple_refresh_token = decrypt_value(encrypted_token)
-                    except Exception:
-                        apple_refresh_token = encrypted_token  # fallback for unencrypted legacy tokens
-                    client_secret = _generate_apple_client_secret()
-                    async with httpx.AsyncClient(timeout=10) as client:
-                        revoke_resp = await client.post(
-                            "https://appleid.apple.com/auth/revoke",
-                            data={
-                                "client_id": APPLE_CLIENT_ID,
-                                "client_secret": client_secret,
-                                "token": apple_refresh_token,
-                                "token_type_hint": "refresh_token",
-                            },
-                        )
-                    if revoke_resp.status_code == 200:
-                        logger.info(f"Revoked Apple token for user {user_id}")
-                    else:
-                        logger.warning(f"Apple token revocation returned {revoke_resp.status_code} for user {user_id}")
+                    except Exception as e:
+                        logger.warning(f"Could not decrypt Apple refresh token for user {user_id}, skipping revocation: {e}")
+                        apple_refresh_token = None
+                    if apple_refresh_token:
+                        client_secret = _generate_apple_client_secret()
+                        async with httpx.AsyncClient(timeout=10) as client:
+                            revoke_resp = await client.post(
+                                "https://appleid.apple.com/auth/revoke",
+                                data={
+                                    "client_id": APPLE_CLIENT_ID,
+                                    "client_secret": client_secret,
+                                    "token": apple_refresh_token,
+                                    "token_type_hint": "refresh_token",
+                                },
+                            )
+                        if revoke_resp.status_code == 200:
+                            logger.info(f"Revoked Apple token for user {user_id}")
+                        else:
+                            logger.warning(f"Apple token revocation returned {revoke_resp.status_code} for user {user_id}")
                 except Exception as apple_err:
                     logger.warning(f"Apple token revocation failed for {user_id}: {apple_err}")
 
