@@ -75,7 +75,6 @@ const AdminSettings = React.lazy(() => import("./pages/admin/AdminSettings"));
 const AdminTesting = React.lazy(() => import("./pages/admin/AdminTesting"));
 const AdminHealth = React.lazy(() => import("./pages/admin/AdminHealth"));
 const AdminMedia = React.lazy(() => import("./pages/admin/AdminMedia"));
-const AdminThemes = React.lazy(() => import("./pages/admin/AdminThemes"));
 const AdminSupport = React.lazy(() => import("./pages/admin/AdminSupport"));
 const AdminPromos = React.lazy(() => import("./pages/admin/AdminPromos"));
 const AdminStats = React.lazy(() => import("./pages/admin/AdminStats"));
@@ -462,7 +461,6 @@ function AppRoutes() {
         <Route path="verification" element={<AdminVerification />} />
         <Route path="testing" element={<AdminTesting />} />
         <Route path="health" element={<AdminHealth />} />
-        <Route path="themes" element={<AdminThemes />} />
         <Route path="support" element={<AdminSupport />} />
         <Route path="promos" element={<AdminPromos />} />
         <Route path="stats" element={<AdminStats />} />
