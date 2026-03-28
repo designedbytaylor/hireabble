@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useAdminAuth } from '../../context/AdminAuthContext';
 import {
-  LayoutDashboard, Users, ShieldAlert, Flag, Settings, LogOut, Shield, Briefcase, Beaker, Menu, X, Image, Palette, Headphones, Tag, BarChart3, DollarSign, Megaphone, Activity, BadgeCheck, ClipboardCheck,
+  LayoutDashboard, Users, ShieldAlert, Flag, Settings, LogOut, Shield, Briefcase, Beaker, Menu, X, Image, Headphones, Tag, BarChart3, DollarSign, Megaphone, Activity, BadgeCheck, ClipboardCheck,
 } from 'lucide-react';
 
 const allNavItems = [
@@ -22,7 +22,6 @@ const allNavItems = [
   { icon: ClipboardCheck, label: 'Launch', path: '/admin/launch', roles: ['admin'] },
   { icon: Activity, label: 'App Health', path: '/admin/health', roles: ['admin'] },
   { icon: Beaker, label: 'Testing', path: '/admin/testing', roles: ['admin'] },
-  { icon: Palette, label: 'Themes', path: '/admin/themes', roles: ['admin'] },
   { icon: Settings, label: 'Settings', path: '/admin/settings', roles: ['admin'] },
 ];
 
