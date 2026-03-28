@@ -220,6 +220,17 @@ SUBSCRIPTION_TIERS = {
 APPLE_TO_PRODUCT = {v["apple_product_id"]: k for k, v in PRODUCTS.items() if "apple_product_id" in v}
 GOOGLE_TO_PRODUCT = {v["google_product_id"]: k for k, v in PRODUCTS.items() if "google_product_id" in v}
 
+# Reverse lookup: Apple/Google subscription product ID -> (tier_id, duration)
+APPLE_TO_SUBSCRIPTION = {}
+for _tid, _tier in SUBSCRIPTION_TIERS.items():
+    for _dur, _apid in _tier.get("apple_product_ids", {}).items():
+        APPLE_TO_SUBSCRIPTION[_apid] = (_tid, _dur)
+
+GOOGLE_TO_SUBSCRIPTION = {}
+for _tid, _tier in SUBSCRIPTION_TIERS.items():
+    for _dur, _gpid in _tier.get("google_product_ids", {}).items():
+        GOOGLE_TO_SUBSCRIPTION[_gpid] = (_tid, _dur)
+
 
 async def _get_pricing_overrides(country: str = ""):
     """Load admin-configured pricing overrides from the database.
@@ -597,12 +608,25 @@ async def verify_apple_receipt(
     in_app = result.get("receipt", {}).get("in_app", [])
     latest_receipt_info = result.get("latest_receipt_info", in_app)
 
-    # Look for our product in the receipt
+    # Determine if this is a consumable product or a subscription tier
     product = PRODUCTS.get(data.product_id)
-    if not product:
+    subscription_info = APPLE_TO_SUBSCRIPTION.get(data.product_id)
+    is_subscription = False
+
+    if product:
+        # Consumable product (boost, super swipes, etc.)
+        apple_pid = product.get("apple_product_id")
+    elif subscription_info:
+        # Subscription tier (e.g., com.hireabble.seeker.plus.monthly)
+        is_subscription = True
+        apple_pid = data.product_id
+    elif data.product_id in APPLE_TO_PRODUCT:
+        # Client sent Apple product ID for a consumable
+        product = PRODUCTS[APPLE_TO_PRODUCT[data.product_id]]
+        apple_pid = data.product_id
+    else:
         raise HTTPException(status_code=400, detail="Invalid product ID")
 
-    apple_pid = product.get("apple_product_id")
     found_transaction = None
     for txn in latest_receipt_info:
         if txn.get("product_id") == apple_pid:
@@ -640,19 +664,34 @@ async def verify_apple_receipt(
     if existing:
         return {"status": "already_fulfilled", "message": "This purchase has already been processed"}
 
-    # Fulfill the purchase
-    metadata = {
-        "user_id": current_user["id"],
-        "product_id": data.product_id,
-        "job_id": data.job_id or "",
-    }
-    await fulfill_purchase(metadata, source="apple_iap", apple_transaction_id=apple_txn_id)
-
-    return {
-        "status": "success",
-        "message": f"Purchase fulfilled: {product['name']}",
-        "product_id": data.product_id,
-    }
+    if is_subscription:
+        tier_id, duration = subscription_info
+        tier = SUBSCRIPTION_TIERS[tier_id]
+        price = tier["prices"].get(duration, 0)
+        metadata = {
+            "user_id": current_user["id"],
+            "tier_id": tier_id,
+            "duration": duration,
+            "price": str(price),
+        }
+        await fulfill_subscription(metadata, source="apple_iap", apple_transaction_id=apple_txn_id)
+        return {
+            "status": "success",
+            "message": f"Subscription activated: {tier['name']} ({duration})",
+            "tier_id": tier_id,
+        }
+    else:
+        metadata = {
+            "user_id": current_user["id"],
+            "product_id": data.product_id,
+            "job_id": data.job_id or "",
+        }
+        await fulfill_purchase(metadata, source="apple_iap", apple_transaction_id=apple_txn_id)
+        return {
+            "status": "success",
+            "message": f"Purchase fulfilled: {product['name']}",
+            "product_id": data.product_id,
+        }
 
 
 @router.post("/apple/app-store-notification")
@@ -1150,7 +1189,7 @@ async def stripe_webhook(request: Request):
     return {"status": "ok"}
 
 
-async def fulfill_subscription(metadata: dict, source: str = "stripe", promo_code: str = None, custom_duration_days: int = None, stripe_session_id: str = None, google_order_id: str = None):
+async def fulfill_subscription(metadata: dict, source: str = "stripe", promo_code: str = None, custom_duration_days: int = None, stripe_session_id: str = None, google_order_id: str = None, apple_transaction_id: str = None):
     """Activate a subscription after successful payment or promo redemption"""
     user_id = metadata.get("user_id")
     tier_id = metadata.get("tier_id")
@@ -1205,6 +1244,8 @@ async def fulfill_subscription(metadata: dict, source: str = "stripe", promo_cod
         transaction["stripe_session_id"] = stripe_session_id
     if google_order_id:
         transaction["google_order_id"] = google_order_id
+    if apple_transaction_id:
+        transaction["apple_transaction_id"] = apple_transaction_id
     await db.transactions.insert_one(transaction)
 
     await create_notification(

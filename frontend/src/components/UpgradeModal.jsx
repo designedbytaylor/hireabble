@@ -100,8 +100,8 @@ export default function UpgradeModal({ open, onClose, onSubscribed, trigger, hig
       } else if (res.data.tiers.length > 0) {
         setSelectedTier(res.data.tiers[0].id);
       }
-    } catch (err) {
-      console.error('Failed to fetch tiers:', err);
+    } catch {
+      // Silently handled — loading state covers the UI
     } finally {
       setLoading(false);
     }

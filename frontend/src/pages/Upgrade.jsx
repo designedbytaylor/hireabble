@@ -211,7 +211,7 @@ export default function Upgrade() {
       setCurrentTier(res.data.current_tier);
       setCurrentDuration(res.data.current_duration);
     } catch (err) {
-      console.error('Failed to fetch tiers:', err);
+
       setFetchError(true);
     } finally {
       setLoading(false);
@@ -230,7 +230,7 @@ export default function Upgrade() {
         setAddOns([...(data.super_swipes || []), ...(data.boosts || [])]);
       }
     } catch (err) {
-      console.error('Failed to fetch add-ons:', err);
+
     }
   };
 
