@@ -413,7 +413,7 @@ export default function AdminLaunchChecklist() {
         const catColor = CATEGORY_COLORS[catIndex >= 0 ? catIndex % CATEGORY_COLORS.length : 0];
         return (
           <div onClick={closeItemModal} style={{ position: "fixed", inset: 0, background: "#000b", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 999 }}>
-            <div onClick={e => e.stopPropagation()} style={{ background: "#161B28", border: `1px solid ${BORDER}`, borderRadius: 14, padding: "28px 30px", maxWidth: 520, width: "92%", maxHeight: "80vh", display: "flex", flexDirection: "column" }}>
+            <div onClick={e => e.stopPropagation()} style={{ background: "#161B28", border: `1px solid ${BORDER}`, borderRadius: 14, padding: "28px 30px", maxWidth: 720, width: "92%", maxHeight: "85vh", display: "flex", flexDirection: "column" }}>
               {/* Category badge */}
               <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
                 <div style={{ width: 8, height: 8, borderRadius: 3, background: catColor, flexShrink: 0 }} />
@@ -460,7 +460,7 @@ export default function AdminLaunchChecklist() {
                     updateItemNotes(liveItem.id, e.target.value);
                   }}
                   placeholder="Add notes, links, or details for this task..."
-                  style={{ width: "100%", minHeight: 160, background: "#0D1020", border: `1px solid ${BORDER}`, borderRadius: 8, padding: "14px 16px", color: TEXT_BRIGHT, fontSize: 14, lineHeight: 1.7, resize: "vertical", outline: "none", fontFamily: "monospace", boxSizing: "border-box", transition: "border-color 0.2s" }}
+                  style={{ width: "100%", minHeight: 320, background: "#0D1020", border: `1px solid ${BORDER}`, borderRadius: 8, padding: "14px 16px", color: TEXT_BRIGHT, fontSize: 14, lineHeight: 1.7, resize: "vertical", outline: "none", fontFamily: "monospace", boxSizing: "border-box", transition: "border-color 0.2s" }}
                   onFocus={e => e.target.style.borderColor = TEAL + "66"}
                   onBlur={e => e.target.style.borderColor = BORDER}
                 />
