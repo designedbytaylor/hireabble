@@ -1178,29 +1178,29 @@ export default function Profile() {
                           { key: 'learning_style', label: 'How do you prefer to learn?', left: 'Self-directed', right: 'Mentored' },
                           { key: 'management_pref', label: 'What management style suits you?', left: 'Hands-off', right: 'Hands-on' },
                           { key: 'problem_approach', label: 'How do you approach problems?', left: 'Creative', right: 'Methodical' },
-                          { key: 'change_comfort', label: 'How do you feel about change?', left: 'Prefer stability', right: 'Thrive in change' },
+                          { key: 'change_comfort', label: 'How do you feel about change?', left: 'Stability', right: 'Change' },
                         ].map(({ key, label, left, right }) => (
-                          <div key={key} className="space-y-1.5">
+                          <div key={key} className="space-y-2">
                             <span className="text-sm">{label}</span>
-                            <div className="flex items-center gap-2">
-                              <span className="text-xs text-muted-foreground w-20 text-right shrink-0">{left}</span>
-                              <div className="flex gap-1 flex-1 justify-center">
-                                {[1, 2, 3, 4, 5].map(val => (
-                                  <button
-                                    key={val}
-                                    type="button"
-                                    onClick={() => setWorkStyle(prev => ({ ...prev, [key]: val }))}
-                                    className={`w-9 h-9 rounded-full border-2 transition-all text-xs font-medium ${
-                                      workStyle[key] === val
-                                        ? 'border-violet-500 bg-violet-500 text-white'
-                                        : 'border-border hover:border-violet-500/50 text-muted-foreground'
-                                    }`}
-                                  >
-                                    {val}
-                                  </button>
-                                ))}
-                              </div>
-                              <span className="text-xs text-muted-foreground w-20 shrink-0">{right}</span>
+                            <div className="flex justify-between text-xs text-muted-foreground px-1">
+                              <span>{left}</span>
+                              <span>{right}</span>
+                            </div>
+                            <div className="flex gap-2 justify-between">
+                              {[1, 2, 3, 4, 5].map(val => (
+                                <button
+                                  key={val}
+                                  type="button"
+                                  onClick={() => setWorkStyle(prev => ({ ...prev, [key]: val }))}
+                                  className={`flex-1 h-9 rounded-full border-2 transition-all text-xs font-medium ${
+                                    workStyle[key] === val
+                                      ? 'border-violet-500 bg-violet-500 text-white'
+                                      : 'border-border hover:border-violet-500/50 text-muted-foreground'
+                                  }`}
+                                >
+                                  {val}
+                                </button>
+                              ))}
                             </div>
                           </div>
                         ))}

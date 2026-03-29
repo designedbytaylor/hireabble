@@ -2172,33 +2172,33 @@ function JobFormDialog({ open, onClose, onSuccess, token, company, job = null, i
                   { key: 'decision_style', label: 'Decisions in this role are...', left: 'Independent', right: 'Collaborative' },
                   { key: 'learning_style', label: 'Onboarding style is...', left: 'Self-directed', right: 'Structured' },
                   { key: 'management_pref', label: 'Management style is...', left: 'Hands-off', right: 'Hands-on' },
-                  { key: 'problem_approach', label: 'This role requires...', left: 'Creative thinking', right: 'Methodical approach' },
-                  { key: 'change_comfort', label: 'This role involves...', left: 'Stability', right: 'Frequent change' },
+                  { key: 'problem_approach', label: 'This role requires...', left: 'Creative', right: 'Methodical' },
+                  { key: 'change_comfort', label: 'This role involves...', left: 'Stability', right: 'Change' },
                 ].map(({ key, label, left, right }) => (
                   <div key={key} className="space-y-1.5">
                     <span className="text-sm text-foreground">{label}</span>
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs text-muted-foreground w-24 text-right shrink-0">{left}</span>
-                      <div className="flex gap-1 flex-1 justify-center">
-                        {[1, 2, 3, 4, 5].map(val => (
-                          <button
-                            key={val}
-                            type="button"
-                            onClick={() => setFormData(prev => ({
-                              ...prev,
-                              work_style: { ...prev.work_style, [key]: val }
-                            }))}
-                            className={`w-8 h-8 rounded-full border-2 transition-all text-xs font-medium ${
-                              formData.work_style[key] === val
-                                ? 'border-violet-500 bg-violet-500 text-white'
-                                : 'border-border hover:border-violet-500/50 text-muted-foreground'
-                            }`}
-                          >
-                            {val}
-                          </button>
-                        ))}
-                      </div>
-                      <span className="text-xs text-muted-foreground w-24 shrink-0">{right}</span>
+                    <div className="flex justify-between text-xs text-muted-foreground px-1">
+                      <span>{left}</span>
+                      <span>{right}</span>
+                    </div>
+                    <div className="flex gap-2 justify-between">
+                      {[1, 2, 3, 4, 5].map(val => (
+                        <button
+                          key={val}
+                          type="button"
+                          onClick={() => setFormData(prev => ({
+                            ...prev,
+                            work_style: { ...prev.work_style, [key]: val }
+                          }))}
+                          className={`flex-1 h-8 rounded-full border-2 transition-all text-xs font-medium ${
+                            formData.work_style[key] === val
+                              ? 'border-violet-500 bg-violet-500 text-white'
+                              : 'border-border hover:border-violet-500/50 text-muted-foreground'
+                          }`}
+                        >
+                          {val}
+                        </button>
+                      ))}
                     </div>
                   </div>
                 ))}
