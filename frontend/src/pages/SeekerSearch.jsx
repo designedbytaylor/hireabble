@@ -484,6 +484,7 @@ export default function SeekerSearch() {
                     token={token}
                     onApply={(jobId) => setResults(prev => prev?.map(j => j.id === jobId ? { ...j, already_applied: true } : j))}
                     onSave={(jobId) => setResults(prev => prev?.map(j => j.id === jobId ? { ...j, _saved: true } : j))}
+                    onViewDetails={(job) => setSelectedJob(job)}
                   />
                 </Suspense>
               </div>

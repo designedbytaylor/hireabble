@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import MarkerClusterGroup from 'react-leaflet-cluster';
-import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import axios from 'axios';
 import 'leaflet/dist/leaflet.css';
@@ -30,8 +29,7 @@ const formatSalary = (min, max) => {
   return `Up to ${fmt(max)}`;
 };
 
-export default function MapView({ jobs = [], userLat, userLng, token, onApply, onSave }) {
-  const navigate = useNavigate();
+export default function MapView({ jobs = [], userLat, userLng, token, onApply, onSave, onViewDetails }) {
   const [appliedIds, setAppliedIds] = useState(new Set());
   const [savedIds, setSavedIds] = useState(new Set());
 
@@ -207,7 +205,7 @@ export default function MapView({ jobs = [], userLat, userLng, token, onApply, o
 
                       {/* View Details */}
                       <button
-                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); navigate(`/jobs/${job.id}`); }}
+                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); onViewDetails?.(job); }}
                         style={{
                           fontSize: '11px',
                           fontWeight: 500,
