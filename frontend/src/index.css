@@ -47,14 +47,13 @@
 }
 
 /* Leaflet map — 3-layer approach: dark base + teal water overlay + labels */
-/* Layer 1: Dark base tiles — the main dark theme */
+/* Layer 1: Dark base tiles — darker land, subtle roads */
 .map-water-underlay {
-  filter: brightness(1.4) contrast(1.2);
+  filter: brightness(1.0) contrast(1.1);
 }
-/* Layer 2: Light tiles filtered to extract water as bright teal, blended with screen mode
-   Screen blend: teal on dark = teal shows, teal on light = washes out */
+/* Layer 2: Light tiles filtered to extract water as bright teal-blue, screen blended */
 .map-dark-base {
-  filter: saturate(5) hue-rotate(320deg) brightness(0.4) contrast(3);
+  filter: saturate(8) hue-rotate(340deg) brightness(0.6) contrast(2.5);
   mix-blend-mode: screen;
 }
 /* Layer 3: Labels — boosted brightness for crisp white text */
