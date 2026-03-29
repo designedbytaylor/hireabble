@@ -3883,3 +3883,91 @@ async def seed_demo_accounts(admin=Depends(get_current_admin)):
             "notifications": 2,
         },
     }
+
+
+# ==================== ADMIN FILE STORAGE ====================
+
+@router.get("/admin/files")
+async def list_admin_files(admin=Depends(get_current_admin)):
+    """List all admin-uploaded files."""
+    doc = await db.site_settings.find_one({"key": "admin_files"})
+    files = doc.get("value", []) if doc else []
+    return {"files": files}
+
+
+@router.post("/admin/files/upload")
+async def upload_admin_file(
+    file: UploadFile = File(...),
+    admin=Depends(get_current_admin),
+):
+    """Upload a file to the admin file storage."""
+    MAX_SIZE = 25 * 1024 * 1024  # 25MB
+    contents = await file.read()
+    if len(contents) > MAX_SIZE:
+        raise HTTPException(status_code=400, detail="File size exceeds 25MB limit")
+
+    from pathlib import Path as _Path
+    original_name = file.filename or "file"
+    safe_name = re.sub(r'[^\w\-.]', '_', original_name)
+    ext = _Path(safe_name).suffix or ""
+    stored_name = f"admin_{uuid.uuid4().hex[:12]}{ext}"
+
+    uploads_dir = _Path(os.environ.get("UPLOADS_PATH", "uploads")) / "admin-files"
+    uploads_dir.mkdir(parents=True, exist_ok=True)
+    (uploads_dir / stored_name).write_bytes(contents)
+
+    file_doc = {
+        "id": uuid.uuid4().hex[:12],
+        "filename": original_name,
+        "url": f"/uploads/admin-files/{stored_name}",
+        "size": len(contents),
+        "content_type": file.content_type or "application/octet-stream",
+        "uploaded_at": datetime.now(timezone.utc).isoformat(),
+        "uploaded_by": admin.get("name", "Admin"),
+    }
+
+    await db.site_settings.update_one(
+        {"key": "admin_files"},
+        {"$push": {"value": file_doc}},
+        upsert=True,
+    )
+
+    doc = await db.site_settings.find_one({"key": "admin_files"})
+    if not isinstance(doc.get("value"), list):
+        await db.site_settings.update_one(
+            {"key": "admin_files"},
+            {"$set": {"value": [file_doc]}},
+        )
+
+    return file_doc
+
+
+@router.delete("/admin/files/{file_id}")
+async def delete_admin_file(file_id: str, admin=Depends(get_current_admin)):
+    """Delete a file from admin storage."""
+    doc = await db.site_settings.find_one({"key": "admin_files"})
+    if not doc:
+        raise HTTPException(status_code=404, detail="File not found")
+
+    files = doc.get("value", [])
+    deleted_url = None
+    for f in files:
+        if f.get("id") == file_id:
+            deleted_url = f.get("url")
+            break
+
+    if not deleted_url:
+        raise HTTPException(status_code=404, detail="File not found")
+
+    updated = [f for f in files if f.get("id") != file_id]
+    await db.site_settings.update_one(
+        {"key": "admin_files"},
+        {"$set": {"value": updated}},
+    )
+
+    from pathlib import Path as _Path
+    file_path = _Path(os.environ.get("UPLOADS_PATH", "uploads")) / deleted_url.lstrip("/uploads/")
+    if file_path.exists():
+        file_path.unlink(missing_ok=True)
+
+    return {"message": "File deleted"}
