@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import {
   Search, MapPin, DollarSign, Briefcase, Filter, X, ChevronDown,
   CheckCircle, Bookmark, Zap, Building2, ArrowRight, Loader2, Clock,
-  Sparkles, GraduationCap, Map, List
+  Sparkles, GraduationCap, List
 } from 'lucide-react';
 
 const MapView = React.lazy(() => import('../components/MapView'));
@@ -408,12 +408,24 @@ export default function SeekerSearch() {
         ) : results?.length > 0 ? (
           <>
             {/* Results header */}
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-2">
+            <div className="space-y-2 mb-3">
+              {/* Row 1: Result count + Swipe Results */}
+              <div className="flex items-center justify-between">
                 <p className="text-sm text-muted-foreground">
                   {results.length} result{results.length !== 1 ? 's' : ''} found
                 </p>
-                <div className="flex gap-1 ml-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleSwipeResults}
+                  className="rounded-xl text-xs border-primary/30 text-primary hover:bg-primary/10"
+                >
+                  <ArrowRight className="w-3.5 h-3.5 mr-1" /> Swipe Results
+                </Button>
+              </div>
+              {/* Row 2: Sort pills + View toggles */}
+              <div className="flex items-center justify-between">
+                <div className="flex gap-1">
                   {[
                     { key: '', label: 'Best Fit' },
                     { key: 'distance', label: 'Near Me' },
@@ -432,38 +444,28 @@ export default function SeekerSearch() {
                     </button>
                   ))}
                 </div>
-              </div>
-              <div className="flex items-center gap-1">
-                <button
-                  onClick={() => setViewMode('list')}
-                  className={`p-1.5 rounded-lg transition-colors ${
-                    viewMode === 'list'
-                      ? 'bg-primary/20 text-primary'
-                      : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
-                  }`}
-                  title="List view"
-                >
-                  <List className="w-4 h-4" />
-                </button>
-                <button
-                  onClick={() => setViewMode('map')}
-                  className={`p-1.5 rounded-lg transition-colors ${
-                    viewMode === 'map'
-                      ? 'bg-primary/20 text-primary'
-                      : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
-                  }`}
-                  title="Map view"
-                >
-                  <Map className="w-4 h-4" />
-                </button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleSwipeResults}
-                  className="rounded-xl text-xs border-primary/30 text-primary hover:bg-primary/10 ml-1"
-                >
-                  <ArrowRight className="w-3.5 h-3.5 mr-1" /> Swipe Results
-                </Button>
+                <div className="flex gap-1">
+                  <button
+                    onClick={() => setViewMode('list')}
+                    className={`px-2.5 py-0.5 rounded-full text-[11px] font-medium transition-colors flex items-center gap-1 ${
+                      viewMode === 'list'
+                        ? 'bg-primary/20 text-primary'
+                        : 'bg-muted/50 text-muted-foreground hover:bg-muted'
+                    }`}
+                  >
+                    <List className="w-3 h-3" /> List
+                  </button>
+                  <button
+                    onClick={() => setViewMode('map')}
+                    className={`px-2.5 py-0.5 rounded-full text-[11px] font-medium transition-colors flex items-center gap-1 ${
+                      viewMode === 'map'
+                        ? 'bg-primary/20 text-primary'
+                        : 'bg-muted/50 text-muted-foreground hover:bg-muted'
+                    }`}
+                  >
+                    <MapPin className="w-3 h-3" /> Map
+                  </button>
+                </div>
               </div>
             </div>
 
