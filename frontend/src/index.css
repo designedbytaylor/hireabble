@@ -46,14 +46,18 @@
   }
 }
 
-/* Leaflet map — dual-layer: inverted Voyager (teal water) + dark labels on top */
-/* Base: Voyager (no labels) inverted for dark land + teal water */
-.map-base-layer {
-  filter: invert(1) hue-rotate(150deg) brightness(0.7) contrast(1.4) saturate(0.7);
+/* Leaflet map — 3-layer approach: teal water underlay + dark base + labels */
+/* Layer 1: Light tiles with heavy teal tint — only water color matters */
+.map-water-underlay {
+  filter: brightness(0.5) saturate(3) hue-rotate(150deg) contrast(2);
 }
-/* Labels: CartoDB dark labels — bright text on transparent bg, boosted for readability */
+/* Layer 2: Dark tiles at reduced opacity — land/roads go dark, water shows through */
+.map-dark-base {
+  opacity: 0.75;
+}
+/* Layer 3: Labels — boosted brightness for crisp white text */
 .map-labels-layer {
-  filter: brightness(1.8);
+  filter: brightness(2);
 }
 
 /* Leaflet map popup — dark theme overrides */

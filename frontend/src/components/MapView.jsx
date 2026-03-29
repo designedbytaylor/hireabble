@@ -100,12 +100,17 @@ export default function MapView({ jobs = [], userLat, userLng, token, onApply, o
           style={{ height: '100%', width: '100%' }}
           scrollWheelZoom={true}
         >
-          {/* Bottom layer: Voyager inverted to dark with teal water */}
+          {/* Layer 1: Teal water underlay — light tiles heavily filtered to only show water color */}
           <TileLayer
-            url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager_nolabels/{z}/{x}/{y}{r}.png"
-            className="map-base-layer"
+            url="https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png"
+            className="map-water-underlay"
           />
-          {/* Top layer: Dark labels only — crisp white text on top */}
+          {/* Layer 2: Dark base — semi-transparent dark tiles let teal water bleed through */}
+          <TileLayer
+            url="https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png"
+            className="map-dark-base"
+          />
+          {/* Layer 3: Labels — crisp white text on transparent bg */}
           <TileLayer
             attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/">CARTO</a>'
             url="https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png"
