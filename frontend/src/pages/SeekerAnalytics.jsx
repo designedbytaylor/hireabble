@@ -1,12 +1,25 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Eye, TrendingUp, BarChart3, Zap } from 'lucide-react';
+import { ArrowLeft, Eye, TrendingUp, BarChart3, Zap, Building2, Clock, Lock } from 'lucide-react';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import Navigation from '../components/Navigation';
+import { UpgradePrompt } from '../components/UpgradeModal';
+import { getPhotoUrl, handleImgError } from '../utils/helpers';
 import useDocumentTitle from '../hooks/useDocumentTitle';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
+
+function timeAgo(dateStr) {
+  if (!dateStr) return '';
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 60) return `${mins}m ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  return `${days}d ago`;
+}
 
 function SimpleBarChart({ data, dataKey, labelKey, color = 'bg-primary' }) {
   if (!data || data.length === 0) return <p className="text-sm text-muted-foreground">No data yet</p>;
@@ -29,18 +42,31 @@ function SimpleBarChart({ data, dataKey, labelKey, color = 'bg-primary' }) {
 export default function SeekerAnalytics() {
   useDocumentTitle('Your Insights');
   const navigate = useNavigate();
-  const { token } = useAuth();
+  const { token, user } = useAuth();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [viewers, setViewers] = useState([]);
+  const [totalViews, setTotalViews] = useState(0);
 
   useEffect(() => {
-    const fetchAnalytics = async () => {
+    const fetchData = async () => {
       try {
         const res = await axios.get(`${API}/seeker/analytics`, {
           headers: { Authorization: `Bearer ${token}` },
         });
         setData(res.data);
+
+        // Fetch profile viewers if user has access
+        if (!res.data.locked) {
+          try {
+            const viewersRes = await axios.get(`${API}/profile/viewers`, {
+              headers: { Authorization: `Bearer ${token}` },
+            });
+            setViewers(viewersRes.data.viewers || []);
+            setTotalViews(viewersRes.data.total_views || 0);
+          } catch { /* viewers fetch failed, continue */ }
+        }
       } catch (err) {
         console.error('Failed to fetch analytics:', err);
         setError('Failed to load analytics');
@@ -48,7 +74,7 @@ export default function SeekerAnalytics() {
         setLoading(false);
       }
     };
-    fetchAnalytics();
+    fetchData();
   }, [token]);
 
   if (loading) {
@@ -70,6 +96,8 @@ export default function SeekerAnalytics() {
     );
   }
 
+  const isLocked = data?.locked;
+
   return (
     <div className="min-h-screen bg-background pb-24">
       {/* Header */}
@@ -86,7 +114,7 @@ export default function SeekerAnalytics() {
       </div>
 
       <div className="max-w-2xl mx-auto px-4 py-6 space-y-6">
-        {/* Stat Cards */}
+        {/* Teaser Stat Cards — shown to everyone */}
         <div className="grid grid-cols-3 gap-3">
           <div className="bg-card border border-border rounded-2xl p-4 text-center">
             <Eye className="w-5 h-5 mx-auto mb-2 text-blue-500" />
@@ -95,7 +123,7 @@ export default function SeekerAnalytics() {
           </div>
           <div className="bg-card border border-border rounded-2xl p-4 text-center">
             <TrendingUp className="w-5 h-5 mx-auto mb-2 text-green-500" />
-            <p className="text-2xl font-bold">{data.application_percentile}%</p>
+            <p className="text-2xl font-bold">{isLocked ? '—' : `${data.application_percentile}%`}</p>
             <p className="text-xs text-muted-foreground">App Percentile</p>
           </div>
           <div className="bg-card border border-border rounded-2xl p-4 text-center">
@@ -105,65 +133,126 @@ export default function SeekerAnalytics() {
           </div>
         </div>
 
-        {/* Profile Views Trend */}
-        <div className="bg-card border border-border rounded-2xl p-5">
-          <h2 className="font-semibold mb-1">Profile Views</h2>
-          <p className="text-xs text-muted-foreground mb-4">Last 14 days</p>
-          <SimpleBarChart data={data.profile_views_trend} dataKey="views" labelKey="date" color="bg-blue-500" />
-          {data.profile_views_trend.length > 0 && (
-            <div className="flex justify-between mt-2 text-[10px] text-muted-foreground">
-              <span>{data.profile_views_trend[Math.max(data.profile_views_trend.length - 14, 0)]?.date}</span>
-              <span>{data.profile_views_trend[data.profile_views_trend.length - 1]?.date}</span>
-            </div>
-          )}
-        </div>
+        {/* Locked state — show upgrade prompt */}
+        {isLocked && (
+          <UpgradePrompt
+            title="Unlock Insights & Analytics"
+            subtitle="See who viewed your profile, track application trends, and discover in-demand skills"
+            tierHint="seeker_plus"
+            trigger="insights"
+          />
+        )}
 
-        {/* Applications Trend */}
-        <div className="bg-card border border-border rounded-2xl p-5">
-          <h2 className="font-semibold mb-1">Applications</h2>
-          <p className="text-xs text-muted-foreground mb-4">Last 14 days</p>
-          <SimpleBarChart data={data.applications_trend} dataKey="count" labelKey="date" color="bg-purple-500" />
-          {data.applications_trend.length > 0 && (
-            <div className="flex justify-between mt-2 text-[10px] text-muted-foreground">
-              <span>{data.applications_trend[Math.max(data.applications_trend.length - 14, 0)]?.date}</span>
-              <span>{data.applications_trend[data.applications_trend.length - 1]?.date}</span>
+        {/* Unlocked content */}
+        {!isLocked && (
+          <>
+            {/* Profile Views Trend */}
+            <div className="bg-card border border-border rounded-2xl p-5">
+              <h2 className="font-semibold mb-1">Profile Views</h2>
+              <p className="text-xs text-muted-foreground mb-4">Last 14 days</p>
+              <SimpleBarChart data={data.profile_views_trend} dataKey="views" labelKey="date" color="bg-blue-500" />
+              {data.profile_views_trend.length > 0 && (
+                <div className="flex justify-between mt-2 text-[10px] text-muted-foreground">
+                  <span>{data.profile_views_trend[Math.max(data.profile_views_trend.length - 14, 0)]?.date}</span>
+                  <span>{data.profile_views_trend[data.profile_views_trend.length - 1]?.date}</span>
+                </div>
+              )}
             </div>
-          )}
-        </div>
 
-        {/* Trending Skills */}
-        <div className="bg-card border border-border rounded-2xl p-5">
-          <div className="flex items-center gap-2 mb-4">
-            <Zap className="w-5 h-5 text-amber-500" />
-            <div>
-              <h2 className="font-semibold">Skills in Demand</h2>
-              <p className="text-xs text-muted-foreground">Popular skills you could add to your profile</p>
+            {/* Applications Trend */}
+            <div className="bg-card border border-border rounded-2xl p-5">
+              <h2 className="font-semibold mb-1">Applications</h2>
+              <p className="text-xs text-muted-foreground mb-4">Last 14 days</p>
+              <SimpleBarChart data={data.applications_trend} dataKey="count" labelKey="date" color="bg-purple-500" />
+              {data.applications_trend.length > 0 && (
+                <div className="flex justify-between mt-2 text-[10px] text-muted-foreground">
+                  <span>{data.applications_trend[Math.max(data.applications_trend.length - 14, 0)]?.date}</span>
+                  <span>{data.applications_trend[data.applications_trend.length - 1]?.date}</span>
+                </div>
+              )}
             </div>
-          </div>
-          {data.trending_skills.length === 0 ? (
-            <p className="text-sm text-muted-foreground">You already have the top in-demand skills!</p>
-          ) : (
-            <div className="space-y-3">
-              {data.trending_skills.map((s, i) => {
-                const maxDemand = Math.max(...data.trending_skills.map(t => t.demand), 1);
-                return (
-                  <div key={i}>
-                    <div className="flex justify-between items-center mb-1">
-                      <span className="text-sm font-medium capitalize">{s.skill}</span>
-                      <span className="text-xs text-muted-foreground">{s.demand} jobs</span>
+
+            {/* Who Viewed Your Profile */}
+            <div className="bg-card border border-border rounded-2xl p-5">
+              <div className="flex items-center gap-2 mb-4">
+                <Eye className="w-5 h-5 text-amber-500" />
+                <div>
+                  <h2 className="font-semibold">Who Viewed Your Profile</h2>
+                  <p className="text-xs text-muted-foreground">
+                    {totalViews} recruiter{totalViews !== 1 ? 's' : ''} viewed your profile
+                  </p>
+                </div>
+              </div>
+              {viewers.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No views yet — keep applying to get noticed!</p>
+              ) : (
+                <div className="space-y-3">
+                  {viewers.map((viewer) => (
+                    <div key={viewer.viewer_id} className="flex items-center gap-3 p-3 rounded-xl bg-background border border-border/50">
+                      <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0 overflow-hidden">
+                        {viewer.photo_url ? (
+                          <img
+                            src={getPhotoUrl(viewer.photo_url)}
+                            alt=""
+                            className="w-full h-full object-cover"
+                            onError={handleImgError}
+                            loading="lazy"
+                          />
+                        ) : (
+                          <Building2 className="w-5 h-5 text-primary" />
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate">{viewer.name}</p>
+                        {viewer.company && (
+                          <p className="text-xs text-muted-foreground">{viewer.company}</p>
+                        )}
+                      </div>
+                      <span className="text-[10px] text-muted-foreground flex items-center gap-0.5 whitespace-nowrap">
+                        <Clock className="w-3 h-3" />
+                        {timeAgo(viewer.viewed_at)}
+                      </span>
                     </div>
-                    <div className="h-2 bg-muted rounded-full overflow-hidden">
-                      <div
-                        className="h-full bg-amber-500 rounded-full transition-all"
-                        style={{ width: `${(s.demand / maxDemand) * 100}%` }}
-                      />
-                    </div>
-                  </div>
-                );
-              })}
+                  ))}
+                </div>
+              )}
             </div>
-          )}
-        </div>
+
+            {/* Trending Skills */}
+            <div className="bg-card border border-border rounded-2xl p-5">
+              <div className="flex items-center gap-2 mb-4">
+                <Zap className="w-5 h-5 text-amber-500" />
+                <div>
+                  <h2 className="font-semibold">Skills in Demand</h2>
+                  <p className="text-xs text-muted-foreground">Popular skills you could add to your profile</p>
+                </div>
+              </div>
+              {data.trending_skills.length === 0 ? (
+                <p className="text-sm text-muted-foreground">You already have the top in-demand skills!</p>
+              ) : (
+                <div className="space-y-3">
+                  {data.trending_skills.map((s, i) => {
+                    const maxDemand = Math.max(...data.trending_skills.map(t => t.demand), 1);
+                    return (
+                      <div key={i}>
+                        <div className="flex justify-between items-center mb-1">
+                          <span className="text-sm font-medium capitalize">{s.skill}</span>
+                          <span className="text-xs text-muted-foreground">{s.demand} jobs</span>
+                        </div>
+                        <div className="h-2 bg-muted rounded-full overflow-hidden">
+                          <div
+                            className="h-full bg-amber-500 rounded-full transition-all"
+                            style={{ width: `${(s.demand / maxDemand) * 100}%` }}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </>
+        )}
       </div>
 
       <Navigation />
