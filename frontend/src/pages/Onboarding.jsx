@@ -844,29 +844,29 @@ export default function Onboarding() {
                       { key: 'learning_style', label: 'How do you prefer to learn?', left: 'Self-directed', right: 'Mentored' },
                       { key: 'management_pref', label: 'What management style suits you?', left: 'Hands-off', right: 'Hands-on' },
                       { key: 'problem_approach', label: 'How do you approach problems?', left: 'Creative', right: 'Methodical' },
-                      { key: 'change_comfort', label: 'How do you feel about change?', left: 'Prefer stability', right: 'Thrive in change' },
+                      { key: 'change_comfort', label: 'How do you feel about change?', left: 'Stability', right: 'Change' },
                     ].map(({ key, label, left, right }) => (
                       <div key={key} className="space-y-2">
                         <Label className="text-sm">{label}</Label>
-                        <div className="flex items-center gap-3">
-                          <span className="text-xs text-muted-foreground w-20 text-right shrink-0">{left}</span>
-                          <div className="flex gap-1.5 flex-1 justify-center">
-                            {[1, 2, 3, 4, 5].map(val => (
-                              <button
-                                key={val}
-                                type="button"
-                                onClick={() => handleChange('work_style', { ...formData.work_style, [key]: val })}
-                                className={`w-10 h-10 rounded-full border-2 transition-all text-sm font-medium ${
-                                  formData.work_style[key] === val
-                                    ? 'border-violet-500 bg-violet-500 text-white shadow-lg shadow-violet-500/30'
-                                    : 'border-border hover:border-violet-500/50 text-muted-foreground'
-                                }`}
-                              >
-                                {val}
-                              </button>
-                            ))}
-                          </div>
-                          <span className="text-xs text-muted-foreground w-20 shrink-0">{right}</span>
+                        <div className="flex justify-between text-xs text-muted-foreground px-1">
+                          <span>{left}</span>
+                          <span>{right}</span>
+                        </div>
+                        <div className="flex gap-2 justify-between">
+                          {[1, 2, 3, 4, 5].map(val => (
+                            <button
+                              key={val}
+                              type="button"
+                              onClick={() => handleChange('work_style', { ...formData.work_style, [key]: val })}
+                              className={`flex-1 h-10 rounded-full border-2 transition-all text-sm font-medium ${
+                                formData.work_style[key] === val
+                                  ? 'border-violet-500 bg-violet-500 text-white shadow-lg shadow-violet-500/30'
+                                  : 'border-border hover:border-violet-500/50 text-muted-foreground'
+                              }`}
+                            >
+                              {val}
+                            </button>
+                          ))}
                         </div>
                       </div>
                     ))}
