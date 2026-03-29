@@ -46,22 +46,18 @@
   }
 }
 
-/* Leaflet map — 4-layer: dark base + teal water (screen) + land mask (darken) + labels */
-/* Layer 1: Dark base */
+/* Leaflet map — 3-layer: dark base + teal water (color blend) + labels */
+/* Layer 1: Dark base — slightly brightened for road visibility */
 .map-dark-base {
-  filter: brightness(1.3) contrast(1.1);
+  filter: brightness(1.4) contrast(1.2);
 }
-/* Layer 2: Light tiles — extreme saturation extracts water color, screen blend adds teal */
+/* Layer 2: Light tiles — boosted saturation + hue-rotated to teal, then COLOR blend mode
+   transfers hue/saturation to base while keeping base luminosity (dark stays dark) */
 .map-water-tint {
-  filter: saturate(10) hue-rotate(340deg) brightness(0.6) contrast(3);
-  mix-blend-mode: screen;
+  filter: saturate(20) hue-rotate(340deg) brightness(1) contrast(1.5);
+  mix-blend-mode: color;
 }
-/* Layer 3: Dark tiles again — darken blend keeps darker pixel, so dark land wins over orange bleed but bright teal water stays */
-.map-land-mask {
-  mix-blend-mode: darken;
-  filter: brightness(1.3);
-}
-/* Layer 4: Labels — bright white text */
+/* Layer 3: Labels — bright white text */
 .map-labels-layer {
   filter: brightness(2);
 }
