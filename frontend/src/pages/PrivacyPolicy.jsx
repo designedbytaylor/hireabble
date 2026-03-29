@@ -12,9 +12,15 @@ export default function PrivacyPolicy() {
         </Link>
 
         <h1 className="text-3xl font-bold font-['Outfit'] mb-2">Privacy Policy</h1>
-        <p className="text-muted-foreground mb-8">Last updated: March 16, 2026</p>
+        <p className="text-muted-foreground mb-8">Last updated: March 29, 2026</p>
 
         <div className="prose prose-invert max-w-none space-y-6 text-sm leading-relaxed">
+          <section>
+            <p className="text-muted-foreground mb-4">
+              Hireabble Inc. ("Company", "we", "us", "our") operates the Hireabble application and website ("Service"). This Privacy Policy explains how we collect, use, and protect your information.
+            </p>
+          </section>
+
           <section>
             <h2 className="text-lg font-bold font-['Outfit'] mb-3">1. Information We Collect</h2>
             <p className="text-muted-foreground mb-2">We collect information you provide directly:</p>

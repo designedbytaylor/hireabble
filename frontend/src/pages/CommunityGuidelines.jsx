@@ -12,13 +12,13 @@ export default function CommunityGuidelines() {
         </Link>
 
         <h1 className="text-3xl font-bold font-['Outfit'] mb-2">Community Guidelines</h1>
-        <p className="text-muted-foreground mb-8">Last updated: March 20, 2026</p>
+        <p className="text-muted-foreground mb-8">Last updated: March 29, 2026</p>
 
         <div className="prose prose-invert max-w-none space-y-6 text-sm leading-relaxed">
           <section>
             <h2 className="text-lg font-bold font-['Outfit'] mb-3">Our Mission</h2>
             <p className="text-muted-foreground">
-              Hireabble is a professional job-matching platform designed to connect job seekers with recruiters in a respectful, safe, and productive environment. These guidelines apply to all users and all content shared on the platform, including profiles, photos, videos, messages, and job postings.
+              Hireabble, operated by Hireabble Inc., is a professional job-matching platform designed to connect job seekers with recruiters in a respectful, safe, and productive environment. These guidelines apply to all users and all content shared on the platform, including profiles, photos, videos, messages, and job postings.
             </p>
           </section>
 

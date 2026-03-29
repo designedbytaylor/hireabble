@@ -92,7 +92,7 @@ const INITIAL_CHECKLIST = [
   { id: uid(), category: "App Store Assets & Metadata", text: "Add support URL for App Store listing", done: false },
   { id: uid(), category: "App Store Assets & Metadata", text: "Set age rating via App Store Connect questionnaire", done: false },
   { id: uid(), category: "App Store Assets & Metadata", text: "Set content rating via Google Play IARC questionnaire", done: false },
-  { id: uid(), category: "App Store Assets & Metadata", text: "Add copyright text (e.g., '2026 Hireabble') in App Store Connect", done: false },
+  { id: uid(), category: "App Store Assets & Metadata", text: "Add copyright text (e.g., '2026 Hireabble Inc.') in App Store Connect", done: false },
 
   { id: uid(), category: "Legal & Compliance", text: "Implement in-app account deletion flow (required by both Apple and Google)", done: false },
   { id: uid(), category: "Legal & Compliance", text: "Add iOS Privacy Manifest file (PrivacyInfo.xcprivacy) — required since Spring 2024", done: false },
