@@ -244,7 +244,7 @@ export default function UpgradeModal({ open, onClose, onSubscribed, trigger, hig
                         {tier.name}
                       </p>
                       <p className={`text-xs ${isSelected ? 'text-white/70' : 'text-muted-foreground'}`}>
-                        {isCurrent ? 'Current' : `From ${formatPrice(Math.round(tier.prices['6month'] / 6))}/mo`}
+                        {isCurrent ? 'Current' : `From ${formatPrice(tier.prices['monthly'])}/mo`}
                       </p>
                     </button>
                   );

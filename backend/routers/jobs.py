@@ -254,6 +254,30 @@ async def create_job(job: JobCreate, request: Request, current_user: dict = Depe
     if not is_clean and is_severe(violations):
         raise HTTPException(status_code=400, detail="Job posting contains prohibited content and cannot be published.")
 
+    # --- Tier-based daily job posting limit ---
+    sub = current_user.get("subscription") or {}
+    now_utc = datetime.now(timezone.utc)
+    tier_id = sub.get("tier_id") if sub.get("status") == "active" else None
+    if tier_id == "recruiter_enterprise":
+        daily_limit = -1  # unlimited
+    elif tier_id == "recruiter_pro":
+        daily_limit = 10
+    else:
+        daily_limit = 3  # free tier
+
+    if daily_limit != -1:
+        start_of_day = now_utc.replace(hour=0, minute=0, second=0, microsecond=0).isoformat()
+        today_count = await db.jobs.count_documents({
+            "recruiter_id": current_user["id"],
+            "created_at": {"$gte": start_of_day},
+        })
+        if today_count >= daily_limit:
+            tier_label = "Pro" if tier_id == "recruiter_pro" else "free"
+            raise HTTPException(
+                status_code=429,
+                detail=f"Daily job posting limit reached ({daily_limit}/day on {tier_label} plan). Upgrade for more posts."
+            )
+
     job_id = str(uuid.uuid4())
 
     # Gradient backgrounds for variety
@@ -270,8 +294,7 @@ async def create_job(job: JobCreate, request: Request, current_user: dict = Depe
     category = job.category or auto_categorize_job(job.title, job.requirements, job.description)
 
     # Check if recruiter has Enterprise subscription for featured listings
-    sub = current_user.get("subscription") or {}
-    now_iso = datetime.now(timezone.utc).isoformat()
+    now_iso = now_utc.isoformat()
     is_enterprise = (
         sub.get("status") == "active"
         and sub.get("period_end", "") >= now_iso
@@ -794,6 +817,68 @@ def _call_anthropic(client, messages, max_tokens=4000):
             logger.warning(f"Model {model_id} failed: {type(e).__name__}: {e}")
             continue
     raise last_error or Exception("All models failed")
+
+
+async def compute_ai_compatibility(seeker: dict, job: dict) -> dict:
+    """Use Claude to generate a compatibility assessment between seeker and job.
+
+    Returns {"score": int, "summary": str, "strengths": [str], "considerations": [str]}
+    or None on failure.
+    """
+    try:
+        client = _get_anthropic_client()
+    except Exception:
+        return None
+
+    seeker_profile = {
+        "title": seeker.get("title"),
+        "skills": seeker.get("skills", []),
+        "experience_years": seeker.get("experience_years"),
+        "work_style": seeker.get("work_style"),
+        "bio": seeker.get("bio"),
+        "interests": seeker.get("interests", []),
+        "degree": seeker.get("degree"),
+    }
+    job_profile = {
+        "title": job.get("title"),
+        "description": job.get("description"),
+        "requirements": job.get("requirements", []),
+        "work_style": job.get("work_style"),
+        "job_type": job.get("job_type"),
+        "experience_level": job.get("experience_level"),
+    }
+
+    import json as _json
+    prompt = f"""Analyze the compatibility between this job seeker and job posting.
+
+Seeker: {_json.dumps(seeker_profile)}
+Job: {_json.dumps(job_profile)}
+
+Return ONLY valid JSON with no other text:
+{{"score": <0-100 compatibility score>, "summary": "<1 concise sentence>", "strengths": ["<strength 1>", "<strength 2>"], "considerations": ["<consideration 1>"]}}
+
+Keep strengths to 2-3 items and considerations to 1-2 items. Be specific and actionable."""
+
+    try:
+        message = _call_anthropic(client, [{"role": "user", "content": prompt}], max_tokens=500)
+        text = message.content[0].text.strip()
+        # Extract JSON from response
+        if text.startswith("```"):
+            text = text.split("```")[1]
+            if text.startswith("json"):
+                text = text[4:]
+            text = text.strip()
+        result = _json.loads(text)
+        # Validate structure
+        return {
+            "score": max(0, min(100, int(result.get("score", 50)))),
+            "summary": str(result.get("summary", ""))[:200],
+            "strengths": [str(s)[:100] for s in result.get("strengths", [])][:3],
+            "considerations": [str(s)[:100] for s in result.get("considerations", [])][:2],
+        }
+    except Exception as e:
+        logger.warning(f"AI compatibility failed: {e}")
+        return None
 
 
 @router.post("/parse-screenshots")

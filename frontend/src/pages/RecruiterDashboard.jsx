@@ -1811,7 +1811,11 @@ function JobFormDialog({ open, onClose, onSuccess, token, company, job = null, i
         onSuccess(res.data);
       }
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Failed to save job');
+      if (error.response?.status === 429 && !isEditing) {
+        toast.error(error.response?.data?.detail || 'Daily job posting limit reached. Upgrade your plan for more posts.', { duration: 6000 });
+      } else {
+        toast.error(error.response?.data?.detail || 'Failed to save job');
+      }
     } finally {
       setLoading(false);
     }

@@ -1,17 +1,41 @@
-import { useRef, useState } from 'react';
+import { useRef, useState, useEffect } from 'react';
 import { motion, useMotionValue, useTransform } from 'framer-motion';
 import {
   Briefcase, MapPin, GraduationCap, Clock, Building2,
-  Sparkles, MessageSquare, BadgeCheck, Video
+  Sparkles, MessageSquare, BadgeCheck, Video, Brain, Lock, Loader2
 } from 'lucide-react';
 import { getPhotoUrl, handleImgError } from '../utils/helpers';
+import { useAuth } from '../context/AuthContext';
+import axios from 'axios';
 import SkillBadges from './SkillBadges';
+
+const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
 export function CandidateDetailSheet({ item, mode, onClose }) {
   const sheetY = useMotionValue(0);
   const sheetOpacity = useTransform(sheetY, [0, 300], [1, 0]);
   const scrollRef = useRef(null);
   const [canDragDown, setCanDragDown] = useState(true);
+  const [aiInsights, setAiInsights] = useState(null);
+  const [aiLoading, setAiLoading] = useState(false);
+  const { user, token } = useAuth();
+
+  const isEnterprise = user?.subscription?.status === 'active'
+    && user?.subscription?.tier_id === 'recruiter_enterprise';
+  const seekerId = mode === 'applicants' ? item.seeker_id : item.id;
+  const jobId = mode === 'applicants' ? item.job_id : null;
+
+  useEffect(() => {
+    if (!isEnterprise || !seekerId || user?.role !== 'recruiter') return;
+    setAiLoading(true);
+    axios.get(`${API}/applications/candidates/${seekerId}/ai-insights`, {
+      params: jobId ? { job_id: jobId } : {},
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then(res => setAiInsights(res.data))
+      .catch(() => setAiInsights(null))
+      .finally(() => setAiLoading(false));
+  }, [seekerId, jobId, isEnterprise, token, user?.role]);
 
   const handleScroll = () => {
     if (scrollRef.current) {
@@ -107,6 +131,46 @@ export function CandidateDetailSheet({ item, mode, onClose }) {
               </span>
             )}
           </div>
+
+          {/* AI-Powered Insights (Enterprise) */}
+          {user?.role === 'recruiter' && (
+            <div className="mb-4">
+              {aiLoading && (
+                <div className="flex items-center gap-2 px-3 py-3 rounded-xl bg-violet-500/5 border border-violet-500/20">
+                  <Loader2 className="w-4 h-4 text-violet-500 animate-spin" />
+                  <span className="text-sm text-violet-400">Generating AI insights...</span>
+                </div>
+              )}
+              {!aiLoading && aiInsights && (
+                <div className="px-3 py-3 rounded-xl bg-violet-500/5 border border-violet-500/20 space-y-2">
+                  <p className="text-xs font-medium text-violet-400 flex items-center gap-1.5">
+                    <Brain className="w-3.5 h-3.5" /> AI Candidate Insights
+                  </p>
+                  <p className="text-sm text-foreground/90">{aiInsights.summary}</p>
+                  {aiInsights.strengths?.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5">
+                      {aiInsights.strengths.map((s, i) => (
+                        <span key={i} className="text-xs px-2 py-0.5 rounded-full bg-success/10 text-success border border-success/20">{s}</span>
+                      ))}
+                    </div>
+                  )}
+                  {aiInsights.considerations?.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5">
+                      {aiInsights.considerations.map((c, i) => (
+                        <span key={i} className="text-xs px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-500 border border-amber-500/20">{c}</span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+              {!aiLoading && !aiInsights && !isEnterprise && (
+                <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-card border border-border">
+                  <Lock className="w-3.5 h-3.5 text-muted-foreground" />
+                  <span className="text-xs text-muted-foreground">Upgrade to Enterprise for AI-powered candidate insights</span>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Also Applied To */}
           {mode === 'applicants' && item.other_applications?.length > 0 && (

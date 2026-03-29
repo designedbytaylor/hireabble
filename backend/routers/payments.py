@@ -180,7 +180,7 @@ SUBSCRIPTION_TIERS = {
             "Analytics dashboard",
         ],
         "limits": {"daily_super_swipes": 10, "can_see_all_applicants": True, "free_monthly_boost": 1,
-                   "priority_listing": True, "advanced_filters": True},
+                   "priority_listing": True, "advanced_filters": True, "daily_job_posts": 10},
     },
     "recruiter_enterprise": {
         "name": "Enterprise",
@@ -207,13 +207,16 @@ SUBSCRIPTION_TIERS = {
             "3 free Boosts per month",
             "Priority in candidate feeds",
             "Advanced candidate filters",
-            "Message candidates before matching",
+            "Message candidates before connecting",
+            "AI-powered candidate insights",
             "Featured job listings",
+            "Unlimited job posts per day",
             "Analytics dashboard",
         ],
         "limits": {"daily_super_swipes": -1, "can_see_all_applicants": True, "free_monthly_boost": 3,
                    "priority_listing": True, "advanced_filters": True,
-                   "can_message_before_match": True, "featured_listings": True},
+                   "can_message_before_match": True, "featured_listings": True,
+                   "ai_candidate_insights": True, "daily_job_posts": -1},
     },
 }
 

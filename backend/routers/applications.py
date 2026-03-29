@@ -1941,3 +1941,68 @@ async def get_candidate_note(
         {"_id": 0, "note": 1, "updated_at": 1},
     )
     return {"note": doc["note"] if doc else "", "updated_at": doc.get("updated_at") if doc else None}
+
+
+@router.get("/candidates/{seeker_id}/ai-insights")
+@limiter.limit("30/minute")
+async def get_candidate_ai_insights(
+    seeker_id: str,
+    request: Request,
+    job_id: Optional[str] = Query(None),
+    current_user: dict = Depends(get_current_user),
+):
+    """Get AI-powered compatibility insights for a candidate (Enterprise only)."""
+    if current_user["role"] != "recruiter":
+        raise HTTPException(status_code=403, detail="Only recruiters can view insights")
+
+    # Verify Enterprise subscription
+    sub = current_user.get("subscription") or {}
+    now = datetime.now(timezone.utc).isoformat()
+    if not (sub.get("status") == "active" and sub.get("period_end", "") >= now
+            and sub.get("tier_id") == "recruiter_enterprise"):
+        raise HTTPException(status_code=403, detail="Enterprise subscription required for AI insights")
+
+    # Check for cached insights
+    cache_query = {"recruiter_id": current_user["id"], "seeker_id": seeker_id}
+    if job_id:
+        cache_query["job_id"] = job_id
+    cached = await db.ai_insights_cache.find_one(cache_query, {"_id": 0})
+    if cached and cached.get("ai_compatibility"):
+        return cached["ai_compatibility"]
+
+    # Fetch seeker and job data
+    seeker = await db.users.find_one({"id": seeker_id}, {"_id": 0, "password": 0})
+    if not seeker:
+        raise HTTPException(status_code=404, detail="Candidate not found")
+
+    job = None
+    if job_id:
+        job = await db.jobs.find_one({"id": job_id, "recruiter_id": current_user["id"]}, {"_id": 0})
+    else:
+        # Use the recruiter's most recent active job as context
+        job = await db.jobs.find_one(
+            {"recruiter_id": current_user["id"], "is_active": True},
+            {"_id": 0},
+            sort=[("created_at", -1)],
+        )
+
+    if not job:
+        raise HTTPException(status_code=404, detail="No job found for comparison")
+
+    # Compute AI compatibility
+    from routers.jobs import compute_ai_compatibility
+    result = await compute_ai_compatibility(seeker, job)
+    if not result:
+        raise HTTPException(status_code=503, detail="AI service temporarily unavailable")
+
+    # Cache the result
+    await db.ai_insights_cache.update_one(
+        {"recruiter_id": current_user["id"], "seeker_id": seeker_id, "job_id": job.get("id")},
+        {"$set": {
+            "ai_compatibility": result,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+        }},
+        upsert=True,
+    )
+
+    return result
