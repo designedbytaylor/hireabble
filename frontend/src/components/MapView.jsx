@@ -25,11 +25,15 @@ export default function MapView({ jobs = [] }) {
 
   // Filter jobs with valid coordinates
   const mappableJobs = jobs.filter(j => j.location_lat && j.location_lng);
+  const unmappedCount = jobs.length - mappableJobs.length;
 
   if (mappableJobs.length === 0) {
     return (
-      <div className="flex items-center justify-center h-[400px] rounded-2xl bg-accent/50 border border-border">
+      <div className="flex flex-col items-center justify-center h-[400px] rounded-2xl bg-accent/50 border border-border gap-2">
         <p className="text-muted-foreground text-sm">No jobs with location data to display on map</p>
+        {jobs.length > 0 && (
+          <p className="text-muted-foreground text-xs">{jobs.length} job{jobs.length !== 1 ? 's' : ''} found but missing coordinates</p>
+        )}
       </div>
     );
   }
@@ -39,6 +43,12 @@ export default function MapView({ jobs = [] }) {
   const avgLng = mappableJobs.reduce((s, j) => s + j.location_lng, 0) / mappableJobs.length;
 
   return (
+    <div className="space-y-2">
+      {unmappedCount > 0 && (
+        <p className="text-xs text-muted-foreground">
+          Showing {mappableJobs.length} of {jobs.length} jobs on map — {unmappedCount} missing location data
+        </p>
+      )}
     <div className="rounded-2xl overflow-hidden border border-border" style={{ height: '450px' }}>
       <MapContainer
         center={[avgLat, avgLng]}
@@ -80,6 +90,7 @@ export default function MapView({ jobs = [] }) {
           ))}
         </MarkerClusterGroup>
       </MapContainer>
+    </div>
     </div>
   );
 }
