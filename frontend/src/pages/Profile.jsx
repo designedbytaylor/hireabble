@@ -22,7 +22,7 @@ import useDocumentTitle from '../hooks/useDocumentTitle';
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 
-function EmailNotificationSettings({ token }) {
+function EmailNotificationSettings({ token, userRole }) {
   const [prefs, setPrefs] = useState(null);
   const [saving, setSaving] = useState(null);
 
@@ -71,7 +71,14 @@ function EmailNotificationSettings({ token }) {
 
   if (!prefs) return null;
 
-  const items = [
+  const isRecruiter = userRole === 'recruiter';
+
+  const items = isRecruiter ? [
+    { key: 'matches', label: 'New applicants', desc: 'When a candidate applies to your job postings' },
+    { key: 'interviews', label: 'Interview updates', desc: 'Interview responses, acceptances & reschedules' },
+    { key: 'messages', label: 'Message digests', desc: 'Summary of unread messages (max every 15 min)' },
+    { key: 'marketing_emails_opt_in', label: 'Marketing & promotions', desc: 'Occasional updates, tips, and promotional offers' },
+  ] : [
     { key: 'matches', label: 'New opportunities', desc: 'When a recruiter is interested in your profile' },
     { key: 'interviews', label: 'Interview updates', desc: 'Interview requests, acceptances & changes' },
     { key: 'messages', label: 'Message digests', desc: 'Summary of unread messages (max every 15 min)' },
@@ -1986,7 +1993,7 @@ export default function Profile() {
           )}
 
           {/* Email Notifications */}
-          <EmailNotificationSettings token={token} />
+          <EmailNotificationSettings token={token} userRole={user?.role} />
 
           {/* Profile Verification — recruiters only for now */}
           {user?.role === 'recruiter' && (
