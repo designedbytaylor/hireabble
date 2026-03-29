@@ -282,7 +282,7 @@ export default function AdminHealth() {
             { label: 'Active (30d)', value: app.active_users_30d, icon: Users, color: 'text-green-400' },
             { label: 'Total Jobs', value: app.total_jobs, icon: Briefcase, color: 'text-blue-400' },
             { label: 'Active Jobs', value: app.active_jobs, icon: Briefcase, color: 'text-cyan-400' },
-            { label: 'Matches', value: app.total_matches, icon: Heart, color: 'text-pink-400' },
+            { label: 'Connections', value: app.total_matches, icon: Heart, color: 'text-pink-400' },
             { label: 'WebSockets', value: server.websocket_connections, icon: Zap, color: 'text-yellow-400' },
           ].map(({ label, value, icon: Icon, color }) => (
             <div key={label} className="bg-gray-800/50 rounded-xl p-4 text-center">

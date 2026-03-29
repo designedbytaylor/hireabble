@@ -10,6 +10,7 @@ import NotificationBell from '../components/NotificationBell';
 import MatchModal from '../components/MatchModal';
 import { isPushSupported, getPermissionStatus, subscribeToPush } from '../utils/pushNotifications';
 import { shouldPromptRating, dismissRatingPrompt, getStoreUrl } from '../utils/appRating';
+import { cacheJobCards, getCachedJobCards } from '../utils/offlineCache';
 import { openExternal } from '../utils/capacitor';
 import { Button } from '../components/ui/button';
 import {
@@ -292,6 +293,9 @@ export default function SeekerDashboard() {
       setJobs(safeJobs);
       setCurrentIndex(0);
 
+      // Cache jobs for offline use
+      cacheJobCards(safeJobs).catch(() => {});
+
       // Stats: merge server values with cached optimistic counts so fast
       // swiping never causes counts to regress while the backend catches up
       const merged = mergeStatsWithCache(data.stats, uidRef.current);
@@ -330,6 +334,18 @@ export default function SeekerDashboard() {
         saveCachedSuperLikes(slRes.data.remaining, uidRef.current);
       } catch (fallbackErr) {
         console.error('Fallback fetch also failed:', fallbackErr);
+        // Last resort: load from offline cache
+        if (!navigator.onLine) {
+          try {
+            const cached = await getCachedJobCards();
+            if (cached.length > 0) {
+              const safe = cached.filter(j => !swipedIdsRef.current.has(j.id));
+              setJobs(safe);
+              setCurrentIndex(0);
+              toast.info('Offline mode — showing cached jobs');
+            }
+          } catch { /* IndexedDB not available */ }
+        }
       }
     } finally {
       hasLoadedOnce.current = true;
@@ -1467,7 +1483,7 @@ export default function SeekerDashboard() {
             if (isPushSupported() && getPermissionStatus() === 'default' && !localStorage.getItem('push_prompt_shown')) {
               localStorage.setItem('push_prompt_shown', '1');
               setTimeout(() => {
-                toast('Get notified about new matches?', {
+                toast('Get notified about new connections?', {
                   action: {
                     label: 'Enable',
                     onClick: () => subscribeToPush(token),

@@ -106,7 +106,7 @@ export default function AdminOverview() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
         <StatCard icon={Users} label="Total Users" value={u.total} color="indigo" />
         <StatCard icon={Briefcase} label="Active Jobs" value={j.active} color="green" sub={`${j.total} total`} />
-        <StatCard icon={Heart} label="Matches" value={a.matches} color="purple" />
+        <StatCard icon={Heart} label="Connections" value={a.matches} color="purple" />
         <StatCard icon={MessageSquare} label="Messages" value={a.messages} color="blue" />
       </div>
 
@@ -149,7 +149,7 @@ export default function AdminOverview() {
                 <Legend wrapperStyle={{ color: '#9ca3af', fontSize: 12 }} />
                 <Area type="monotone" dataKey="users" name="New Users" stroke="#6366f1" fill="url(#colorUsers)" strokeWidth={2} />
                 <Area type="monotone" dataKey="applications" name="Applications" stroke="#22c55e" fill="url(#colorApps)" strokeWidth={2} />
-                <Area type="monotone" dataKey="matches" name="Matches" stroke="#ec4899" fill="url(#colorMatches)" strokeWidth={2} />
+                <Area type="monotone" dataKey="matches" name="Connections" stroke="#ec4899" fill="url(#colorMatches)" strokeWidth={2} />
               </AreaChart>
             </ResponsiveContainer>
           ) : (

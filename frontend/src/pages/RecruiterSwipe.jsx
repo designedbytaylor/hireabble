@@ -1092,8 +1092,14 @@ function CandidateCard({ candidate, onSwipe, expanded, setExpanded }) {
             <span className={scoreColor}>Fit Score: {matchScore}%</span>
           </div>
         )}
+        {/* Video Intro Badge */}
+        {(candidate.video_url || candidate.seeker_video) && (
+          <div className="absolute top-4 left-4 z-20 px-3 py-1 rounded-full bg-primary/90 backdrop-blur-sm text-white text-xs font-bold flex items-center gap-1 shadow-lg">
+            <Video className="w-3 h-3" /> Video Intro
+          </div>
+        )}
         {/* Featured Badge for Premium seekers */}
-        {candidate.is_featured && (
+        {candidate.is_featured && !candidate.video_url && !candidate.seeker_video && (
           <div className="absolute top-4 left-4 z-20 px-3 py-1 rounded-full bg-gradient-to-r from-amber-500 to-orange-500 text-white text-xs font-bold flex items-center gap-1 shadow-lg">
             <Star className="w-3 h-3 fill-white" /> Featured
           </div>

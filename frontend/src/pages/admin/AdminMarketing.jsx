@@ -77,7 +77,7 @@ const INITIAL_CHECKLIST = {
     { id:"p3_7", text:"Apply for Startup Edmonton program", done:false },
     { id:"p3_8", text:"Submit to EEDC startup spotlight", done:false },
     { id:"p3_9", text:"Launch on Product Hunt (after 100+ active users)", done:false },
-    { id:"p3_10", text:"90-day review: hit 50 employers, 500 seekers, 100 matches?", done:false },
+    { id:"p3_10", text:"90-day review: hit 50 employers, 500 seekers, 100 connections?", done:false },
     { id:"p3_11", text:"Assess Calgary / Vancouver expansion readiness", done:false },
   ],
 };
@@ -333,7 +333,7 @@ function OverviewTab({checklist,metrics,setMetrics,metricsEditing,setMetricsEdit
     <div>
       <SectionTitle>Launch Overview</SectionTitle>
       <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:12,marginBottom:20}}>
-        {[{label:"Employers Onboarded",key:"employers",target:50,color:TEAL},{label:"Job Seekers",key:"seekers",target:500,color:"#60A5FA"},{label:"Matches Made",key:"matches",target:100,color:"#A78BFA"},{label:"Emails Sent",key:"emailsSent",target:500,color:"#F97316"}].map(m=>(
+        {[{label:"Employers Onboarded",key:"employers",target:50,color:TEAL},{label:"Job Seekers",key:"seekers",target:500,color:"#60A5FA"},{label:"Connections Made",key:"matches",target:100,color:"#A78BFA"},{label:"Emails Sent",key:"emailsSent",target:500,color:"#F97316"}].map(m=>(
           <Card key={m.key}>
             <div style={{fontSize:10,color:TEXT_DIM,textTransform:"uppercase",letterSpacing:1.3,marginBottom:7}}>{m.label}</div>
             {metricsEditing?<input type="number" min="0" value={metrics[m.key]} onChange={e=>setMetrics(p=>({...p,[m.key]:Number(e.target.value)}))} style={{width:"100%",background:"#1A2035",border:`1px solid ${m.color}44`,borderRadius:6,padding:"4px 8px",color:TEXT_BRIGHT,fontSize:22,fontWeight:800,boxSizing:"border-box"}}/>

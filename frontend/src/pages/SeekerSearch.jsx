@@ -1,10 +1,12 @@
-import { useState, useCallback, useRef, useEffect } from 'react';
+import React, { useState, useCallback, useRef, useEffect, Suspense } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Search, MapPin, DollarSign, Briefcase, Filter, X, ChevronDown,
   CheckCircle, Bookmark, Zap, Building2, ArrowRight, Loader2, Clock,
-  Sparkles, GraduationCap
+  Sparkles, GraduationCap, Map, List
 } from 'lucide-react';
+
+const MapView = React.lazy(() => import('../components/MapView'));
 import { motion, AnimatePresence, useMotionValue, useTransform } from 'framer-motion';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -81,6 +83,7 @@ export default function SeekerSearch() {
   const [salaryMin, setSalaryMin] = useState('');
   const [showFilters, setShowFilters] = useState(false);
   const [sortBy, setSortBy] = useState(''); // '', 'distance', 'newest'
+  const [viewMode, setViewMode] = useState('list'); // 'list' or 'map'
 
   const [results, setResults] = useState(null); // null = not searched yet
   const [loading, setLoading] = useState(false);
@@ -412,7 +415,7 @@ export default function SeekerSearch() {
                 </p>
                 <div className="flex gap-1 ml-2">
                   {[
-                    { key: '', label: 'Best Match' },
+                    { key: '', label: 'Best Fit' },
                     { key: 'distance', label: 'Near Me' },
                     { key: 'newest', label: 'Newest' },
                   ].map(s => (
@@ -430,18 +433,55 @@ export default function SeekerSearch() {
                   ))}
                 </div>
               </div>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleSwipeResults}
-                className="rounded-xl text-xs border-primary/30 text-primary hover:bg-primary/10"
-              >
-                <ArrowRight className="w-3.5 h-3.5 mr-1" /> Swipe Results
-              </Button>
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => setViewMode('list')}
+                  className={`p-1.5 rounded-lg transition-colors ${
+                    viewMode === 'list'
+                      ? 'bg-primary/20 text-primary'
+                      : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
+                  }`}
+                  title="List view"
+                >
+                  <List className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={() => setViewMode('map')}
+                  className={`p-1.5 rounded-lg transition-colors ${
+                    viewMode === 'map'
+                      ? 'bg-primary/20 text-primary'
+                      : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
+                  }`}
+                  title="Map view"
+                >
+                  <Map className="w-4 h-4" />
+                </button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleSwipeResults}
+                  className="rounded-xl text-xs border-primary/30 text-primary hover:bg-primary/10 ml-1"
+                >
+                  <ArrowRight className="w-3.5 h-3.5 mr-1" /> Swipe Results
+                </Button>
+              </div>
             </div>
 
+            {/* Map view */}
+            {viewMode === 'map' && (
+              <div className="mb-4">
+                <Suspense fallback={
+                  <div className="flex items-center justify-center h-[450px] rounded-2xl bg-accent/50 border border-border">
+                    <Loader2 className="w-6 h-6 text-primary animate-spin" />
+                  </div>
+                }>
+                  <MapView jobs={results} />
+                </Suspense>
+              </div>
+            )}
+
             {/* Results list */}
-            <div className="space-y-3">
+            {viewMode === 'list' && <div className="space-y-3">
               {results.map(job => (
                 <div
                   key={job.id}
@@ -459,6 +499,14 @@ export default function SeekerSearch() {
                     <div className="flex-1 min-w-0">
                       <h3 className="font-semibold text-foreground truncate">{job.title}</h3>
                       <p className="text-sm text-muted-foreground">{job.company}</p>
+                      {formatSalary(job.salary_min, job.salary_max) && (
+                        <div className="mt-1.5 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-green-500/10 border border-green-500/20">
+                          <DollarSign className="w-3.5 h-3.5 text-green-400" />
+                          <span className="text-sm font-semibold text-green-400">
+                            {formatSalary(job.salary_min, job.salary_max)}
+                          </span>
+                        </div>
+                      )}
                       <div className="flex flex-wrap gap-x-3 gap-y-1 mt-1.5">
                         {job.location && (
                           <span className="text-xs text-muted-foreground flex items-center gap-1">
@@ -468,11 +516,6 @@ export default function SeekerSearch() {
                                 · {job.distance_label}
                               </span>
                             )}
-                          </span>
-                        )}
-                        {formatSalary(job.salary_min, job.salary_max) && (
-                          <span className="text-xs text-green-500 flex items-center gap-1">
-                            <DollarSign className="w-3 h-3" /> {formatSalary(job.salary_min, job.salary_max)}
                           </span>
                         )}
                         {job.job_type && (
@@ -526,7 +569,7 @@ export default function SeekerSearch() {
                   </div>
                 </div>
               ))}
-            </div>
+            </div>}
           </>
         ) : null}
       </main>

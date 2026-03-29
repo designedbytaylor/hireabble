@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Send, Briefcase, User, Flag, ShieldBan, Calendar, CheckCheck, Check, Image, X, Video, Square, Loader2, Clock, Phone, MapPin, FileText } from 'lucide-react';
 import { getPhotoUrl, handleImgError } from '../utils/helpers';
 import { openExternal } from '../utils/capacitor';
+import { cacheMessages, getCachedMessages } from '../utils/offlineCache';
 import ReportDialog from '../components/ReportDialog';
 import BlockDialog from '../components/BlockDialog';
 import { Button } from '../components/ui/button';
@@ -134,8 +135,17 @@ export default function Chat() {
         const currentMatch = matchesRes.data.find(m => m.id === matchId);
         setMatch(currentMatch);
         setMessages(messagesRes.data);
+        // Cache messages for offline access
+        cacheMessages(matchId, messagesRes.data).catch(() => {});
       } catch (error) {
         console.error('Failed to fetch:', error);
+        // Try loading cached messages when offline
+        if (!navigator.onLine) {
+          try {
+            const cached = await getCachedMessages(matchId);
+            if (cached.length > 0) setMessages(cached);
+          } catch { /* ignore */ }
+        }
       } finally {
         setLoading(false);
       }
@@ -390,7 +400,7 @@ export default function Chat() {
           onClick={() => navigate('/matches')}
           className="p-2 rounded-xl hover:bg-accent transition-colors"
           data-testid="back-btn"
-          aria-label="Back to matches"
+          aria-label="Back to connections"
         >
           <ArrowLeft className="w-5 h-5" />
         </button>

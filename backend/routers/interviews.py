@@ -338,3 +338,92 @@ async def cancel_interview(interview_id: str, current_user: dict = Depends(get_c
     )
 
     return {"message": "Interview cancelled"}
+
+
+@router.get("/{interview_id}/calendar")
+async def get_interview_calendar(interview_id: str, current_user: dict = Depends(get_current_user)):
+    """Generate an ICS calendar file for an accepted interview."""
+    interview = await db.interviews.find_one({"id": interview_id}, {"_id": 0})
+    if not interview:
+        raise HTTPException(status_code=404, detail="Interview not found")
+
+    # Verify access
+    match = await db.matches.find_one({"id": interview.get("match_id")}, {"_id": 0})
+    if not match or (match["seeker_id"] != current_user["id"] and match["recruiter_id"] != current_user["id"]):
+        raise HTTPException(status_code=403, detail="Not authorized")
+
+    selected = interview.get("selected_time")
+    if not selected or interview.get("status") != "accepted":
+        raise HTTPException(status_code=400, detail="Interview must be accepted with a selected time")
+
+    # Parse times
+    start = selected.get("start", "")
+    end = selected.get("end", "")
+    title = interview.get("title") or f"Interview - {match.get('job_title', 'Position')}"
+    location = interview.get("location", "")
+    interview_type = interview.get("type", "video")
+
+    # Format for ICS (strip dashes, colons, but keep T and Z)
+    def to_ics_dt(iso_str):
+        return iso_str.replace("-", "").replace(":", "").split(".")[0] + "Z"
+
+    ics_start = to_ics_dt(start)
+    ics_end = to_ics_dt(end) if end else to_ics_dt(start)  # fallback to 1 hour
+
+    description = f"Interview type: {interview_type}"
+    if location:
+        description += f"\\nLocation: {location}"
+
+    ics_content = f"""BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//Hireabble//Interview//EN
+BEGIN:VEVENT
+DTSTART:{ics_start}
+DTEND:{ics_end}
+SUMMARY:{title}
+DESCRIPTION:{description}
+LOCATION:{location}
+STATUS:CONFIRMED
+END:VEVENT
+END:VCALENDAR"""
+
+    from fastapi.responses import Response
+    return Response(
+        content=ics_content,
+        media_type="text/calendar",
+        headers={"Content-Disposition": f'attachment; filename="interview-{interview_id}.ics"'},
+    )
+
+
+@router.get("/{interview_id}/google-calendar-url")
+async def get_google_calendar_url(interview_id: str, current_user: dict = Depends(get_current_user)):
+    """Generate a Google Calendar deep link for an accepted interview."""
+    import urllib.parse
+
+    interview = await db.interviews.find_one({"id": interview_id}, {"_id": 0})
+    if not interview:
+        raise HTTPException(status_code=404, detail="Interview not found")
+
+    match = await db.matches.find_one({"id": interview.get("match_id")}, {"_id": 0})
+    if not match or (match["seeker_id"] != current_user["id"] and match["recruiter_id"] != current_user["id"]):
+        raise HTTPException(status_code=403, detail="Not authorized")
+
+    selected = interview.get("selected_time")
+    if not selected or interview.get("status") != "accepted":
+        raise HTTPException(status_code=400, detail="Interview must be accepted with a selected time")
+
+    start = selected.get("start", "").replace("-", "").replace(":", "").split(".")[0] + "Z"
+    end = selected.get("end", start).replace("-", "").replace(":", "").split(".")[0] + "Z"
+    title = interview.get("title") or f"Interview - {match.get('job_title', 'Position')}"
+    location = interview.get("location", "")
+    details = f"Interview via Hireabble. Type: {interview.get('type', 'video')}"
+
+    params = urllib.parse.urlencode({
+        "action": "TEMPLATE",
+        "text": title,
+        "dates": f"{start}/{end}",
+        "details": details,
+        "location": location,
+    })
+
+    return {"url": f"https://calendar.google.com/calendar/render?{params}"}

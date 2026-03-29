@@ -100,6 +100,10 @@ export default memo(function Navigation() {
       icon: Sparkles,
       label: 'Opportunities',
       path: '/matches'
+    }, {
+      icon: BarChart3,
+      label: 'Insights',
+      path: '/analytics'
     }] : []),
     {
       icon: MessageCircle,

@@ -5,6 +5,7 @@ import {
   Sparkles, MessageSquare, BadgeCheck, Video
 } from 'lucide-react';
 import { getPhotoUrl, handleImgError } from '../utils/helpers';
+import SkillBadges from './SkillBadges';
 
 export function CandidateDetailSheet({ item, mode, onClose }) {
   const sheetY = useMotionValue(0);
@@ -181,19 +182,11 @@ export function CandidateDetailSheet({ item, mode, onClose }) {
             )}
           </div>
 
-          {/* Bio */}
-          {bio && (
-            <div className="mb-5">
-              <h3 className="text-sm font-bold font-['Outfit'] mb-2 text-foreground">About</h3>
-              <p className="text-sm text-muted-foreground leading-relaxed whitespace-pre-line">{bio}</p>
-            </div>
-          )}
-
-          {/* Video Introduction */}
+          {/* Elevator Pitch Video — shown first for maximum impact */}
           {videoUrl && (
             <div className="mb-5">
               <h3 className="text-sm font-bold font-['Outfit'] mb-2 text-foreground flex items-center gap-1.5">
-                <Video className="w-4 h-4 text-primary" /> Video Introduction
+                <Video className="w-4 h-4 text-primary" /> Elevator Pitch
               </h3>
               <video
                 src={videoUrl}
@@ -203,6 +196,24 @@ export function CandidateDetailSheet({ item, mode, onClose }) {
                 className="w-full rounded-xl border border-border"
                 style={{ maxHeight: '240px' }}
               />
+            </div>
+          )}
+
+          {/* Bio */}
+          {bio && (
+            <div className="mb-5">
+              <h3 className="text-sm font-bold font-['Outfit'] mb-2 text-foreground">About</h3>
+              <p className="text-sm text-muted-foreground leading-relaxed whitespace-pre-line">{bio}</p>
+            </div>
+          )}
+
+          {/* Verified Skill Badges */}
+          {item.verified_skills?.length > 0 && (
+            <div className="mb-5">
+              <h3 className="text-sm font-bold font-['Outfit'] mb-2 text-foreground flex items-center gap-1.5">
+                <BadgeCheck className="w-4 h-4 text-emerald-400" /> Verified Skills
+              </h3>
+              <SkillBadges badges={item.verified_skills} size="md" />
             </div>
           )}
 

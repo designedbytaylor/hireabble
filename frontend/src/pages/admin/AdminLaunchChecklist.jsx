@@ -69,7 +69,7 @@ const INITIAL_CHECKLIST = [
   { id: uid(), category: "Production Readiness", text: "Configure CDN/caching for static assets", done: false },
   { id: uid(), category: "Production Readiness", text: "Load test backend endpoints for expected traffic", done: false },
 
-  { id: uid(), category: "Pre-Submission Final Checks", text: "Test all critical flows on a real iOS device (signup, swipe, match, chat, payment)", done: false },
+  { id: uid(), category: "Pre-Submission Final Checks", text: "Test all critical flows on a real iOS device (signup, browse, connect, chat, payment)", done: false },
   { id: uid(), category: "Pre-Submission Final Checks", text: "Test all critical flows on a real Android device", done: false },
   { id: uid(), category: "Pre-Submission Final Checks", text: "Test push notifications on both platforms", done: false },
   { id: uid(), category: "Pre-Submission Final Checks", text: "Test deep links / universal links", done: false },

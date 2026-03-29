@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import {
   ArrowLeft, Calendar, Clock, Video, Phone, MapPin,
-  Plus, Check, X, Send, RefreshCw, AlertCircle, Users
+  Plus, Check, X, Send, RefreshCw, AlertCircle, Users, Download
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -113,6 +113,36 @@ export default function InterviewScheduler() {
       toast.info('Previous interview cancelled. Schedule a new time.');
     } catch {
       toast.error('Failed to modify interview');
+    }
+  };
+
+  const handleCalendarDownload = async (interviewId) => {
+    try {
+      const response = await axios.get(`${API}/interviews/${interviewId}/calendar`, {
+        headers: { Authorization: `Bearer ${token}` },
+        responseType: 'blob',
+      });
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `interview-${interviewId}.ics`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch {
+      toast.error('Failed to download calendar file');
+    }
+  };
+
+  const handleGoogleCalendar = async (interviewId) => {
+    try {
+      const { data } = await axios.get(`${API}/interviews/${interviewId}/google-calendar-url`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      window.open(data.url, '_blank');
+    } catch {
+      toast.error('Failed to generate calendar link');
     }
   };
 
@@ -250,7 +280,7 @@ export default function InterviewScheduler() {
             <h2 className="text-2xl font-bold font-['Outfit'] mb-3">No Interviews Yet</h2>
             <p className="text-muted-foreground max-w-xs mx-auto mb-6">
               {user?.role === 'recruiter'
-                ? 'Schedule your first interview with a match to get started.'
+                ? 'Schedule your first interview with a connection to get started.'
                 : 'When a recruiter schedules an interview with you, it will appear here.'}
             </p>
             {user?.role === 'recruiter' && (
@@ -285,6 +315,8 @@ export default function InterviewScheduler() {
               user={user}
               onCancel={() => handleCancel(selectedInterview.id)}
               onModify={() => handleModify(selectedInterview)}
+              onCalendarDownload={handleCalendarDownload}
+              onGoogleCalendar={handleGoogleCalendar}
             />
           )}
         </DialogContent>
@@ -363,7 +395,7 @@ function InterviewCard({ interview, user, onClick, showRespond }) {
   );
 }
 
-function InterviewDetail({ interview, user, onCancel, onModify }) {
+function InterviewDetail({ interview, user, onCancel, onModify, onCalendarDownload, onGoogleCalendar }) {
   const TypeIcon = TYPE_ICONS[interview.interview_type] || Video;
   const canCancel = interview.status !== 'cancelled' && interview.status !== 'declined';
   const isRecruiter = user?.role === 'recruiter';
@@ -419,6 +451,16 @@ function InterviewDetail({ interview, user, onCancel, onModify }) {
           <div className="text-sm text-green-400">
             {new Date(interview.selected_time.start).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} - {new Date(interview.selected_time.end).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
           </div>
+          {interview.status === 'accepted' && (
+            <div className="flex gap-2 mt-2">
+              <button onClick={() => onCalendarDownload(interview.id)} className="text-xs text-primary flex items-center gap-1 hover:underline">
+                <Download className="w-3 h-3" /> Download .ics
+              </button>
+              <button onClick={() => onGoogleCalendar(interview.id)} className="text-xs text-primary flex items-center gap-1 hover:underline">
+                <Calendar className="w-3 h-3" /> Google Calendar
+              </button>
+            </div>
+          )}
         </div>
       )}
 
@@ -534,7 +576,7 @@ function CreateInterviewDialog({ open, onClose, matches, preselectedMatch, token
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!matchId) {
-      toast.error('Please select a match');
+      toast.error('Please select a connection');
       return;
     }
 
@@ -582,10 +624,10 @@ function CreateInterviewDialog({ open, onClose, matches, preselectedMatch, token
 
         <form onSubmit={handleSubmit} className="space-y-5">
           <div className="space-y-2">
-            <Label>Match *</Label>
+            <Label>Connection *</Label>
             <Select value={matchId} onValueChange={setMatchId}>
               <SelectTrigger className="h-11 rounded-xl bg-background">
-                <SelectValue placeholder="Select a match..." />
+                <SelectValue placeholder="Select a connection..." />
               </SelectTrigger>
               <SelectContent>
                 {matches.map(m => (
