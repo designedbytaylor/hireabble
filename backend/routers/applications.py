@@ -42,7 +42,7 @@ def _get_seeker_daily_superlike_limit(user: dict) -> int:
 # ==================== EMAIL TEMPLATES ====================
 
 def get_match_email_html(job_title: str, company: str, other_name: str, is_seeker: bool = True):
-    """Generate match notification email HTML"""
+    """Generate connection notification email HTML"""
     safe_job_title = escape_html(job_title)
     safe_company = escape_html(company)
     safe_other_name = escape_html(other_name)
@@ -898,7 +898,7 @@ async def undo_last_swipe(current_user: dict = Depends(get_current_user)):
 
     # Don't allow undo if already matched or recruiter already acted
     if last_app.get("is_matched") or last_app.get("recruiter_action"):
-        raise HTTPException(status_code=400, detail="Cannot undo — recruiter has already responded or you matched")
+        raise HTTPException(status_code=400, detail="Cannot undo — recruiter has already responded or you connected")
 
     # Delete the application
     await db.applications.delete_one({"id": last_app["id"]})
@@ -1673,6 +1673,20 @@ async def mark_application_read(application_id: str, current_user: dict = Depend
         {"id": application_id, "recruiter_id": current_user["id"], "read_at": {"$exists": False}},
         {"$set": {"read_at": now, "read_by": current_user["id"]}}
     )
+
+    # Notify seeker that their application was viewed
+    if result.modified_count > 0:
+        application = await db.applications.find_one(
+            {"id": application_id},
+            {"_id": 0, "seeker_id": 1, "job_title": 1}
+        )
+        if application:
+            await create_notification(
+                application["seeker_id"], "application_viewed",
+                "Application Viewed",
+                f"A recruiter viewed your application for {application.get('job_title', 'a position')}.",
+                data={"application_id": application_id},
+            )
 
     return {"marked": result.modified_count > 0}
 

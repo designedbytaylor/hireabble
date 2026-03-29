@@ -68,8 +68,8 @@ const TIER_STYLES = {
 };
 
 const FREE_FEATURES = {
-  seeker: ['3 Priority Applies per day', 'Basic job matching', 'Apply to jobs', 'Chat with matches'],
-  recruiter: ['3 Candidate Invites per day', 'Post job listings', 'View basic applicant info', 'Chat with matches'],
+  seeker: ['3 Priority Applies per day', 'Smart job recommendations', 'Apply to jobs', 'Chat with connections'],
+  recruiter: ['3 Candidate Invites per day', 'Post job listings', 'View basic applicant info', 'Chat with connections'],
 };
 
 function formatPrice(cents) {

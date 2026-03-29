@@ -181,3 +181,48 @@ self.addEventListener('fetch', (event) => {
     })
   );
 });
+
+// Background Sync: flush offline swipe queue when connectivity returns
+self.addEventListener('sync', (event) => {
+  if (event.tag === 'sync-swipes') {
+    event.waitUntil(
+      (async () => {
+        try {
+          const db = await new Promise((resolve, reject) => {
+            const req = indexedDB.open('hireabble-offline', 1);
+            req.onsuccess = () => resolve(req.result);
+            req.onerror = () => reject(req.error);
+          });
+          const tx = db.transaction('swipeQueue', 'readonly');
+          const store = tx.objectStore('swipeQueue');
+          const swipes = await new Promise((resolve, reject) => {
+            const req = store.getAll();
+            req.onsuccess = () => resolve(req.result || []);
+            req.onerror = () => reject(req.error);
+          });
+
+          for (const swipe of swipes) {
+            try {
+              await fetch('/api/swipe', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${swipe.token}`,
+                },
+                body: JSON.stringify({ job_id: swipe.job_id, action: swipe.action }),
+              });
+            } catch {
+              // Will retry on next sync
+            }
+          }
+
+          // Clear the queue after processing
+          const clearTx = db.transaction('swipeQueue', 'readwrite');
+          clearTx.objectStore('swipeQueue').clear();
+        } catch {
+          // IndexedDB not available
+        }
+      })()
+    );
+  }
+});

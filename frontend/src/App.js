@@ -31,6 +31,7 @@ const Matches = React.lazy(() => import("./pages/Matches"));
 const Chat = React.lazy(() => import("./pages/Chat"));
 const InterviewScheduler = React.lazy(() => import("./pages/InterviewScheduler"));
 const RecruiterAnalytics = React.lazy(() => import("./pages/RecruiterAnalytics"));
+const SeekerAnalytics = React.lazy(() => import("./pages/SeekerAnalytics"));
 const AppliedJobs = React.lazy(() => import("./pages/AppliedJobs"));
 const SavedJobs = React.lazy(() => import("./pages/SavedJobs"));
 const SeekerSearch = React.lazy(() => import("./pages/SeekerSearch"));
@@ -41,6 +42,7 @@ const Upgrade = React.lazy(() => import("./pages/Upgrade"));
 const ProfileViewers = React.lazy(() => import("./pages/ProfileViewers"));
 const CompanyJobs = React.lazy(() => import("./pages/CompanyJobs"));
 const Impersonate = React.lazy(() => import("./pages/Impersonate"));
+const SkillQuiz = React.lazy(() => import("./pages/SkillQuiz"));
 const BrowseJobs = React.lazy(() => import("./pages/BrowseJobs"));
 const PublicJobDetail = React.lazy(() => import("./pages/PublicJobDetail"));
 const TermsOfService = React.lazy(() => import("./pages/TermsOfService"));
@@ -339,6 +341,22 @@ function AppRoutes() {
         }
       />
       <Route
+        path="/skills"
+        element={
+          <ProtectedRoute>
+            <SkillQuiz />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/skills/:quizId"
+        element={
+          <ProtectedRoute>
+            <SkillQuiz />
+          </ProtectedRoute>
+        }
+      />
+      <Route
         path="/matches"
         element={
           <ProtectedRoute>
@@ -399,6 +417,14 @@ function AppRoutes() {
         element={
           <ProtectedRoute>
             <InterviewScheduler />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/analytics"
+        element={
+          <ProtectedRoute allowedRoles={['seeker']}>
+            <SeekerAnalytics />
           </ProtectedRoute>
         }
       />

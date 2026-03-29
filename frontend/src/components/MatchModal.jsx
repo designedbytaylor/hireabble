@@ -28,11 +28,15 @@ export default function MatchModal({ match, onClose, onMessage, userRole = 'seek
             exit={{ y: 50, opacity: 0 }}
             transition={{ type: 'spring', damping: 20, stiffness: 300 }}
             className="relative z-10 glass-card rounded-3xl p-6 max-w-sm w-full"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="match-modal-title-recruiter"
           >
             {/* Close button */}
             <button
               onClick={onClose}
               className="absolute top-4 right-4 p-2 rounded-full hover:bg-accent transition-colors"
+              aria-label="Close notification"
             >
               <X className="w-5 h-5 text-muted-foreground" />
             </button>
@@ -43,7 +47,7 @@ export default function MatchModal({ match, onClose, onMessage, userRole = 'seek
                 <Rocket className="w-5 h-5 text-green-500" />
               </div>
               <div>
-                <h2 className="text-lg font-bold font-['Outfit']">New Applicant</h2>
+                <h2 id="match-modal-title-recruiter" className="text-lg font-bold font-['Outfit']">New Applicant</h2>
                 <p className="text-xs text-muted-foreground">{match.seeker_name || 'A candidate'} applied to your role</p>
               </div>
             </div>
@@ -179,11 +183,15 @@ export default function MatchModal({ match, onClose, onMessage, userRole = 'seek
           exit={{ scale: 0.5, opacity: 0 }}
           transition={{ type: 'spring', damping: 15 }}
           className="relative z-10 glass-card rounded-3xl p-8 max-w-sm w-full text-center"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="match-modal-title-seeker"
         >
           {/* Close button */}
           <button
             onClick={onClose}
             className="absolute top-4 right-4 p-2 rounded-full hover:bg-accent transition-colors"
+            aria-label="Close notification"
           >
             <X className="w-5 h-5 text-muted-foreground" />
           </button>
@@ -203,6 +211,7 @@ export default function MatchModal({ match, onClose, onMessage, userRole = 'seek
             initial={{ y: 20, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             transition={{ delay: 0.3 }}
+            id="match-modal-title-seeker"
             className="text-3xl font-bold font-['Outfit'] mb-2 gradient-text"
           >
             Great News!

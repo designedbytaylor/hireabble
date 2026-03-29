@@ -34,11 +34,11 @@ if _sentry_dsn:
     )
 
 # Import database and shared utilities
-from database import db, manager, UPLOADS_DIR, logger, JWT_SECRET, JWT_ALGORITHM, create_notification
+from database import db, manager, UPLOADS_DIR, logger, JWT_SECRET, JWT_ALGORITHM, create_notification, send_web_push
 from content_filter import check_text, is_severe
 
 # Import routers
-from routers import auth, jobs, applications, matches, notifications, uploads, stats, admin, interviews, payments, support, users
+from routers import auth, jobs, applications, matches, notifications, uploads, stats, admin, interviews, payments, support, users, skills
 
 # Rate limiter — uses remote IP address by default
 limiter = Limiter(key_func=get_remote_address, default_limits=["120/minute"])
@@ -216,6 +216,7 @@ app.include_router(interviews.router, prefix="/api")
 app.include_router(payments.router, prefix="/api")
 app.include_router(support.router, prefix="/api")
 app.include_router(users.router, prefix="/api")
+app.include_router(skills.router, prefix="/api")
 
 # ==================== WEBSOCKET ====================
 
@@ -558,7 +559,73 @@ async def startup():
     # Start background saved-job reminder scheduler
     asyncio.create_task(_saved_job_reminder_loop())
 
+    # Start background job alerts scheduler
+    asyncio.create_task(_job_alerts_loop())
+
     logger.info("Hireabble API started successfully!")
+
+
+async def _job_alerts_loop():
+    """Send periodic job alert digests to seekers."""
+    import random
+    from datetime import timedelta
+    await asyncio.sleep(random.randint(60, 300))  # initial jitter
+    while True:
+        try:
+            now = datetime.now(timezone.utc)
+            six_hours_ago = (now - timedelta(hours=6)).isoformat()
+
+            # Find seekers with job alerts enabled
+            seekers = await db.users.find(
+                {
+                    "role": "seeker",
+                    "email_notifications.job_alerts": {"$ne": False},
+                    "$or": [
+                        {"last_job_alert_at": {"$exists": False}},
+                        {"last_job_alert_at": {"$lte": six_hours_ago}},
+                    ],
+                },
+                {"_id": 0, "id": 1, "skills": 1, "location": 1, "desired_salary": 1,
+                 "job_type_preference": 1, "last_job_alert_at": 1, "name": 1},
+            ).to_list(500)
+
+            for seeker in seekers:
+                try:
+                    since = seeker.get("last_job_alert_at", six_hours_ago)
+                    # Find new jobs since last alert
+                    new_jobs_query = {
+                        "is_active": True,
+                        "created_at": {"$gte": since},
+                    }
+                    new_jobs = await db.jobs.find(
+                        new_jobs_query,
+                        {"_id": 0, "id": 1, "title": 1, "company": 1, "location": 1,
+                         "salary_min": 1, "salary_max": 1, "category": 1},
+                    ).to_list(50)
+
+                    if len(new_jobs) >= 3:
+                        await create_notification(
+                            seeker["id"], "job_alert",
+                            f"{len(new_jobs)} New Jobs for You",
+                            f"There are {len(new_jobs)} new job openings that may interest you. Check them out!",
+                            data={"type": "job_alert"},
+                        )
+                        await send_web_push(
+                            seeker["id"],
+                            title=f"{len(new_jobs)} New Jobs",
+                            body="New jobs posted that match your profile!",
+                            push_data={"type": "job_alert"},
+                        )
+                        await db.users.update_one(
+                            {"id": seeker["id"]},
+                            {"$set": {"last_job_alert_at": now.isoformat()}},
+                        )
+                except Exception:
+                    pass
+        except Exception:
+            pass
+
+        await asyncio.sleep(6 * 3600)  # every 6 hours
 
 
 async def _saved_job_reminder_loop():

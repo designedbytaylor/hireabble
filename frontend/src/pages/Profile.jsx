@@ -55,6 +55,20 @@ function EmailNotificationSettings({ token }) {
     }
   };
 
+  const updateFrequency = async (frequency) => {
+    if (!prefs) return;
+    const oldFreq = prefs.job_alerts_frequency;
+    setPrefs(prev => ({ ...prev, job_alerts_frequency: frequency }));
+    try {
+      await axios.put(`${API}/notifications/preferences`, { job_alerts_frequency: frequency }, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+    } catch {
+      setPrefs(prev => ({ ...prev, job_alerts_frequency: oldFreq }));
+      toast.error('Failed to update frequency');
+    }
+  };
+
   if (!prefs) return null;
 
   const items = [
@@ -62,7 +76,14 @@ function EmailNotificationSettings({ token }) {
     { key: 'interviews', label: 'Interview updates', desc: 'Interview requests, acceptances & changes' },
     { key: 'messages', label: 'Message digests', desc: 'Summary of unread messages (max every 15 min)' },
     { key: 'status_updates', label: 'Application updates', desc: 'When your application stage changes' },
+    { key: 'job_alerts', label: 'Job Alerts', desc: 'Get notified when new jobs match your profile' },
     { key: 'marketing_emails_opt_in', label: 'Marketing & promotions', desc: 'Occasional updates, tips, and promotional offers' },
+  ];
+
+  const frequencyOptions = [
+    { value: 'instant', label: 'Instant' },
+    { value: 'daily', label: 'Daily' },
+    { value: 'weekly', label: 'Weekly' },
   ];
 
   return (
@@ -72,24 +93,44 @@ function EmailNotificationSettings({ token }) {
       </h3>
       <div className="space-y-2">
         {items.map(({ key, label, desc }) => (
-          <button
-            key={key}
-            type="button"
-            onClick={() => toggle(key)}
-            className={`w-full flex items-center gap-3 p-3 rounded-xl border transition-all ${
-              prefs[key]
-                ? 'bg-primary/5 border-primary/20 text-foreground'
-                : 'bg-background border-border text-muted-foreground hover:border-primary/10'
-            }`}
-          >
-            <div className="flex-1 text-left">
-              <div className="font-medium text-sm">{label}</div>
-              <div className="text-xs opacity-70">{desc}</div>
-            </div>
-            <div className={`w-10 h-6 rounded-full transition-colors shrink-0 ${prefs[key] ? 'bg-primary' : 'bg-muted'}`}>
-              <div className={`w-5 h-5 rounded-full bg-white mt-0.5 transition-transform ${prefs[key] ? 'translate-x-[18px]' : 'translate-x-0.5'}`} />
-            </div>
-          </button>
+          <div key={key}>
+            <button
+              type="button"
+              onClick={() => toggle(key)}
+              className={`w-full flex items-center gap-3 p-3 rounded-xl border transition-all ${
+                prefs[key]
+                  ? 'bg-primary/5 border-primary/20 text-foreground'
+                  : 'bg-background border-border text-muted-foreground hover:border-primary/10'
+              }`}
+            >
+              <div className="flex-1 text-left">
+                <div className="font-medium text-sm">{label}</div>
+                <div className="text-xs opacity-70">{desc}</div>
+              </div>
+              <div className={`w-10 h-6 rounded-full transition-colors shrink-0 ${prefs[key] ? 'bg-primary' : 'bg-muted'}`}>
+                <div className={`w-5 h-5 rounded-full bg-white mt-0.5 transition-transform ${prefs[key] ? 'translate-x-[18px]' : 'translate-x-0.5'}`} />
+              </div>
+            </button>
+            {key === 'job_alerts' && prefs.job_alerts && (
+              <div className="flex items-center gap-2 mt-2 ml-3 mb-1">
+                <span className="text-xs text-muted-foreground">Frequency:</span>
+                {frequencyOptions.map(({ value, label: freqLabel }) => (
+                  <button
+                    key={value}
+                    type="button"
+                    onClick={() => updateFrequency(value)}
+                    className={`px-3 py-1 text-xs rounded-full border transition-all ${
+                      (prefs.job_alerts_frequency || 'daily') === value
+                        ? 'bg-primary text-white border-primary'
+                        : 'bg-background border-border text-muted-foreground hover:border-primary/30'
+                    }`}
+                  >
+                    {freqLabel}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
         ))}
       </div>
       <p className="text-xs text-muted-foreground mt-2">
@@ -326,7 +367,7 @@ export default function Profile() {
     if (!referralData?.referral_code) return;
     const shareData = {
       title: 'Join Hireabble',
-      text: `Join Hireabble using my referral code ${referralData.referral_code} and help me earn Candidate Invites!`,
+      text: `Join Hireabble using my referral code ${referralData.referral_code} — we both get a free month of Plus!`,
       url: `${window.location.origin}/signup?ref=${referralData.referral_code}`,
     };
     if (navigator.share) {
@@ -1241,6 +1282,34 @@ export default function Profile() {
                   )}
                 </div>
 
+                {/* Skill Badges */}
+                {user?.role === 'seeker' && (
+                  <div className="pt-4 border-t border-border space-y-3">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-base font-semibold flex items-center gap-1.5">
+                        <BadgeCheck className="w-4 h-4 text-emerald-400" /> Verified Skills
+                      </Label>
+                      <a
+                        href="/skills"
+                        className="text-xs text-primary font-medium hover:underline"
+                      >
+                        Take a Quiz
+                      </a>
+                    </div>
+                    {user?.verified_skills?.length > 0 ? (
+                      <div className="flex flex-wrap gap-2">
+                        {user.verified_skills.map((skill) => (
+                          <span key={skill} className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-500/15 text-emerald-400 text-xs font-medium border border-emerald-500/20">
+                            <BadgeCheck className="w-3 h-3" /> {skill}
+                          </span>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-sm text-muted-foreground">No verified skills yet. Take a quiz to earn badges!</p>
+                    )}
+                  </div>
+                )}
+
                 {/* Certifications */}
                 <div className="pt-4 border-t border-border space-y-3">
                   <div className="flex items-center justify-between">
@@ -1330,7 +1399,7 @@ export default function Profile() {
                       <div className="text-sm font-medium">{showContactOnResume ? 'Contact Info Visible' : 'Contact Info Hidden'}</div>
                       <div className="text-xs text-muted-foreground">
                         {showContactOnResume
-                          ? 'Your email is shown on resumes downloaded by matched recruiters'
+                          ? 'Your email is shown on resumes downloaded by connected recruiters'
                           : 'Recruiters see "Contact via Hireabble" instead of your email'}
                       </div>
                     </div>
@@ -1903,7 +1972,7 @@ export default function Profile() {
                 <div className="flex-1 text-left">
                   <div className="font-medium text-sm">Push Notifications</div>
                   <div className="text-xs opacity-70">
-                    {pushEnabled ? 'Get notified of matches, messages & interviews' : 'Enable to stay updated on your phone'}
+                    {pushEnabled ? 'Get notified of connections, messages & interviews' : 'Enable to stay updated on your phone'}
                   </div>
                 </div>
                 <div className={`w-10 h-6 rounded-full transition-colors ${pushEnabled ? 'bg-primary' : 'bg-muted'}`}>
@@ -1967,7 +2036,7 @@ export default function Profile() {
               <Gift className="w-5 h-5" /> Invite Friends
             </h3>
             <p className="text-sm text-muted-foreground mb-4">
-              Share your referral code — when someone joins, you get <strong className="text-foreground">5 Candidate Invites</strong>!
+              Share your referral code — when someone joins, you get <strong className="text-foreground">1 month of Plus free</strong>!
             </p>
             {referralLoading ? (
               <div className="flex items-center gap-2 text-muted-foreground">
@@ -1997,7 +2066,7 @@ export default function Profile() {
                 {referralData.referral_count > 0 && (
                   <p className="text-sm text-muted-foreground">
                     {referralData.referral_count} friend{referralData.referral_count !== 1 ? 's' : ''} joined
-                    {' '}· {referralData.total_swipes_earned} Candidate Invites earned
+                    {' '}· {referralData.referral_count} month{referralData.referral_count !== 1 ? 's' : ''} of Plus earned
                   </p>
                 )}
               </div>
@@ -2082,7 +2151,7 @@ export default function Profile() {
             open={showDeleteConfirm}
             onOpenChange={setShowDeleteConfirm}
             title="Delete your account?"
-            description="This will permanently delete your account, profile, applications, matches, and messages. This action cannot be undone. If you have an active subscription, please cancel it first in your App Store or Google Play settings to avoid further charges."
+            description="This will permanently delete your account, profile, applications, connections, and messages. This action cannot be undone. If you have an active subscription, please cancel it first in your App Store or Google Play settings to avoid further charges."
             confirmLabel={deleteLoading ? 'Deleting...' : 'Delete My Account'}
             variant="destructive"
             onConfirm={handleDeleteAccount}

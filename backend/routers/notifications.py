@@ -64,6 +64,8 @@ class EmailPreferences(BaseModel):
     messages: Optional[bool] = None
     status_updates: Optional[bool] = None
     saved_job_reminders: Optional[bool] = None
+    job_alerts: Optional[bool] = None
+    job_alerts_frequency: Optional[str] = None  # "instant", "daily", "weekly", "off"
     marketing_emails_opt_in: Optional[bool] = None
 
 @router.get("/preferences")
@@ -79,10 +81,15 @@ async def get_notification_preferences(current_user: dict = Depends(get_current_
 async def update_notification_preferences(data: EmailPreferences, current_user: dict = Depends(get_current_user)):
     """Update email notification preferences"""
     update = {}
-    for field in ("matches", "interviews", "messages", "status_updates", "saved_job_reminders"):
+    for field in ("matches", "interviews", "messages", "status_updates", "saved_job_reminders", "job_alerts"):
         val = getattr(data, field)
         if val is not None:
             update[f"email_notifications.{field}"] = val
+    if data.job_alerts_frequency is not None:
+        valid_frequencies = ("instant", "daily", "weekly", "off")
+        if data.job_alerts_frequency not in valid_frequencies:
+            raise HTTPException(status_code=400, detail=f"Invalid frequency. Must be one of: {', '.join(valid_frequencies)}")
+        update["email_notifications.job_alerts_frequency"] = data.job_alerts_frequency
     if data.marketing_emails_opt_in is not None:
         update["marketing_emails_opt_in"] = data.marketing_emails_opt_in
     if update:
@@ -98,7 +105,7 @@ async def unsubscribe_from_emails(token: str = Query(...), type: str = Query(...
             raise HTTPException(status_code=400, detail="Invalid token")
         user_id = payload["user_id"]
         notif_type = payload.get("type", type)
-        valid_types = ("matches", "interviews", "messages", "status_updates")
+        valid_types = ("matches", "interviews", "messages", "status_updates", "job_alerts")
         if notif_type not in valid_types:
             raise HTTPException(status_code=400, detail="Invalid notification type")
         await db.users.update_one({"id": user_id}, {"$set": {f"email_notifications.{notif_type}": False}})

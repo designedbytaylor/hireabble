@@ -770,6 +770,87 @@ async def download_applicant_resume_pdf(seeker_id: str, current_user: dict = Dep
     )
 
 
+# ==================== SEEKER ANALYTICS ====================
+
+@router.get("/seeker/analytics")
+async def seeker_analytics(current_user: dict = Depends(get_current_user)):
+    """Get detailed analytics for job seekers."""
+    if current_user.get("role") != "seeker":
+        raise HTTPException(status_code=403, detail="Only seekers can view analytics")
+
+    uid = current_user["id"]
+    now = datetime.now(timezone.utc)
+    seven_days_ago = (now - timedelta(days=7)).isoformat()
+    thirty_days_ago = (now - timedelta(days=30)).isoformat()
+
+    # Profile views this week
+    profile_views_weekly = await db.profile_views.count_documents({
+        "viewed_user_id": uid,
+        "created_at": {"$gte": seven_days_ago},
+    })
+
+    # Profile views daily trend (last 30 days)
+    views_pipeline = [
+        {"$match": {"viewed_user_id": uid, "created_at": {"$gte": thirty_days_ago}}},
+        {"$addFields": {"date": {"$substr": ["$created_at", 0, 10]}}},
+        {"$group": {"_id": "$date", "count": {"$sum": 1}}},
+        {"$sort": {"_id": 1}},
+    ]
+    views_trend = await db.profile_views.aggregate(views_pipeline).to_list(30)
+
+    # Applications over time (last 30 days, grouped by day)
+    apps_pipeline = [
+        {"$match": {"seeker_id": uid, "created_at": {"$gte": thirty_days_ago}}},
+        {"$addFields": {"date": {"$substr": ["$created_at", 0, 10]}}},
+        {"$group": {"_id": "$date", "count": {"$sum": 1}}},
+        {"$sort": {"_id": 1}},
+    ]
+    apps_trend = await db.applications.aggregate(apps_pipeline).to_list(30)
+
+    # Application percentile (how user ranks vs others)
+    user_app_count = await db.applications.count_documents({"seeker_id": uid})
+    total_seekers = await db.users.count_documents({"role": "seeker"})
+
+    # Count seekers with more applications
+    seekers_with_more = 0
+    if total_seekers > 1:
+        pipeline = [
+            {"$match": {"action": {"$in": ["like", "superlike"]}}},
+            {"$group": {"_id": "$seeker_id", "count": {"$sum": 1}}},
+            {"$match": {"count": {"$gt": user_app_count}}},
+            {"$count": "total"},
+        ]
+        result = await db.applications.aggregate(pipeline).to_list(1)
+        seekers_with_more = result[0]["total"] if result else 0
+
+    percentile = round(((total_seekers - seekers_with_more) / max(total_seekers, 1)) * 100)
+
+    # Trending skills user doesn't have
+    user_skills = set(s.lower() for s in (current_user.get("skills") or []))
+    skills_pipeline = [
+        {"$match": {"is_active": True, "requirements": {"$exists": True, "$ne": []}}},
+        {"$unwind": "$requirements"},
+        {"$group": {"_id": {"$toLower": "$requirements"}, "count": {"$sum": 1}}},
+        {"$sort": {"count": -1}},
+        {"$limit": 20},
+    ]
+    popular_skills = await db.jobs.aggregate(skills_pipeline).to_list(20)
+    trending = [
+        {"skill": s["_id"], "demand": s["count"]}
+        for s in popular_skills
+        if s["_id"].lower() not in user_skills and len(s["_id"]) > 2
+    ][:5]
+
+    return {
+        "profile_views_weekly": profile_views_weekly,
+        "profile_views_trend": [{"date": v["_id"], "views": v["count"]} for v in views_trend],
+        "applications_trend": [{"date": a["_id"], "count": a["count"]} for a in apps_trend],
+        "application_percentile": min(percentile, 99),
+        "total_applications": user_app_count,
+        "trending_skills": trending,
+    }
+
+
 # ==================== PUSH NOTIFICATIONS ====================
 
 @router.post("/push/subscribe")

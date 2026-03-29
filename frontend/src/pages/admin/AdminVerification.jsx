@@ -391,12 +391,12 @@ export default function AdminVerification() {
                         {selectedUser.user.role === 'seeker' ? (
                           <>
                             <StatBox label="Applications" value={selectedUser.user.stats.applications} />
-                            <StatBox label="Matches" value={selectedUser.user.stats.matches} />
+                            <StatBox label="Connections" value={selectedUser.user.stats.matches} />
                           </>
                         ) : (
                           <>
                             <StatBox label="Jobs Posted" value={selectedUser.user.stats.jobs_posted} />
-                            <StatBox label="Matches" value={selectedUser.user.stats.matches} />
+                            <StatBox label="Connections" value={selectedUser.user.stats.matches} />
                           </>
                         )}
                         {selectedUser.user.stats.reports_against > 0 && (

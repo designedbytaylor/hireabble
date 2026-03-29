@@ -149,12 +149,12 @@ async def get_referral_info(current_user: dict = Depends(get_current_user)):
 
     # Count successful referrals
     referral_count = await db.referrals.count_documents({"referrer_id": uid, "status": "completed"})
-    total_swipes_earned = referral_count * 5
+    total_months_earned = referral_count  # 1 month of Plus per referral
 
     return {
         "referral_code": code,
         "referral_count": referral_count,
-        "total_swipes_earned": total_swipes_earned,
+        "total_months_earned": total_months_earned,
     }
 
 
@@ -190,13 +190,40 @@ async def redeem_referral_code(current_user: dict = Depends(get_current_user)):
         "created_at": now,
     })
 
-    # Award 5 super swipes to referrer
-    role = (await db.users.find_one({"id": referrer["id"]}, {"role": 1}) or {}).get("role", "seeker")
-    swipe_field = "seeker_purchased_superlikes" if role == "seeker" else "recruiter_purchased_superlikes"
-    await db.users.update_one(
-        {"id": referrer["id"]},
-        {"$inc": {swipe_field: 5}},
-    )
+    # Award 1 month of Plus free to referrer
+    role = (await db.users.find_one({"id": referrer["id"]}, {"_id": 0, "role": 1, "subscription": 1}) or {}).get("role", "seeker")
+    referrer_doc = await db.users.find_one({"id": referrer["id"]}, {"_id": 0, "subscription": 1})
+    existing_sub = (referrer_doc or {}).get("subscription") or {}
+    tier_id = "seeker_plus" if role == "seeker" else "recruiter_pro"
+
+    # If referrer already has an active subscription, extend it by 30 days
+    if existing_sub.get("status") == "active" and existing_sub.get("period_end", "") >= now:
+        from datetime import timedelta
+        try:
+            current_end = datetime.fromisoformat(existing_sub["period_end"].replace("Z", "+00:00"))
+        except (ValueError, TypeError):
+            current_end = datetime.now(timezone.utc)
+        new_end = (current_end + timedelta(days=30)).isoformat()
+        await db.users.update_one(
+            {"id": referrer["id"]},
+            {"$set": {"subscription.period_end": new_end}},
+        )
+    else:
+        # Grant a fresh 30-day Plus subscription
+        from datetime import timedelta
+        period_end = (datetime.now(timezone.utc) + timedelta(days=30)).isoformat()
+        await db.users.update_one(
+            {"id": referrer["id"]},
+            {"$set": {
+                "subscription": {
+                    "tier_id": tier_id,
+                    "status": "active",
+                    "period_start": now,
+                    "period_end": period_end,
+                    "source": "referral",
+                }
+            }},
+        )
 
     # Mark as redeemed
     await db.users.update_one({"id": uid}, {"$set": {"referral_redeemed": True}})
@@ -206,12 +233,12 @@ async def redeem_referral_code(current_user: dict = Depends(get_current_user)):
     await create_notification(
         referrer["id"], "referral",
         "Referral Reward!",
-        f"{referred_name} joined using your referral code! You earned 5 Super Swipes.",
+        f"{referred_name} joined using your referral code! You earned 1 month of Plus free.",
     )
     await send_web_push(
         referrer["id"],
         "Referral Reward!",
-        f"{referred_name} joined using your code! +5 Super Swipes",
+        f"{referred_name} joined using your code! +1 month of Plus free",
         {"type": "referral"},
     )
 
@@ -219,4 +246,4 @@ async def redeem_referral_code(current_user: dict = Depends(get_current_user)):
     from cache import invalidate_user
     invalidate_user(referrer["id"])
 
-    return {"message": "Referral redeemed! Referrer awarded 5 Super Swipes."}
+    return {"message": "Referral redeemed! Referrer awarded 1 month of Plus free."}

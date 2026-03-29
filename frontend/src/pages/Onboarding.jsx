@@ -41,7 +41,7 @@ const STEPS = [
   { id: 'interests', title: 'Your Interests', subtitle: 'Share what you\'re passionate about outside of work' },
   { id: 'job_type', title: 'What type of work?', subtitle: 'Tell us what you\'re looking for' },
   { id: 'preferences', title: 'Preferences', subtitle: 'What are you looking for?' },
-  { id: 'notifications', title: 'Stay in the Loop', subtitle: 'Never miss a match or message' },
+  { id: 'notifications', title: 'Stay in the Loop', subtitle: 'Never miss a connection or message' },
 ];
 
 export default function Onboarding() {

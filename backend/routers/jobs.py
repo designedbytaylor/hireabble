@@ -855,6 +855,39 @@ Rules:
         raise HTTPException(status_code=500, detail="Failed to parse screenshots. Please try again.")
 
 
+@router.get("/salary-insights")
+async def salary_insights(category: str = None, location: str = None):
+    """Get average salary data by category for salary transparency."""
+    match_filter = {"is_active": True, "salary_min": {"$gt": 0}, "salary_max": {"$gt": 0}}
+    if category:
+        match_filter["category"] = category
+    if location:
+        match_filter["location"] = {"$regex": location, "$options": "i"}
+
+    pipeline = [
+        {"$match": match_filter},
+        {"$group": {
+            "_id": "$category",
+            "avg_salary_min": {"$avg": "$salary_min"},
+            "avg_salary_max": {"$avg": "$salary_max"},
+            "job_count": {"$sum": 1},
+        }},
+        {"$sort": {"job_count": -1}},
+    ]
+    results = await db.jobs.aggregate(pipeline).to_list(50)
+
+    insights = {}
+    for r in results:
+        if r["_id"]:
+            insights[r["_id"]] = {
+                "avg_salary_min": round(r["avg_salary_min"]),
+                "avg_salary_max": round(r["avg_salary_max"]),
+                "job_count": r["job_count"],
+            }
+
+    return {"insights": insights}
+
+
 class AIAssistRequest(BaseModel):
     title: str = ""
     company: str = ""

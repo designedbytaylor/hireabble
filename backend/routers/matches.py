@@ -199,7 +199,7 @@ async def send_message(message: MessageCreate, request: Request, current_user: d
         raise HTTPException(status_code=404, detail="Match not found")
     
     if match["seeker_id"] != current_user["id"] and match["recruiter_id"] != current_user["id"]:
-        raise HTTPException(status_code=403, detail="Not authorized to message in this match")
+        raise HTTPException(status_code=403, detail="Not authorized to message in this connection")
 
     # Enforce message length limit to prevent DoS via massive payloads
     if len(message.content) > 5000:
@@ -374,17 +374,17 @@ async def mark_messages_read(match_id: str, current_user: dict = Depends(get_cur
 
 @router.post("/messages/pre-match")
 async def send_pre_match_message(body: dict, current_user: dict = Depends(get_current_user)):
-    """Send a message to a candidate before matching (Enterprise recruiter only).
+    """Send a message to a candidate before connecting (Enterprise recruiter only).
     Creates an intro conversation the seeker sees in their messages."""
     if current_user.get("role") != "recruiter":
-        raise HTTPException(status_code=403, detail="Only recruiters can send pre-match messages")
+        raise HTTPException(status_code=403, detail="Only recruiters can send pre-connection messages")
 
     # Verify Enterprise subscription
     sub = current_user.get("subscription") or {}
     now = datetime.now(timezone.utc).isoformat()
     if not (sub.get("status") == "active" and sub.get("period_end", "") >= now
             and sub.get("tier_id") == "recruiter_enterprise"):
-        raise HTTPException(status_code=403, detail="Enterprise subscription required to message before matching")
+        raise HTTPException(status_code=403, detail="Enterprise subscription required to message before connecting")
 
     seeker_id = body.get("seeker_id")
     content = body.get("content", "").strip()
