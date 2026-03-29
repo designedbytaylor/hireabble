@@ -1,11 +1,15 @@
+import { useState } from 'react';
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import MarkerClusterGroup from 'react-leaflet-cluster';
 import { useNavigate } from 'react-router-dom';
+import { toast } from 'sonner';
+import axios from 'axios';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 
+const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
+
 // Custom themed marker icon — inline SVG, no external image dependencies
-// Uses app's primary teal color (#2A9D8F / hsl(173, 58%, 39%))
 const customIcon = L.divIcon({
   className: '',
   html: `<svg width="30" height="40" viewBox="0 0 30 40" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -26,8 +30,10 @@ const formatSalary = (min, max) => {
   return `Up to ${fmt(max)}`;
 };
 
-export default function MapView({ jobs = [] }) {
+export default function MapView({ jobs = [], userLat, userLng, token, onApply, onSave }) {
   const navigate = useNavigate();
+  const [appliedIds, setAppliedIds] = useState(new Set());
+  const [savedIds, setSavedIds] = useState(new Set());
 
   // Filter jobs with valid coordinates
   const mappableJobs = jobs.filter(j => j.location_lat && j.location_lng);
@@ -44,11 +50,43 @@ export default function MapView({ jobs = [] }) {
     );
   }
 
-  // Calculate center from jobs
-  const avgLat = mappableJobs.reduce((s, j) => s + j.location_lat, 0) / mappableJobs.length;
-  const avgLng = mappableJobs.reduce((s, j) => s + j.location_lng, 0) / mappableJobs.length;
+  // Center on user's location if available, otherwise average of jobs
+  const hasUserLocation = userLat && userLng;
+  const centerLat = hasUserLocation ? userLat : mappableJobs.reduce((s, j) => s + j.location_lat, 0) / mappableJobs.length;
+  const centerLng = hasUserLocation ? userLng : mappableJobs.reduce((s, j) => s + j.location_lng, 0) / mappableJobs.length;
+  const defaultZoom = hasUserLocation ? 11 : 4;
+
+  const handleApply = async (job) => {
+    if (job.already_applied || appliedIds.has(job.id)) return;
+    try {
+      await axios.post(`${API}/swipe`, { job_id: job.id, action: 'like' }, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setAppliedIds(prev => new Set([...prev, job.id]));
+      onApply?.(job.id);
+      toast.success('Applied!');
+    } catch (err) {
+      toast.error(err.response?.data?.detail || 'Failed to apply');
+    }
+  };
+
+  const handleSave = async (job) => {
+    if (job._saved || savedIds.has(job.id)) return;
+    try {
+      await axios.post(`${API}/jobs/${job.id}/save`, {}, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setSavedIds(prev => new Set([...prev, job.id]));
+      onSave?.(job.id);
+      toast.success('Saved for later');
+    } catch {
+      toast.error('Failed to save');
+    }
+  };
 
   const salary = (job) => formatSalary(job.salary_min, job.salary_max);
+  const isApplied = (job) => job.already_applied || appliedIds.has(job.id);
+  const isSaved = (job) => job._saved || savedIds.has(job.id);
 
   return (
     <div className="space-y-2">
@@ -59,8 +97,8 @@ export default function MapView({ jobs = [] }) {
       )}
       <div className="rounded-2xl overflow-hidden border border-border" style={{ height: '450px' }}>
         <MapContainer
-          center={[avgLat, avgLng]}
-          zoom={10}
+          center={[centerLat, centerLng]}
+          zoom={defaultZoom}
           style={{ height: '100%', width: '100%' }}
           scrollWheelZoom={true}
         >
@@ -76,7 +114,7 @@ export default function MapView({ jobs = [] }) {
           >
             {mappableJobs.map((job) => (
               <Marker key={job.id} position={[job.location_lat, job.location_lng]} icon={customIcon}>
-                <Popup maxWidth={260} minWidth={220}>
+                <Popup maxWidth={280} minWidth={240}>
                   <div style={{ fontFamily: "'Outfit', sans-serif", padding: '2px 0' }}>
                     {/* Title */}
                     <div style={{ fontSize: '15px', fontWeight: 700, color: '#f5f5f5', marginBottom: '2px', lineHeight: 1.3 }}>
@@ -105,15 +143,16 @@ export default function MapView({ jobs = [] }) {
                     )}
 
                     {/* Location + Type */}
-                    <div style={{ fontSize: '11px', color: '#a1a1aa', marginBottom: '8px' }}>
+                    <div style={{ fontSize: '11px', color: '#a1a1aa', marginBottom: '10px' }}>
                       {job.location || 'Location not specified'}
                       {job.job_type && ` · ${job.job_type.charAt(0).toUpperCase() + job.job_type.slice(1)}`}
                       {job.employment_type && ` · ${job.employment_type}`}
                     </div>
 
-                    {/* Actions */}
+                    {/* Action Buttons */}
                     <div style={{ display: 'flex', gap: '6px' }}>
-                      {job.already_applied ? (
+                      {/* Apply / Applied */}
+                      {isApplied(job) ? (
                         <div style={{
                           flex: 1,
                           textAlign: 'center',
@@ -123,27 +162,65 @@ export default function MapView({ jobs = [] }) {
                           background: 'rgba(16, 185, 129, 0.1)',
                           border: '1px solid rgba(16, 185, 129, 0.2)',
                           borderRadius: '8px',
-                          padding: '6px 0',
+                          padding: '7px 0',
                         }}>
                           ✓ Applied
                         </div>
-                      ) : null}
+                      ) : (
+                        <button
+                          onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleApply(job); }}
+                          style={{
+                            flex: 1,
+                            fontSize: '12px',
+                            fontWeight: 600,
+                            color: 'white',
+                            background: '#2A9D8F',
+                            border: 'none',
+                            borderRadius: '8px',
+                            padding: '7px 12px',
+                            cursor: 'pointer',
+                            textAlign: 'center',
+                          }}
+                        >
+                          Apply
+                        </button>
+                      )}
+
+                      {/* Save / Saved */}
+                      <button
+                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleSave(job); }}
+                        disabled={isSaved(job)}
+                        style={{
+                          fontSize: '12px',
+                          fontWeight: 600,
+                          color: isSaved(job) ? '#2A9D8F' : '#a1a1aa',
+                          background: isSaved(job) ? 'rgba(42, 157, 143, 0.1)' : 'rgba(161, 161, 170, 0.1)',
+                          border: `1px solid ${isSaved(job) ? 'rgba(42, 157, 143, 0.3)' : 'rgba(161, 161, 170, 0.2)'}`,
+                          borderRadius: '8px',
+                          padding: '7px 10px',
+                          cursor: isSaved(job) ? 'default' : 'pointer',
+                          textAlign: 'center',
+                        }}
+                      >
+                        {isSaved(job) ? '★ Saved' : '☆ Save'}
+                      </button>
+
+                      {/* View Details */}
                       <button
                         onClick={(e) => { e.preventDefault(); e.stopPropagation(); navigate(`/jobs/${job.id}`); }}
                         style={{
-                          flex: 1,
-                          fontSize: '12px',
-                          fontWeight: 600,
-                          color: 'white',
-                          background: '#2A9D8F',
-                          border: 'none',
+                          fontSize: '11px',
+                          fontWeight: 500,
+                          color: '#a1a1aa',
+                          background: 'transparent',
+                          border: '1px solid rgba(161, 161, 170, 0.2)',
                           borderRadius: '8px',
-                          padding: '6px 12px',
+                          padding: '7px 8px',
                           cursor: 'pointer',
                           textAlign: 'center',
                         }}
                       >
-                        View Details
+                        Details
                       </button>
                     </div>
                   </div>

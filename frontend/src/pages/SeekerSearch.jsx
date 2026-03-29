@@ -73,7 +73,7 @@ const SALARY_RANGES = [
 export default function SeekerSearch() {
   useDocumentTitle('Search Jobs');
   const navigate = useNavigate();
-  const { token } = useAuth();
+  const { token, user } = useAuth();
 
   const [keyword, setKeyword] = useState('');
   const [location, setLocation] = useState('');
@@ -477,7 +477,14 @@ export default function SeekerSearch() {
                     <Loader2 className="w-6 h-6 text-primary animate-spin" />
                   </div>
                 }>
-                  <MapView jobs={results} />
+                  <MapView
+                    jobs={results}
+                    userLat={user?.location_lat}
+                    userLng={user?.location_lng}
+                    token={token}
+                    onApply={(jobId) => setResults(prev => prev?.map(j => j.id === jobId ? { ...j, already_applied: true } : j))}
+                    onSave={(jobId) => setResults(prev => prev?.map(j => j.id === jobId ? { ...j, _saved: true } : j))}
+                  />
                 </Suspense>
               </div>
             )}
