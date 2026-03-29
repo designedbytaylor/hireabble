@@ -199,6 +199,7 @@ export default function AdminLaunchChecklist() {
   const [modalConfirmDelete, setModalConfirmDelete] = useState(false);
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef(null);
+  const editorRef = useRef(null);
   const saveTimer = useRef(null);
   const notesTimer = useRef(null);
   const modalNotesTimer = useRef(null);
@@ -390,14 +391,19 @@ export default function AdminLaunchChecklist() {
     setModalEditingText(false);
     setModalTextDraft("");
     setModalConfirmDelete(false);
+    // Set editor content after render
+    setTimeout(() => {
+      if (editorRef.current) editorRef.current.innerHTML = item.notes || "";
+    }, 0);
   };
 
   // Close item modal
   const closeItemModal = () => {
     if (modalItem) {
+      const html = editorRef.current ? editorRef.current.innerHTML : modalNotes;
       const currentItem = checklist.find(i => i.id === modalItem.id);
-      if (currentItem && (currentItem.notes || "") !== modalNotes) {
-        updateItemNotes(modalItem.id, modalNotes);
+      if (currentItem && (currentItem.notes || "") !== html) {
+        updateItemNotes(modalItem.id, html);
       }
     }
     setModalItem(null);
@@ -667,13 +673,16 @@ export default function AdminLaunchChecklist() {
                 </div>
                 {/* Editable area */}
                 <div
+                  ref={editorRef}
                   contentEditable
                   suppressContentEditableWarning
-                  dangerouslySetInnerHTML={{ __html: modalNotes }}
-                  onInput={e => {
-                    const html = e.currentTarget.innerHTML;
-                    setModalNotes(html);
-                    updateItemNotes(liveItem.id, html);
+                  onInput={() => {
+                    if (!editorRef.current) return;
+                    const html = editorRef.current.innerHTML;
+                    clearTimeout(modalNotesTimer.current);
+                    modalNotesTimer.current = setTimeout(() => {
+                      updateItemNotes(liveItem.id, html);
+                    }, 800);
                   }}
                   onFocus={e => e.target.style.borderColor = TEAL + "66"}
                   onBlur={e => e.target.style.borderColor = BORDER}
