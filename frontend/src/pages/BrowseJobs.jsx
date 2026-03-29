@@ -4,6 +4,7 @@ import { MapPin, Briefcase, Clock, ArrowRight, Search, Building2, DollarSign } f
 import { Button } from '../components/ui/button';
 import axios from 'axios';
 import useDocumentTitle from '../hooks/useDocumentTitle';
+import { useAuth } from '../context/AuthContext';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -46,6 +47,7 @@ function timeAgo(dateStr) {
 
 export default function BrowseJobs() {
   useDocumentTitle('Browse Jobs');
+  const { user } = useAuth();
   const [jobs, setJobs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [category, setCategory] = useState('');
@@ -137,14 +139,24 @@ export default function BrowseJobs() {
             <span className="text-lg font-bold font-['Outfit']">hireabble</span>
           </Link>
           <div className="flex items-center gap-2">
-            <Link to="/login">
-              <Button variant="ghost" size="sm">Log in</Button>
-            </Link>
-            <Link to="/register/seeker">
-              <Button size="sm" className="bg-gradient-to-r from-primary to-secondary text-white">
-                Sign Up
-              </Button>
-            </Link>
+            {user ? (
+              <Link to={user.role === 'seeker' ? '/dashboard' : '/recruiter'}>
+                <Button size="sm" className="bg-gradient-to-r from-primary to-secondary text-white">
+                  Go to Dashboard
+                </Button>
+              </Link>
+            ) : (
+              <>
+                <Link to="/login">
+                  <Button variant="ghost" size="sm">Log in</Button>
+                </Link>
+                <Link to="/register/seeker">
+                  <Button size="sm" className="bg-gradient-to-r from-primary to-secondary text-white">
+                    Sign Up
+                  </Button>
+                </Link>
+              </>
+            )}
           </div>
         </div>
       </header>
@@ -156,7 +168,7 @@ export default function BrowseJobs() {
             Browse <span className="gradient-text">Open Positions</span>
           </h1>
           <p className="text-muted-foreground">
-            Explore opportunities from top companies. Sign up to apply and get matched.
+            {user ? 'Explore opportunities from top companies.' : 'Explore opportunities from top companies. Sign up to apply and get connected.'}
           </p>
         </div>
       </div>
@@ -240,15 +252,31 @@ export default function BrowseJobs() {
 
             {/* CTA */}
             <div className="text-center py-8">
-              <p className="text-muted-foreground mb-3">
-                Sign up to see full job details, apply, and get matched with employers.
-              </p>
-              <Link to="/register/seeker">
-                <Button className="bg-gradient-to-r from-primary to-secondary text-white px-8">
-                  Create Free Account
-                  <ArrowRight className="w-4 h-4 ml-2" />
-                </Button>
-              </Link>
+              {user ? (
+                <>
+                  <p className="text-muted-foreground mb-3">
+                    Use your dashboard to search, apply, and track your applications.
+                  </p>
+                  <Link to={user.role === 'seeker' ? '/search' : '/recruiter'}>
+                    <Button className="bg-gradient-to-r from-primary to-secondary text-white px-8">
+                      Open Dashboard
+                      <ArrowRight className="w-4 h-4 ml-2" />
+                    </Button>
+                  </Link>
+                </>
+              ) : (
+                <>
+                  <p className="text-muted-foreground mb-3">
+                    Sign up to see full job details, apply, and get connected with employers.
+                  </p>
+                  <Link to="/register/seeker">
+                    <Button className="bg-gradient-to-r from-primary to-secondary text-white px-8">
+                      Create Free Account
+                      <ArrowRight className="w-4 h-4 ml-2" />
+                    </Button>
+                  </Link>
+                </>
+              )}
             </div>
           </div>
         )}

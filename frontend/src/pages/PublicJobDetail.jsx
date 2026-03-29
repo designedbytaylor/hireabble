@@ -165,8 +165,8 @@ export default function PublicJobDetail() {
 
       {/* Back link */}
       <div className="max-w-3xl mx-auto px-4 pt-4">
-        <Link to="/browse" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors">
-          <ArrowLeft className="w-4 h-4" /> Browse all jobs
+        <Link to={user ? '/search' : '/browse'} className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors">
+          <ArrowLeft className="w-4 h-4" /> {user ? 'Back to search' : 'Browse all jobs'}
         </Link>
       </div>
 
