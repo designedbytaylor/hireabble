@@ -37,6 +37,7 @@ export default function SkillQuiz() {
 
   useEffect(() => {
     fetchQuizzes();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
 
   useEffect(() => {
@@ -46,6 +47,7 @@ export default function SkillQuiz() {
         startQuiz(quizId);
       }
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [quizId, quizzes]);
 
   const fetchQuizzes = async () => {
