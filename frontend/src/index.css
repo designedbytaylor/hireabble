@@ -54,7 +54,7 @@
 /* Layer 2: Light tiles filtered to extract water as bright teal, blended with screen mode
    Screen blend: teal on dark = teal shows, teal on light = washes out */
 .map-dark-base {
-  filter: saturate(5) hue-rotate(150deg) brightness(0.4) contrast(3);
+  filter: saturate(5) hue-rotate(320deg) brightness(0.4) contrast(3);
   mix-blend-mode: screen;
 }
 /* Layer 3: Labels — boosted brightness for crisp white text */
