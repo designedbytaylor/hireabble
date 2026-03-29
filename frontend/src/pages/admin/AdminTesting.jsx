@@ -16,9 +16,10 @@ const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
 export default function AdminTesting() {
   const { token } = useAdminAuth();
-  const [loading, setLoading] = useState({ seed: false, clear: false, impersonate: null });
+  const [loading, setLoading] = useState({ seed: false, clear: false, impersonate: null, seedDemo: false });
   const [showClearConfirm, setShowClearConfirm] = useState(false);
   const [seedResult, setSeedResult] = useState(null);
+  const [demoResult, setDemoResult] = useState(null);
   const [showPassword, setShowPassword] = useState(false);
   const [users, setUsers] = useState([]);
   const [usersLoading, setUsersLoading] = useState(true);
@@ -95,6 +96,23 @@ export default function AdminTesting() {
     }
   };
 
+  const handleSeedDemo = async () => {
+    setLoading(prev => ({ ...prev, seedDemo: true }));
+    try {
+      const res = await axios.post(`${API}/admin/seed-demo-accounts`, {}, {
+        headers: { Authorization: `Bearer ${token}` },
+        timeout: 120000,
+      });
+      setDemoResult(res.data);
+      toast.success('Demo accounts created!');
+      fetchUsers();
+    } catch (e) {
+      toast.error(e.response?.data?.detail || 'Failed to seed demo accounts');
+    } finally {
+      setLoading(prev => ({ ...prev, seedDemo: false }));
+    }
+  };
+
   const handleImpersonate = async (user) => {
     setLoading(prev => ({ ...prev, impersonate: user.id }));
 
@@ -148,7 +166,7 @@ export default function AdminTesting() {
       </div>
 
       {/* Quick Actions */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6 sm:mb-8">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6 sm:mb-8">
         <div className="bg-gray-900 border border-gray-800 rounded-2xl p-4 sm:p-6">
           <div className="flex items-center gap-3 mb-3">
             <div className="w-10 h-10 rounded-xl bg-green-500/20 flex items-center justify-center flex-shrink-0">
@@ -192,7 +210,61 @@ export default function AdminTesting() {
             {loading.clear ? 'Clearing...' : 'Clear Test Data'}
           </Button>
         </div>
+
+        <div className="bg-gray-900 border border-gray-800 rounded-2xl p-4 sm:p-6">
+          <div className="flex items-center gap-3 mb-3">
+            <div className="w-10 h-10 rounded-xl bg-blue-500/20 flex items-center justify-center flex-shrink-0">
+              <UserCheck className="w-5 h-5 text-blue-400" />
+            </div>
+            <div className="min-w-0">
+              <h2 className="text-base sm:text-lg font-semibold text-white">Demo Accounts</h2>
+              <p className="text-xs text-gray-400">For Apple & Google Play reviewers</p>
+            </div>
+          </div>
+          <p className="text-xs text-gray-500 mb-3">
+            Creates seeker + recruiter with jobs, matches & messages
+          </p>
+          <Button onClick={handleSeedDemo} disabled={loading.seedDemo} className="w-full bg-blue-600 hover:bg-blue-700">
+            {loading.seedDemo ? <RefreshCw className="w-4 h-4 mr-2 animate-spin" /> : <Play className="w-4 h-4 mr-2" />}
+            {loading.seedDemo ? 'Creating...' : 'Seed Demo Accounts'}
+          </Button>
+        </div>
       </div>
+
+      {/* Demo Account Result */}
+      {demoResult && (
+        <div className="bg-gray-900 border border-blue-500/30 rounded-2xl p-4 sm:p-6 mb-6">
+          <div className="flex items-center gap-2 mb-4">
+            <CheckCircle className="w-5 h-5 text-blue-400" />
+            <h3 className="text-base sm:text-lg font-semibold text-white">Demo Accounts Ready</h3>
+          </div>
+          <div className="space-y-3">
+            {[demoResult.seeker, demoResult.recruiter].map((acct, i) => (
+              <div key={i} className="bg-gray-800 rounded-xl p-3 sm:p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <Badge className={i === 0 ? 'bg-cyan-500/20 text-cyan-400' : 'bg-amber-500/20 text-amber-400'}>
+                    {i === 0 ? 'Seeker' : 'Recruiter'}
+                  </Badge>
+                  <span className="text-sm font-medium text-white">{acct.name}</span>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-1 text-xs">
+                  <div>
+                    <span className="text-gray-400">Email: </span>
+                    <span className="text-white font-mono">{acct.email}</span>
+                  </div>
+                  <div>
+                    <span className="text-gray-400">Password: </span>
+                    <span className="text-white font-mono">{acct.password}</span>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+          <p className="text-[10px] text-gray-500 mt-3">
+            Data: {demoResult.data_created.jobs} jobs, {demoResult.data_created.applications} applications, {demoResult.data_created.matches} match, {demoResult.data_created.messages} messages
+          </p>
+        </div>
+      )}
 
       {/* Seed Result */}
       {seedResult && (
