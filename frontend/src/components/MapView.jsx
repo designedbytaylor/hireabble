@@ -100,14 +100,14 @@ export default function MapView({ jobs = [], userLat, userLng, token, onApply, o
           style={{ height: '100%', width: '100%' }}
           scrollWheelZoom={true}
         >
-          {/* Layer 1: Teal water underlay — light tiles heavily filtered to only show water color */}
-          <TileLayer
-            url="https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png"
-            className="map-water-underlay"
-          />
-          {/* Layer 2: Dark base — semi-transparent dark tiles let teal water bleed through */}
+          {/* Layer 1: Dark base — the main dark theme with brightened roads */}
           <TileLayer
             url="https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png"
+            className="map-water-underlay"
+          />
+          {/* Layer 2: Light tiles filtered to teal water, screen blended — teal shows on dark, land stays invisible */}
+          <TileLayer
+            url="https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png"
             className="map-dark-base"
           />
           {/* Layer 3: Labels — crisp white text on transparent bg */}
