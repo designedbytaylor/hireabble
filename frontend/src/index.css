@@ -46,9 +46,9 @@
   }
 }
 
-/* Leaflet map tiles — darken Voyager tiles while keeping colored water/parks */
+/* Leaflet map tiles — darken Positron tiles: gray roads, teal water */
 .dark-map-tiles {
-  filter: invert(1) hue-rotate(160deg) brightness(0.95) contrast(1.1) saturate(1.8);
+  filter: invert(1) hue-rotate(160deg) brightness(0.9) contrast(1.3) saturate(1.6);
 }
 
 /* Leaflet map popup — dark theme overrides */
