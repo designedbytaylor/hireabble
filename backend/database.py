@@ -430,6 +430,7 @@ class UserResponse(BaseModel):
     email_notifications: Optional[dict] = None
     marketing_emails_opt_in: bool = False
     status: Optional[str] = None
+    work_style: Optional[dict] = None
     profile_boost_until: Optional[str] = None
     created_at: Optional[str] = None
 
@@ -449,6 +450,7 @@ class JobCreate(BaseModel):
     listing_photo: Optional[str] = None  # URL to custom listing photo or 'profile' to use recruiter's photo
     location_lat: Optional[float] = None
     location_lng: Optional[float] = None
+    work_style: Optional[dict] = None  # {team_preference, social_style, work_pace, decision_style, learning_style, management_pref, problem_approach, change_comfort} each 1-5
 
 class JobResponse(BaseModel):
     model_config = ConfigDict(extra="ignore")
@@ -478,6 +480,7 @@ class JobResponse(BaseModel):
     location_lng: Optional[float] = None
     distance_km: Optional[float] = None
     distance_label: Optional[str] = None
+    work_style: Optional[dict] = None
 
 class SwipeAction(BaseModel):
     job_id: str

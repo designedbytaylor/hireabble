@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   User, Briefcase, MapPin, GraduationCap, Building2, Calendar,
   DollarSign, Clock, ArrowRight, ArrowLeft, Camera, CheckCircle2,
-  Wrench, Upload, X, Globe, Navigation2, FileText, Loader2, Bell, BellOff, Heart
+  Wrench, Upload, X, Globe, Navigation2, FileText, Loader2, Bell, BellOff, Heart, Sparkles
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -39,6 +39,7 @@ const STEPS = [
   { id: 'education', title: 'Education', subtitle: 'Your educational background' },
   { id: 'skills', title: 'Skills', subtitle: 'What are you good at?' },
   { id: 'interests', title: 'Your Interests', subtitle: 'Share what you\'re passionate about outside of work' },
+  { id: 'work_style', title: 'Your Work Style', subtitle: 'Help us find your ideal match' },
   { id: 'job_type', title: 'What type of work?', subtitle: 'Tell us what you\'re looking for' },
   { id: 'preferences', title: 'Preferences', subtitle: 'What are you looking for?' },
   { id: 'notifications', title: 'Stay in the Loop', subtitle: 'Never miss a connection or message' },
@@ -85,6 +86,16 @@ export default function Onboarding() {
     available_immediately: true,
     job_type_preference: [],
     interests: '',
+    work_style: {
+      team_preference: 3,
+      social_style: 3,
+      work_pace: 3,
+      decision_style: 3,
+      learning_style: 3,
+      management_pref: 3,
+      problem_approach: 3,
+      change_comfort: 3,
+    },
   });
 
   const handleChange = (field, value) => {
@@ -337,6 +348,7 @@ export default function Onboarding() {
         available_immediately: formData.available_immediately,
         job_type_preference: formData.job_type_preference || [],
         interests: formData.interests ? formData.interests.split(',').map(s => s.trim()).filter(Boolean) : [],
+        work_style: formData.work_style,
         onboarding_complete: true,
         // Structured data from resume parsing
         work_history: resumeWorkHistory.length > 0 ? resumeWorkHistory : [],
@@ -814,6 +826,55 @@ export default function Onboarding() {
                         Interests give interviewers something to connect with you on — it makes you more than just a resume.
                       </p>
                     </div>
+                  </div>
+                </div>
+              )}
+
+              {step.id === 'work_style' && (
+                <div className="space-y-6">
+                  <div className="w-16 h-16 rounded-2xl bg-violet-500/20 flex items-center justify-center mb-4">
+                    <Sparkles className="w-8 h-8 text-violet-500" />
+                  </div>
+                  <div className="space-y-5">
+                    {[
+                      { key: 'team_preference', label: 'How do you prefer to work?', left: 'Solo', right: 'Team' },
+                      { key: 'social_style', label: 'How would you describe yourself?', left: 'Reserved', right: 'Outgoing' },
+                      { key: 'work_pace', label: 'What pace do you thrive in?', left: 'Steady', right: 'Fast-paced' },
+                      { key: 'decision_style', label: 'How do you make decisions?', left: 'Independently', right: 'Collaboratively' },
+                      { key: 'learning_style', label: 'How do you prefer to learn?', left: 'Self-directed', right: 'Mentored' },
+                      { key: 'management_pref', label: 'What management style suits you?', left: 'Hands-off', right: 'Hands-on' },
+                      { key: 'problem_approach', label: 'How do you approach problems?', left: 'Creative', right: 'Methodical' },
+                      { key: 'change_comfort', label: 'How do you feel about change?', left: 'Prefer stability', right: 'Thrive in change' },
+                    ].map(({ key, label, left, right }) => (
+                      <div key={key} className="space-y-2">
+                        <Label className="text-sm">{label}</Label>
+                        <div className="flex items-center gap-3">
+                          <span className="text-xs text-muted-foreground w-20 text-right shrink-0">{left}</span>
+                          <div className="flex gap-1.5 flex-1 justify-center">
+                            {[1, 2, 3, 4, 5].map(val => (
+                              <button
+                                key={val}
+                                type="button"
+                                onClick={() => handleChange('work_style', { ...formData.work_style, [key]: val })}
+                                className={`w-10 h-10 rounded-full border-2 transition-all text-sm font-medium ${
+                                  formData.work_style[key] === val
+                                    ? 'border-violet-500 bg-violet-500 text-white shadow-lg shadow-violet-500/30'
+                                    : 'border-border hover:border-violet-500/50 text-muted-foreground'
+                                }`}
+                              >
+                                {val}
+                              </button>
+                            ))}
+                          </div>
+                          <span className="text-xs text-muted-foreground w-20 shrink-0">{right}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="p-4 rounded-xl bg-violet-500/5 border border-violet-500/20">
+                    <p className="text-sm text-muted-foreground">
+                      These help us match you with roles that fit your working style — there are no wrong answers.
+                    </p>
                   </div>
                 </div>
               )}

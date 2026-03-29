@@ -1089,6 +1089,15 @@ export default function SeekerDashboard() {
       {/* Main Content - Swipe Area */}
       <main className="relative z-10 flex-1 flex flex-col px-3 pb-28 min-h-0">
         <div className="max-w-md mx-auto w-full flex-1 flex flex-col min-h-0">
+          {user && !user.work_style && (
+            <button
+              onClick={() => navigate('/profile')}
+              className="mb-3 flex items-center gap-2 p-3 rounded-xl bg-violet-500/10 border border-violet-500/20 text-left w-full hover:bg-violet-500/15 transition-colors"
+            >
+              <Sparkles className="w-4 h-4 text-violet-500 shrink-0" />
+              <span className="text-sm text-violet-600 dark:text-violet-400">Complete your <strong>work style</strong> profile for better matches</span>
+            </button>
+          )}
           {currentJob ? (
             <>
               {/* Card Stack */}

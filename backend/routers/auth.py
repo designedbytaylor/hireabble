@@ -1006,6 +1006,7 @@ async def update_profile(updates: dict, current_user: dict = Depends(get_current
         "company_size", "company_industry",
         "location_lat", "location_lng",
         "company_address_lat", "company_address_lng",
+        "work_style",
     ]
     
     update_data = {k: v for k, v in updates.items() if k in allowed_fields}
@@ -1030,11 +1031,26 @@ async def update_profile(updates: dict, current_user: dict = Depends(get_current
         "location_lng": (float, int, type(None)),
         "company_address_lat": (float, int, type(None)),
         "company_address_lng": (float, int, type(None)),
+        "work_style": dict,
     }
     for field, expected_type in _FIELD_TYPES.items():
         if field in update_data and update_data[field] is not None:
             if not isinstance(update_data[field], expected_type):
                 del update_data[field]
+
+    # Validate work_style: each key must be int 1-5
+    if "work_style" in update_data and update_data["work_style"]:
+        _WS_KEYS = ["team_preference", "social_style", "work_pace", "decision_style",
+                     "learning_style", "management_pref", "problem_approach", "change_comfort"]
+        ws = update_data["work_style"]
+        cleaned = {}
+        for key in _WS_KEYS:
+            val = ws.get(key)
+            if isinstance(val, int) and 1 <= val <= 5:
+                cleaned[key] = val
+            else:
+                cleaned[key] = 3
+        update_data["work_style"] = cleaned
 
     # Validate URL fields — must be valid HTTPS URLs from trusted domains (or relative paths from local uploads)
     _TRUSTED_URL_DOMAINS = {"dicebear.com", "googleapis.com", "hireabble.com", "localhost"}

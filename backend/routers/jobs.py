@@ -71,6 +71,47 @@ def auto_categorize_job(title: str, requirements: list, description: str) -> str
     return best if scores[best] > 0 else "other"
 
 
+_WORK_STYLE_KEYS = [
+    "team_preference", "social_style", "work_pace", "decision_style",
+    "learning_style", "management_pref", "problem_approach", "change_comfort"
+]
+
+def _validate_work_style(ws):
+    """Validate and sanitize work_style dict. Returns cleaned dict or None."""
+    if not ws or not isinstance(ws, dict):
+        return None
+    cleaned = {}
+    for key in _WORK_STYLE_KEYS:
+        val = ws.get(key)
+        if isinstance(val, int) and 1 <= val <= 5:
+            cleaned[key] = val
+        else:
+            cleaned[key] = 3
+    return cleaned
+
+
+def calculate_work_style_score(seeker_ws, job_ws, max_points=20):
+    """Calculate work-style compatibility using inverse Manhattan distance.
+
+    Perfect alignment = max_points, max divergence (all 4 apart) = 0.
+    """
+    if not seeker_ws or not job_ws:
+        return 0
+    total_diff = 0
+    counted = 0
+    for key in _WORK_STYLE_KEYS:
+        s_val = seeker_ws.get(key)
+        j_val = job_ws.get(key)
+        if isinstance(s_val, int) and isinstance(j_val, int):
+            total_diff += abs(s_val - j_val)
+            counted += 1
+    if counted == 0:
+        return 0
+    max_possible_diff = counted * 4
+    similarity = 1 - (total_diff / max_possible_diff)
+    return int(similarity * max_points)
+
+
 def haversine_km(lat1, lon1, lat2, lon2):
     """Calculate distance between two points in km using Haversine formula."""
     R = 6371  # Earth radius in km
@@ -85,54 +126,61 @@ def calculate_job_match_score(seeker: dict, job: dict) -> int:
     score = 0
     max_score = 0
 
-    # Skills match (40 points)
+    # Skills match (35 points)
     if job.get("requirements"):
-        max_score += 40
+        max_score += 35
         seeker_skills = [s.lower().strip() for s in seeker.get("skills", [])]
         job_reqs = [r.lower().strip() for r in job["requirements"]]
         if job_reqs and seeker_skills:
             matched = sum(1 for r in job_reqs if any(r in s or s in r for s in seeker_skills))
-            score += int((matched / len(job_reqs)) * 40)
+            score += int((matched / len(job_reqs)) * 35)
 
-    # Experience level (25 points)
+    # Experience level (20 points)
     if job.get("experience_level"):
-        max_score += 25
+        max_score += 20
         exp_years = seeker.get("experience_years") or 0
         level_map = {"entry": (0, 2), "mid": (2, 5), "senior": (5, 10), "lead": (8, 99)}
         low, high = level_map.get(job["experience_level"], (0, 99))
         if low <= exp_years <= high:
-            score += 25
+            score += 20
         elif abs(exp_years - low) <= 2 or abs(exp_years - high) <= 2:
-            score += 12
+            score += 10
 
-    # Location (20 points)
-    max_score += 20
+    # Location (15 points)
+    max_score += 15
     if job.get("job_type") == "remote":
-        score += 20
+        score += 15
     elif seeker.get("location_lat") and job.get("location_lat"):
         dist = haversine_km(seeker["location_lat"], seeker["location_lng"],
                             job["location_lat"], job["location_lng"])
         if dist <= 25:
-            score += 20
-        elif dist <= 50:
             score += 15
+        elif dist <= 50:
+            score += 11
         elif dist <= 100:
-            score += 10
+            score += 7
         elif dist <= 200:
-            score += 5
+            score += 3
     elif job.get("location") and seeker.get("location"):
         job_loc = job["location"].lower().split(",")[0].strip()
         user_loc = seeker["location"].lower().split(",")[0].strip()
         if job_loc and user_loc and (job_loc in user_loc or user_loc in job_loc):
-            score += 20
-
-    # Salary match (15 points)
-    if job.get("salary_min") and seeker.get("desired_salary"):
-        max_score += 15
-        if seeker["desired_salary"] <= (job.get("salary_max") or job["salary_min"] * 2):
             score += 15
+
+    # Salary match (10 points)
+    if job.get("salary_min") and seeker.get("desired_salary"):
+        max_score += 10
+        if seeker["desired_salary"] <= (job.get("salary_max") or job["salary_min"] * 2):
+            score += 10
         elif seeker["desired_salary"] <= job["salary_min"] * 1.3:
-            score += 7
+            score += 5
+
+    # Work style match (20 points)
+    seeker_ws = seeker.get("work_style")
+    job_ws = job.get("work_style")
+    if seeker_ws and job_ws:
+        max_score += 20
+        score += calculate_work_style_score(seeker_ws, job_ws, 20)
 
     if max_score == 0:
         return 50
@@ -259,6 +307,7 @@ async def create_job(job: JobCreate, request: Request, current_user: dict = Depe
         "employment_type": job.employment_type or "full-time",
         "is_active": True,
         "is_featured": is_enterprise,
+        "work_style": _validate_work_style(job.work_style) if job.work_style else None,
     }
 
     # Flag for review if non-severe violations found
@@ -533,8 +582,12 @@ async def update_job(job_id: str, updates: dict, current_user: dict = Depends(ge
     allowed_fields = ["title", "company", "description", "requirements",
                       "salary_min", "salary_max", "location", "job_type",
                       "experience_level", "is_active", "location_restriction", "category", "employment_type",
-                      "listing_photo"]
+                      "listing_photo", "work_style"]
     update_data = {k: v for k, v in updates.items() if k in allowed_fields}
+
+    # Validate work_style if provided
+    if "work_style" in update_data:
+        update_data["work_style"] = _validate_work_style(update_data["work_style"])
 
     # Resolve listing_photo markers
     lp = update_data.get("listing_photo")
