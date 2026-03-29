@@ -48,7 +48,7 @@
 
 /* Leaflet map tiles — darken Voyager tiles while keeping colored water/parks */
 .dark-map-tiles {
-  filter: invert(1) hue-rotate(180deg) brightness(0.85) contrast(1.2) saturate(0.6);
+  filter: invert(1) hue-rotate(160deg) brightness(0.95) contrast(1.1) saturate(1.8);
 }
 
 /* Leaflet map popup — dark theme overrides */
