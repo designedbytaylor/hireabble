@@ -15,6 +15,7 @@ from database import (
     get_user_email_prefs, escape_html, FRONTEND_URL, logger,
 )
 from content_filter import check_text, is_severe
+from routers.jobs import calculate_work_style_score
 from routers.users import get_all_blocked_ids
 from slowapi import Limiter
 from slowapi.util import get_remote_address
@@ -140,46 +141,54 @@ def calculate_match_score(viewer: dict, other: dict, job: dict = None) -> int:
     score = 0
     max_score = 0
 
-    # Skills match (40 points max)
+    # Skills match (35 points max)
     if job and job.get("requirements"):
-        max_score += 40
+        max_score += 35
         seeker = other if other.get("role") == "seeker" else viewer
         seeker_skills = [s.lower().strip() for s in seeker.get("skills", [])]
         job_reqs = [r.lower().strip() for r in job["requirements"]]
         if job_reqs:
             matched = sum(1 for r in job_reqs if any(r in s or s in r for s in seeker_skills))
-            score += int((matched / len(job_reqs)) * 40)
+            score += int((matched / len(job_reqs)) * 35)
 
-    # Experience level match (20 points max)
+    # Experience level match (15 points max)
     if job and job.get("experience_level"):
-        max_score += 20
+        max_score += 15
         seeker = other if other.get("role") == "seeker" else viewer
         exp_years = seeker.get("experience_years") or 0
         level_map = {"entry": (0, 2), "mid": (2, 5), "senior": (5, 10), "lead": (8, 99)}
         low, high = level_map.get(job["experience_level"], (0, 99))
         if low <= exp_years <= high:
-            score += 20
+            score += 15
         elif abs(exp_years - low) <= 2 or abs(exp_years - high) <= 2:
-            score += 10
+            score += 7
 
-    # Location match (20 points max)
-    max_score += 20
+    # Location match (15 points max)
+    max_score += 15
     if job and job.get("job_type") == "remote":
-        score += 20  # Remote jobs match everyone
+        score += 15  # Remote jobs match everyone
     elif job and job.get("location") and other.get("location"):
         job_loc = job["location"].lower().split(",")[0].strip()
         user_loc = other.get("location", "").lower().split(",")[0].strip()
         if job_loc and user_loc and (job_loc in user_loc or user_loc in job_loc):
-            score += 20
+            score += 15
         elif job_loc and user_loc:
-            score += 5  # Partial credit
+            score += 4  # Partial credit
 
-    # Profile completeness bonus (20 points max)
-    max_score += 20
+    # Profile completeness bonus (15 points max)
+    max_score += 15
     seeker = other if other.get("role") == "seeker" else viewer
     fields_present = sum(1 for f in ["bio", "skills", "experience_years", "school", "work_history", "education"]
                         if seeker.get(f))
-    score += int((fields_present / 6) * 20)
+    score += int((fields_present / 6) * 15)
+
+    # Work style match (20 points max)
+    if job and job.get("work_style"):
+        seeker = other if other.get("role") == "seeker" else viewer
+        seeker_ws = seeker.get("work_style")
+        if seeker_ws:
+            max_score += 20
+            score += calculate_work_style_score(seeker_ws, job["work_style"], 20)
 
     if max_score == 0:
         return 50

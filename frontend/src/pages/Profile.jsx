@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { User, Mail, Briefcase, MapPin, Save, LogOut, Building2, Download, Upload, CheckCircle, AlertCircle, Lock, Eye, EyeOff, ChevronDown, Plus, Trash2, GraduationCap, Award, Clock, Navigation2, Bell, BellOff, CreditCard, Crown, ExternalLink, FileText, Loader2, HelpCircle, Shield, BadgeCheck, Gift, Copy, Share2, Heart, Globe, Users, Hash } from 'lucide-react';
+import { User, Mail, Briefcase, MapPin, Save, LogOut, Building2, Download, Upload, CheckCircle, AlertCircle, Lock, Eye, EyeOff, ChevronDown, Plus, Trash2, GraduationCap, Award, Clock, Navigation2, Bell, BellOff, CreditCard, Crown, ExternalLink, FileText, Loader2, HelpCircle, Shield, BadgeCheck, Gift, Copy, Share2, Heart, Globe, Users, Hash, Sparkles } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -189,6 +189,8 @@ export default function Profile() {
     company_size: '', company_industry: '',
   });
   const [savingCompany, setSavingCompany] = useState(false);
+  const [workStyle, setWorkStyle] = useState(null);
+  const [showWorkStyleEditor, setShowWorkStyleEditor] = useState(false);
   const [locationCoords, setLocationCoords] = useState(null);
   const [companyAddressCoords, setCompanyAddressCoords] = useState(null);
   const [workHistory, setWorkHistory] = useState([]);
@@ -230,6 +232,10 @@ export default function Profile() {
       });
       if (user.location_lat && user.location_lng) {
         setLocationCoords({ lat: user.location_lat, lng: user.location_lng });
+      }
+      if (user.work_style) {
+        setWorkStyle(user.work_style);
+        setShowWorkStyleEditor(true);
       }
       setWorkHistory(user.work_history || []);
       setEducation(user.education || []);
@@ -608,6 +614,7 @@ export default function Profile() {
         show_contact_on_resume: showContactOnResume,
         include_photo_on_resume: includePhotoOnResume,
         ...(finalCoords ? { location_lat: finalCoords.lat, location_lng: finalCoords.lng } : {}),
+        ...(workStyle ? { work_style: workStyle } : {}),
       };
       await updateProfile(updates);
       toast.success('Profile updated!');
@@ -1140,7 +1147,69 @@ export default function Profile() {
                   </div>
                 </div>
 
-                {/* ── Education ── */}
+                {/* ── Work Style ── */}
+                {user?.role === 'seeker' && (
+                  <div className="space-y-3 pt-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const opening = !showWorkStyleEditor;
+                        setShowWorkStyleEditor(opening);
+                        if (opening && !workStyle) {
+                          setWorkStyle({
+                            team_preference: 3, social_style: 3, work_pace: 3, decision_style: 3,
+                            learning_style: 3, management_pref: 3, problem_approach: 3, change_comfort: 3,
+                          });
+                        }
+                      }}
+                      className="flex items-center gap-2 w-full text-left"
+                    >
+                      <Sparkles className="w-5 h-5 text-violet-500" />
+                      <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Work Style</h3>
+                      <span className="ml-auto text-xs text-muted-foreground">{showWorkStyleEditor ? 'Hide' : 'Edit'}</span>
+                    </button>
+                    {showWorkStyleEditor && workStyle && (
+                      <div className="space-y-4 p-4 rounded-xl border border-border bg-card/50">
+                        {[
+                          { key: 'team_preference', label: 'How do you prefer to work?', left: 'Solo', right: 'Team' },
+                          { key: 'social_style', label: 'How would you describe yourself?', left: 'Reserved', right: 'Outgoing' },
+                          { key: 'work_pace', label: 'What pace do you thrive in?', left: 'Steady', right: 'Fast-paced' },
+                          { key: 'decision_style', label: 'How do you make decisions?', left: 'Independently', right: 'Collaboratively' },
+                          { key: 'learning_style', label: 'How do you prefer to learn?', left: 'Self-directed', right: 'Mentored' },
+                          { key: 'management_pref', label: 'What management style suits you?', left: 'Hands-off', right: 'Hands-on' },
+                          { key: 'problem_approach', label: 'How do you approach problems?', left: 'Creative', right: 'Methodical' },
+                          { key: 'change_comfort', label: 'How do you feel about change?', left: 'Prefer stability', right: 'Thrive in change' },
+                        ].map(({ key, label, left, right }) => (
+                          <div key={key} className="space-y-1.5">
+                            <span className="text-sm">{label}</span>
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs text-muted-foreground w-20 text-right shrink-0">{left}</span>
+                              <div className="flex gap-1 flex-1 justify-center">
+                                {[1, 2, 3, 4, 5].map(val => (
+                                  <button
+                                    key={val}
+                                    type="button"
+                                    onClick={() => setWorkStyle(prev => ({ ...prev, [key]: val }))}
+                                    className={`w-9 h-9 rounded-full border-2 transition-all text-xs font-medium ${
+                                      workStyle[key] === val
+                                        ? 'border-violet-500 bg-violet-500 text-white'
+                                        : 'border-border hover:border-violet-500/50 text-muted-foreground'
+                                    }`}
+                                  >
+                                    {val}
+                                  </button>
+                                ))}
+                              </div>
+                              <span className="text-xs text-muted-foreground w-20 shrink-0">{right}</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* ─��� Education ── */}
                 <div className="pt-2">
                   <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-4">Education</h3>
                 </div>

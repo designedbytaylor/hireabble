@@ -1635,8 +1635,11 @@ function JobFormDialog({ open, onClose, onSuccess, token, company, job = null, i
     experience_level: 'mid',
     location_restriction: 'any',
     category: user?.company_industry || '',
-    employment_type: 'full-time'
+    employment_type: 'full-time',
+    work_style: null,
   });
+
+  const [showWorkStyle, setShowWorkStyle] = useState(false);
 
   useEffect(() => {
     if (job && isEditing) {
@@ -1652,8 +1655,10 @@ function JobFormDialog({ open, onClose, onSuccess, token, company, job = null, i
         experience_level: job.experience_level || 'mid',
         location_restriction: job.location_restriction || 'any',
         category: job.category || '',
-        employment_type: job.employment_type || 'full-time'
+        employment_type: job.employment_type || 'full-time',
+        work_style: job.work_style || null,
       });
+      if (job.work_style) setShowWorkStyle(true);
       // Restore photo option from existing job data
       if (job.listing_photo && job.listing_photo === user?.company_logo) {
         setPhotoOption('logo');
@@ -1676,8 +1681,10 @@ function JobFormDialog({ open, onClose, onSuccess, token, company, job = null, i
         experience_level: 'mid',
         location_restriction: 'any',
         category: user?.company_industry || '',
-        employment_type: 'full-time'
+        employment_type: 'full-time',
+        work_style: null,
       });
+      setShowWorkStyle(false);
       setScreenshots([]);
     }
   }, [job, isEditing, company, user?.company_logo, user?.company_address, user?.location, user?.company_industry]);
@@ -2128,6 +2135,75 @@ function JobFormDialog({ open, onClose, onSuccess, token, company, job = null, i
                 ? 'Only applicants near this job\'s location will see this posting'
                 : 'Applicants from any location can see and apply to this job'}
             </p>
+          </div>
+
+          {/* Work Style Preferences */}
+          <div className="space-y-3">
+            <button
+              type="button"
+              onClick={() => {
+                const opening = !showWorkStyle;
+                setShowWorkStyle(opening);
+                if (opening && !formData.work_style) {
+                  setFormData(prev => ({ ...prev, work_style: {
+                    team_preference: 3, social_style: 3, work_pace: 3, decision_style: 3,
+                    learning_style: 3, management_pref: 3, problem_approach: 3, change_comfort: 3,
+                  }}));
+                }
+              }}
+              className="flex items-center justify-between w-full text-left"
+            >
+              <div>
+                <Label className="pointer-events-none">Work Style Preferences</Label>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Help match candidates whose work style fits this role
+                </p>
+              </div>
+              <span className={`text-xs px-2 py-1 rounded-full border transition-colors ${showWorkStyle ? 'bg-violet-500/10 border-violet-500/30 text-violet-600' : 'border-border text-muted-foreground'}`}>
+                {showWorkStyle ? 'Hide' : 'Optional'}
+              </span>
+            </button>
+            {showWorkStyle && formData.work_style && (
+              <div className="space-y-4 p-4 rounded-xl border border-border bg-card/50">
+                {[
+                  { key: 'team_preference', label: 'This role is mostly...', left: 'Solo work', right: 'Team-based' },
+                  { key: 'social_style', label: 'Ideal candidate is...', left: 'Reserved', right: 'Outgoing' },
+                  { key: 'work_pace', label: "This role's environment is...", left: 'Steady', right: 'Fast-paced' },
+                  { key: 'decision_style', label: 'Decisions in this role are...', left: 'Independent', right: 'Collaborative' },
+                  { key: 'learning_style', label: 'Onboarding style is...', left: 'Self-directed', right: 'Structured' },
+                  { key: 'management_pref', label: 'Management style is...', left: 'Hands-off', right: 'Hands-on' },
+                  { key: 'problem_approach', label: 'This role requires...', left: 'Creative thinking', right: 'Methodical approach' },
+                  { key: 'change_comfort', label: 'This role involves...', left: 'Stability', right: 'Frequent change' },
+                ].map(({ key, label, left, right }) => (
+                  <div key={key} className="space-y-1.5">
+                    <span className="text-sm text-foreground">{label}</span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-muted-foreground w-24 text-right shrink-0">{left}</span>
+                      <div className="flex gap-1 flex-1 justify-center">
+                        {[1, 2, 3, 4, 5].map(val => (
+                          <button
+                            key={val}
+                            type="button"
+                            onClick={() => setFormData(prev => ({
+                              ...prev,
+                              work_style: { ...prev.work_style, [key]: val }
+                            }))}
+                            className={`w-8 h-8 rounded-full border-2 transition-all text-xs font-medium ${
+                              formData.work_style[key] === val
+                                ? 'border-violet-500 bg-violet-500 text-white'
+                                : 'border-border hover:border-violet-500/50 text-muted-foreground'
+                            }`}
+                          >
+                            {val}
+                          </button>
+                        ))}
+                      </div>
+                      <span className="text-xs text-muted-foreground w-24 shrink-0">{right}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Listing Photo */}
