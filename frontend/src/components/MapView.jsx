@@ -105,17 +105,12 @@ export default function MapView({ jobs = [], userLat, userLng, token, onApply, o
             url="https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png"
             className="map-dark-base"
           />
-          {/* Layer 2: Light tiles filtered to teal — adds color to water via screen blend */}
+          {/* Layer 2: Light tiles with teal tint — color blend transfers hue to dark base */}
           <TileLayer
             url="https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png"
             className="map-water-tint"
           />
-          {/* Layer 3: Dark tiles again with darken blend — masks orange land bleed while keeping teal water */}
-          <TileLayer
-            url="https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png"
-            className="map-land-mask"
-          />
-          {/* Layer 4: Labels — crisp white text on transparent bg */}
+          {/* Layer 3: Labels — crisp white text on transparent bg */}
           <TileLayer
             attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/">CARTO</a>'
             url="https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png"
