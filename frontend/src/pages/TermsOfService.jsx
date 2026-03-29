@@ -12,13 +12,13 @@ export default function TermsOfService() {
         </Link>
 
         <h1 className="text-3xl font-bold font-['Outfit'] mb-2">Terms of Service</h1>
-        <p className="text-muted-foreground mb-8">Last updated: March 14, 2026</p>
+        <p className="text-muted-foreground mb-8">Last updated: March 29, 2026</p>
 
         <div className="prose prose-invert max-w-none space-y-6 text-sm leading-relaxed">
           <section>
             <h2 className="text-lg font-bold font-['Outfit'] mb-3">1. Acceptance of Terms</h2>
             <p className="text-muted-foreground">
-              By accessing or using Hireabble ("Service"), you agree to be bound by these Terms of Service ("Terms"). If you do not agree to these Terms, do not use the Service. We may update these Terms from time to time and your continued use constitutes acceptance.
+              By accessing or using Hireabble ("Service"), operated by Hireabble Inc. ("Company", "we", "us", "our"), you agree to be bound by these Terms of Service ("Terms"). If you do not agree to these Terms, do not use the Service. We may update these Terms from time to time and your continued use constitutes acceptance.
             </p>
           </section>
 
@@ -54,7 +54,7 @@ export default function TermsOfService() {
           <section>
             <h2 className="text-lg font-bold font-['Outfit'] mb-3">5. Content</h2>
             <p className="text-muted-foreground">
-              You retain ownership of content you submit to Hireabble (resumes, job listings, messages, photos). By posting content, you grant Hireabble a non-exclusive, worldwide, royalty-free license to use, display, and distribute such content as necessary to operate the Service. You are solely responsible for your content and must ensure it does not violate any third-party rights.
+              You retain ownership of content you submit to Hireabble (resumes, job listings, messages, photos). By posting content, you grant Hireabble Inc. a non-exclusive, worldwide, royalty-free license to use, display, and distribute such content as necessary to operate the Service. You are solely responsible for your content and must ensure it does not violate any third-party rights.
             </p>
           </section>
 
@@ -88,7 +88,7 @@ export default function TermsOfService() {
           <section>
             <h2 className="text-lg font-bold font-['Outfit'] mb-3">8. Intellectual Property</h2>
             <p className="text-muted-foreground">
-              The Hireabble name, logo, features, and design are the exclusive property of Hireabble. You may not copy, modify, distribute, or create derivative works from any part of the Service without our prior written consent. All trademarks, service marks, and trade names are owned by their respective holders.
+              The Hireabble name, logo, features, and design are the exclusive property of Hireabble Inc. You may not copy, modify, distribute, or create derivative works from any part of the Service without our prior written consent. All trademarks, service marks, and trade names are owned by their respective holders.
             </p>
           </section>
 
@@ -102,14 +102,14 @@ export default function TermsOfService() {
           <section>
             <h2 className="text-lg font-bold font-['Outfit'] mb-3">10. Disclaimers</h2>
             <p className="text-muted-foreground">
-              THE SERVICE IS PROVIDED "AS IS" AND "AS AVAILABLE" WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED. HIREABBLE DOES NOT WARRANT THAT THE SERVICE WILL BE UNINTERRUPTED, SECURE, OR ERROR-FREE. WE DISCLAIM ALL WARRANTIES INCLUDING IMPLIED WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, AND NON-INFRINGEMENT.
+              THE SERVICE IS PROVIDED "AS IS" AND "AS AVAILABLE" WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED. HIREABBLE INC. DOES NOT WARRANT THAT THE SERVICE WILL BE UNINTERRUPTED, SECURE, OR ERROR-FREE. WE DISCLAIM ALL WARRANTIES INCLUDING IMPLIED WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, AND NON-INFRINGEMENT.
             </p>
           </section>
 
           <section>
             <h2 className="text-lg font-bold font-['Outfit'] mb-3">11. Limitation of Liability</h2>
             <p className="text-muted-foreground">
-              TO THE MAXIMUM EXTENT PERMITTED BY LAW, HIREABBLE SHALL NOT BE LIABLE FOR ANY INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, OR PUNITIVE DAMAGES ARISING FROM YOUR USE OF THE SERVICE. OUR TOTAL LIABILITY SHALL NOT EXCEED THE AMOUNT YOU PAID TO HIREABBLE IN THE TWELVE MONTHS PRECEDING THE CLAIM.
+              TO THE MAXIMUM EXTENT PERMITTED BY LAW, HIREABBLE INC. SHALL NOT BE LIABLE FOR ANY INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, OR PUNITIVE DAMAGES ARISING FROM YOUR USE OF THE SERVICE. OUR TOTAL LIABILITY SHALL NOT EXCEED THE AMOUNT YOU PAID TO HIREABBLE INC. IN THE TWELVE MONTHS PRECEDING THE CLAIM.
             </p>
           </section>
 
@@ -142,11 +142,11 @@ export default function TermsOfService() {
           <section>
             <h2 className="text-lg font-bold font-['Outfit'] mb-3">15. End User License Agreement (EULA)</h2>
             <p className="text-muted-foreground mb-3">
-              This End User License Agreement ("EULA") is a binding agreement between you and Hireabble governing your use of the Hireabble application ("Licensed Application").
+              This End User License Agreement ("EULA") is a binding agreement between you and Hireabble Inc. governing your use of the Hireabble application ("Licensed Application").
             </p>
             <p className="text-muted-foreground mb-2"><strong>License Grant:</strong></p>
             <p className="text-muted-foreground mb-3">
-              Hireabble grants you a limited, non-exclusive, non-transferable, revocable license to use the Licensed Application on any Apple-branded device that you own or control, subject to the Usage Rules set forth in the Apple Media Services Terms and Conditions. This license does not allow you to use the Licensed Application on any device that you do not own or control, and you may not distribute or make the Licensed Application available over a network where it could be used by multiple devices at the same time.
+              Hireabble Inc. grants you a limited, non-exclusive, non-transferable, revocable license to use the Licensed Application on any Apple-branded device that you own or control, subject to the Usage Rules set forth in the Apple Media Services Terms and Conditions. This license does not allow you to use the Licensed Application on any device that you do not own or control, and you may not distribute or make the Licensed Application available over a network where it could be used by multiple devices at the same time.
             </p>
             <p className="text-muted-foreground mb-2"><strong>Third-Party Terms:</strong></p>
             <p className="text-muted-foreground mb-3">
@@ -158,19 +158,19 @@ export default function TermsOfService() {
             </p>
             <p className="text-muted-foreground mb-2"><strong>Maintenance and Support:</strong></p>
             <p className="text-muted-foreground mb-3">
-              Hireabble is solely responsible for providing maintenance and support services for the Licensed Application. Apple has no obligation whatsoever to furnish any maintenance and support services with respect to the Licensed Application.
+              Hireabble Inc. is solely responsible for providing maintenance and support services for the Licensed Application. Apple has no obligation whatsoever to furnish any maintenance and support services with respect to the Licensed Application.
             </p>
             <p className="text-muted-foreground mb-2"><strong>Warranty:</strong></p>
             <p className="text-muted-foreground mb-3">
-              In the event of any failure of the Licensed Application to conform to any applicable warranty, you may notify Apple, and Apple will refund the purchase price (if any) for the Licensed Application. To the maximum extent permitted by applicable law, Apple will have no other warranty obligation whatsoever with respect to the Licensed Application. Any other claims, losses, liabilities, damages, costs, or expenses attributable to any failure to conform to any warranty will be the sole responsibility of Hireabble.
+              In the event of any failure of the Licensed Application to conform to any applicable warranty, you may notify Apple, and Apple will refund the purchase price (if any) for the Licensed Application. To the maximum extent permitted by applicable law, Apple will have no other warranty obligation whatsoever with respect to the Licensed Application. Any other claims, losses, liabilities, damages, costs, or expenses attributable to any failure to conform to any warranty will be the sole responsibility of Hireabble Inc.
             </p>
             <p className="text-muted-foreground mb-2"><strong>Product Claims:</strong></p>
             <p className="text-muted-foreground mb-3">
-              Hireabble, not Apple, is responsible for addressing any claims relating to the Licensed Application or your possession and/or use of the Licensed Application, including but not limited to: (i) product liability claims; (ii) any claim that the Licensed Application fails to conform to any applicable legal or regulatory requirement; and (iii) claims arising under consumer protection, privacy, or similar legislation.
+              Hireabble Inc., not Apple, is responsible for addressing any claims relating to the Licensed Application or your possession and/or use of the Licensed Application, including but not limited to: (i) product liability claims; (ii) any claim that the Licensed Application fails to conform to any applicable legal or regulatory requirement; and (iii) claims arising under consumer protection, privacy, or similar legislation.
             </p>
             <p className="text-muted-foreground mb-2"><strong>Intellectual Property:</strong></p>
             <p className="text-muted-foreground">
-              In the event of any third-party claim that the Licensed Application or your possession and use of the Licensed Application infringes that third party's intellectual property rights, Hireabble, not Apple, will be solely responsible for the investigation, defense, settlement, and discharge of any such intellectual property infringement claim.
+              In the event of any third-party claim that the Licensed Application or your possession and use of the Licensed Application infringes that third party's intellectual property rights, Hireabble Inc., not Apple, will be solely responsible for the investigation, defense, settlement, and discharge of any such intellectual property infringement claim.
             </p>
           </section>
 
