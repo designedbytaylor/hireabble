@@ -209,6 +209,7 @@ export default function UpgradeModal({ open, onClose, onSubscribed, trigger, hig
                   {trigger === 'blurred' && 'See Who Applied'}
                   {trigger === 'boost' && 'Boost Your Listings'}
                   {trigger === 'undo' && 'Undo Your Last Swipe'}
+                  {trigger === 'insights' && 'Unlock Insights & Analytics'}
                   {!trigger && 'Upgrade Your Experience'}
                 </h2>
                 <p className="text-sm text-white/80 mt-1">
@@ -216,6 +217,7 @@ export default function UpgradeModal({ open, onClose, onSubscribed, trigger, hig
                   {trigger === 'super_swipes' && "You've used all your free Candidate Invites today"}
                   {trigger === 'blurred' && 'Unlock the full applicant list'}
                   {trigger === 'boost' && 'Get your jobs in front of more candidates'}
+                  {trigger === 'insights' && 'See who viewed your profile, track trends, and discover in-demand skills'}
                   {!trigger && 'Unlock premium features'}
                 </p>
               </div>

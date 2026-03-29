@@ -109,6 +109,7 @@ SUBSCRIPTION_TIERS = {
         "features": [
             "10 Priority Applies per day (vs 3)",
             "See who viewed your profile",
+            "Insights & analytics dashboard",
             "Unlimited undo swipes (free: 1/day)",
             "Priority application badge",
             "Advanced job filters",

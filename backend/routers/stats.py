@@ -783,11 +783,32 @@ async def seeker_analytics(current_user: dict = Depends(get_current_user)):
     seven_days_ago = (now - timedelta(days=7)).isoformat()
     thirty_days_ago = (now - timedelta(days=30)).isoformat()
 
-    # Profile views this week
+    # Subscription check — free users get teaser data only
+    sub = current_user.get("subscription") or {}
+    now_iso = now.isoformat()
+    has_access = (
+        sub.get("status") == "active"
+        and sub.get("period_end", "") >= now_iso
+        and sub.get("tier_id", "") in ("seeker_plus", "seeker_premium")
+    )
+
+    # Profile views this week (shown to everyone as teaser)
     profile_views_weekly = await db.profile_views.count_documents({
         "viewed_user_id": uid,
         "created_at": {"$gte": seven_days_ago},
     })
+
+    if not has_access:
+        user_app_count = await db.applications.count_documents({"seeker_id": uid})
+        return {
+            "locked": True,
+            "profile_views_weekly": profile_views_weekly,
+            "total_applications": user_app_count,
+            "profile_views_trend": [],
+            "applications_trend": [],
+            "application_percentile": 0,
+            "trending_skills": [],
+        }
 
     # Profile views daily trend (last 30 days)
     views_pipeline = [
@@ -842,6 +863,7 @@ async def seeker_analytics(current_user: dict = Depends(get_current_user)):
     ][:5]
 
     return {
+        "locked": False,
         "profile_views_weekly": profile_views_weekly,
         "profile_views_trend": [{"date": v["_id"], "views": v["count"]} for v in views_trend],
         "applications_trend": [{"date": a["_id"], "count": a["count"]} for a in apps_trend],

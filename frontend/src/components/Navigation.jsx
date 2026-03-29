@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, memo, useMemo } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Heart, User, Briefcase, MessageCircle, BarChart3, Bookmark, Sparkles, Search, GitBranch } from 'lucide-react';
+import { Heart, User, Briefcase, MessageCircle, Bookmark, Sparkles, Search, GitBranch } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import axios from 'axios';
 
@@ -100,10 +100,6 @@ export default memo(function Navigation() {
       icon: Sparkles,
       label: 'Opportunities',
       path: '/matches'
-    }, {
-      icon: BarChart3,
-      label: 'Insights',
-      path: '/analytics'
     }] : []),
     {
       icon: MessageCircle,

@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo, memo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence, useMotionValue, useTransform } from 'framer-motion';
-import { X, Heart, Star, Briefcase, MapPin, DollarSign, Building2, Clock, ChevronDown, Filter, SlidersHorizontal, Zap, CheckCircle, Globe, Wifi, Navigation2, Info, Calendar, Undo2, Eye, EyeOff, Rocket, Crown, Sparkles, Lock, Bookmark } from 'lucide-react';
+import { X, Heart, Star, Briefcase, MapPin, DollarSign, Building2, Clock, ChevronDown, Filter, SlidersHorizontal, Zap, CheckCircle, Globe, Wifi, Navigation2, Info, Calendar, Undo2, Eye, EyeOff, Rocket, Crown, Sparkles, Lock, Bookmark, BarChart3 } from 'lucide-react';
 import { toast } from 'sonner';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
@@ -1046,11 +1046,11 @@ export default function SeekerDashboard() {
         <div className="flex items-center gap-1">
           <NotificationBell />
           <button
-            onClick={() => navigate('/profile-viewers')}
+            onClick={() => navigate('/analytics')}
             className="relative p-2 rounded-xl hover:bg-accent transition-colors"
-            title="Profile Views"
+            title="Insights"
           >
-            <Eye className="w-5 h-5 text-muted-foreground" />
+            <BarChart3 className="w-5 h-5 text-muted-foreground" />
             {(stats.profile_views || 0) > 0 && (
               <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] rounded-full bg-amber-500 text-white text-[10px] font-bold flex items-center justify-center px-1">
                 {stats.profile_views > 99 ? '99+' : stats.profile_views}
