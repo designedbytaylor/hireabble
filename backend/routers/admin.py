@@ -3600,3 +3600,286 @@ async def revoke_user_verification(
     invalidate_user(user_id)
 
     return {"status": "revoked", "user_id": user_id}
+
+
+# ==================== DEMO ACCOUNT SEEDING ====================
+
+DEMO_SEEKER_EMAIL = "demo-seeker@hireabble.com"
+DEMO_RECRUITER_EMAIL = "demo-recruiter@hireabble.com"
+DEMO_PASSWORD = "Hireabble2026!"
+
+
+@router.post("/admin/seed-demo-accounts")
+async def seed_demo_accounts(admin=Depends(get_current_admin)):
+    """Create or reset demo accounts with pre-populated data for App Store / Google Play reviewers."""
+
+    now = datetime.now(timezone.utc).isoformat()
+    hashed_pw = hash_password(DEMO_PASSWORD)
+
+    # ── Clean up any existing demo data ──
+    for email in [DEMO_SEEKER_EMAIL, DEMO_RECRUITER_EMAIL]:
+        existing = await db.users.find_one({"email": email})
+        if existing:
+            uid = existing["id"]
+            await db.applications.delete_many({"$or": [{"seeker_id": uid}, {"recruiter_id": uid}]})
+            await db.matches.delete_many({"$or": [{"seeker_id": uid}, {"recruiter_id": uid}]})
+            await db.messages.delete_many({"$or": [{"sender_id": uid}, {"receiver_id": uid}]})
+            await db.jobs.delete_many({"recruiter_id": uid})
+            await db.notifications.delete_many({"user_id": uid})
+            await db.recruiter_swipes.delete_many({"recruiter_id": uid})
+            await db.boosts.delete_many({"user_id": uid})
+            await db.users.delete_one({"email": email})
+
+    # ── Create demo seeker ──
+    seeker_id = str(uuid.uuid4())
+    seeker_doc = {
+        "id": seeker_id,
+        "email": DEMO_SEEKER_EMAIL,
+        "password": hashed_pw,
+        "name": "Jordan Rivera",
+        "role": "seeker",
+        "company": None,
+        "avatar": f"https://api.dicebear.com/7.x/initials/svg?seed=Jordan+Rivera",
+        "photo_url": None,
+        "video_url": None,
+        "title": "Full Stack Developer",
+        "bio": "Passionate full stack developer with 5 years of experience building web and mobile applications. Looking for a role where I can make an impact at a growing company.",
+        "skills": ["JavaScript", "React", "Node.js", "Python", "TypeScript", "PostgreSQL", "MongoDB", "AWS", "Docker", "GraphQL"],
+        "experience_years": 5,
+        "location": "San Francisco, CA",
+        "current_employer": "TechStartup Inc.",
+        "previous_employers": ["Google", "Stripe"],
+        "school": "UC Berkeley",
+        "degree": "B.S. Computer Science",
+        "certifications": ["AWS Solutions Architect"],
+        "work_preference": "remote",
+        "desired_salary": 150000,
+        "available_immediately": True,
+        "onboarding_complete": True,
+        "email_verified": True,
+        "push_subscription": None,
+        "blocked_users": [],
+        "marketing_emails_opt_in": False,
+        "created_at": now,
+    }
+    await db.users.insert_one(seeker_doc)
+
+    # ── Create demo recruiter ──
+    recruiter_id = str(uuid.uuid4())
+    recruiter_doc = {
+        "id": recruiter_id,
+        "email": DEMO_RECRUITER_EMAIL,
+        "password": hashed_pw,
+        "name": "Alex Chen",
+        "role": "recruiter",
+        "company": "InnovateTech",
+        "avatar": f"https://api.dicebear.com/7.x/initials/svg?seed=Alex+Chen",
+        "photo_url": None,
+        "video_url": None,
+        "title": "Head of Talent",
+        "bio": "Building an exceptional engineering team at InnovateTech. We're a Series B startup transforming how businesses handle data analytics. Always looking for talented, driven people.",
+        "skills": [],
+        "experience_years": 8,
+        "location": "New York, NY",
+        "current_employer": "InnovateTech",
+        "previous_employers": [],
+        "school": "NYU Stern",
+        "degree": "MBA",
+        "certifications": [],
+        "work_preference": None,
+        "desired_salary": None,
+        "available_immediately": False,
+        "onboarding_complete": True,
+        "email_verified": True,
+        "push_subscription": None,
+        "blocked_users": [],
+        "marketing_emails_opt_in": False,
+        "created_at": now,
+    }
+    await db.users.insert_one(recruiter_doc)
+
+    # ── Create job listings ──
+    jobs = [
+        {
+            "id": str(uuid.uuid4()),
+            "title": "Senior Full Stack Engineer",
+            "company": "InnovateTech",
+            "description": "Join our core engineering team to build and scale our data analytics platform. You'll work across the stack — React frontend, Python/Node backend, and AWS infrastructure. We value clean code, thoughtful architecture, and shipping fast.",
+            "requirements": ["5+ years full stack experience", "React and TypeScript proficiency", "Python or Node.js backend experience", "Cloud infrastructure (AWS/GCP)", "Strong communication skills"],
+            "salary_min": 140000,
+            "salary_max": 180000,
+            "location": "Remote (US)",
+            "job_type": "remote",
+            "experience_level": "senior",
+            "category": "Engineering",
+            "employment_type": "full-time",
+        },
+        {
+            "id": str(uuid.uuid4()),
+            "title": "Product Designer",
+            "company": "InnovateTech",
+            "description": "We're looking for a product designer to own the end-to-end design process for our analytics dashboard. You'll collaborate closely with engineering and product to craft intuitive, beautiful experiences that help businesses make better decisions.",
+            "requirements": ["3+ years product design experience", "Figma proficiency", "Experience with data-heavy interfaces", "Strong portfolio", "User research skills"],
+            "salary_min": 120000,
+            "salary_max": 160000,
+            "location": "New York, NY",
+            "job_type": "hybrid",
+            "experience_level": "mid",
+            "category": "Design",
+            "employment_type": "full-time",
+        },
+        {
+            "id": str(uuid.uuid4()),
+            "title": "Growth Marketing Manager",
+            "company": "InnovateTech",
+            "description": "Drive user acquisition and retention for our B2B SaaS platform. You'll own paid and organic channels, run experiments, and build our marketing engine from the ground up. Ideal for someone who loves data-driven marketing at a fast-paced startup.",
+            "requirements": ["4+ years B2B marketing experience", "Paid acquisition expertise (Google, LinkedIn)", "Analytics and attribution skills", "Content marketing experience", "Startup experience preferred"],
+            "salary_min": 110000,
+            "salary_max": 145000,
+            "location": "New York, NY",
+            "job_type": "onsite",
+            "experience_level": "mid",
+            "category": "Marketing",
+            "employment_type": "full-time",
+        },
+    ]
+
+    for job in jobs:
+        job_doc = {
+            **job,
+            "recruiter_id": recruiter_id,
+            "recruiter_name": "Alex Chen",
+            "company_logo": f"https://api.dicebear.com/7.x/initials/svg?seed=InnovateTech",
+            "background_image": "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+            "listing_photo": None,
+            "location_lat": None,
+            "location_lng": None,
+            "location_restriction": None,
+            "is_active": True,
+            "is_featured": False,
+            "created_at": now,
+        }
+        await db.jobs.insert_one(job_doc)
+
+    # ── Create applications (seeker liked 2 jobs) ──
+    app1_id = str(uuid.uuid4())
+    app2_id = str(uuid.uuid4())
+
+    for i, (app_id, job) in enumerate([(app1_id, jobs[0]), (app2_id, jobs[1])]):
+        app_doc = {
+            "id": app_id,
+            "job_id": job["id"],
+            "seeker_id": seeker_id,
+            "seeker_name": "Jordan Rivera",
+            "seeker_title": "Full Stack Developer",
+            "seeker_skills": seeker_doc["skills"],
+            "seeker_avatar": seeker_doc["avatar"],
+            "seeker_photo": None,
+            "seeker_video": None,
+            "seeker_experience": 5,
+            "seeker_school": "UC Berkeley",
+            "seeker_degree": "B.S. Computer Science",
+            "seeker_location": "San Francisco, CA",
+            "seeker_current_employer": "TechStartup Inc.",
+            "seeker_bio": seeker_doc["bio"],
+            "job_title": job["title"],
+            "recruiter_id": recruiter_id,
+            "action": "like",
+            "is_matched": i == 0,  # First job is a mutual match
+            "recruiter_action": "like" if i == 0 else None,
+            "created_at": now,
+        }
+        await db.applications.insert_one(app_doc)
+
+    # ── Create a recruiter swipe (for the match) ──
+    await db.recruiter_swipes.insert_one({
+        "recruiter_id": recruiter_id,
+        "seeker_id": seeker_id,
+        "job_id": jobs[0]["id"],
+        "action": "like",
+        "created_at": now,
+    })
+
+    # ── Create match (mutual like on first job) ──
+    match_id = str(uuid.uuid4())
+    match_doc = {
+        "id": match_id,
+        "application_id": app1_id,
+        "job_id": jobs[0]["id"],
+        "job_title": jobs[0]["title"],
+        "company": "InnovateTech",
+        "seeker_id": seeker_id,
+        "seeker_name": "Jordan Rivera",
+        "seeker_avatar": seeker_doc["avatar"],
+        "seeker_photo": None,
+        "recruiter_id": recruiter_id,
+        "recruiter_name": "Alex Chen",
+        "recruiter_avatar": recruiter_doc["avatar"],
+        "recruiter_photo": None,
+        "company_logo": f"https://api.dicebear.com/7.x/initials/svg?seed=InnovateTech",
+        "listing_photo": None,
+        "ranking": {"percentile": 95, "total_applicants": 47},
+        "match_score": 92,
+        "created_at": now,
+        "last_message": "Looking forward to chatting!",
+        "last_message_sender": seeker_id,
+        "last_message_at": now,
+    }
+    await db.matches.insert_one(match_doc)
+
+    # ── Create messages in the match ──
+    messages = [
+        {"sender_id": recruiter_id, "sender_name": "Alex Chen", "receiver_id": seeker_id, "content": "Hi Jordan! Really impressed with your profile. Your experience at Google and Stripe is exactly what we're looking for. Would love to chat about the Senior Full Stack role."},
+        {"sender_id": seeker_id, "sender_name": "Jordan Rivera", "receiver_id": recruiter_id, "content": "Thanks Alex! InnovateTech sounds like a great opportunity. I'd love to learn more about the tech stack and team."},
+        {"sender_id": recruiter_id, "sender_name": "Alex Chen", "receiver_id": seeker_id, "content": "We're building with React, TypeScript, Python (FastAPI), and deploying on AWS. The team is about 15 engineers right now. Would you be open to a 30-minute intro call this week?"},
+        {"sender_id": seeker_id, "sender_name": "Jordan Rivera", "receiver_id": recruiter_id, "content": "That stack sounds right up my alley! I'm free Thursday or Friday afternoon. Looking forward to chatting!"},
+    ]
+
+    for msg in messages:
+        msg_doc = {
+            "id": str(uuid.uuid4()),
+            "match_id": match_id,
+            "sender_id": msg["sender_id"],
+            "sender_name": msg["sender_name"],
+            "sender_avatar": seeker_doc["avatar"] if msg["sender_id"] == seeker_id else recruiter_doc["avatar"],
+            "receiver_id": msg["receiver_id"],
+            "content": msg["content"],
+            "created_at": now,
+            "is_read": True,
+        }
+        await db.messages.insert_one(msg_doc)
+
+    # ── Create notifications ──
+    await db.notifications.insert_one({
+        "id": str(uuid.uuid4()),
+        "user_id": seeker_id,
+        "type": "match",
+        "title": "New Match!",
+        "message": "You matched with InnovateTech for Senior Full Stack Engineer!",
+        "data": {"match_id": match_id, "job_id": jobs[0]["id"]},
+        "is_read": False,
+        "created_at": now,
+    })
+    await db.notifications.insert_one({
+        "id": str(uuid.uuid4()),
+        "user_id": recruiter_id,
+        "type": "match",
+        "title": "New Match!",
+        "message": "Jordan Rivera matched with your Senior Full Stack Engineer role!",
+        "data": {"match_id": match_id, "job_id": jobs[0]["id"]},
+        "is_read": False,
+        "created_at": now,
+    })
+
+    return {
+        "message": "Demo accounts seeded successfully",
+        "seeker": {"email": DEMO_SEEKER_EMAIL, "password": DEMO_PASSWORD, "name": "Jordan Rivera"},
+        "recruiter": {"email": DEMO_RECRUITER_EMAIL, "password": DEMO_PASSWORD, "name": "Alex Chen"},
+        "data_created": {
+            "jobs": 3,
+            "applications": 2,
+            "matches": 1,
+            "messages": len(messages),
+            "notifications": 2,
+        },
+    }
