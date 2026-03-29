@@ -1888,16 +1888,26 @@ _RECRUITER_HEADSHOTS = [
 ]
 
 SAMPLE_JOBS = [
-    {"title": "Senior React Developer", "description": "Join our frontend team building a next-gen dashboard used by millions. You'll architect component systems, optimize performance, and mentor junior devs.", "requirements": ["React", "TypeScript", "5+ years experience", "Design systems"], "salary_min": 150000, "salary_max": 200000, "location": "San Francisco, CA", "job_type": "hybrid", "experience_level": "senior"},
-    {"title": "Backend Engineer (Go)", "description": "Build high-throughput microservices for our real-time data platform. You'll work with distributed systems at scale.", "requirements": ["Go", "Kubernetes", "PostgreSQL", "3+ years experience"], "salary_min": 140000, "salary_max": 190000, "location": "Remote", "job_type": "remote", "experience_level": "mid"},
-    {"title": "Full Stack Developer", "description": "Own features end-to-end, from database schema to pixel-perfect UI. Fast-paced startup environment with lots of autonomy.", "requirements": ["React", "Node.js", "PostgreSQL", "AWS"], "salary_min": 120000, "salary_max": 170000, "location": "New York, NY", "job_type": "onsite", "experience_level": "mid"},
-    {"title": "Mobile Engineer (React Native)", "description": "Build our flagship mobile app used by 500K+ users. Focus on native performance, offline support, and smooth animations.", "requirements": ["React Native", "TypeScript", "iOS/Android", "4+ years"], "salary_min": 140000, "salary_max": 185000, "location": "Austin, TX", "job_type": "hybrid", "experience_level": "senior"},
-    {"title": "DevOps / SRE Engineer", "description": "Design and maintain our infrastructure on AWS. Implement CI/CD, monitoring, and incident response for 99.99% uptime.", "requirements": ["AWS", "Terraform", "Docker", "Kubernetes", "5+ years"], "salary_min": 155000, "salary_max": 210000, "location": "Seattle, WA", "job_type": "remote", "experience_level": "senior"},
-    {"title": "Data Engineer", "description": "Build data pipelines that process terabytes daily. Work with our analytics and ML teams to power data-driven decisions.", "requirements": ["Python", "Spark", "Airflow", "SQL", "3+ years"], "salary_min": 130000, "salary_max": 180000, "location": "Chicago, IL", "job_type": "hybrid", "experience_level": "mid"},
-    {"title": "ML Engineer", "description": "Ship production ML models for our recommendation engine. Collaborate with research to bring cutting-edge papers to production.", "requirements": ["Python", "PyTorch", "MLOps", "SQL", "4+ years"], "salary_min": 160000, "salary_max": 220000, "location": "San Francisco, CA", "job_type": "hybrid", "experience_level": "senior"},
-    {"title": "Junior Software Engineer", "description": "Great opportunity for early-career engineers! Supportive team, strong mentorship, and real-world projects from day one.", "requirements": ["JavaScript or Python", "CS fundamentals", "Eagerness to learn"], "salary_min": 80000, "salary_max": 110000, "location": "Denver, CO", "job_type": "onsite", "experience_level": "entry"},
-    {"title": "Engineering Manager", "description": "Lead a team of 6-8 engineers building our core platform. Balance technical leadership with people development.", "requirements": ["5+ years engineering", "2+ years management", "System design"], "salary_min": 180000, "salary_max": 250000, "location": "Remote", "job_type": "remote", "experience_level": "lead"},
-    {"title": "Security Engineer", "description": "Own application security for our fintech platform. Conduct security reviews, build tooling, and drive security culture.", "requirements": ["AppSec", "Python or Go", "OWASP", "Cloud security", "5+ years"], "salary_min": 160000, "salary_max": 215000, "location": "New York, NY", "job_type": "hybrid", "experience_level": "senior"},
+    {"title": "Senior React Developer", "description": "Join our frontend team building a next-gen dashboard used by millions. You'll architect component systems, optimize performance, and mentor junior devs.", "requirements": ["React", "TypeScript", "5+ years experience", "Design systems"], "salary_min": 150000, "salary_max": 200000, "location": "San Francisco, CA", "job_type": "hybrid", "experience_level": "senior",
+     "work_style": {"team_preference": 4, "social_style": 3, "work_pace": 4, "decision_style": 3, "learning_style": 2, "management_pref": 2, "problem_approach": 2, "change_comfort": 3}},
+    {"title": "Backend Engineer (Go)", "description": "Build high-throughput microservices for our real-time data platform. You'll work with distributed systems at scale.", "requirements": ["Go", "Kubernetes", "PostgreSQL", "3+ years experience"], "salary_min": 140000, "salary_max": 190000, "location": "Remote", "job_type": "remote", "experience_level": "mid",
+     "work_style": {"team_preference": 2, "social_style": 2, "work_pace": 3, "decision_style": 2, "learning_style": 1, "management_pref": 1, "problem_approach": 4, "change_comfort": 3}},
+    {"title": "Full Stack Developer", "description": "Own features end-to-end, from database schema to pixel-perfect UI. Fast-paced startup environment with lots of autonomy.", "requirements": ["React", "Node.js", "PostgreSQL", "AWS"], "salary_min": 120000, "salary_max": 170000, "location": "New York, NY", "job_type": "onsite", "experience_level": "mid",
+     "work_style": {"team_preference": 3, "social_style": 4, "work_pace": 5, "decision_style": 2, "learning_style": 1, "management_pref": 1, "problem_approach": 2, "change_comfort": 5}},
+    {"title": "Mobile Engineer (React Native)", "description": "Build our flagship mobile app used by 500K+ users. Focus on native performance, offline support, and smooth animations.", "requirements": ["React Native", "TypeScript", "iOS/Android", "4+ years"], "salary_min": 140000, "salary_max": 185000, "location": "Austin, TX", "job_type": "hybrid", "experience_level": "senior",
+     "work_style": {"team_preference": 3, "social_style": 3, "work_pace": 4, "decision_style": 2, "learning_style": 2, "management_pref": 2, "problem_approach": 3, "change_comfort": 4}},
+    {"title": "DevOps / SRE Engineer", "description": "Design and maintain our infrastructure on AWS. Implement CI/CD, monitoring, and incident response for 99.99% uptime.", "requirements": ["AWS", "Terraform", "Docker", "Kubernetes", "5+ years"], "salary_min": 155000, "salary_max": 210000, "location": "Seattle, WA", "job_type": "remote", "experience_level": "senior",
+     "work_style": {"team_preference": 2, "social_style": 2, "work_pace": 4, "decision_style": 1, "learning_style": 1, "management_pref": 1, "problem_approach": 5, "change_comfort": 4}},
+    {"title": "Data Engineer", "description": "Build data pipelines that process terabytes daily. Work with our analytics and ML teams to power data-driven decisions.", "requirements": ["Python", "Spark", "Airflow", "SQL", "3+ years"], "salary_min": 130000, "salary_max": 180000, "location": "Chicago, IL", "job_type": "hybrid", "experience_level": "mid",
+     "work_style": {"team_preference": 3, "social_style": 2, "work_pace": 3, "decision_style": 3, "learning_style": 2, "management_pref": 2, "problem_approach": 4, "change_comfort": 3}},
+    {"title": "ML Engineer", "description": "Ship production ML models for our recommendation engine. Collaborate with research to bring cutting-edge papers to production.", "requirements": ["Python", "PyTorch", "MLOps", "SQL", "4+ years"], "salary_min": 160000, "salary_max": 220000, "location": "San Francisco, CA", "job_type": "hybrid", "experience_level": "senior",
+     "work_style": {"team_preference": 3, "social_style": 2, "work_pace": 3, "decision_style": 3, "learning_style": 1, "management_pref": 1, "problem_approach": 2, "change_comfort": 4}},
+    {"title": "Junior Software Engineer", "description": "Great opportunity for early-career engineers! Supportive team, strong mentorship, and real-world projects from day one.", "requirements": ["JavaScript or Python", "CS fundamentals", "Eagerness to learn"], "salary_min": 80000, "salary_max": 110000, "location": "Denver, CO", "job_type": "onsite", "experience_level": "entry",
+     "work_style": {"team_preference": 5, "social_style": 4, "work_pace": 2, "decision_style": 4, "learning_style": 5, "management_pref": 5, "problem_approach": 3, "change_comfort": 2}},
+    {"title": "Engineering Manager", "description": "Lead a team of 6-8 engineers building our core platform. Balance technical leadership with people development.", "requirements": ["5+ years engineering", "2+ years management", "System design"], "salary_min": 180000, "salary_max": 250000, "location": "Remote", "job_type": "remote", "experience_level": "lead",
+     "work_style": {"team_preference": 5, "social_style": 5, "work_pace": 4, "decision_style": 4, "learning_style": 3, "management_pref": 4, "problem_approach": 3, "change_comfort": 4}},
+    {"title": "Security Engineer", "description": "Own application security for our fintech platform. Conduct security reviews, build tooling, and drive security culture.", "requirements": ["AppSec", "Python or Go", "OWASP", "Cloud security", "5+ years"], "salary_min": 160000, "salary_max": 215000, "location": "New York, NY", "job_type": "hybrid", "experience_level": "senior",
+     "work_style": {"team_preference": 2, "social_style": 2, "work_pace": 3, "decision_style": 1, "learning_style": 1, "management_pref": 1, "problem_approach": 5, "change_comfort": 2}},
 ]
 
 
@@ -2009,6 +2019,16 @@ async def seed_test_data(body: dict = {}, admin: dict = Depends(get_current_admi
             "work_preference": random.choice(["remote", "hybrid", "onsite"]),
             "desired_salary": random.randint(80, 200) * 1000,
             "available_immediately": random.choice([True, False]),
+            "work_style": {
+                "team_preference": random.randint(1, 5),
+                "social_style": random.randint(1, 5),
+                "work_pace": random.randint(1, 5),
+                "decision_style": random.randint(1, 5),
+                "learning_style": random.randint(1, 5),
+                "management_pref": random.randint(1, 5),
+                "problem_approach": random.randint(1, 5),
+                "change_comfort": random.randint(1, 5),
+            },
             "onboarding_complete": True, "push_subscription": None,
             "created_at": (datetime.now(timezone.utc) - timedelta(days=random.randint(1, 60))).isoformat(),
         }
@@ -3655,6 +3675,16 @@ async def seed_demo_accounts(admin=Depends(get_current_admin)):
         "work_preference": "remote",
         "desired_salary": 150000,
         "available_immediately": True,
+        "work_style": {
+            "team_preference": 3,
+            "social_style": 3,
+            "work_pace": 4,
+            "decision_style": 2,
+            "learning_style": 1,
+            "management_pref": 1,
+            "problem_approach": 2,
+            "change_comfort": 4,
+        },
         "onboarding_complete": True,
         "email_verified": True,
         "push_subscription": None,
@@ -3713,6 +3743,7 @@ async def seed_demo_accounts(admin=Depends(get_current_admin)):
             "experience_level": "senior",
             "category": "Engineering",
             "employment_type": "full-time",
+            "work_style": {"team_preference": 3, "social_style": 3, "work_pace": 4, "decision_style": 2, "learning_style": 1, "management_pref": 1, "problem_approach": 2, "change_comfort": 4},
         },
         {
             "id": str(uuid.uuid4()),
@@ -3727,6 +3758,7 @@ async def seed_demo_accounts(admin=Depends(get_current_admin)):
             "experience_level": "mid",
             "category": "Design",
             "employment_type": "full-time",
+            "work_style": {"team_preference": 4, "social_style": 4, "work_pace": 3, "decision_style": 4, "learning_style": 3, "management_pref": 3, "problem_approach": 1, "change_comfort": 3},
         },
         {
             "id": str(uuid.uuid4()),
@@ -3741,6 +3773,7 @@ async def seed_demo_accounts(admin=Depends(get_current_admin)):
             "experience_level": "mid",
             "category": "Marketing",
             "employment_type": "full-time",
+            "work_style": {"team_preference": 4, "social_style": 5, "work_pace": 5, "decision_style": 3, "learning_style": 2, "management_pref": 2, "problem_approach": 2, "change_comfort": 5},
         },
     ]
 
