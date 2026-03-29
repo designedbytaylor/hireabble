@@ -442,6 +442,8 @@ export default function AdminLaunchChecklist() {
 
   return (
     <div style={{ maxWidth: 900, margin: "0 auto" }}>
+      {/* Rich editor placeholder style */}
+      <style>{`[contenteditable]:empty:before { content: attr(data-placeholder); color: ${TEXT_DIM}; pointer-events: none; }`}</style>
       {/* Header */}
       <div style={{ marginBottom: 28 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 6 }}>
@@ -601,7 +603,7 @@ export default function AdminLaunchChecklist() {
         const catColor = CATEGORY_COLORS[catIndex >= 0 ? catIndex % CATEGORY_COLORS.length : 0];
         return (
           <div onClick={closeItemModal} style={{ position: "fixed", inset: 0, background: "#000b", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 999 }}>
-            <div onClick={e => e.stopPropagation()} style={{ background: "#161B28", border: `1px solid ${BORDER}`, borderRadius: 14, padding: "28px 30px", maxWidth: 720, width: "92%", maxHeight: "85vh", display: "flex", flexDirection: "column", overflowY: "auto" }}>
+            <div onClick={e => e.stopPropagation()} style={{ background: "#161B28", border: `1px solid ${BORDER}`, borderRadius: 14, padding: "28px 30px", maxWidth: 960, width: "95%", maxHeight: "85vh", display: "flex", flexDirection: "column", overflowY: "auto" }}>
               {/* Category badge */}
               <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
                 <div style={{ width: 8, height: 8, borderRadius: 3, background: catColor, flexShrink: 0 }} />
@@ -638,19 +640,45 @@ export default function AdminLaunchChecklist() {
                 )}
               </div>
 
-              {/* Notes textarea */}
+              {/* Notes rich editor */}
               <div style={{ marginBottom: 20, flex: 1 }}>
                 <label style={{ fontSize: 12, fontWeight: 700, color: TEXT_MID, textTransform: "uppercase", letterSpacing: 1, display: "block", marginBottom: 8 }}>Notes</label>
-                <textarea
-                  value={modalNotes}
-                  onChange={e => {
-                    setModalNotes(e.target.value);
-                    updateItemNotes(liveItem.id, e.target.value);
+                {/* Toolbar */}
+                <div style={{ display: "flex", gap: 4, marginBottom: 6, flexWrap: "wrap" }}>
+                  {[
+                    { cmd: "bold", label: "B", style: { fontWeight: 800 }, title: "Bold" },
+                    { cmd: "italic", label: "I", style: { fontStyle: "italic" }, title: "Italic" },
+                    { cmd: "underline", label: "U", style: { textDecoration: "underline" }, title: "Underline" },
+                  ].map(btn => (
+                    <button key={btn.cmd} onMouseDown={e => { e.preventDefault(); document.execCommand(btn.cmd); }} style={{ background: "#1A2035", border: `1px solid ${BORDER}`, borderRadius: 5, padding: "4px 10px", cursor: "pointer", color: TEXT_BRIGHT, fontSize: 13, minWidth: 30, ...btn.style }} title={btn.title}>{btn.label}</button>
+                  ))}
+                  <span style={{ width: 1, background: BORDER, margin: "0 4px" }} />
+                  {[
+                    { size: "3", label: "Small", fs: 11 },
+                    { size: "4", label: "Normal", fs: 13 },
+                    { size: "5", label: "Large", fs: 15 },
+                    { size: "6", label: "XL", fs: 17 },
+                  ].map(sz => (
+                    <button key={sz.size} onMouseDown={e => { e.preventDefault(); document.execCommand("fontSize", false, sz.size); }} style={{ background: "#1A2035", border: `1px solid ${BORDER}`, borderRadius: 5, padding: "4px 8px", cursor: "pointer", color: TEXT_MID, fontSize: sz.fs, lineHeight: 1 }} title={`Font size: ${sz.label}`}>{sz.label}</button>
+                  ))}
+                  <span style={{ width: 1, background: BORDER, margin: "0 4px" }} />
+                  <button onMouseDown={e => { e.preventDefault(); document.execCommand("insertUnorderedList"); }} style={{ background: "#1A2035", border: `1px solid ${BORDER}`, borderRadius: 5, padding: "4px 10px", cursor: "pointer", color: TEXT_MID, fontSize: 13 }} title="Bullet list">• List</button>
+                  <button onMouseDown={e => { e.preventDefault(); document.execCommand("removeFormat"); }} style={{ background: "#1A2035", border: `1px solid ${BORDER}`, borderRadius: 5, padding: "4px 10px", cursor: "pointer", color: TEXT_DIM, fontSize: 11 }} title="Clear formatting">Clear</button>
+                </div>
+                {/* Editable area */}
+                <div
+                  contentEditable
+                  suppressContentEditableWarning
+                  dangerouslySetInnerHTML={{ __html: modalNotes }}
+                  onInput={e => {
+                    const html = e.currentTarget.innerHTML;
+                    setModalNotes(html);
+                    updateItemNotes(liveItem.id, html);
                   }}
-                  placeholder="Add notes, links, or details for this task..."
-                  style={{ width: "100%", minHeight: 320, background: "#0D1020", border: `1px solid ${BORDER}`, borderRadius: 8, padding: "14px 16px", color: TEXT_BRIGHT, fontSize: 14, lineHeight: 1.7, resize: "vertical", outline: "none", fontFamily: "monospace", boxSizing: "border-box", transition: "border-color 0.2s" }}
                   onFocus={e => e.target.style.borderColor = TEAL + "66"}
                   onBlur={e => e.target.style.borderColor = BORDER}
+                  style={{ width: "100%", minHeight: 320, background: "#0D1020", border: `1px solid ${BORDER}`, borderRadius: 8, padding: "14px 16px", color: TEXT_BRIGHT, fontSize: 14, lineHeight: 1.7, outline: "none", boxSizing: "border-box", transition: "border-color 0.2s", overflowY: "auto", whiteSpace: "pre-wrap", wordBreak: "break-word" }}
+                  data-placeholder="Add notes, links, or details for this task..."
                 />
               </div>
 
