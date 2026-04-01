@@ -58,9 +58,14 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     private func injectStoreKitHandler() {
         guard let bridge = (window?.rootViewController as? CAPBridgeViewController)?.bridge else { return }
         let webView = bridge.webView
-        let handler = StoreKitPlugin()
-        handler.webView = webView
-        webView?.configuration.userContentController.add(handler, name: "storeKit")
+
+        let storeKitHandler = StoreKitPlugin()
+        storeKitHandler.webView = webView
+        webView?.configuration.userContentController.add(storeKitHandler, name: "storeKit")
+
+        let reviewHandler = AppReviewPlugin()
+        reviewHandler.webView = webView
+        webView?.configuration.userContentController.add(reviewHandler, name: "appReview")
     }
 }
 
