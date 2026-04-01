@@ -490,6 +490,8 @@ async def startup():
     await ensure_index(db.matches, "seeker_id")
     await ensure_index(db.matches, "recruiter_id")
     await ensure_index(db.matches, "job_id")
+    await ensure_index(db.matches, [("expired", 1), ("expires_at", 1)])
+    await ensure_index(db.matches, "created_at")
     await ensure_index(db.notifications, "user_id")
 
     # User blocked_users index (for block-list lookups)
@@ -551,6 +553,7 @@ async def startup():
         await db.admin_2fa_codes.create_index("created_at", expireAfterSeconds=900)
         await db.profile_views.create_index("created_at", expireAfterSeconds=7776000)  # 90 days
         await db.email_verification_tokens.create_index("created_at", expireAfterSeconds=86400)
+        await db.conversation_starters_cache.create_index("created_at", expireAfterSeconds=604800)  # 7 days
     except Exception:
         pass  # TTL indexes may already exist
 
@@ -561,6 +564,11 @@ async def startup():
 
     # Start background job alerts scheduler
     asyncio.create_task(_job_alerts_loop())
+
+    # Start match expiry, streak check, and weekly digest schedulers
+    asyncio.create_task(_match_expiry_loop())
+    asyncio.create_task(_streak_check_loop())
+    asyncio.create_task(_weekly_digest_loop())
 
     logger.info("Hireabble API started successfully!")
 
@@ -729,3 +737,160 @@ async def _send_saved_job_reminders():
             body=f"You have {active_count} saved job{'s' if active_count != 1 else ''} waiting for you",
             push_data={"type": "saved_job_reminder", "url": "/saved"}
         )
+
+
+async def _match_expiry_loop():
+    """Background: expire unresponded matches after 72 hours."""
+    import random
+    await asyncio.sleep(random.randint(120, 600))
+    while True:
+        try:
+            now = datetime.now(timezone.utc)
+            now_iso = now.isoformat()
+
+            expired_matches = await db.matches.find(
+                {"expires_at": {"$lte": now_iso}, "expired": {"$ne": True}},
+                {"_id": 0, "id": 1, "seeker_id": 1, "recruiter_id": 1}
+            ).to_list(200)
+
+            for match in expired_matches:
+                msg_count = await db.messages.count_documents({"match_id": match["id"]})
+                if msg_count > 0:
+                    await db.matches.update_one(
+                        {"id": match["id"]},
+                        {"$unset": {"expires_at": "", "expired": ""}}
+                    )
+                else:
+                    await db.matches.update_one(
+                        {"id": match["id"]},
+                        {"$set": {"expired": True}}
+                    )
+                    for uid in [match["seeker_id"], match["recruiter_id"]]:
+                        await create_notification(
+                            uid, "system_message",
+                            "Match Expired",
+                            "A match expired because no one started a conversation. Keep swiping!",
+                            data={"match_id": match["id"]}
+                        )
+
+            # "Expiring soon" warnings (24hr before expiry)
+            warning_cutoff = (now + timedelta(hours=24)).isoformat()
+            expiring_soon = await db.matches.find(
+                {
+                    "expires_at": {"$lte": warning_cutoff, "$gt": now_iso},
+                    "expired": {"$ne": True},
+                    "expiry_warned": {"$ne": True},
+                },
+                {"_id": 0, "id": 1, "seeker_id": 1, "recruiter_id": 1, "job_title": 1}
+            ).to_list(200)
+
+            for match in expiring_soon:
+                msg_count = await db.messages.count_documents({"match_id": match["id"]})
+                if msg_count == 0:
+                    for uid in [match["seeker_id"], match["recruiter_id"]]:
+                        await create_notification(
+                            uid, "system_message",
+                            "Match Expiring Soon",
+                            f"Your match for {match.get('job_title', 'a position')} expires in 24 hours. Send a message to keep it!",
+                            data={"match_id": match["id"]}
+                        )
+                        await manager.send_to_user(uid, {"type": "match_expiring_soon", "match_id": match["id"]})
+                    await db.matches.update_one({"id": match["id"]}, {"$set": {"expiry_warned": True}})
+        except Exception as e:
+            logger.error(f"Match expiry loop error: {e}")
+
+        await asyncio.sleep(3600)
+
+
+async def _streak_check_loop():
+    """Background: reset broken streaks and notify users."""
+    import random
+    from datetime import date as _date
+    await asyncio.sleep(random.randint(600, 1800))
+    while True:
+        try:
+            two_days_ago = (_date.today() - timedelta(days=2)).isoformat()
+            broken = await db.users.find(
+                {"streak_count": {"$gt": 0}, "streak_last_active_date": {"$lte": two_days_ago}},
+                {"_id": 0, "id": 1, "streak_count": 1}
+            ).to_list(500)
+
+            for user in broken:
+                old_count = user.get("streak_count", 0)
+                await db.users.update_one({"id": user["id"]}, {"$set": {"streak_count": 0}})
+                if old_count >= 3:
+                    await create_notification(
+                        user["id"], "system_message",
+                        "Streak Ended",
+                        f"Your {old_count}-day streak ended. Start a new one today!",
+                        data={"type": "streak_broken"}
+                    )
+        except Exception as e:
+            logger.error(f"Streak check loop error: {e}")
+
+        await asyncio.sleep(86400 + random.randint(0, 3600))
+
+
+async def _weekly_digest_loop():
+    """Background: send weekly market digest emails on Sundays."""
+    import random
+    await asyncio.sleep(random.randint(300, 900))
+    while True:
+        try:
+            now = datetime.now(timezone.utc)
+            if now.weekday() == 6 and 8 <= now.hour <= 10:
+                week_ago = (now - timedelta(days=7)).isoformat()
+
+                seekers = await db.users.find(
+                    {
+                        "role": "seeker", "email_verified": True,
+                        "email_notifications.weekly_digest": {"$ne": False},
+                        "$or": [
+                            {"last_weekly_digest_at": {"$exists": False}},
+                            {"last_weekly_digest_at": {"$lte": week_ago}},
+                        ],
+                    },
+                    {"_id": 0, "id": 1, "email": 1, "name": 1}
+                ).to_list(500)
+
+                for seeker in seekers:
+                    try:
+                        new_jobs = await db.jobs.count_documents({"is_active": True, "created_at": {"$gte": week_ago}})
+                        profile_views = await db.profile_views.count_documents({"seeker_id": seeker["id"], "created_at": {"$gte": week_ago}})
+                        new_matches = await db.matches.count_documents({"seeker_id": seeker["id"], "created_at": {"$gte": week_ago}, "expired": {"$ne": True}})
+                        apps_sent = await db.applications.count_documents({"seeker_id": seeker["id"], "created_at": {"$gte": week_ago}})
+
+                        if new_jobs > 0 or new_matches > 0:
+                            summary = f"This week: {new_jobs} new jobs, {new_matches} matches, {profile_views} profile views"
+                            await create_notification(seeker["id"], "system_message", "Your Weekly Market Report", summary, data={"type": "weekly_digest"})
+
+                        await db.users.update_one({"id": seeker["id"]}, {"$set": {"last_weekly_digest_at": now.isoformat()}})
+                    except Exception as e:
+                        logger.error(f"Weekly digest error for {seeker['id']}: {e}")
+
+                recruiters = await db.users.find(
+                    {
+                        "role": "recruiter", "email_verified": True,
+                        "email_notifications.weekly_digest": {"$ne": False},
+                        "$or": [
+                            {"last_weekly_digest_at": {"$exists": False}},
+                            {"last_weekly_digest_at": {"$lte": week_ago}},
+                        ],
+                    },
+                    {"_id": 0, "id": 1, "email": 1, "name": 1}
+                ).to_list(500)
+
+                for recruiter in recruiters:
+                    try:
+                        new_apps = await db.applications.count_documents({"recruiter_id": recruiter["id"], "created_at": {"$gte": week_ago}})
+                        new_matches = await db.matches.count_documents({"recruiter_id": recruiter["id"], "created_at": {"$gte": week_ago}, "expired": {"$ne": True}})
+                        if new_apps > 0 or new_matches > 0:
+                            summary = f"This week: {new_apps} new applications, {new_matches} matches"
+                            await create_notification(recruiter["id"], "system_message", "Your Weekly Hiring Report", summary, data={"type": "weekly_digest"})
+                        await db.users.update_one({"id": recruiter["id"]}, {"$set": {"last_weekly_digest_at": now.isoformat()}})
+                    except Exception as e:
+                        logger.error(f"Weekly digest error for {recruiter['id']}: {e}")
+        except Exception as e:
+            logger.error(f"Weekly digest loop error: {e}")
+
+        await asyncio.sleep(3600)

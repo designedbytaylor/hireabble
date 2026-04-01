@@ -331,6 +331,7 @@ async def create_job(job: JobCreate, request: Request, current_user: dict = Depe
         "is_active": True,
         "is_featured": is_enterprise,
         "work_style": _validate_work_style(job.work_style) if job.work_style else None,
+        "culture_media": (job.culture_media or [])[:5],
     }
 
     # Flag for review if non-severe violations found

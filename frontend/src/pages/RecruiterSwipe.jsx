@@ -5,7 +5,7 @@ import { CandidateDetailSheet } from '../components/CandidateDetailSheet';
 import {
   X, Heart, Star, MapPin, Briefcase, GraduationCap, Clock,
   ChevronDown, BarChart3, Users, FileText, Building2, SlidersHorizontal,
-  Search, Sparkles, Zap, MessageSquare, Plus, Lock, Crown, Filter, Video, BadgeCheck, Rocket, CheckCircle
+  Search, Sparkles, Zap, MessageSquare, Plus, Lock, Crown, Filter, Video, BadgeCheck, Rocket, CheckCircle, Flame
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { toast } from 'sonner';
@@ -60,6 +60,7 @@ export default function RecruiterSwipe() {
   const [matchData, setMatchData] = useState(null);
   const [discoverLoading, setDiscoverLoading] = useState(false);
   const [showDiscoverFilters, setShowDiscoverFilters] = useState(false);
+  const [streak, setStreak] = useState(null);
   const [discoverFilters, setDiscoverFilters] = useState({
     location: '', experience_level: '', skill: '',
     degree: '', work_preference: '', min_experience: '',
@@ -78,6 +79,8 @@ export default function RecruiterSwipe() {
   useEffect(() => {
     const isPaymentReturn = searchParams.get('payment') === 'success' && searchParams.get('session_id');
     if (!isPaymentReturn) fetchData(); // skip on Stripe return — payment verify handles it
+    axios.get(`${API}/stats/streak`, { headers: { Authorization: `Bearer ${token}` } })
+      .then(res => setStreak(res.data)).catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -382,6 +385,11 @@ export default function RecruiterSwipe() {
             <h1 className="text-lg font-bold font-['Outfit']">hireabble</h1>
           </div>
           <div className="flex items-center gap-1">
+            {streak && streak.current > 0 && (
+              <span className="flex items-center gap-1 px-2 py-1.5 rounded-xl bg-orange-500/10 text-orange-400 text-sm font-bold" title={`${streak.current}-day streak`}>
+                <Flame className="w-4 h-4" />{streak.current}
+              </span>
+            )}
             <NotificationBell />
             <button
               onClick={() => navigate('/recruiter')}

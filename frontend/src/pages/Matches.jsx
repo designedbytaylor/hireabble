@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import {
   Sparkles, MessageCircle, Briefcase, Building2, Calendar, ChevronRight, CheckCircle,
   X, MapPin, GraduationCap, Clock, User, Mail, ArrowLeft, Star, FileText, Award, Download,
+  Zap, Timer, Crown,
 } from 'lucide-react';
 import { Badge } from '../components/ui/badge';
 import { Button } from '../components/ui/button';
@@ -16,6 +17,47 @@ import { Skeleton } from '../components/ui/skeleton';
 import useDocumentTitle from '../hooks/useDocumentTitle';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
+
+/** Calculate hours remaining until match expires. Returns null if no expiry. */
+function getExpiryHours(expiresAt) {
+  if (!expiresAt) return null;
+  const diff = new Date(expiresAt) - Date.now();
+  if (diff <= 0) return 0;
+  return diff / (1000 * 60 * 60);
+}
+
+function ExpiryBadge({ expiresAt }) {
+  const [hours, setHours] = useState(() => getExpiryHours(expiresAt));
+  useEffect(() => {
+    if (!expiresAt) return;
+    const interval = setInterval(() => setHours(getExpiryHours(expiresAt)), 60000);
+    return () => clearInterval(interval);
+  }, [expiresAt]);
+  if (hours == null || hours <= 0) return null;
+  const color = hours > 24 ? 'text-success' : hours > 12 ? 'text-amber-400' : 'text-destructive animate-pulse';
+  const label = hours >= 24 ? `${Math.floor(hours)}h left` : hours >= 1 ? `${Math.floor(hours)}h left` : `${Math.max(1, Math.floor(hours * 60))}m left`;
+  return (
+    <span className={`inline-flex items-center gap-1 text-xs font-medium ${color}`}>
+      <Timer className="w-3 h-3" />
+      {label}
+    </span>
+  );
+}
+
+function ResponsivenessBadge({ badge, avgHours }) {
+  if (!badge) return null;
+  if (badge === 'fast') return (
+    <span className="inline-flex items-center gap-1 text-xs text-amber-400 font-medium">
+      <Zap className="w-3 h-3" /> ~{avgHours}h
+    </span>
+  );
+  if (badge === 'moderate') return (
+    <span className="inline-flex items-center gap-1 text-xs text-muted-foreground font-medium">
+      <Clock className="w-3 h-3" /> ~{avgHours}h
+    </span>
+  );
+  return null;
+}
 
 export default function Matches() {
   const navigate = useNavigate();
@@ -453,7 +495,16 @@ export default function Matches() {
         <div className="max-w-lg mx-auto">
           {matches.length > 0 ? (
             <div className="space-y-4">
-              {matches.map((match) => (
+              {[...matches].sort((a, b) => {
+                // Sort expiring-soon (no messages, has expires_at) to the top
+                const aHrs = getExpiryHours(a.expires_at);
+                const bHrs = getExpiryHours(b.expires_at);
+                const aExpiring = aHrs != null && aHrs > 0 && aHrs < 48 && !a.last_message;
+                const bExpiring = bHrs != null && bHrs > 0 && bHrs < 48 && !b.last_message;
+                if (aExpiring && !bExpiring) return -1;
+                if (!aExpiring && bExpiring) return 1;
+                return 0; // preserve server order otherwise
+              }).map((match) => (
                 <div
                   key={match.id}
                   className="glass-card rounded-2xl p-5 hover:border-primary/30 transition-colors"
@@ -518,9 +569,17 @@ export default function Matches() {
                         </p>
                       )}
 
-                      <div className="flex items-center gap-2 mt-2 text-xs text-muted-foreground">
-                        <Calendar className="w-3 h-3" />
-                        {user?.role === 'recruiter' ? 'Shortlisted' : 'Connected'} {new Date(match.created_at).toLocaleDateString()}
+                      <div className="flex items-center gap-2 mt-2 text-xs text-muted-foreground flex-wrap">
+                        <span className="inline-flex items-center gap-1">
+                          <Calendar className="w-3 h-3" />
+                          {user?.role === 'recruiter' ? 'Shortlisted' : 'Connected'} {new Date(match.created_at).toLocaleDateString()}
+                        </span>
+                        {!match.last_message && match.expires_at && (
+                          <ExpiryBadge expiresAt={match.expires_at} />
+                        )}
+                        {user?.role === 'seeker' && match.responsiveness_badge && (
+                          <ResponsivenessBadge badge={match.responsiveness_badge} avgHours={match.avg_response_hours} />
+                        )}
                       </div>
                     </div>
 

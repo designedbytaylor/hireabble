@@ -78,6 +78,7 @@ function EmailNotificationSettings({ token, userRole }) {
     { key: 'matches', label: 'New applicants', desc: 'When a candidate applies to your job postings' },
     { key: 'interviews', label: 'Interview updates', desc: 'Interview responses, acceptances & reschedules' },
     { key: 'messages', label: 'Message digests', desc: 'Summary of unread messages (max every 15 min)' },
+    { key: 'weekly_digest', label: 'Weekly hiring report', desc: 'Weekly summary of applications, matches, and pipeline stats' },
     { key: 'marketing_emails_opt_in', label: 'Marketing & promotions', desc: 'Occasional updates, tips, and promotional offers' },
   ] : [
     { key: 'matches', label: 'New opportunities', desc: 'When a recruiter is interested in your profile' },
@@ -85,6 +86,7 @@ function EmailNotificationSettings({ token, userRole }) {
     { key: 'messages', label: 'Message digests', desc: 'Summary of unread messages (max every 15 min)' },
     { key: 'status_updates', label: 'Application updates', desc: 'When your application stage changes' },
     { key: 'job_alerts', label: 'Job Alerts', desc: 'Get notified when new jobs match your profile' },
+    { key: 'weekly_digest', label: 'Weekly market report', desc: 'Weekly summary of new jobs, matches, and profile views' },
     { key: 'marketing_emails_opt_in', label: 'Marketing & promotions', desc: 'Occasional updates, tips, and promotional offers' },
   ];
 
