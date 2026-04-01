@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo, memo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence, useMotionValue, useTransform } from 'framer-motion';
-import { X, Heart, Star, Briefcase, MapPin, DollarSign, Building2, Clock, ChevronDown, Filter, SlidersHorizontal, Zap, CheckCircle, Globe, Wifi, Navigation2, Info, Calendar, Undo2, Eye, EyeOff, Rocket, Crown, Sparkles, Lock, Bookmark, BarChart3 } from 'lucide-react';
+import { X, Heart, Star, Briefcase, MapPin, DollarSign, Building2, Clock, ChevronDown, Filter, SlidersHorizontal, Zap, CheckCircle, Globe, Wifi, Navigation2, Info, Calendar, Undo2, Eye, EyeOff, Rocket, Crown, Sparkles, Lock, Bookmark, BarChart3, Flame } from 'lucide-react';
 import { toast } from 'sonner';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
@@ -180,6 +180,8 @@ export default function SeekerDashboard() {
   const [undoCounter, setUndoCounter] = useState(0); // forces SwipeCard remount after undo
   const [savedJobIds, setSavedJobIds] = useState(new Set());
   const [upgradeTrigger, setUpgradeTrigger] = useState('super_likes'); // what triggered upgrade modal
+  const [streak, setStreak] = useState(null);
+  const [showStreakSheet, setShowStreakSheet] = useState(false);
   const lastSwipedRef = useRef(null); // track last swiped card for undo animation
   const swipeInFlightRef = useRef(false); // true while a swipe API call is pending (prevents WS race)
   const fetchingMoreRef = useRef(false);
@@ -360,6 +362,9 @@ export default function SeekerDashboard() {
     flushSwipeQueue().then(async () => {
       if (isPaymentReturn) return; // let payment verify effect handle the fetch
       await fetchDashboard();
+      // Fetch streak data
+      axios.get(`${API}/stats/streak`, { headers: { Authorization: `Bearer ${token}` } })
+        .then(res => setStreak(res.data)).catch(() => {});
       // If user had saved filter preferences, apply them after initial load
       const hasActiveFilters = Object.entries(filters).some(([k, v]) =>
         k === 'remote_only' ? v === true : v !== ''
@@ -1049,6 +1054,16 @@ export default function SeekerDashboard() {
           <h1 className="text-lg font-bold font-['Outfit']">hireabble</h1>
         </div>
         <div className="flex items-center gap-1">
+          {streak && streak.current > 0 && (
+            <button
+              onClick={() => setShowStreakSheet(true)}
+              className="relative flex items-center gap-1 px-2 py-1.5 rounded-xl bg-orange-500/10 text-orange-400 text-sm font-bold hover:bg-orange-500/20 transition-colors"
+              title={`${streak.current}-day streak`}
+            >
+              <Flame className="w-4 h-4" />
+              {streak.current}
+            </button>
+          )}
           <NotificationBell />
           <button
             onClick={() => navigate('/analytics')}
@@ -1520,6 +1535,84 @@ export default function SeekerDashboard() {
         trigger={upgradeTrigger}
         highlightTier="seeker_plus"
       />
+
+      {/* Streak Detail Sheet */}
+      <AnimatePresence>
+        {showStreakSheet && streak && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 bg-black/50 flex items-end justify-center"
+            onClick={() => setShowStreakSheet(false)}
+          >
+            <motion.div
+              initial={{ y: 300 }}
+              animate={{ y: 0 }}
+              exit={{ y: 300 }}
+              className="w-full max-w-lg bg-background rounded-t-3xl p-6 pb-10"
+              onClick={e => e.stopPropagation()}
+            >
+              <div className="w-12 h-1 bg-border rounded-full mx-auto mb-6" />
+              <div className="text-center mb-6">
+                <div className="inline-flex items-center gap-2 text-3xl font-bold text-orange-400">
+                  <Flame className="w-8 h-8" /> {streak.current}
+                </div>
+                <p className="text-muted-foreground mt-1">day streak</p>
+                {streak.longest > streak.current && (
+                  <p className="text-xs text-muted-foreground mt-1">Longest: {streak.longest} days</p>
+                )}
+              </div>
+              {/* Milestones */}
+              <div className="space-y-3">
+                {[3, 7, 14, 30].map(m => {
+                  const reached = streak.current >= m;
+                  const claimed = (streak.rewards_available || []).length === 0 && reached;
+                  const claimable = (streak.rewards_available || []).some(r => r.milestone === m);
+                  const labels = { 3: '1 Super Like', 7: '24hr Profile Boost', 14: '3 Super Likes', 30: '3-Day Boost + Badge' };
+                  return (
+                    <div key={m} className={`flex items-center justify-between p-3 rounded-xl border ${reached ? 'border-orange-500/30 bg-orange-500/5' : 'border-border'}`}>
+                      <div className="flex items-center gap-3">
+                        <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${reached ? 'bg-orange-500 text-white' : 'bg-muted text-muted-foreground'}`}>
+                          {m}
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium">{labels[m]}</p>
+                          <p className="text-xs text-muted-foreground">{m}-day streak</p>
+                        </div>
+                      </div>
+                      {claimable ? (
+                        <button
+                          onClick={async () => {
+                            try {
+                              await axios.post(`${API}/stats/streak/claim?milestone=${m}`, {}, { headers: { Authorization: `Bearer ${token}` } });
+                              toast.success(`Claimed: ${labels[m]}!`);
+                              const res = await axios.get(`${API}/stats/streak`, { headers: { Authorization: `Bearer ${token}` } });
+                              setStreak(res.data);
+                            } catch { toast.error('Failed to claim reward'); }
+                          }}
+                          className="px-3 py-1.5 rounded-lg bg-orange-500 text-white text-xs font-bold hover:bg-orange-600 transition-colors"
+                        >
+                          Claim
+                        </button>
+                      ) : reached ? (
+                        <CheckCircle className="w-5 h-5 text-success" />
+                      ) : (
+                        <Lock className="w-4 h-4 text-muted-foreground" />
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+              {streak.next_reward && (
+                <p className="text-center text-xs text-muted-foreground mt-4">
+                  Next reward at {streak.next_reward.milestone} days: {streak.next_reward.label}
+                </p>
+              )}
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
@@ -1807,6 +1900,45 @@ function EnteringCard({ card }) {
   );
 }
 
+function CultureMediaCarousel({ media }) {
+  const [activeIdx, setActiveIdx] = useState(0);
+  if (!media || media.length === 0) return null;
+  const BACKEND = process.env.REACT_APP_BACKEND_URL || '';
+  const getUrl = (url) => url?.startsWith('http') ? url : `${BACKEND}${url}`;
+  return (
+    <>
+      <img
+        src={getUrl(media[activeIdx]?.url)}
+        alt={media[activeIdx]?.caption || 'Team culture'}
+        className="w-full h-full object-cover"
+      />
+      {media.length > 1 && (
+        <>
+          {/* Dots */}
+          <div className="absolute top-4 left-1/2 -translate-x-1/2 z-20 flex gap-1.5">
+            {media.map((_, i) => (
+              <button
+                key={i}
+                onClick={(e) => { e.stopPropagation(); setActiveIdx(i); }}
+                className={`w-2 h-2 rounded-full transition-all ${i === activeIdx ? 'bg-white w-4' : 'bg-white/50'}`}
+              />
+            ))}
+          </div>
+          {/* Tap zones */}
+          <button
+            className="absolute left-0 top-0 w-1/3 h-full z-15"
+            onClick={(e) => { e.stopPropagation(); setActiveIdx(i => Math.max(0, i - 1)); }}
+          />
+          <button
+            className="absolute right-0 top-0 w-1/3 h-full z-15"
+            onClick={(e) => { e.stopPropagation(); setActiveIdx(i => Math.min(media.length - 1, i + 1)); }}
+          />
+        </>
+      )}
+    </>
+  );
+}
+
 function SwipeCard({ job, onSwipe, expanded, setExpanded }) {
   const x = useMotionValue(0);
   const y = useMotionValue(0);
@@ -1876,9 +2008,13 @@ function SwipeCard({ job, onSwipe, expanded, setExpanded }) {
       data-testid="job-card"
     >
       <div className="w-full h-full rounded-3xl overflow-hidden relative gradient-border">
-        {/* Background Image */}
+        {/* Background — culture media carousel or default gradient */}
         <div className="absolute inset-0">
-          <img src={job.background_image} alt="" className="w-full h-full object-cover" onError={handleBgImgError} />
+          {job.culture_media?.length > 0 ? (
+            <CultureMediaCarousel media={job.culture_media} />
+          ) : (
+            <img src={job.background_image} alt="" className="w-full h-full object-cover" onError={handleBgImgError} />
+          )}
           <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/60 to-black/30" />
         </div>
 

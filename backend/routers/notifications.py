@@ -66,6 +66,7 @@ class EmailPreferences(BaseModel):
     saved_job_reminders: Optional[bool] = None
     job_alerts: Optional[bool] = None
     job_alerts_frequency: Optional[str] = None  # "instant", "daily", "weekly", "off"
+    weekly_digest: Optional[bool] = None
     marketing_emails_opt_in: Optional[bool] = None
 
 @router.get("/preferences")

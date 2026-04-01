@@ -663,6 +663,8 @@ async def _check_match_on_swipe(
         "recruiter_avatar": recruiter.get("avatar") if recruiter else None,
         "recruiter_photo": recruiter.get("photo_url") if recruiter else None,
         "created_at": now,
+        "expires_at": (datetime.now(timezone.utc) + timedelta(hours=72)).isoformat(),
+        "expired": False,
     }
 
     try:
@@ -844,6 +846,13 @@ async def swipe(request: Request, action: SwipeAction, current_user: dict = Depe
     except Exception as e:
         import logging
         logging.getLogger(__name__).error(f"Match check error (non-fatal): {e}")
+
+    # Update activity streak
+    try:
+        from routers.stats import _update_streak
+        asyncio.create_task(_update_streak(current_user["id"]))
+    except Exception:
+        pass
 
     return {
         "message": f"Swiped {action.action}",
@@ -1297,7 +1306,9 @@ async def respond_to_application(response: RecruiterAction, current_user: dict =
             "ranking": ranking,
             "match_score": match_score,
             "is_superliked": is_superlike,
-            "created_at": datetime.now(timezone.utc).isoformat()
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "expires_at": (datetime.now(timezone.utc) + timedelta(hours=72)).isoformat(),
+            "expired": False,
         }
         await db.matches.insert_one(match_doc)
 

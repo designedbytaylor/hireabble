@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Send, Briefcase, User, Flag, ShieldBan, Calendar, CheckCheck, Check, Image, X, Video, Square, Loader2, Clock, Phone, MapPin, FileText } from 'lucide-react';
+import { ArrowLeft, Send, Briefcase, User, Flag, ShieldBan, Calendar, CheckCheck, Check, Image, X, Video, Square, Loader2, Clock, Phone, MapPin, FileText, Sparkles } from 'lucide-react';
 import { getPhotoUrl, handleImgError } from '../utils/helpers';
 import { openExternal } from '../utils/capacitor';
 import { cacheMessages, getCachedMessages } from '../utils/offlineCache';
@@ -28,6 +28,8 @@ export default function Chat() {
   const [sending, setSending] = useState(false);
   const [wsConnected, setWsConnected] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
+  const [conversationStarters, setConversationStarters] = useState([]);
+  const [startersLoading, setStartersLoading] = useState(false);
   const [blockOpen, setBlockOpen] = useState(false);
   const [otherTyping, setOtherTyping] = useState(false);
   const [imagePreview, setImagePreview] = useState(null);
@@ -137,6 +139,15 @@ export default function Chat() {
         setMessages(messagesRes.data);
         // Cache messages for offline access
         cacheMessages(matchId, messagesRes.data).catch(() => {});
+        // Fetch AI conversation starters if no messages yet
+        if (messagesRes.data.length === 0) {
+          setStartersLoading(true);
+          axios.get(`${API}/matches/${matchId}/conversation-starters`, {
+            headers: { Authorization: `Bearer ${token}` }
+          }).then(res => {
+            setConversationStarters(res.data.starters || []);
+          }).catch(() => {}).finally(() => setStartersLoading(false));
+        }
       } catch (error) {
         console.error('Failed to fetch:', error);
         // Try loading cached messages when offline
@@ -331,6 +342,7 @@ export default function Chat() {
           { headers: { Authorization: `Bearer ${token}` } }
         );
         setMessages(prev => [...prev, response.data]);
+        setConversationStarters([]); // Hide starters after first message
       }
     } catch (error) {
       console.error('Failed to send message:', error);
@@ -614,6 +626,36 @@ export default function Chat() {
               </>
             )}
           </div>
+        </div>
+      )}
+
+      {/* AI Conversation Starters */}
+      {messages.length === 0 && (conversationStarters.length > 0 || startersLoading) && (
+        <div className="px-4 pb-2">
+          {startersLoading ? (
+            <div className="flex items-center gap-2 text-xs text-muted-foreground py-2">
+              <Sparkles className="w-3.5 h-3.5 animate-pulse" />
+              <span>Generating conversation starters...</span>
+            </div>
+          ) : (
+            <div className="space-y-1.5">
+              <p className="text-xs text-muted-foreground flex items-center gap-1">
+                <Sparkles className="w-3 h-3" /> Suggested openers
+              </p>
+              <div className="flex flex-col gap-1.5">
+                {conversationStarters.map((starter, i) => (
+                  <button
+                    key={i}
+                    type="button"
+                    onClick={() => { setNewMessage(starter); setConversationStarters([]); }}
+                    className="text-left text-sm px-3 py-2 rounded-xl border border-primary/20 bg-primary/5 text-foreground hover:bg-primary/10 transition-colors"
+                  >
+                    {starter}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
 

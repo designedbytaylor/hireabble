@@ -892,3 +892,136 @@ async def unsubscribe_push(current_user: dict = Depends(get_current_user)):
         {"$set": {"push_subscription": None}}
     )
     return {"message": "Push subscription removed"}
+
+
+# ==================== ACTIVITY STREAKS ====================
+
+async def _update_streak(user_id: str):
+    """Update user's activity streak. Call after any qualifying activity (swipe, message, quiz)."""
+    from datetime import date as _date
+    today = _date.today().isoformat()
+    user = await db.users.find_one(
+        {"id": user_id},
+        {"_id": 0, "streak_count": 1, "streak_last_active_date": 1, "streak_longest": 1}
+    )
+    if not user:
+        return
+
+    last_active = user.get("streak_last_active_date")
+    if last_active == today:
+        return  # Already counted today
+
+    current = user.get("streak_count", 0)
+    longest = user.get("streak_longest", 0)
+
+    yesterday = (_date.today() - timedelta(days=1)).isoformat()
+    new_count = current + 1 if last_active == yesterday else 1
+
+    await db.users.update_one(
+        {"id": user_id},
+        {"$set": {
+            "streak_count": new_count,
+            "streak_last_active_date": today,
+            "streak_longest": max(longest, new_count),
+        }}
+    )
+
+
+STREAK_MILESTONES = {
+    3: {"reward": "super_like", "amount": 1, "label": "1 free Super Like"},
+    7: {"reward": "profile_boost", "amount": 24, "label": "24-hour profile boost"},
+    14: {"reward": "super_like", "amount": 3, "label": "3 free Super Likes"},
+    30: {"reward": "boost_3day", "amount": 1, "label": "3-day boost + Dedicated badge"},
+}
+
+
+@router.get("/stats/streak")
+async def get_streak(current_user: dict = Depends(get_current_user)):
+    """Get current user's activity streak info."""
+    user = await db.users.find_one(
+        {"id": current_user["id"]},
+        {"_id": 0, "streak_count": 1, "streak_last_active_date": 1,
+         "streak_longest": 1, "streak_rewards": 1}
+    )
+    current = user.get("streak_count", 0) if user else 0
+    longest = user.get("streak_longest", 0) if user else 0
+    claimed = {r["milestone"] for r in (user.get("streak_rewards") or [])}
+
+    next_reward = None
+    rewards_available = []
+    for milestone, info in sorted(STREAK_MILESTONES.items()):
+        if milestone not in claimed and current >= milestone:
+            rewards_available.append({"milestone": milestone, **info})
+        if milestone not in claimed and milestone > current and next_reward is None:
+            next_reward = {"milestone": milestone, **info}
+
+    return {
+        "current": current,
+        "longest": longest,
+        "last_active": user.get("streak_last_active_date") if user else None,
+        "next_reward": next_reward,
+        "rewards_available": rewards_available,
+    }
+
+
+@router.post("/stats/streak/claim")
+async def claim_streak_reward(milestone: int = 0, current_user: dict = Depends(get_current_user)):
+    """Claim a streak milestone reward."""
+    if milestone not in STREAK_MILESTONES:
+        raise HTTPException(status_code=400, detail="Invalid milestone")
+
+    user = await db.users.find_one(
+        {"id": current_user["id"]},
+        {"_id": 0, "streak_count": 1, "streak_rewards": 1}
+    )
+    if not user or user.get("streak_count", 0) < milestone:
+        raise HTTPException(status_code=400, detail="Streak not long enough for this milestone")
+
+    claimed = {r["milestone"] for r in (user.get("streak_rewards") or [])}
+    if milestone in claimed:
+        raise HTTPException(status_code=400, detail="Already claimed this reward")
+
+    reward_info = STREAK_MILESTONES[milestone]
+    now = datetime.now(timezone.utc).isoformat()
+
+    update = {"$push": {"streak_rewards": {"milestone": milestone, "reward": reward_info["reward"], "claimed_at": now}}}
+
+    if reward_info["reward"] == "super_like":
+        field = "seeker_purchased_superlikes" if current_user.get("role") == "seeker" else "recruiter_purchased_superswipes"
+        update["$inc"] = {field: reward_info["amount"]}
+    elif reward_info["reward"] == "profile_boost":
+        boost_until = (datetime.now(timezone.utc) + timedelta(hours=reward_info["amount"])).isoformat()
+        update["$set"] = {"profile_boost_until": boost_until}
+    elif reward_info["reward"] == "boost_3day":
+        boost_until = (datetime.now(timezone.utc) + timedelta(days=3)).isoformat()
+        update["$set"] = {"profile_boost_until": boost_until, "streak_badge": True}
+
+    await db.users.update_one({"id": current_user["id"]}, update)
+    return {"success": True, "reward": reward_info["label"]}
+
+
+# ==================== WEEKLY DIGEST ====================
+
+@router.get("/stats/weekly-digest")
+async def get_weekly_digest(current_user: dict = Depends(get_current_user)):
+    """Get on-demand weekly digest data for in-app viewing."""
+    now = datetime.now(timezone.utc)
+    week_ago = (now - timedelta(days=7)).isoformat()
+    uid = current_user["id"]
+
+    if current_user["role"] == "seeker":
+        new_jobs_count = await db.jobs.count_documents({"is_active": True, "created_at": {"$gte": week_ago}})
+        profile_views = await db.profile_views.count_documents({"seeker_id": uid, "created_at": {"$gte": week_ago}})
+        new_matches = await db.matches.count_documents({
+            "$or": [{"seeker_id": uid}, {"recruiter_id": uid}],
+            "created_at": {"$gte": week_ago}, "expired": {"$ne": True}
+        })
+        apps_sent = await db.applications.count_documents({"seeker_id": uid, "created_at": {"$gte": week_ago}})
+        return {"period": "week", "new_jobs": new_jobs_count, "profile_views": profile_views,
+                "new_matches": new_matches, "applications_sent": apps_sent}
+    else:
+        new_apps = await db.applications.count_documents({"recruiter_id": uid, "created_at": {"$gte": week_ago}})
+        new_matches = await db.matches.count_documents({
+            "recruiter_id": uid, "created_at": {"$gte": week_ago}, "expired": {"$ne": True}
+        })
+        return {"period": "week", "new_applications": new_apps, "new_matches": new_matches}

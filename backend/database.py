@@ -451,6 +451,7 @@ class JobCreate(BaseModel):
     location_lat: Optional[float] = None
     location_lng: Optional[float] = None
     work_style: Optional[dict] = None  # {team_preference, social_style, work_pace, decision_style, learning_style, management_pref, problem_approach, change_comfort} each 1-5
+    culture_media: Optional[List[dict]] = None  # [{url, caption, type}] max 5 items
 
 class JobResponse(BaseModel):
     model_config = ConfigDict(extra="ignore")
@@ -481,6 +482,7 @@ class JobResponse(BaseModel):
     distance_km: Optional[float] = None
     distance_label: Optional[str] = None
     work_style: Optional[dict] = None
+    culture_media: Optional[List[dict]] = None
 
 class SwipeAction(BaseModel):
     job_id: str
@@ -538,6 +540,10 @@ class MatchResponse(BaseModel):
     last_message_at: Optional[str] = None
     unread_count: Optional[int] = None
     ranking: Optional[dict] = None
+    expires_at: Optional[str] = None
+    expired: Optional[bool] = None
+    responsiveness_badge: Optional[str] = None
+    avg_response_hours: Optional[float] = None
 
 class MessageCreate(BaseModel):
     match_id: str

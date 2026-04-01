@@ -3,8 +3,9 @@ Matches and Messages routes for Hireabble API
 """
 from fastapi import APIRouter, HTTPException, Depends, Request
 from typing import List
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 import uuid
+import json as _json
 
 import asyncio
 
@@ -35,18 +36,17 @@ async def get_matches(current_user: dict = Depends(get_current_user)):
         "$or": [
             {"seeker_id": current_user["id"]},
             {"recruiter_id": current_user["id"]}
-        ]
+        ],
+        "expired": {"$ne": True},
     }
     # Exclude matches involving blocked users
     if blocked_ids:
-        query["seeker_id"] = {"$nin": blocked_ids} if current_user.get("role") == "recruiter" else current_user["id"]
-        query["recruiter_id"] = {"$nin": blocked_ids} if current_user.get("role") == "seeker" else current_user["id"]
-        # Rebuild with proper $and to handle both directions
         query = {"$and": [
             {"$or": [
                 {"seeker_id": current_user["id"]},
                 {"recruiter_id": current_user["id"]}
             ]},
+            {"expired": {"$ne": True}},
             {"seeker_id": {"$nin": blocked_ids}},
             {"recruiter_id": {"$nin": blocked_ids}}
         ]}
@@ -86,6 +86,30 @@ async def get_matches(current_user: dict = Depends(get_current_user)):
             job_data = jobs_map.get(m.get("job_id"), {})
             m["listing_photo"] = job_data.get("listing_photo")
             m["company_logo"] = job_data.get("company_logo")
+
+        # Batch-fetch responsiveness scores for the other party
+        other_ids = list(set(
+            m["recruiter_id"] if m["seeker_id"] == current_user["id"] else m["seeker_id"]
+            for m in matches
+        ))
+        if other_ids:
+            resp_users = await db.users.find(
+                {"id": {"$in": other_ids}},
+                {"_id": 0, "id": 1, "avg_response_time_hours": 1, "response_time_samples": 1}
+            ).to_list(len(other_ids))
+            resp_map = {u["id"]: u for u in resp_users}
+            for m in matches:
+                other_id = m["recruiter_id"] if m["seeker_id"] == current_user["id"] else m["seeker_id"]
+                resp_data = resp_map.get(other_id, {})
+                samples = resp_data.get("response_time_samples", 0)
+                if samples >= 5:
+                    avg_hrs = resp_data.get("avg_response_time_hours", 999)
+                    if avg_hrs < 4:
+                        m["responsiveness_badge"] = "fast"
+                        m["avg_response_hours"] = round(avg_hrs, 1)
+                    elif avg_hrs < 24:
+                        m["responsiveness_badge"] = "moderate"
+                        m["avg_response_hours"] = round(avg_hrs, 1)
 
     return matches
 
@@ -242,7 +266,47 @@ async def send_message(message: MessageCreate, request: Request, current_user: d
     }
     
     await db.messages.insert_one(message_doc)
-    
+
+    # Track recruiter response time for responsiveness scoring
+    if current_user.get("role") == "recruiter":
+        try:
+            last_other_msg = await db.messages.find_one(
+                {"match_id": message.match_id, "sender_id": receiver_id},
+                {"_id": 0, "created_at": 1},
+                sort=[("created_at", -1)]
+            )
+            if last_other_msg and last_other_msg.get("created_at"):
+                msg_time = datetime.fromisoformat(last_other_msg["created_at"].replace("Z", "+00:00"))
+                response_hours = (datetime.now(timezone.utc) - msg_time).total_seconds() / 3600
+                if 0 < response_hours < 168:
+                    await db.users.update_one(
+                        {"id": current_user["id"]},
+                        [{"$set": {
+                            "avg_response_time_hours": {
+                                "$divide": [
+                                    {"$add": [
+                                        {"$multiply": [
+                                            {"$ifNull": ["$avg_response_time_hours", 0]},
+                                            {"$ifNull": ["$response_time_samples", 0]}
+                                        ]},
+                                        response_hours
+                                    ]},
+                                    {"$add": [{"$ifNull": ["$response_time_samples", 0]}, 1]}
+                                ]
+                            },
+                            "response_time_samples": {"$add": [{"$ifNull": ["$response_time_samples", 0]}, 1]}
+                        }}]
+                    )
+        except Exception:
+            pass
+
+    # Update activity streak
+    try:
+        from routers.stats import _update_streak
+        asyncio.create_task(_update_streak(current_user["id"]))
+    except Exception:
+        pass
+
     # Create in-app notification for receiver
     await create_notification(
         user_id=receiver_id,
@@ -497,3 +561,107 @@ async def send_pre_match_message(body: dict, current_user: dict = Depends(get_cu
     })
 
     return {"message": "Message sent!", "thread_id": thread_id}
+
+
+# ==================== MATCH EXTEND (Premium) ====================
+
+@router.post("/matches/{match_id}/extend")
+@limiter.limit("5/minute")
+async def extend_match(match_id: str, request: Request, current_user: dict = Depends(get_current_user)):
+    """Premium users can extend an expiring match by 48 hours."""
+    match = await db.matches.find_one({"id": match_id}, {"_id": 0})
+    if not match:
+        raise HTTPException(status_code=404, detail="Match not found")
+    if match["seeker_id"] != current_user["id"] and match["recruiter_id"] != current_user["id"]:
+        raise HTTPException(status_code=403, detail="Not authorized")
+
+    sub = current_user.get("subscription", {})
+    now_str = datetime.now(timezone.utc).isoformat()
+    is_premium = (sub.get("status") == "active" and sub.get("period_end", "") >= now_str
+                  and sub.get("tier_id") in ("seeker_plus", "seeker_premium", "recruiter_pro", "recruiter_enterprise"))
+    if not is_premium:
+        raise HTTPException(status_code=403, detail="Premium subscription required to extend matches")
+
+    if not match.get("expires_at"):
+        raise HTTPException(status_code=400, detail="Match does not have an expiration")
+
+    new_expires = (datetime.now(timezone.utc) + timedelta(hours=48)).isoformat()
+    await db.matches.update_one({"id": match_id}, {"$set": {"expires_at": new_expires, "expiry_warned": False}})
+    return {"expires_at": new_expires}
+
+
+# ==================== AI CONVERSATION STARTERS ====================
+
+@router.get("/matches/{match_id}/conversation-starters")
+@limiter.limit("5/minute")
+async def get_conversation_starters(match_id: str, request: Request, current_user: dict = Depends(get_current_user)):
+    """Generate AI-powered conversation starters for a match."""
+    match = await db.matches.find_one({"id": match_id}, {"_id": 0})
+    if not match:
+        raise HTTPException(status_code=404, detail="Match not found")
+    if match["seeker_id"] != current_user["id"] and match["recruiter_id"] != current_user["id"]:
+        raise HTTPException(status_code=403, detail="Not authorized")
+
+    # Check cache first
+    cached = await db.conversation_starters_cache.find_one({"match_id": match_id}, {"_id": 0})
+    if cached:
+        return {"starters": cached["starters"]}
+
+    # Fetch context
+    seeker = await db.users.find_one(
+        {"id": match["seeker_id"]},
+        {"_id": 0, "name": 1, "title": 1, "skills": 1, "bio": 1, "experience_years": 1}
+    )
+    job = await db.jobs.find_one(
+        {"id": match["job_id"]},
+        {"_id": 0, "title": 1, "company": 1, "requirements": 1, "job_type": 1}
+    )
+    if not seeker or not job:
+        return {"starters": []}
+
+    try:
+        from routers.jobs import _get_anthropic_client, _call_anthropic
+        client = _get_anthropic_client()
+
+        is_seeker = current_user["id"] == match["seeker_id"]
+        role_label = "job seeker" if is_seeker else "recruiter"
+        other_label = "recruiter" if is_seeker else "candidate"
+
+        prompt = f"""Generate exactly 3 short, friendly conversation starters for a {role_label} to send to a {other_label} after matching on a job platform.
+
+Context:
+- Job: {job.get('title', 'Unknown')} at {job.get('company', 'Unknown')}
+- Job type: {job.get('job_type', 'Unknown')}
+- Key requirements: {', '.join((job.get('requirements') or [])[:5])}
+- Candidate skills: {', '.join((seeker.get('skills') or [])[:5])}
+- Candidate title: {seeker.get('title', 'Unknown')}
+- Candidate experience: {seeker.get('experience_years', 'Unknown')} years
+
+Rules:
+- Each starter must be 1-2 sentences max
+- Be conversational and natural, not corporate
+- Reference specific shared context (skills, role, company)
+- Return as a JSON array of 3 strings, nothing else
+
+Example format: ["starter 1", "starter 2", "starter 3"]"""
+
+        message = _call_anthropic(client, [{"role": "user", "content": prompt}], max_tokens=300)
+        text = message.content[0].text.strip()
+        if text.startswith("```"):
+            text = text.split("\n", 1)[1].rsplit("```", 1)[0].strip()
+        starters = _json.loads(text)
+        if not isinstance(starters, list):
+            starters = []
+        starters = [s for s in starters[:3] if isinstance(s, str) and len(s) < 300]
+    except Exception as e:
+        logger.error(f"Conversation starter generation failed: {e}")
+        starters = []
+
+    if starters:
+        await db.conversation_starters_cache.insert_one({
+            "match_id": match_id,
+            "starters": starters,
+            "created_at": datetime.now(timezone.utc)
+        })
+
+    return {"starters": starters}
