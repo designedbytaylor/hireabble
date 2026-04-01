@@ -201,7 +201,7 @@ export default function SeekerSearch() {
         {/* Header */}
         <div className="mb-6">
           <h1 className="text-2xl font-bold font-['Outfit'] mb-1">Search Jobs</h1>
-          <p className="text-sm text-muted-foreground">Find specific roles that match what you're looking for</p>
+          <p className="text-sm text-muted-foreground">Find specific roles that fit what you're looking for</p>
         </div>
 
         {/* Search Bar */}

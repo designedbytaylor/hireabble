@@ -1887,6 +1887,44 @@ _RECRUITER_HEADSHOTS = [
     "https://images.unsplash.com/photo-1592621385612-4d7129426394?w=500&h=500&fit=crop&crop=faces",
 ]
 
+# Culture media photo sets for seeding jobs with the culture_media carousel feature.
+# Each set is a list of 3-4 team/office photos from Unsplash, themed by company vibe.
+_CULTURE_MEDIA_SETS = [
+    # Tech startup — modern office vibes
+    [
+        {"url": "https://images.unsplash.com/photo-1522071820081-009f0129c71c?w=800&h=600&fit=crop", "caption": "Team collaboration", "type": "image"},
+        {"url": "https://images.unsplash.com/photo-1497366216548-37526070297c?w=800&h=600&fit=crop", "caption": "Our open-plan workspace", "type": "image"},
+        {"url": "https://images.unsplash.com/photo-1531482615713-2afd69097998?w=800&h=600&fit=crop", "caption": "Sprint planning session", "type": "image"},
+        {"url": "https://images.unsplash.com/photo-1559136555-9303baea8ebd?w=800&h=600&fit=crop", "caption": "Rooftop happy hour", "type": "image"},
+    ],
+    # Remote-first — distributed team
+    [
+        {"url": "https://images.unsplash.com/photo-1588196749597-9ff075ee6b5b?w=800&h=600&fit=crop", "caption": "Work from anywhere", "type": "image"},
+        {"url": "https://images.unsplash.com/photo-1600880292203-757bb62b4baf?w=800&h=600&fit=crop", "caption": "Virtual team standup", "type": "image"},
+        {"url": "https://images.unsplash.com/photo-1517048676732-d65bc937f952?w=800&h=600&fit=crop", "caption": "Annual team retreat", "type": "image"},
+    ],
+    # Corporate — professional environment
+    [
+        {"url": "https://images.unsplash.com/photo-1497215842964-222b430dc094?w=800&h=600&fit=crop", "caption": "Downtown headquarters", "type": "image"},
+        {"url": "https://images.unsplash.com/photo-1573164713714-d95e436ab8d6?w=800&h=600&fit=crop", "caption": "Strategy session", "type": "image"},
+        {"url": "https://images.unsplash.com/photo-1556761175-5973dc0f32e7?w=800&h=600&fit=crop", "caption": "Team lunch", "type": "image"},
+        {"url": "https://images.unsplash.com/photo-1524758631624-e2822e304c36?w=800&h=600&fit=crop", "caption": "Modern meeting rooms", "type": "image"},
+    ],
+    # Creative studio — design-focused
+    [
+        {"url": "https://images.unsplash.com/photo-1542744173-8e7e53415bb0?w=800&h=600&fit=crop", "caption": "Design review", "type": "image"},
+        {"url": "https://images.unsplash.com/photo-1558403194-611308249627?w=800&h=600&fit=crop", "caption": "Creative workspace", "type": "image"},
+        {"url": "https://images.unsplash.com/photo-1552664730-d307ca884978?w=800&h=600&fit=crop", "caption": "Whiteboard brainstorm", "type": "image"},
+    ],
+    # Engineering-focused — builder culture
+    [
+        {"url": "https://images.unsplash.com/photo-1605379399642-870262d3d051?w=800&h=600&fit=crop", "caption": "Pair programming", "type": "image"},
+        {"url": "https://images.unsplash.com/photo-1504384308090-c894fdcc538d?w=800&h=600&fit=crop", "caption": "Hackathon weekend", "type": "image"},
+        {"url": "https://images.unsplash.com/photo-1553877522-43269d4ea984?w=800&h=600&fit=crop", "caption": "Tech talk Fridays", "type": "image"},
+        {"url": "https://images.unsplash.com/photo-1531297484001-80022131f5a1?w=800&h=600&fit=crop", "caption": "Our dev setup", "type": "image"},
+    ],
+]
+
 SAMPLE_JOBS = [
     {"title": "Senior React Developer", "description": "Join our frontend team building a next-gen dashboard used by millions. You'll architect component systems, optimize performance, and mentor junior devs.", "requirements": ["React", "TypeScript", "5+ years experience", "Design systems"], "salary_min": 150000, "salary_max": 200000, "location": "San Francisco, CA", "job_type": "hybrid", "experience_level": "senior",
      "work_style": {"team_preference": 4, "social_style": 3, "work_pace": 4, "decision_style": 3, "learning_style": 2, "management_pref": 2, "problem_approach": 2, "change_comfort": 3}},
@@ -2107,6 +2145,7 @@ async def seed_test_data(body: dict = {}, admin: dict = Depends(get_current_admi
                 "company": recruiter.get("company", "Test Company"),
                 "company_logo": logo,
                 "background_image": bg,
+                "culture_media": random.choice(_CULTURE_MEDIA_SETS) if random.random() < 0.6 else [],
                 "is_active": True,
                 "created_at": (datetime.now(timezone.utc) - timedelta(days=random.randint(0, 30))).isoformat(),
             }
@@ -3777,7 +3816,27 @@ async def seed_demo_accounts(admin=Depends(get_current_admin)):
         },
     ]
 
-    for job in jobs:
+    # Culture media per demo job (engineering, design, marketing themes)
+    _demo_culture = [
+        [  # Senior Full Stack Engineer
+            {"url": "https://images.unsplash.com/photo-1522071820081-009f0129c71c?w=800&h=600&fit=crop", "caption": "Team collaboration", "type": "image"},
+            {"url": "https://images.unsplash.com/photo-1605379399642-870262d3d051?w=800&h=600&fit=crop", "caption": "Pair programming", "type": "image"},
+            {"url": "https://images.unsplash.com/photo-1497366216548-37526070297c?w=800&h=600&fit=crop", "caption": "Our workspace", "type": "image"},
+            {"url": "https://images.unsplash.com/photo-1559136555-9303baea8ebd?w=800&h=600&fit=crop", "caption": "Friday happy hour", "type": "image"},
+        ],
+        [  # Product Designer
+            {"url": "https://images.unsplash.com/photo-1542744173-8e7e53415bb0?w=800&h=600&fit=crop", "caption": "Design review", "type": "image"},
+            {"url": "https://images.unsplash.com/photo-1558403194-611308249627?w=800&h=600&fit=crop", "caption": "Creative workspace", "type": "image"},
+            {"url": "https://images.unsplash.com/photo-1552664730-d307ca884978?w=800&h=600&fit=crop", "caption": "Brainstorming session", "type": "image"},
+        ],
+        [  # Growth Marketing Manager
+            {"url": "https://images.unsplash.com/photo-1573164713714-d95e436ab8d6?w=800&h=600&fit=crop", "caption": "Strategy meeting", "type": "image"},
+            {"url": "https://images.unsplash.com/photo-1517048676732-d65bc937f952?w=800&h=600&fit=crop", "caption": "Team offsite", "type": "image"},
+            {"url": "https://images.unsplash.com/photo-1556761175-5973dc0f32e7?w=800&h=600&fit=crop", "caption": "Team lunch", "type": "image"},
+        ],
+    ]
+
+    for i, job in enumerate(jobs):
         job_doc = {
             **job,
             "recruiter_id": recruiter_id,
@@ -3785,6 +3844,7 @@ async def seed_demo_accounts(admin=Depends(get_current_admin)):
             "company_logo": f"https://api.dicebear.com/7.x/initials/svg?seed=InnovateTech",
             "background_image": "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
             "listing_photo": None,
+            "culture_media": _demo_culture[i] if i < len(_demo_culture) else [],
             "location_lat": None,
             "location_lng": None,
             "location_restriction": None,

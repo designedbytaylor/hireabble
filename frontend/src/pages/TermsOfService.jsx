@@ -79,9 +79,9 @@ export default function TermsOfService() {
           </section>
 
           <section>
-            <h2 className="text-lg font-bold font-['Outfit'] mb-3">7. Matching and Communication</h2>
+            <h2 className="text-lg font-bold font-['Outfit'] mb-3">7. Connections and Communication</h2>
             <p className="text-muted-foreground">
-              Hireabble provides a matching platform connecting job seekers with recruiters. We do not guarantee employment outcomes, the accuracy of user profiles, or the quality of any match. All hiring decisions are made independently by the parties involved. Hireabble is not an employment agency and does not act as an employer or recruiter.
+              Hireabble provides a connection platform linking job seekers with recruiters. We do not guarantee employment outcomes, the accuracy of user profiles, or the quality of any connection. All hiring decisions are made independently by the parties involved. Hireabble is not an employment agency and does not act as an employer or recruiter.
             </p>
           </section>
 
@@ -133,7 +133,7 @@ export default function TermsOfService() {
               You may delete your account at any time from within the app by navigating to Profile &gt; Delete Account. Upon deletion:
             </p>
             <ul className="list-disc pl-6 text-muted-foreground space-y-1">
-              <li>All personal data (profile, photos, messages, swipe history, matches) will be permanently removed within 30 days.</li>
+              <li>All personal data (profile, photos, messages, swipe history, connections) will be permanently removed within 30 days.</li>
               <li>If you have an active subscription purchased through the Apple App Store or Google Play, deleting your account does <strong>not</strong> automatically cancel your subscription. You must cancel your subscription separately through your device settings to avoid further charges.</li>
               <li>Transaction records may be retained for up to 7 years as required by financial regulations.</li>
             </ul>

@@ -100,7 +100,7 @@ export default function CommunityGuidelines() {
               <li>Do not use Hireabble for phishing, scams, or fraudulent activity</li>
               <li>Do not post links to malware, phishing sites, or malicious content</li>
               <li>Do not use automated tools or bots to interact with the platform</li>
-              <li>Do not artificially inflate profile views, matches, or other metrics</li>
+              <li>Do not artificially inflate profile views, connections, or other metrics</li>
             </ul>
           </section>
 

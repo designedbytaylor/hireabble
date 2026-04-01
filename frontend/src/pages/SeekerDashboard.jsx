@@ -1115,7 +1115,7 @@ export default function SeekerDashboard() {
               className="mb-3 flex items-center gap-2 p-3 rounded-xl bg-violet-500/10 border border-violet-500/20 text-left w-full hover:bg-violet-500/15 transition-colors"
             >
               <Sparkles className="w-4 h-4 text-violet-500 shrink-0" />
-              <span className="text-sm text-violet-600 dark:text-violet-400">Complete your <strong>work style</strong> profile for better matches</span>
+              <span className="text-sm text-violet-600 dark:text-violet-400">Complete your <strong>work style</strong> profile for better results</span>
             </button>
           )}
           {currentJob ? (
@@ -1257,7 +1257,7 @@ export default function SeekerDashboard() {
               <h2 className="text-2xl font-bold font-['Outfit'] mb-3">No More Jobs</h2>
               <p className="text-muted-foreground mb-6">
                 {activeFiltersCount > 0 
-                  ? "No jobs match your filters. Try adjusting them."
+                  ? "No jobs fit your filters. Try adjusting them."
                   : "You've seen all available jobs. Check back later!"}
               </p>
               <div className="flex gap-3">

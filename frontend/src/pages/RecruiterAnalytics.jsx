@@ -218,7 +218,7 @@ export default function RecruiterAnalytics() {
                     <div className="font-medium truncate">{job.title}</div>
                     <div className="text-xs text-muted-foreground flex items-center gap-3">
                       <span className="flex items-center gap-1"><Users className="w-3 h-3" /> {job.applications} apps</span>
-                      <span className="flex items-center gap-1"><Heart className="w-3 h-3" /> {job.matches} matches</span>
+                      <span className="flex items-center gap-1"><Heart className="w-3 h-3" /> {job.matches} connections</span>
                     </div>
                   </div>
                   <div className="text-right">

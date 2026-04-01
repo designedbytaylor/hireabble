@@ -44,9 +44,9 @@ export default function PrivacyPolicy() {
             <h2 className="text-lg font-bold font-['Outfit'] mb-3">2. How We Use Your Information</h2>
             <ul className="list-disc pl-6 text-muted-foreground space-y-1">
               <li>To provide and operate the Service, including job matching and communication features</li>
-              <li>To personalize your experience and improve match quality</li>
+              <li>To personalize your experience and improve connection quality</li>
               <li>To process payments and manage subscriptions</li>
-              <li>To send push notifications about matches, messages, and interviews</li>
+              <li>To send push notifications about connections, messages, and interviews</li>
               <li>To detect, prevent, and address fraud, abuse, and security issues</li>
               <li>To comply with legal obligations</li>
               <li>To communicate service updates and promotional offers (with your consent)</li>
@@ -86,7 +86,7 @@ export default function PrivacyPolicy() {
             <ul className="list-disc pl-6 text-muted-foreground space-y-1">
               <li><strong>Stripe:</strong> Payment processing for subscriptions. Stripe collects payment card details directly; we do not store full card numbers. See <a href="https://stripe.com/privacy" className="text-primary hover:underline" target="_blank" rel="noopener noreferrer">Stripe's Privacy Policy</a></li>
               <li><strong>Google OAuth:</strong> Optional sign-in via Google account. We receive your name, email, and profile photo. See <a href="https://policies.google.com/privacy" className="text-primary hover:underline" target="_blank" rel="noopener noreferrer">Google's Privacy Policy</a></li>
-              <li><strong>Web Push (Browser Notifications):</strong> We use the Web Push API to deliver notifications about matches, messages, and interviews. Push subscription tokens are stored on our servers</li>
+              <li><strong>Web Push (Browser Notifications):</strong> We use the Web Push API to deliver notifications about connections, messages, and interviews. Push subscription tokens are stored on our servers</li>
               <li><strong>OpenStreetMap (Nominatim):</strong> Reverse geocoding for location detection. Your coordinates are sent to the Nominatim service when you use "detect my location"</li>
               <li><strong>Google Fonts:</strong> Web fonts are loaded from Google's CDN. See <a href="https://policies.google.com/privacy" className="text-primary hover:underline" target="_blank" rel="noopener noreferrer">Google's Privacy Policy</a></li>
               <li><strong>Sentry:</strong> Error tracking and performance monitoring. When a crash or error occurs, Sentry collects technical diagnostic data (device type, OS version, app version, stack traces) to help us fix bugs. No personally identifiable information is intentionally sent. See <a href="https://sentry.io/privacy/" className="text-primary hover:underline" target="_blank" rel="noopener noreferrer">Sentry's Privacy Policy</a></li>
