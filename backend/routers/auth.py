@@ -11,13 +11,12 @@ import os
 import httpx
 
 import secrets
-import hashlib
 
 from database import (
     db, security, logger, RESEND_API_KEY, FRONTEND_URL,
     JWT_SECRET, JWT_ALGORITHM,
     hash_password, verify_password, create_token, get_current_user,
-    blacklist_token,
+    blacklist_token, hash_token,
     send_email_notification, get_email_template, escape_html, manager,
     encrypt_value, decrypt_value,
     UserCreate, UserLogin, UserResponse, ForgotPasswordRequest,
@@ -282,9 +281,8 @@ async def _apply_signup_promo(user_id: str, role: str, code: str):
 
 async def _send_verification_email(user_id: str, email: str, name: str):
     """Send email verification link"""
-    import hashlib
     verification_token = str(uuid.uuid4())
-    token_hash = hashlib.sha256(verification_token.encode()).hexdigest()
+    token_hash = hash_token(verification_token)
     expires_at = datetime.now(timezone.utc) + timedelta(hours=24)
 
     await db.email_verification_tokens.delete_many({"user_id": user_id})
@@ -307,14 +305,14 @@ async def _send_verification_email(user_id: str, email: str, name: str):
 
 
 @router.post("/verify-email")
-async def verify_email(body: dict):
+@limiter.limit("5/minute")
+async def verify_email(request: Request, body: dict):
     """Verify email using token from email link"""
-    import hashlib
     token_str = body.get("token")
     if not token_str:
         raise HTTPException(status_code=400, detail="Missing verification token")
 
-    token_hash = hashlib.sha256(token_str.encode()).hexdigest()
+    token_hash = hash_token(token_str)
     token_doc = await db.email_verification_tokens.find_one({"token": token_hash})
     if not token_doc:
         raise HTTPException(status_code=400, detail="Invalid or expired verification token")
@@ -422,7 +420,7 @@ async def login(credentials: UserLogin, request: Request):
     # Check email-based 2FA (separate from TOTP)
     if user.get("email_2fa_enabled") and not user.get("totp_enabled"):
         code = f"{secrets.randbelow(1000000):06d}"
-        code_hash = hashlib.sha256(code.encode()).hexdigest()
+        code_hash = hash_token(code)
         expires_at = datetime.now(timezone.utc) + timedelta(minutes=10)
 
         await db.user_2fa_codes.delete_many({"user_id": user["id"]})
@@ -511,18 +509,20 @@ async def check_promo(code: str, role: str = "seeker"):
 @limiter.limit("3/minute")
 async def forgot_password(body: ForgotPasswordRequest, request: Request):
     """Send password reset email"""
+    import random
     user = await db.users.find_one({"email": body.email})
-    
+
     # Always return success to prevent email enumeration
     if not user:
+        # Add random delay to match timing of the success path
+        await asyncio.sleep(random.uniform(0.05, 0.15))
         return {"message": "If an account exists with this email, a reset link has been sent."}
     
     # Generate unique reset token
     reset_token = secrets.token_urlsafe(32)
     expires_at = datetime.now(timezone.utc) + timedelta(hours=1)
 
-    import hashlib
-    token_hash = hashlib.sha256(reset_token.encode()).hexdigest()
+    token_hash = hash_token(reset_token)
 
     # Store token in database (delete any existing tokens for this user first)
     await db.password_reset_tokens.delete_many({"user_id": user["id"]})
@@ -579,8 +579,7 @@ async def forgot_password(body: ForgotPasswordRequest, request: Request):
 async def reset_password(body: ResetPasswordRequest, request: Request):
     """Reset password using token"""
     # Hash the incoming token before lookup
-    import hashlib
-    token_hash = hashlib.sha256(body.token.encode()).hexdigest()
+    token_hash = hash_token(body.token)
     token_doc = await db.password_reset_tokens.find_one({"token": token_hash})
 
     if not token_doc:
@@ -833,7 +832,7 @@ async def verify_email_2fa_login(body: dict, request: Request):
         await db.user_2fa_codes.delete_many({"user_id": user_id})
         raise HTTPException(status_code=401, detail="Verification code expired. Please log in again.")
 
-    code_hash = hashlib.sha256(code.encode()).hexdigest()
+    code_hash = hash_token(code)
     if not secrets.compare_digest(code_hash, stored["code_hash"]):
         raise HTTPException(status_code=401, detail="Invalid verification code")
 
@@ -919,9 +918,8 @@ async def request_email_change(body: dict, request: Request, current_user: dict 
         raise HTTPException(status_code=400, detail="This email is already registered")
 
     # Generate verification token (hash before storage — same pattern as password reset)
-    import hashlib
     change_token = str(uuid.uuid4())
-    token_hash = hashlib.sha256(change_token.encode()).hexdigest()
+    token_hash = hash_token(change_token)
     expires_at = datetime.now(timezone.utc) + timedelta(hours=1)
 
     # Store the pending email change (hashed token)
@@ -951,13 +949,12 @@ async def request_email_change(body: dict, request: Request, current_user: dict 
 @router.post("/confirm-email-change")
 async def confirm_email_change(body: dict):
     """Confirm email change using token from verification email."""
-    import hashlib
     token_str = body.get("token")
     if not token_str:
         raise HTTPException(status_code=400, detail="Missing verification token")
 
     # Hash the incoming token before DB lookup (tokens stored as hashes)
-    token_hash = hashlib.sha256(token_str.encode()).hexdigest()
+    token_hash = hash_token(token_str)
     token_doc = await db.email_change_tokens.find_one({"token": token_hash})
     if not token_doc:
         raise HTTPException(status_code=400, detail="Invalid or expired token")

@@ -53,6 +53,8 @@ import base64 as _base64
 _ENCRYPTION_KEY_RAW = os.environ.get('ENCRYPTION_KEY', '')
 if _ENCRYPTION_KEY_RAW:
     _ENCRYPTION_KEY = _base64.urlsafe_b64encode(_hashlib.sha256(_ENCRYPTION_KEY_RAW.encode()).digest())
+elif os.environ.get('ENVIRONMENT', 'development') == 'production':
+    raise RuntimeError("ENCRYPTION_KEY must be set in production. Generate one with: python -c \"import secrets; print(secrets.token_urlsafe(32))\"")
 else:
     logger.warning("ENCRYPTION_KEY not set — falling back to JWT_SECRET-derived key. Set a separate ENCRYPTION_KEY in production.")
     _ENCRYPTION_KEY = _base64.urlsafe_b64encode(_hashlib.sha256(JWT_SECRET.encode()).digest())
@@ -68,6 +70,12 @@ def decrypt_value(ciphertext: str) -> str:
     from cryptography.fernet import Fernet
     f = Fernet(_ENCRYPTION_KEY)
     return f.decrypt(ciphertext.encode()).decode()
+
+import hmac as _hmac
+def hash_token(token: str) -> str:
+    """HMAC-SHA256 hash for one-time tokens (reset, verification, 2FA).
+    Uses server-side key to prevent rainbow table attacks if DB is compromised."""
+    return _hmac.new(JWT_SECRET.encode(), token.encode(), _hashlib.sha256).hexdigest()
 
 # Email Configuration
 RESEND_API_KEY = os.environ.get('RESEND_API_KEY')
@@ -114,11 +122,13 @@ def verify_password(password: str, hashed: str) -> bool:
 
 def create_token(user_id: str, role: str, remember_me: bool = False) -> str:
     exp_hours = 24 * 30 if remember_me else JWT_EXPIRATION_HOURS  # 30 days vs 24 hours
+    now = datetime.now(timezone.utc)
     payload = {
         "user_id": user_id,
         "role": role,
         "jti": str(uuid.uuid4()),  # Unique token ID for future revocation
-        "exp": datetime.now(timezone.utc) + timedelta(hours=exp_hours)
+        "iat": now,
+        "exp": now + timedelta(hours=exp_hours)
     }
     return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
 
@@ -157,6 +167,16 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
             if not user:
                 raise HTTPException(status_code=401, detail="User not found")
             set_cached_user(user_id, user)
+
+        # Reject tokens issued before a password change (session revocation)
+        pwd_changed = user.get("password_changed_at")
+        if pwd_changed:
+            token_iat = payload.get("iat")
+            if token_iat:
+                issued_at = datetime.fromtimestamp(token_iat, tz=timezone.utc)
+                changed_at = datetime.fromisoformat(pwd_changed.replace('Z', '+00:00')) if isinstance(pwd_changed, str) else pwd_changed
+                if issued_at < changed_at:
+                    raise HTTPException(status_code=401, detail="Session expired due to password change. Please log in again.")
 
         # Block banned/suspended users from making API calls
         if user.get("status") == "banned":

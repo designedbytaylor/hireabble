@@ -40,4 +40,12 @@ if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('/service-worker.js').catch(() => {});
   });
+
+  // Respond to service worker requests for auth token (offline swipe sync)
+  navigator.serviceWorker.addEventListener('message', (event) => {
+    if (event.data?.type === 'GET_AUTH_TOKEN') {
+      const token = localStorage.getItem('token');
+      event.ports[0]?.postMessage({ token });
+    }
+  });
 }

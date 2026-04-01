@@ -26,11 +26,29 @@ if _sentry_dsn:
     import sentry_sdk
     from sentry_sdk.integrations.fastapi import FastApiIntegration
     from sentry_sdk.integrations.starlette import StarletteIntegration
+    def _sentry_before_send(event, hint):
+        """Strip sensitive data from Sentry events."""
+        if event.get("request"):
+            headers = event["request"].get("headers", {})
+            if "Authorization" in headers:
+                headers["Authorization"] = "[Filtered]"
+            if "cookie" in headers:
+                headers["cookie"] = "[Filtered]"
+            # Strip sensitive request body fields
+            data = event["request"].get("data")
+            if isinstance(data, dict):
+                for key in ("password", "token", "code", "secret", "totp_secret"):
+                    if key in data:
+                        data[key] = "[Filtered]"
+        return event
+
     sentry_sdk.init(
         dsn=_sentry_dsn,
         traces_sample_rate=0.1,
+        send_default_pii=False,
         environment=os.getenv("ENVIRONMENT", "production"),
         integrations=[StarletteIntegration(), FastApiIntegration()],
+        before_send=_sentry_before_send,
     )
 
 # Import database and shared utilities

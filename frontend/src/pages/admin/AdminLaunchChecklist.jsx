@@ -5,6 +5,20 @@ import { toast } from "sonner";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
+// Sanitize HTML to prevent XSS in contentEditable editor
+function sanitizeHtml(html) {
+  const doc = new DOMParser().parseFromString(html, 'text/html');
+  doc.querySelectorAll('script, iframe, object, embed, form').forEach(el => el.remove());
+  doc.querySelectorAll('*').forEach(el => {
+    for (const attr of [...el.attributes]) {
+      if (attr.name.startsWith('on') || attr.value.includes('javascript:')) {
+        el.removeAttribute(attr.name);
+      }
+    }
+  });
+  return doc.body.innerHTML;
+}
+
 // ─── CONSTANTS ────────────────────────────────────────────────────────────────
 const TEAL = "#00BFA6";
 const CARD_BG = "#111520";
@@ -393,7 +407,7 @@ export default function AdminLaunchChecklist() {
     setModalConfirmDelete(false);
     // Set editor content after render
     setTimeout(() => {
-      if (editorRef.current) editorRef.current.innerHTML = item.notes || "";
+      if (editorRef.current) editorRef.current.innerHTML = sanitizeHtml(item.notes || "");
     }, 0);
   };
 
