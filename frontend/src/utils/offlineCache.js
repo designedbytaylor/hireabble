@@ -69,7 +69,8 @@ export async function queueOfflineSwipe(swipeData) {
     const db = await openDB();
     const tx = db.transaction('swipeQueue', 'readwrite');
     const store = tx.objectStore('swipeQueue');
-    store.add({ ...swipeData, queued_at: new Date().toISOString() });
+    const { token, ...safeData } = swipeData; // Strip auth token — never store in IndexedDB
+    store.add({ ...safeData, queued_at: new Date().toISOString() });
     await new Promise((resolve, reject) => {
       tx.oncomplete = resolve;
       tx.onerror = () => reject(tx.error);

@@ -201,13 +201,30 @@ self.addEventListener('sync', (event) => {
             req.onerror = () => reject(req.error);
           });
 
+          // Request auth token from active client window (avoid storing tokens in IndexedDB)
+          let authToken = null;
+          const clients = await self.clients.matchAll({ type: 'window' });
+          if (clients.length > 0) {
+            authToken = await new Promise((resolve) => {
+              const channel = new MessageChannel();
+              channel.port1.onmessage = (e) => resolve(e.data?.token || null);
+              clients[0].postMessage({ type: 'GET_AUTH_TOKEN' }, [channel.port2]);
+              setTimeout(() => resolve(null), 3000);
+            });
+          }
+
+          if (!authToken) {
+            // No active window or token unavailable — skip sync, will retry when app opens
+            return;
+          }
+
           for (const swipe of swipes) {
             try {
               await fetch('/api/swipe', {
                 method: 'POST',
                 headers: {
                   'Content-Type': 'application/json',
-                  'Authorization': `Bearer ${swipe.token}`,
+                  'Authorization': `Bearer ${authToken}`,
                 },
                 body: JSON.stringify({ job_id: swipe.job_id, action: swipe.action }),
               });
