@@ -261,7 +261,7 @@ export default function AdminTesting() {
             ))}
           </div>
           <p className="text-[10px] text-gray-500 mt-3">
-            Data: {demoResult.data_created.jobs} jobs, {demoResult.data_created.applications} applications, {demoResult.data_created.matches} match, {demoResult.data_created.messages} messages
+            Data: {demoResult.data_created.jobs} jobs, {demoResult.data_created.applications} applications, {demoResult.data_created.matches} connection, {demoResult.data_created.messages} messages
           </p>
         </div>
       )}

@@ -768,8 +768,8 @@ async def _match_expiry_loop():
                     for uid in [match["seeker_id"], match["recruiter_id"]]:
                         await create_notification(
                             uid, "system_message",
-                            "Match Expired",
-                            "A match expired because no one started a conversation. Keep swiping!",
+                            "Connection Expired",
+                            "A connection expired because no one started a conversation. Keep swiping!",
                             data={"match_id": match["id"]}
                         )
 
@@ -790,8 +790,8 @@ async def _match_expiry_loop():
                     for uid in [match["seeker_id"], match["recruiter_id"]]:
                         await create_notification(
                             uid, "system_message",
-                            "Match Expiring Soon",
-                            f"Your match for {match.get('job_title', 'a position')} expires in 24 hours. Send a message to keep it!",
+                            "Connection Expiring Soon",
+                            f"Your connection for {match.get('job_title', 'a position')} expires in 24 hours. Send a message to keep it!",
                             data={"match_id": match["id"]}
                         )
                         await manager.send_to_user(uid, {"type": "match_expiring_soon", "match_id": match["id"]})
@@ -861,7 +861,7 @@ async def _weekly_digest_loop():
                         apps_sent = await db.applications.count_documents({"seeker_id": seeker["id"], "created_at": {"$gte": week_ago}})
 
                         if new_jobs > 0 or new_matches > 0:
-                            summary = f"This week: {new_jobs} new jobs, {new_matches} matches, {profile_views} profile views"
+                            summary = f"This week: {new_jobs} new jobs, {new_matches} connections, {profile_views} profile views"
                             await create_notification(seeker["id"], "system_message", "Your Weekly Market Report", summary, data={"type": "weekly_digest"})
 
                         await db.users.update_one({"id": seeker["id"]}, {"$set": {"last_weekly_digest_at": now.isoformat()}})
@@ -885,7 +885,7 @@ async def _weekly_digest_loop():
                         new_apps = await db.applications.count_documents({"recruiter_id": recruiter["id"], "created_at": {"$gte": week_ago}})
                         new_matches = await db.matches.count_documents({"recruiter_id": recruiter["id"], "created_at": {"$gte": week_ago}, "expired": {"$ne": True}})
                         if new_apps > 0 or new_matches > 0:
-                            summary = f"This week: {new_apps} new applications, {new_matches} matches"
+                            summary = f"This week: {new_apps} new applications, {new_matches} connections"
                             await create_notification(recruiter["id"], "system_message", "Your Weekly Hiring Report", summary, data={"type": "weekly_digest"})
                         await db.users.update_one({"id": recruiter["id"]}, {"$set": {"last_weekly_digest_at": now.isoformat()}})
                     except Exception as e:

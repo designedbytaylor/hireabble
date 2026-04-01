@@ -50,7 +50,7 @@ export default function CookiePolicy() {
               <div className="p-4 rounded-xl bg-card border border-border">
                 <h3 className="font-semibold mb-1">Push Notification Tokens</h3>
                 <p className="text-muted-foreground text-xs">
-                  If you opt in to push notifications, we store a push subscription token to send you real-time updates about matches, messages, and interviews. You can disable this through your device settings.
+                  If you opt in to push notifications, we store a push subscription token to send you real-time updates about connections, messages, and interviews. You can disable this through your device settings.
                 </p>
               </div>
             </div>

@@ -292,7 +292,7 @@ export default function PublicJobDetail() {
               ) : (
                 <>
                   <p className="text-sm text-muted-foreground">
-                    Sign up on Hireabble to apply and get matched with employers.
+                    Sign up on Hireabble to apply and connect with employers.
                   </p>
                   <Link to="/register/seeker">
                     <Button className="bg-gradient-to-r from-primary to-secondary text-white px-8 mt-2">
