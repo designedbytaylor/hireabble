@@ -18,6 +18,7 @@ import ConfirmDialog from '../components/ConfirmDialog';
 import PhotoCropModal from '../components/PhotoCropModal';
 import LocationAutocomplete from '../components/LocationAutocomplete';
 import useDocumentTitle from '../hooks/useDocumentTitle';
+import { isIOS, isAndroid } from '../utils/capacitor';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
@@ -912,7 +913,7 @@ export default function Profile() {
                 </p>
               )}
               <a
-                href="https://apps.apple.com/account/subscriptions"
+                href={isIOS ? 'https://apps.apple.com/account/subscriptions' : isAndroid ? 'https://play.google.com/store/account/subscriptions' : '/upgrade'}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex items-center gap-2 text-sm text-primary hover:underline"
@@ -2162,24 +2163,28 @@ export default function Profile() {
                 To manage or cancel your subscription, use the platform where you subscribed:
               </p>
               <div className="space-y-2">
-                <a
-                  href="https://apps.apple.com/account/subscriptions"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="w-full h-10 rounded-xl border border-border bg-background hover:bg-accent flex items-center justify-center gap-2 text-sm font-medium text-foreground transition-colors"
-                >
-                  <ExternalLink className="w-4 h-4" />
-                  Manage in App Store
-                </a>
-                <a
-                  href="https://play.google.com/store/account/subscriptions"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="w-full h-10 rounded-xl border border-border bg-background hover:bg-accent flex items-center justify-center gap-2 text-sm font-medium text-foreground transition-colors"
-                >
-                  <ExternalLink className="w-4 h-4" />
-                  Manage in Google Play
-                </a>
+                {(!isAndroid) && (
+                  <a
+                    href="https://apps.apple.com/account/subscriptions"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="w-full h-10 rounded-xl border border-border bg-background hover:bg-accent flex items-center justify-center gap-2 text-sm font-medium text-foreground transition-colors"
+                  >
+                    <ExternalLink className="w-4 h-4" />
+                    Manage in App Store
+                  </a>
+                )}
+                {(!isIOS) && (
+                  <a
+                    href="https://play.google.com/store/account/subscriptions"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="w-full h-10 rounded-xl border border-border bg-background hover:bg-accent flex items-center justify-center gap-2 text-sm font-medium text-foreground transition-colors"
+                  >
+                    <ExternalLink className="w-4 h-4" />
+                    Manage in Google Play
+                  </a>
+                )}
               </div>
             </div>
           )}
