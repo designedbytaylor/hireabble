@@ -1,3 +1,5 @@
+import { isIOS, isAndroid } from './capacitor';
+
 const STORAGE_KEY = 'hireabble_app_rating';
 
 /**
@@ -47,4 +49,22 @@ export function getStoreUrl() {
     return process.env.REACT_APP_PLAY_STORE_URL || null;
   }
   return null;
+}
+
+/**
+ * Request the native in-app review dialog.
+ * iOS: Uses SKStoreReviewController via the AppReviewPlugin bridge.
+ * Android: Placeholder for Google Play In-App Review API.
+ * Returns true if the native prompt was triggered (caller can skip the toast fallback).
+ */
+export function requestNativeReview() {
+  if (isIOS && window.webkit?.messageHandlers?.appReview) {
+    window.webkit.messageHandlers.appReview.postMessage({ action: 'requestReview' });
+    return true;
+  }
+  if (isAndroid && window.Android?.requestReview) {
+    window.Android.requestReview();
+    return true;
+  }
+  return false;
 }

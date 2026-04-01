@@ -16,6 +16,7 @@ import NotificationBell from '../components/NotificationBell';
 import { getPhotoUrl, handleImgError } from '../utils/helpers';
 import UpgradeModal from '../components/UpgradeModal';
 import MatchModal from '../components/MatchModal';
+import { requestNativeReview, dismissRatingPrompt, shouldPromptRating } from '../utils/appRating';
 import { SkeletonPageBackground, SkeletonStatCard, SkeletonSwipeCard, SkeletonActionButtons } from '../components/skeletons';
 import { Skeleton } from '../components/ui/skeleton';
 import useDocumentTitle from '../hooks/useDocumentTitle';
@@ -150,7 +151,14 @@ export default function RecruiterSwipe() {
                 id: data.match.id,
               });
               setShowMatch(true);
-              setStats(prev => ({ ...prev, matches: (prev.matches || 0) + 1 }));
+              setStats(prev => {
+                const next = { ...prev, matches: (prev.matches || 0) + 1 };
+                // Trigger native review prompt after milestone matches
+                if (shouldPromptRating(next.matches)) {
+                  if (requestNativeReview()) dismissRatingPrompt();
+                }
+                return next;
+              });
             }
           } catch { /* ignore parse errors */ }
         };

@@ -9,7 +9,7 @@ import Navigation from '../components/Navigation';
 import NotificationBell from '../components/NotificationBell';
 import MatchModal from '../components/MatchModal';
 import { isPushSupported, getPermissionStatus, subscribeToPush } from '../utils/pushNotifications';
-import { shouldPromptRating, dismissRatingPrompt, getStoreUrl } from '../utils/appRating';
+import { shouldPromptRating, dismissRatingPrompt, getStoreUrl, requestNativeReview } from '../utils/appRating';
 import { cacheJobCards, getCachedJobCards } from '../utils/offlineCache';
 import { openExternal } from '../utils/capacitor';
 import { Button } from '../components/ui/button';
@@ -407,14 +407,19 @@ export default function SeekerDashboard() {
       const cachedStats = loadCachedStats(uidRef.current);
       const matchCount = cachedStats?.matches || 0;
       if (shouldPromptRating(matchCount)) {
-        const storeUrl = getStoreUrl();
-        if (storeUrl) {
-          toast('Enjoying Hireabble?', {
-            description: 'A quick rating helps us reach more job seekers!',
-            action: { label: 'Rate us', onClick: () => { dismissRatingPrompt(); openExternal(storeUrl); } },
-            cancel: { label: 'Not now', onClick: dismissRatingPrompt },
-            duration: 10000,
-          });
+        // Use native review dialog on iOS/Android; fall back to toast with store link on web
+        if (!requestNativeReview()) {
+          const storeUrl = getStoreUrl();
+          if (storeUrl) {
+            toast('Enjoying Hireabble?', {
+              description: 'A quick rating helps us reach more job seekers!',
+              action: { label: 'Rate us', onClick: () => { dismissRatingPrompt(); openExternal(storeUrl); } },
+              cancel: { label: 'Not now', onClick: dismissRatingPrompt },
+              duration: 10000,
+            });
+          }
+        } else {
+          dismissRatingPrompt();
         }
       }
     }, 5000);
