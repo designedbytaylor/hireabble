@@ -161,6 +161,46 @@ const INITIAL_CHECKLIST = [
   { id: uid(), category: "Marketing & Launch", text: "Prepare launch announcement (social media, website, email)", done: false },
   { id: uid(), category: "Marketing & Launch", text: "Set up app store rating prompt (SKStoreReviewController on iOS)", done: false },
   { id: uid(), category: "Marketing & Launch", text: "Create a marketing website landing page or update hireabble.com with store badges", done: false },
+
+  // ── Marketing — Free Tools ──
+
+  { id: uid(), category: "Marketing — Free Tools", text: "Build Resume Builder tool at /tools/resume-builder (client-side PDF generation with react-pdf or jspdf)", done: false },
+  { id: uid(), category: "Marketing — Free Tools", text: "Build Resume Score Checker tool at /tools/resume-score (paste resume → 0-100 score with improvement tips)", done: false },
+  { id: uid(), category: "Marketing — Free Tools", text: "Build Cover Letter Generator tool at /tools/cover-letter-generator (templated output from role/company/skills input)", done: false },
+  { id: uid(), category: "Marketing — Free Tools", text: "Build Salary Calculator tool at /tools/salary-calculator (job title + city → salary range from Canadian data)", done: false },
+  { id: uid(), category: "Marketing — Free Tools", text: "Build Interview Question Practice tool at /tools/interview-prep (randomized questions by job category with STAR tips)", done: false },
+  { id: uid(), category: "Marketing — Free Tools", text: "Build Job Search Tracker tool at /tools/job-tracker (Kanban board with localStorage + CSV export)", done: false },
+  { id: uid(), category: "Marketing — Free Tools", text: "Build Skills Gap Analyzer tool at /tools/skills-gap (current role vs target role → skill gaps + learning resources)", done: false },
+  { id: uid(), category: "Marketing — Free Tools", text: "Build LinkedIn Headline Generator tool at /tools/linkedin-headline (role/strengths → 5-10 headline variations)", done: false },
+  { id: uid(), category: "Marketing — Free Tools", text: "Build Job Description Generator tool at /tools/job-description-generator (role/seniority/industry → structured posting)", done: false },
+  { id: uid(), category: "Marketing — Free Tools", text: "Build Hiring Cost Calculator tool at /tools/hiring-cost-calculator (salary/benefits/time-to-fill → cost-per-hire)", done: false },
+  { id: uid(), category: "Marketing — Free Tools", text: "Build Offer Letter Template Generator tool at /tools/offer-letter (fill details → professional PDF)", done: false },
+  { id: uid(), category: "Marketing — Free Tools", text: "Build Employer Branding Scorecard tool at /tools/employer-brand-score (15-question quiz → score + tips)", done: false },
+  { id: uid(), category: "Marketing — Free Tools", text: "Add /api/leads endpoint in backend for optional email capture from free tools", done: false },
+  { id: uid(), category: "Marketing — Free Tools", text: "Add react-helmet-async for per-page meta tags, Open Graph, and JSON-LD schema on all tool pages", done: false },
+  { id: uid(), category: "Marketing — Free Tools", text: "Create /tools landing page listing all free tools with descriptions and SEO keywords", done: false },
+  { id: uid(), category: "Marketing — Free Tools", text: "Add public routes for /tools/* in App.js (no auth wrapper)", done: false },
+  { id: uid(), category: "Marketing — Free Tools", text: "Submit all tool pages to Google Search Console for indexing", done: false },
+
+  // ── Marketing — Content & SEO ──
+
+  { id: uid(), category: "Marketing — Content & SEO", text: "Set up separate Next.js project for SEO content site (blog.hireabble.com or subdirectory via Vercel rewrites)", done: false },
+  { id: uid(), category: "Marketing — Content & SEO", text: "Design URL structure: /jobs/[city]/[role], /salary/[city]/[role], /career-guide/[slug], /interview-questions/[role]", done: false },
+  { id: uid(), category: "Marketing — Content & SEO", text: "Build city+role data matrix — 50 Canadian cities × 80 job titles with salary data from Stats Canada", done: false },
+  { id: uid(), category: "Marketing — Content & SEO", text: "Create AI prompt templates for each page type (job pages, salary guides, career guides, interview questions)", done: false },
+  { id: uid(), category: "Marketing — Content & SEO", text: "Build batch content generation pipeline — script calling Claude Haiku API (~$22 for 10K pages)", done: false },
+  { id: uid(), category: "Marketing — Content & SEO", text: "Generate ~4,000 city+role job pages (/jobs/edmonton/software-developer etc.)", done: false },
+  { id: uid(), category: "Marketing — Content & SEO", text: "Generate ~4,000 city+role salary guide pages (/salary/calgary/nurse etc.)", done: false },
+  { id: uid(), category: "Marketing — Content & SEO", text: "Write 200 long-form career guide articles (/career-guide/how-to-become-a-plumber)", done: false },
+  { id: uid(), category: "Marketing — Content & SEO", text: "Generate 80 interview question pages by role (/interview-questions/nurse)", done: false },
+  { id: uid(), category: "Marketing — Content & SEO", text: "Build city hub pages (50) and role hub pages (80) for internal linking", done: false },
+  { id: uid(), category: "Marketing — Content & SEO", text: "Implement dynamic XML sitemap generation in Next.js for all programmatic SEO pages", done: false },
+  { id: uid(), category: "Marketing — Content & SEO", text: "Add JSON-LD structured data — JobPosting, Occupation, FAQPage, BreadcrumbList schemas per page type", done: false },
+  { id: uid(), category: "Marketing — Content & SEO", text: "Build internal linking system — each page links to related cities, roles, salary pages, and free tools", done: false },
+  { id: uid(), category: "Marketing — Content & SEO", text: "Set up canonical URLs and cross-link SEO pages with main app (/browse, signup CTAs)", done: false },
+  { id: uid(), category: "Marketing — Content & SEO", text: "Submit sitemaps to Google Search Console and Bing Webmaster Tools", done: false },
+  { id: uid(), category: "Marketing — Content & SEO", text: "Set up Vercel Analytics or Plausible for SEO traffic tracking on content site", done: false },
+  { id: uid(), category: "Marketing — Content & SEO", text: "Add Hireabble signup CTAs and app download links to every SEO page", done: false },
 ];
 
 // ─── MAIN COMPONENT ──────────────────────────────────────────────────────────
