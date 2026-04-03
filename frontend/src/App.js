@@ -50,6 +50,21 @@ const PrivacyPolicy = React.lazy(() => import("./pages/PrivacyPolicy"));
 const CookiePolicy = React.lazy(() => import("./pages/CookiePolicy"));
 const CommunityGuidelines = React.lazy(() => import("./pages/CommunityGuidelines"));
 
+// Free marketing tools — public, no auth
+const ToolsIndex = React.lazy(() => import("./pages/tools/ToolsIndex"));
+const ResumeBuilder = React.lazy(() => import("./pages/tools/ResumeBuilder"));
+const ResumeScore = React.lazy(() => import("./pages/tools/ResumeScore"));
+const CoverLetterGenerator = React.lazy(() => import("./pages/tools/CoverLetterGenerator"));
+const SalaryCalculator = React.lazy(() => import("./pages/tools/SalaryCalculator"));
+const InterviewPrep = React.lazy(() => import("./pages/tools/InterviewPrep"));
+const JobTracker = React.lazy(() => import("./pages/tools/JobTracker"));
+const SkillsGap = React.lazy(() => import("./pages/tools/SkillsGap"));
+const LinkedInHeadline = React.lazy(() => import("./pages/tools/LinkedInHeadline"));
+const JobDescriptionGenerator = React.lazy(() => import("./pages/tools/JobDescriptionGenerator"));
+const HiringCostCalculator = React.lazy(() => import("./pages/tools/HiringCostCalculator"));
+const OfferLetter = React.lazy(() => import("./pages/tools/OfferLetter"));
+const EmployerBrandScore = React.lazy(() => import("./pages/tools/EmployerBrandScore"));
+
 // Prefetch likely-next page chunks after initial load so navigation feels instant
 const prefetchChunks = () => {
   // Warm the chunk cache — import() returns cached promises if already loaded
@@ -471,6 +486,21 @@ function AppRoutes() {
       <Route path="/privacy" element={<PrivacyPolicy />} />
       <Route path="/cookie-policy" element={<CookiePolicy />} />
       <Route path="/community-guidelines" element={<CommunityGuidelines />} />
+
+      {/* Free marketing tools — public, no auth required */}
+      <Route path="/tools" element={<ToolsIndex />} />
+      <Route path="/tools/resume-builder" element={<ResumeBuilder />} />
+      <Route path="/tools/resume-score" element={<ResumeScore />} />
+      <Route path="/tools/cover-letter-generator" element={<CoverLetterGenerator />} />
+      <Route path="/tools/salary-calculator" element={<SalaryCalculator />} />
+      <Route path="/tools/interview-prep" element={<InterviewPrep />} />
+      <Route path="/tools/job-tracker" element={<JobTracker />} />
+      <Route path="/tools/skills-gap" element={<SkillsGap />} />
+      <Route path="/tools/linkedin-headline" element={<LinkedInHeadline />} />
+      <Route path="/tools/job-description-generator" element={<JobDescriptionGenerator />} />
+      <Route path="/tools/hiring-cost-calculator" element={<HiringCostCalculator />} />
+      <Route path="/tools/offer-letter" element={<OfferLetter />} />
+      <Route path="/tools/employer-brand-score" element={<EmployerBrandScore />} />
 
       {/* Admin impersonation — no PublicRoute wrapper so it always works */}
       <Route path="/impersonate" element={<Impersonate />} />

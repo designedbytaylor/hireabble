@@ -314,3 +314,37 @@ input:focus, textarea:focus {
   border-color: rgba(220, 38, 38, 0.2) !important;
   box-shadow: 0 8px 32px rgba(220, 38, 38, 0.1) !important;
 }
+
+/* Print styles for marketing tools (Resume Builder, Offer Letter, Cover Letter) */
+@media print {
+  .no-print,
+  header,
+  [data-sonner-toaster] {
+    display: none !important;
+  }
+
+  body,
+  .min-h-screen {
+    background: white !important;
+    color: black !important;
+  }
+
+  .printable-area {
+    width: 100% !important;
+    max-width: 100% !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    background: white !important;
+    color: black !important;
+    border: none !important;
+    box-shadow: none !important;
+    backdrop-filter: none !important;
+  }
+
+  .glass-card {
+    background: white !important;
+    border: none !important;
+    box-shadow: none !important;
+    backdrop-filter: none !important;
+  }
+}
