@@ -29,6 +29,12 @@ export const PAGE_TYPES = [
   { value: 'salary_guide', label: 'Salary Guide' },
   { value: 'career_guide', label: 'Career Guide' },
   { value: 'interview_prep', label: 'Interview Prep' },
+  { value: 'resume_tips', label: 'Resume Tips' },
+  { value: 'cover_letter_guide', label: 'Cover Letter Guide' },
+  { value: 'cost_of_living', label: 'Cost of Living' },
+  { value: 'skills_guide', label: 'Skills Guide' },
+  { value: 'day_in_life', label: 'Day in the Life' },
+  { value: 'salary_negotiation', label: 'Salary Negotiation' },
 ];
 
 export const PAGE_TYPE_MAP = Object.fromEntries(PAGE_TYPES.map(p => [p.value, p.label]));

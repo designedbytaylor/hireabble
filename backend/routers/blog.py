@@ -50,7 +50,11 @@ ROLES = [
     "Customer Service Rep", "Retail Manager", "Chef", "Physiotherapist", "Paramedic",
 ]
 
-PAGE_TYPES = ["jobs_in_city", "salary_guide", "career_guide", "interview_prep"]
+PAGE_TYPES = [
+    "jobs_in_city", "salary_guide", "career_guide", "interview_prep",
+    "resume_tips", "cover_letter_guide", "cost_of_living",
+    "skills_guide", "day_in_life", "salary_negotiation",
+]
 
 # Salary data (CAD baseline for Canada, multiply ~1.1x for US/USD)
 # Format: { role: { "junior": (low, high), "mid": (low, high), "senior": (low, high) } }
@@ -136,6 +140,48 @@ ANGLE_VARIATIONS = {
         "Highlight cultural fit questions and what {city} employers value most.",
         "Focus on questions candidates should ask the interviewer.",
         "Emphasize common mistakes {role} candidates make in interviews and how to avoid them.",
+    ],
+    "resume_tips": [
+        "Focus on ATS optimization and keywords that {city} recruiters actually search for.",
+        "Emphasize quantifiable achievements and metrics that matter for {role} positions.",
+        "Highlight the resume format debate (chronological vs. functional) for {role}s in {city}.",
+        "Focus on what {city} hiring managers scan for in the first 6 seconds.",
+        "Emphasize how to tailor your {role} resume for different company sizes in {city}.",
+    ],
+    "cover_letter_guide": [
+        "Focus on opening hooks that grab attention for {role} applications in {city}.",
+        "Emphasize storytelling techniques that connect your experience to the {role} position.",
+        "Highlight how to research {city} companies and personalize each cover letter.",
+        "Focus on the right tone — formal vs. conversational — for {role} jobs in {city}.",
+        "Emphasize what NOT to include and common cover letter mistakes for {role} applicants.",
+    ],
+    "cost_of_living": [
+        "Focus on neighborhood-by-neighborhood rent comparison for {role}s in {city}.",
+        "Emphasize the salary-to-rent ratio and what percentage of income goes to housing.",
+        "Highlight hidden costs that {role}s moving to {city} often overlook.",
+        "Focus on how {role} salaries in {city} compare to the actual cost of a comfortable life.",
+        "Emphasize money-saving tips specific to living in {city} as a {role}.",
+    ],
+    "skills_guide": [
+        "Focus on skills that {city} employers value most — based on local job postings.",
+        "Emphasize the gap between university training and what {role} employers actually need.",
+        "Highlight emerging skills that will define {role} hiring in {city} over the next 2 years.",
+        "Focus on free and affordable ways to learn the top {role} skills in {city}.",
+        "Emphasize soft skills vs. hard skills and which matter more for {role}s in {city}.",
+    ],
+    "day_in_life": [
+        "Focus on the morning routine and commute experience of a {role} in {city}.",
+        "Emphasize the surprising parts of the job that outsiders don't see.",
+        "Highlight work-life balance realities for {role}s in {city} — the honest version.",
+        "Focus on how the daily routine differs by seniority level for {role}s.",
+        "Emphasize the social and team dynamics of working as a {role} in {city}.",
+    ],
+    "salary_negotiation": [
+        "Focus on exact scripts and phrases to use when negotiating {role} salary in {city}.",
+        "Emphasize the best timing and leverage points for salary negotiation.",
+        "Highlight non-salary perks that {role}s in {city} should negotiate for.",
+        "Focus on counter-offer strategies specific to the {city} market.",
+        "Emphasize how to negotiate as a {role} when switching jobs vs. asking for a raise.",
     ],
 }
 
@@ -243,6 +289,79 @@ def _build_prompt(page_type: str, city: str, role: str) -> tuple[str, str]:
             f"Add tips on researching {city}-based employers, salary negotiation "
             f"(typical range: {salary['mid']} {currency} mid-level), "
             f"and what hiring managers in {city} specifically look for. "
+            f"{style_instructions}"
+        )
+    elif page_type == "resume_tips":
+        title = f"How to Write a {role} Resume in {city} (2025-2026)"
+        prompt = (
+            f"Write a practical resume writing guide for {role} positions in {city}, {country}. "
+            f"Cover the best resume format, must-include sections, and keywords that ATS systems "
+            f"and {city} recruiters look for. Include specific skills to highlight, "
+            f"how to quantify achievements, and common resume mistakes. "
+            f"Reference the salary range (mid-level {salary['mid']} {currency}) so readers "
+            f"understand the caliber of resume needed. "
+            f"Mention how Hireabble's swipe-based job matching removes some resume friction. "
+            f"{style_instructions}"
+        )
+    elif page_type == "cover_letter_guide":
+        title = f"{role} Cover Letter Template for {city} Jobs"
+        prompt = (
+            f"Write a cover letter guide for {role} job applications in {city}, {country}. "
+            f"Include 2-3 sample opening paragraphs, body paragraph frameworks, and closings. "
+            f"Cover the right tone for {city}'s job market, how to research the company, "
+            f"and what hiring managers look for in {role} cover letters. "
+            f"Explain when a cover letter matters and when it doesn't. "
+            f"Include tips on customization and common mistakes to avoid. "
+            f"{style_instructions}"
+        )
+    elif page_type == "cost_of_living":
+        title = f"Can You Afford to Live in {city} as a {role}? (2025-2026)"
+        prompt = (
+            f"Write a cost of living analysis for {role} professionals in {city}, {country}. "
+            f"Break down major expenses: rent/housing, transportation, food, taxes, and utilities. "
+            f"Compare the {role} salary range (junior {salary['junior']}, mid {salary['mid']}, "
+            f"senior {salary['senior']} {currency}) against these costs. "
+            f"Cover affordable neighborhoods, commute trade-offs, and savings potential "
+            f"at each career stage. Compare {city}'s affordability to similar cities. "
+            f"Be honest about the financial reality — don't sugarcoat it. "
+            f"{style_instructions}"
+        )
+    elif page_type == "skills_guide":
+        title = f"Top Skills You Need as a {role} in {city} (2025-2026)"
+        prompt = (
+            f"Write a skills guide for {role} professionals in {city}, {country}. "
+            f"Break down the must-have technical skills, nice-to-have skills, and soft skills "
+            f"that {city} employers are hiring for right now. "
+            f"Cover where to learn each skill (courses, bootcamps, certifications), "
+            f"how long it takes to become proficient, and which skills command the highest "
+            f"salary premium (senior range: {salary['senior']} {currency}). "
+            f"Include emerging skills and trends specific to the {city} market. "
+            f"{style_instructions}"
+        )
+    elif page_type == "day_in_life":
+        title = f"A Day in the Life of a {role} in {city}"
+        prompt = (
+            f"Write a narrative 'day in the life' article about working as a {role} in {city}, {country}. "
+            f"Walk through a typical workday: morning routine, commute, key tasks, meetings, "
+            f"lunch, afternoon work, and end of day. Include realistic details about the {city} "
+            f"lifestyle — neighborhoods, transit, weather, work culture. "
+            f"Cover how the day differs for junior vs. senior {role}s. "
+            f"Be authentic and specific — include both the rewarding parts and the challenges. "
+            f"Mention typical compensation ({salary['mid']} {currency} mid-level) for context. "
+            f"{style_instructions}"
+        )
+    elif page_type == "salary_negotiation":
+        title = f"How to Negotiate Your {role} Salary in {city}"
+        prompt = (
+            f"Write a salary negotiation guide for {role} professionals in {city}, {country}. "
+            f"Include specific negotiation scripts and phrases. Cover when to negotiate "
+            f"(new offer vs. annual review), how to research market rates, and what leverage "
+            f"points work best in {city}'s job market. "
+            f"Reference the salary range: junior {salary['junior']}, mid {salary['mid']}, "
+            f"senior {salary['senior']} {currency}. "
+            f"Cover non-salary negotiation items (remote work, signing bonus, equity, PTO). "
+            f"Include what to do if they say 'the salary is non-negotiable.' "
+            f"Mention how knowing your market value on platforms like Hireabble helps negotiation. "
             f"{style_instructions}"
         )
     else:
