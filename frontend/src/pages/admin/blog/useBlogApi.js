@@ -73,14 +73,15 @@ export default function useBlogApi() {
 
   // ─── ACTIONS ──────────────────────────────────────────────────────────────
 
-  const handleGenerate = async ({ pageType, cities, roles }) => {
-    if (cities.length === 0 || roles.length === 0) return;
+  const handleGenerate = async ({ pageType, cities, roles, extras }) => {
+    if (cities.length === 0) return;
     setGenerating(true);
     try {
       await axios.post(`${API}/admin/blog/generate`, {
         page_type: pageType,
         cities,
         roles,
+        extras: extras || {},
       }, { headers });
       toast.success('Generation started successfully');
       return true;

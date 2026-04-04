@@ -19,6 +19,20 @@ const PAGE_TYPE_LABELS = {
   skills_guide: 'Skills Guide',
   day_in_life: 'Day in the Life',
   salary_negotiation: 'Negotiation',
+  remote_work_guide: 'Remote Work',
+  entry_level_guide: 'Entry Level',
+  freelance_guide: 'Freelance',
+  certification_guide: 'Certifications',
+  company_size_guide: 'Startup vs Corp',
+  role_comparison: 'Role Comparison',
+  industry_guide: 'Industry Guide',
+  neighborhood_guide: 'Neighborhoods',
+  company_hiring: 'Companies Hiring',
+  visa_immigration: 'Immigration',
+  career_transition: 'Career Change',
+  technology_stack: 'Tech Jobs',
+  city_comparison: 'City vs City',
+  annual_job_market: 'Job Market',
 };
 
 const PAGE_TYPE_COLORS = {
@@ -32,6 +46,20 @@ const PAGE_TYPE_COLORS = {
   skills_guide: 'bg-indigo-500/20 text-indigo-400',
   day_in_life: 'bg-rose-500/20 text-rose-400',
   salary_negotiation: 'bg-emerald-500/20 text-emerald-400',
+  remote_work_guide: 'bg-sky-500/20 text-sky-400',
+  entry_level_guide: 'bg-lime-500/20 text-lime-400',
+  freelance_guide: 'bg-amber-500/20 text-amber-400',
+  certification_guide: 'bg-teal-500/20 text-teal-400',
+  company_size_guide: 'bg-violet-500/20 text-violet-400',
+  role_comparison: 'bg-fuchsia-500/20 text-fuchsia-400',
+  industry_guide: 'bg-blue-500/20 text-blue-300',
+  neighborhood_guide: 'bg-green-500/20 text-green-300',
+  company_hiring: 'bg-purple-500/20 text-purple-300',
+  visa_immigration: 'bg-orange-500/20 text-orange-300',
+  career_transition: 'bg-cyan-500/20 text-cyan-300',
+  technology_stack: 'bg-pink-500/20 text-pink-300',
+  city_comparison: 'bg-indigo-500/20 text-indigo-300',
+  annual_job_market: 'bg-rose-500/20 text-rose-300',
 };
 
 function markdownToHtml(md) {

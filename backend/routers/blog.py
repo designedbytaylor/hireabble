@@ -51,9 +51,101 @@ ROLES = [
 ]
 
 PAGE_TYPES = [
+    # Tier 1 — city × role (1,200 posts each)
     "jobs_in_city", "salary_guide", "career_guide", "interview_prep",
     "resume_tips", "cover_letter_guide", "cost_of_living",
     "skills_guide", "day_in_life", "salary_negotiation",
+    # Tier 2 — city × role (1,200 posts each)
+    "remote_work_guide", "entry_level_guide", "freelance_guide",
+    "certification_guide", "company_size_guide",
+    # Tier 2 — multi-dimension
+    "role_comparison",    # city × role × role2
+    "industry_guide",     # city × role × industry
+    # Tier 3 — city × role (1,200 posts each)
+    "neighborhood_guide", "company_hiring", "visa_immigration",
+    # Tier 3 — multi-dimension
+    "career_transition",  # city × role × role2
+    "technology_stack",   # city × technology (no role)
+    "city_comparison",    # city × city2 × role
+    "annual_job_market",  # city only (no role)
+]
+
+# Page types that use extra dimensions beyond city × role
+MULTI_DIM_PAGE_TYPES = {
+    "role_comparison": "role2",
+    "career_transition": "role2",
+    "industry_guide": "industry",
+    "technology_stack": "technology",
+    "city_comparison": "city2",
+    "annual_job_market": "city_only",
+}
+
+# ==================== MULTI-DIMENSION DATA ====================
+
+INDUSTRIES = [
+    "Technology", "Healthcare", "Finance", "Retail", "Manufacturing",
+    "Education", "Government", "Construction", "Energy", "Hospitality",
+]
+
+TECHNOLOGIES = [
+    "Python", "JavaScript", "React", "Node.js", "TypeScript", "Java",
+    "AWS", "Docker", "Kubernetes", "SQL", "PostgreSQL", "MongoDB",
+    "Go", "Rust", "C#", ".NET", "Ruby", "PHP", "Swift", "Kotlin",
+    "Terraform", "GraphQL", "Redis", "Tableau", "Salesforce",
+    "SAP", "Power BI", "Figma", "AutoCAD", "MATLAB",
+]
+
+# Curated role comparison pairs (most-searched combinations)
+ROLE_COMPARISON_PAIRS = [
+    ("Software Developer", "Data Analyst"), ("Software Developer", "DevOps Engineer"),
+    ("Software Developer", "UX Designer"), ("Software Developer", "Project Manager"),
+    ("Data Analyst", "Business Analyst"), ("Data Analyst", "Financial Analyst"),
+    ("Project Manager", "Business Analyst"), ("Project Manager", "Construction Manager"),
+    ("Registered Nurse", "Paramedic"), ("Registered Nurse", "Pharmacist"),
+    ("Registered Nurse", "Physiotherapist"), ("Marketing Manager", "Sales Representative"),
+    ("Graphic Designer", "UX Designer"), ("Accountant", "Financial Analyst"),
+    ("HR Manager", "Retail Manager"), ("Electrician", "Plumber"),
+    ("Mechanical Engineer", "Civil Engineer"), ("Teacher", "Social Worker"),
+    ("DevOps Engineer", "Data Analyst"), ("Chef", "Retail Manager"),
+    ("Administrative Assistant", "Customer Service Rep"),
+    ("Welder", "Plumber"), ("Truck Driver", "Construction Manager"),
+    ("Dental Hygienist", "Pharmacist"), ("Paramedic", "Physiotherapist"),
+]
+
+# Curated career transition pairs (realistic direction)
+CAREER_TRANSITION_PAIRS = [
+    ("Teacher", "HR Manager"), ("Teacher", "Project Manager"),
+    ("Teacher", "Marketing Manager"), ("Registered Nurse", "Pharmacist"),
+    ("Registered Nurse", "Social Worker"), ("Sales Representative", "Marketing Manager"),
+    ("Sales Representative", "Business Analyst"), ("Customer Service Rep", "HR Manager"),
+    ("Customer Service Rep", "Administrative Assistant"),
+    ("Retail Manager", "HR Manager"), ("Retail Manager", "Marketing Manager"),
+    ("Administrative Assistant", "Business Analyst"),
+    ("Administrative Assistant", "Project Manager"),
+    ("Graphic Designer", "UX Designer"), ("Graphic Designer", "Marketing Manager"),
+    ("Financial Analyst", "Data Analyst"), ("Financial Analyst", "Business Analyst"),
+    ("Accountant", "Financial Analyst"), ("Accountant", "Business Analyst"),
+    ("Mechanical Engineer", "Project Manager"), ("Civil Engineer", "Construction Manager"),
+    ("Electrician", "Construction Manager"), ("Plumber", "Construction Manager"),
+    ("Chef", "Retail Manager"), ("Paramedic", "Registered Nurse"),
+    ("Data Analyst", "Software Developer"), ("Software Developer", "DevOps Engineer"),
+    ("Software Developer", "Project Manager"), ("Software Developer", "UX Designer"),
+    ("Welder", "Mechanical Engineer"), ("Truck Driver", "Construction Manager"),
+]
+
+# City comparison pairs (most common relocation/comparison searches)
+CITY_COMPARISON_PAIRS = [
+    ("Toronto", "Vancouver"), ("Toronto", "Montreal"), ("Toronto", "Calgary"),
+    ("Toronto", "Ottawa"), ("Vancouver", "Calgary"), ("Vancouver", "Victoria"),
+    ("Montreal", "Quebec City"), ("Calgary", "Edmonton"),
+    ("New York", "San Francisco"), ("New York", "Los Angeles"), ("New York", "Chicago"),
+    ("New York", "Boston"), ("San Francisco", "Seattle"), ("San Francisco", "Austin"),
+    ("Los Angeles", "San Diego"), ("Chicago", "Minneapolis"),
+    ("Seattle", "Portland"), ("Austin", "Dallas"), ("Miami", "Atlanta"),
+    ("Denver", "Austin"), ("Boston", "Philadelphia"), ("Nashville", "Charlotte"),
+    ("Raleigh", "Charlotte"), ("Washington DC", "Philadelphia"),
+    ("Toronto", "New York"), ("Vancouver", "Seattle"), ("Montreal", "Boston"),
+    ("Calgary", "Denver"), ("Toronto", "Chicago"),
 ]
 
 # Salary data (CAD baseline for Canada, multiply ~1.1x for US/USD)
@@ -183,6 +275,106 @@ ANGLE_VARIATIONS = {
         "Focus on counter-offer strategies specific to the {city} market.",
         "Emphasize how to negotiate as a {role} when switching jobs vs. asking for a raise.",
     ],
+    # Tier 2
+    "remote_work_guide": [
+        "Focus on which {city} employers are offering remote {role} positions right now.",
+        "Emphasize the salary impact of going remote vs. staying in-office in {city}.",
+        "Highlight the tools and home office setup that remote {role}s need.",
+        "Focus on the tax implications of working remotely from {city}.",
+        "Emphasize how to stand out in remote {role} interviews.",
+    ],
+    "entry_level_guide": [
+        "Focus on what {city} employers actually expect from entry-level {role} candidates.",
+        "Emphasize internship and apprenticeship pathways in {city}.",
+        "Highlight the first-year experience and what surprises new {role}s.",
+        "Focus on the education vs. experience debate for entry-level {role}s.",
+        "Emphasize networking strategies for new graduates in {city}.",
+    ],
+    "freelance_guide": [
+        "Focus on setting freelance rates as a {role} in {city}'s market.",
+        "Emphasize finding your first freelance clients in {city}.",
+        "Highlight the legal and tax setup for freelance {role}s.",
+        "Focus on building a portfolio that wins freelance {role} contracts.",
+        "Emphasize the feast-or-famine cycle and how to stabilize income.",
+    ],
+    "certification_guide": [
+        "Focus on which certifications {city} employers actually value for {role}s.",
+        "Emphasize the ROI calculation — cost vs. salary bump for each certification.",
+        "Highlight accelerated certification paths for working {role}s.",
+        "Focus on free or employer-sponsored certification options in {city}.",
+        "Emphasize how certifications impact hiring decisions for {role}s.",
+    ],
+    "company_size_guide": [
+        "Focus on the day-to-day reality of {role} work at a 10-person startup vs. 10,000-person company.",
+        "Emphasize equity and stock options vs. salary stability for {role}s in {city}.",
+        "Highlight career growth speed differences between startup and corporate {role}s.",
+        "Focus on interview process differences — startup vs. enterprise for {role}s.",
+        "Emphasize which company size best fits different personality types.",
+    ],
+    "role_comparison": [
+        "Focus on which role offers better long-term career prospects in {city}.",
+        "Emphasize the lifestyle and work-life balance differences between these roles.",
+        "Highlight transferable skills and how easy it is to switch between them.",
+        "Focus on the salary trajectory over 10 years for each role in {city}.",
+        "Emphasize which role has stronger job security in {city}'s market.",
+    ],
+    "industry_guide": [
+        "Focus on how the industry context changes the daily work of a {role}.",
+        "Emphasize salary premiums and penalties by industry for {role}s in {city}.",
+        "Highlight the top employers in this industry in {city}.",
+        "Focus on industry-specific skills that {role}s need beyond their core competency.",
+        "Emphasize career growth differences across industries for {role}s.",
+    ],
+    # Tier 3
+    "neighborhood_guide": [
+        "Focus on rent-to-salary ratios in different {city} neighborhoods for {role}s.",
+        "Emphasize commute times and transit access to major {role} employment hubs.",
+        "Highlight up-and-coming neighborhoods that {role}s are moving to.",
+        "Focus on lifestyle amenities that matter most to {role} professionals.",
+        "Emphasize safety, walkability, and family-friendliness for each neighborhood.",
+    ],
+    "company_hiring": [
+        "Focus on the interview processes and culture at top {city} employers hiring {role}s.",
+        "Emphasize which companies offer the best total compensation packages.",
+        "Highlight companies with strong growth that are actively expanding {role} teams.",
+        "Focus on company culture and work-life balance ratings for {role}s.",
+        "Emphasize lesser-known companies in {city} that are great places to work as a {role}.",
+    ],
+    "visa_immigration": [
+        "Focus on the step-by-step visa process for {role}s moving to {city}.",
+        "Emphasize credential recognition and equivalency for international {role}s.",
+        "Highlight employers in {city} that sponsor visas for {role} positions.",
+        "Focus on settlement resources and community support for immigrant {role}s.",
+        "Emphasize the timeline and costs involved in immigrating as a {role}.",
+    ],
+    "career_transition": [
+        "Focus on the transferable skills that make this career switch realistic.",
+        "Emphasize the retraining timeline and most efficient learning path.",
+        "Highlight real success stories of people who made this exact transition.",
+        "Focus on the salary impact during and after the career change.",
+        "Emphasize how to position your experience on your resume for the new field.",
+    ],
+    "technology_stack": [
+        "Focus on which {city} companies are actively hiring for this technology.",
+        "Emphasize the salary premium for professionals skilled in this technology.",
+        "Highlight the learning path from beginner to job-ready for this technology.",
+        "Focus on how this technology fits into the broader tech ecosystem in {city}.",
+        "Emphasize project ideas and portfolio pieces that showcase this technology skill.",
+    ],
+    "city_comparison": [
+        "Focus on the quality of life differences that matter most to {role}s.",
+        "Emphasize the after-tax, after-rent salary comparison between the two cities.",
+        "Highlight career growth opportunities in each city for {role}s.",
+        "Focus on the relocation process and what to expect when moving.",
+        "Emphasize which city is better at different career stages (early vs. mid vs. senior).",
+    ],
+    "annual_job_market": [
+        "Focus on which industries and roles are growing fastest in {city}.",
+        "Emphasize salary trends and how they've shifted over the past year.",
+        "Highlight the impact of remote work on {city}'s local job market.",
+        "Focus on unemployment trends and what they mean for job seekers.",
+        "Emphasize emerging sectors and new employers setting up in {city}.",
+    ],
 }
 
 
@@ -213,20 +405,28 @@ def _slugify(title: str) -> str:
     return slug.strip('-')
 
 
-def _build_prompt(page_type: str, city: str, role: str) -> tuple[str, str]:
+def _build_prompt(page_type: str, city: str, role: str, extra: dict = None) -> tuple[str, str]:
     """Build Claude prompt and title for a given page type, city, and role.
 
     Each call randomly selects a voice, structure, and angle variation
     so that posts for the same page_type don't all sound identical.
+
+    `extra` may contain: role2, industry, technology, city2 for multi-dimension types.
     """
-    salary = _get_salary_range(role, city)
+    extra = extra or {}
+    # Some page types don't use role — use a placeholder for voice/angle formatting
+    effective_role = role or "professional"
+    salary = _get_salary_range(effective_role, city) if effective_role != "professional" else {
+        "currency": "USD" if city in CITIES_US else "CAD",
+        "junior": "varies", "mid": "varies", "senior": "varies",
+    }
     country = _get_country(city)
     currency = salary["currency"]
 
     # Randomly select variety elements
-    voice = random.choice(VOICE_VARIATIONS).format(city=city, role=role)
+    voice = random.choice(VOICE_VARIATIONS).format(city=city, role=effective_role)
     structure = random.choice(STRUCTURE_VARIATIONS)
-    angle = random.choice(ANGLE_VARIATIONS.get(page_type, [""])).format(city=city, role=role)
+    angle = random.choice(ANGLE_VARIATIONS.get(page_type, [""])).format(city=city, role=effective_role)
 
     style_instructions = (
         f"{voice} "
@@ -364,6 +564,177 @@ def _build_prompt(page_type: str, city: str, role: str) -> tuple[str, str]:
             f"Mention how knowing your market value on platforms like Hireabble helps negotiation. "
             f"{style_instructions}"
         )
+    # ==================== TIER 2 ====================
+    elif page_type == "remote_work_guide":
+        title = f"Remote {role} Jobs: A Guide for {city} Professionals"
+        prompt = (
+            f"Write a guide about remote {role} jobs for professionals based in {city}, {country}. "
+            f"Cover remote job availability, which {city} employers offer remote {role} positions, "
+            f"salary adjustments for remote work (base range: {salary['mid']} {currency} mid-level), "
+            f"home office setup tips, and tax implications of working remotely. "
+            f"Discuss the pros and cons of remote vs. hybrid vs. in-office for {role}s in {city}. "
+            f"Mention how Hireabble helps find remote-friendly positions. "
+            f"{style_instructions}"
+        )
+    elif page_type == "entry_level_guide":
+        title = f"Entry-Level {role} Jobs in {city}: How to Get Started"
+        prompt = (
+            f"Write a guide for getting an entry-level {role} job in {city}, {country}. "
+            f"Cover what employers expect from new {role}s, required education and training, "
+            f"internship and apprenticeship pathways, and realistic first-year salary expectations "
+            f"({salary['junior']} {currency} entry-level). "
+            f"Include tips on building a portfolio or getting experience without a job, "
+            f"local training programs and bootcamps in {city}, and networking advice. "
+            f"Be encouraging but honest about the competitive landscape. "
+            f"{style_instructions}"
+        )
+    elif page_type == "freelance_guide":
+        title = f"Freelance {role} in {city}: Rates, Clients & Getting Started"
+        prompt = (
+            f"Write a freelance guide for {role} professionals in {city}, {country}. "
+            f"Cover setting hourly/project rates (derive from annual salary: "
+            f"mid-level {salary['mid']} {currency} ÷ 2080 hours × 1.3 freelance premium), "
+            f"finding clients in {city}, legal structure (sole proprietor vs. corporation), "
+            f"tax obligations, invoicing, and managing feast-or-famine income cycles. "
+            f"Include where to find freelance work and local coworking spaces. "
+            f"{style_instructions}"
+        )
+    elif page_type == "certification_guide":
+        title = f"Best Certifications for {role} in {country} (2025-2026)"
+        prompt = (
+            f"Write a certification guide for {role} professionals in {country}. "
+            f"List the most valuable certifications, their costs, study time required, "
+            f"pass rates, and the salary impact of each (senior {role}s earn {salary['senior']} {currency}). "
+            f"Cover which certifications are required vs. nice-to-have, "
+            f"where to take exams in or near {city}, employer-sponsored options, "
+            f"and whether certifications actually matter for {role} hiring in {country}. "
+            f"{style_instructions}"
+        )
+    elif page_type == "company_size_guide":
+        title = f"{role} at a Startup vs Corporate in {city}: Pros, Cons & Salary"
+        prompt = (
+            f"Write a comparison of working as a {role} at a startup vs. a large corporation "
+            f"in {city}, {country}. Cover salary differences (startups may pay less base but offer "
+            f"equity; corporate range: {salary['mid']}-{salary['senior']} {currency}), "
+            f"work culture, career growth speed, job security, benefits, interview processes, "
+            f"and which is better at different career stages. "
+            f"Include examples of startups and large employers in {city} that hire {role}s. "
+            f"{style_instructions}"
+        )
+    elif page_type == "role_comparison":
+        role2 = extra.get("role2", "Data Analyst")
+        salary2 = _get_salary_range(role2, city)
+        title = f"{role} vs {role2} in {city}: Salary, Skills & Career Path"
+        prompt = (
+            f"Write a detailed comparison of {role} vs {role2} careers in {city}, {country}. "
+            f"Compare salaries: {role} earns {salary['junior']}-{salary['senior']} {currency} "
+            f"while {role2} earns {salary2['junior']}-{salary2['senior']} {currency}. "
+            f"Cover required skills for each, career progression, day-to-day work differences, "
+            f"job availability in {city}, and which role is better for different personality types. "
+            f"Include advice for someone deciding between the two paths. "
+            f"{style_instructions}"
+        )
+    elif page_type == "industry_guide":
+        industry = extra.get("industry", "Technology")
+        title = f"{role} Jobs in {industry} in {city}: What to Expect"
+        prompt = (
+            f"Write a guide about working as a {role} in the {industry} industry in {city}, {country}. "
+            f"Cover how {industry} affects the {role} role: salary premiums or adjustments "
+            f"(base range: {salary['mid']} {currency}), domain-specific skills needed, "
+            f"top {industry} employers in {city}, company culture, career growth paths, "
+            f"and what makes {industry} different from other sectors for {role}s. "
+            f"Mention how Hireabble can help find industry-specific positions. "
+            f"{style_instructions}"
+        )
+    # ==================== TIER 3 ====================
+    elif page_type == "neighborhood_guide":
+        title = f"Best Neighborhoods in {city} for {role} Professionals"
+        prompt = (
+            f"Write a neighborhood guide for {role} professionals in {city}, {country}. "
+            f"Cover 5-7 neighborhoods: rent ranges, commute times to major employment areas, "
+            f"lifestyle amenities, transit access, safety, and walkability. "
+            f"Factor in the {role} salary range ({salary['junior']}-{salary['senior']} {currency}) "
+            f"when discussing affordability. Recommend the best neighborhood for different budgets. "
+            f"Include up-and-coming areas and neighborhoods to avoid. "
+            f"{style_instructions}"
+        )
+    elif page_type == "company_hiring":
+        title = f"Top Companies Hiring {role}s in {city} (2025-2026)"
+        prompt = (
+            f"Write about the top 10-15 companies actively hiring {role}s in {city}, {country}. "
+            f"For each, cover: what they do, typical {role} salary range, company culture, "
+            f"interview process, benefits, and growth opportunities. "
+            f"Include a mix of large corporations, mid-size companies, and fast-growing startups. "
+            f"Salary context: {role}s in {city} earn {salary['junior']}-{salary['senior']} {currency}. "
+            f"Mention how Hireabble's swipe-based matching can connect you with these employers. "
+            f"{style_instructions}"
+        )
+    elif page_type == "visa_immigration":
+        title = f"How to Get a {role} Job in {city} as an Immigrant"
+        visa_type = "Express Entry, Provincial Nominee Program (PNP), and LMIA" if country == "Canada" else "H-1B, O-1, TN, and EB visa categories"
+        title_code = "NOC" if country == "Canada" else "SOC"
+        prompt = (
+            f"Write an immigration guide for {role} professionals moving to {city}, {country}. "
+            f"Cover the visa process ({visa_type}), {title_code} classification codes, "
+            f"credential recognition and equivalency, processing times and costs, "
+            f"employers in {city} that sponsor {role} visas, salary expectations "
+            f"({salary['mid']} {currency} mid-level), settlement resources, "
+            f"and community organizations for newcomers. "
+            f"Be practical and specific about the step-by-step process. "
+            f"{style_instructions}"
+        )
+    elif page_type == "career_transition":
+        role2 = extra.get("role2", "Project Manager")
+        salary2 = _get_salary_range(role2, city)
+        title = f"Career Change: From {role} to {role2} in {city}"
+        prompt = (
+            f"Write a career transition guide for {role}s switching to {role2} in {city}, {country}. "
+            f"Cover transferable skills, skill gaps to fill, retraining options and timeline, "
+            f"salary impact ({role}: {salary['mid']} → {role2}: {salary2['mid']} {currency}), "
+            f"how to position your {role} experience on a {role2} resume, "
+            f"local training programs in {city}, and realistic timeline expectations. "
+            f"Include networking strategies and bridge roles that ease the transition. "
+            f"{style_instructions}"
+        )
+    elif page_type == "technology_stack":
+        technology = extra.get("technology", "Python")
+        title = f"{technology} Jobs in {city}: Salary & Demand (2025-2026)"
+        prompt = (
+            f"Write a guide about {technology} jobs in {city}, {country}. "
+            f"Cover demand for {technology} skills, which roles use it most, "
+            f"salary premiums for {technology} expertise, top employers in {city} "
+            f"that use {technology}, learning resources (courses, bootcamps, communities), "
+            f"and career paths for {technology} specialists. "
+            f"Include both junior and senior salary expectations. "
+            f"Mention how Hireabble can help find {technology}-focused positions. "
+            f"{style_instructions}"
+        )
+    elif page_type == "city_comparison":
+        city2 = extra.get("city2", "Vancouver")
+        country2 = _get_country(city2)
+        salary2 = _get_salary_range(role, city2)
+        title = f"{role} in {city} vs {city2}: Salary, Cost of Living & Career"
+        prompt = (
+            f"Write a comparison of working as a {role} in {city} ({country}) vs {city2} ({country2}). "
+            f"Compare salaries: {city} {salary['junior']}-{salary['senior']} {currency} vs "
+            f"{city2} {salary2['junior']}-{salary2['senior']} {salary2['currency']}. "
+            f"Cover cost of living (rent, transit, food, taxes), job market strength, "
+            f"career growth opportunities, lifestyle and culture, weather, and immigration factors. "
+            f"Give a clear recommendation for different career stages and priorities. "
+            f"{style_instructions}"
+        )
+    elif page_type == "annual_job_market":
+        title = f"{city} Job Market Report 2026: Hiring Trends, Salaries & Top Industries"
+        prompt = (
+            f"Write a comprehensive job market report for {city}, {country} for 2026. "
+            f"Cover top hiring industries, unemployment trends, salary growth across major roles, "
+            f"which sectors are booming and which are contracting, remote work trends, "
+            f"major employers expanding or downsizing, impact of AI and automation, "
+            f"and advice for job seekers in {city}'s current market. "
+            f"Include specific numbers and data points where possible. "
+            f"Mention how Hireabble helps job seekers navigate the {city} market. "
+            f"{style_instructions}"
+        )
     else:
         raise ValueError(f"Unknown page_type: {page_type}")
 
@@ -401,6 +772,75 @@ async def _call_claude(prompt: str) -> str:
     raise RuntimeError(f"All Claude models failed. Last error: {last_error}")
 
 
+def _generate_combinations(page_type: str, cities: list, roles: list, extras: dict = None) -> list:
+    """Generate all (city, role, extra_dims) tuples for a page type.
+
+    Returns a list of tuples: (city, role, extra_dict).
+    For multi-dimension types, the extra_dict contains the additional field(s).
+    """
+    extras = extras or {}
+    dim_type = MULTI_DIM_PAGE_TYPES.get(page_type)
+
+    if dim_type == "role2":
+        # Use curated pairs for role_comparison or career_transition
+        pairs = ROLE_COMPARISON_PAIRS if page_type == "role_comparison" else CAREER_TRANSITION_PAIRS
+        # Filter to selected roles if any
+        role_set = set(roles) if roles else set(ROLES)
+        combos = []
+        for city in cities:
+            for r1, r2 in pairs:
+                if r1 in role_set or r2 in role_set:
+                    combos.append((city, r1, {"role2": r2}))
+        return combos
+
+    elif dim_type == "industry":
+        industries = extras.get("industries", INDUSTRIES)
+        combos = []
+        for city in cities:
+            for role in roles:
+                for industry in industries:
+                    combos.append((city, role, {"industry": industry}))
+        return combos
+
+    elif dim_type == "technology":
+        technologies = extras.get("technologies", TECHNOLOGIES)
+        combos = []
+        for city in cities:
+            for tech in technologies:
+                combos.append((city, None, {"technology": tech}))
+        return combos
+
+    elif dim_type == "city2":
+        # Use curated city pairs, filtered to selected cities
+        city_set = set(cities) if cities else set(ALL_CITIES)
+        combos = []
+        for c1, c2 in CITY_COMPARISON_PAIRS:
+            if c1 in city_set or c2 in city_set:
+                for role in roles:
+                    combos.append((c1, role, {"city2": c2}))
+        return combos
+
+    elif dim_type == "city_only":
+        # annual_job_market: city only, no role
+        return [(city, None, {}) for city in cities]
+
+    else:
+        # Standard city × role
+        return [(city, role, {}) for city in cities for role in roles]
+
+
+def _build_dedup_query(page_type: str, city: str, role: str, extra: dict = None) -> dict:
+    """Build the MongoDB dedup query for a given combination."""
+    extra = extra or {}
+    query = {"page_type": page_type, "city": city}
+    if role:
+        query["role"] = role
+    for key in ("role2", "industry", "technology", "city2"):
+        if key in extra:
+            query[key] = extra[key]
+    return query
+
+
 async def run_generation_job(job_id: str):
     """Background task that generates blog posts for a job."""
     _running_jobs[job_id] = True
@@ -412,7 +852,8 @@ async def run_generation_job(job_id: str):
 
         page_type = job["page_type"]
         cities = job["cities"]
-        roles = job["roles"]
+        roles = job.get("roles", [])
+        extras = job.get("extras", {})
         error_log = []
 
         await db.blog_jobs.update_one(
@@ -420,92 +861,106 @@ async def run_generation_job(job_id: str):
             {"$set": {"status": "running", "started_at": datetime.now(timezone.utc).isoformat()}}
         )
 
+        combos = _generate_combinations(page_type, cities, roles, extras)
+
+        # Update total to reflect actual combos (may differ from initial estimate)
+        await db.blog_jobs.update_one(
+            {"id": job_id},
+            {"$set": {"total": len(combos)}}
+        )
+
         completed = 0
         failed = 0
         skipped = 0
 
-        for city in cities:
-            for role in roles:
-                # Check for cancellation
-                if not _running_jobs.get(job_id, False):
-                    await db.blog_jobs.update_one(
-                        {"id": job_id},
-                        {"$set": {
-                            "status": "cancelled",
-                            "completed": completed,
-                            "failed": failed,
-                            "skipped": skipped,
-                            "error_log": error_log,
-                            "completed_at": datetime.now(timezone.utc).isoformat(),
-                        }}
-                    )
-                    logger.info(f"Blog generation job {job_id} cancelled")
-                    return
-
-                # Duplicate prevention: skip if this city+role+page_type already exists
-                existing_post = await db.blog_posts.find_one({
-                    "city": city, "role": role, "page_type": page_type
-                })
-                if existing_post:
-                    skipped += 1
-                    await db.blog_jobs.update_one(
-                        {"id": job_id},
-                        {"$set": {"completed": completed, "failed": failed, "skipped": skipped}}
-                    )
-                    continue
-
-                try:
-                    title, prompt = _build_prompt(page_type, city, role)
-                    content = await _call_claude(prompt)
-                    slug = _slugify(title)
-
-                    # Check for duplicate slug, append uuid fragment if needed
-                    existing_slug = await db.blog_posts.find_one({"slug": slug})
-                    if existing_slug:
-                        slug = f"{slug}-{uuid.uuid4().hex[:6]}"
-
-                    # Extract first paragraph as excerpt
-                    lines = [l.strip() for l in content.split('\n') if l.strip() and not l.strip().startswith('#')]
-                    excerpt = lines[0][:200] if lines else title
-
-                    word_count = len(content.split())
-
-                    post_doc = {
-                        "id": str(uuid.uuid4()),
-                        "slug": slug,
-                        "title": title,
-                        "content": content,
-                        "excerpt": excerpt,
-                        "page_type": page_type,
-                        "city": city,
-                        "role": role,
-                        "country": _get_country(city),
-                        "status": "draft",
-                        "meta_title": title,
-                        "meta_description": excerpt,
-                        "word_count": word_count,
-                        "created_at": datetime.now(timezone.utc).isoformat(),
-                        "updated_at": datetime.now(timezone.utc).isoformat(),
-                        "published_at": None,
-                        "generation_job_id": job_id,
-                    }
-                    await db.blog_posts.insert_one(post_doc)
-                    completed += 1
-
-                except Exception as e:
-                    failed += 1
-                    error_msg = f"{city}/{role}: {str(e)}"
-                    error_log.append(error_msg)
-                    logger.error(f"Blog generation error in job {job_id}: {error_msg}")
-
-                # Update job progress
+        for city, role, extra in combos:
+            # Check for cancellation
+            if not _running_jobs.get(job_id, False):
                 await db.blog_jobs.update_one(
                     {"id": job_id},
-                    {"$set": {"completed": completed, "failed": failed, "skipped": skipped, "error_log": error_log}}
+                    {"$set": {
+                        "status": "cancelled",
+                        "completed": completed,
+                        "failed": failed,
+                        "skipped": skipped,
+                        "error_log": error_log,
+                        "completed_at": datetime.now(timezone.utc).isoformat(),
+                    }}
                 )
+                logger.info(f"Blog generation job {job_id} cancelled")
+                return
 
-                # Rate limit between API calls
-                await asyncio.sleep(0.5)
+            # Duplicate prevention
+            dedup_query = _build_dedup_query(page_type, city, role, extra)
+            existing_post = await db.blog_posts.find_one(dedup_query)
+            if existing_post:
+                skipped += 1
+                await db.blog_jobs.update_one(
+                    {"id": job_id},
+                    {"$set": {"completed": completed, "failed": failed, "skipped": skipped}}
+                )
+                continue
+
+            try:
+                title, prompt = _build_prompt(page_type, city, role, extra)
+                content = await _call_claude(prompt)
+                slug = _slugify(title)
+
+                # Check for duplicate slug, append uuid fragment if needed
+                existing_slug = await db.blog_posts.find_one({"slug": slug})
+                if existing_slug:
+                    slug = f"{slug}-{uuid.uuid4().hex[:6]}"
+
+                # Extract first paragraph as excerpt
+                lines = [l.strip() for l in content.split('\n') if l.strip() and not l.strip().startswith('#')]
+                excerpt = lines[0][:200] if lines else title
+
+                word_count = len(content.split())
+
+                post_doc = {
+                    "id": str(uuid.uuid4()),
+                    "slug": slug,
+                    "title": title,
+                    "content": content,
+                    "excerpt": excerpt,
+                    "page_type": page_type,
+                    "city": city,
+                    "role": role,
+                    "country": _get_country(city),
+                    "status": "draft",
+                    "meta_title": title,
+                    "meta_description": excerpt,
+                    "word_count": word_count,
+                    "created_at": datetime.now(timezone.utc).isoformat(),
+                    "updated_at": datetime.now(timezone.utc).isoformat(),
+                    "published_at": None,
+                    "generation_job_id": job_id,
+                }
+                # Add extra dimension fields to the document
+                for key in ("role2", "industry", "technology", "city2"):
+                    if key in extra:
+                        post_doc[key] = extra[key]
+
+                await db.blog_posts.insert_one(post_doc)
+                completed += 1
+
+            except Exception as e:
+                failed += 1
+                label = f"{city}/{role or 'N/A'}"
+                if extra:
+                    label += f"/{'/'.join(str(v) for v in extra.values())}"
+                error_msg = f"{label}: {str(e)}"
+                error_log.append(error_msg)
+                logger.error(f"Blog generation error in job {job_id}: {error_msg}")
+
+            # Update job progress
+            await db.blog_jobs.update_one(
+                {"id": job_id},
+                {"$set": {"completed": completed, "failed": failed, "skipped": skipped, "error_log": error_log}}
+            )
+
+            # Rate limit between API calls
+            await asyncio.sleep(0.5)
 
         # Job finished
         final_status = "completed" if failed == 0 else "completed_with_errors"
@@ -556,6 +1011,8 @@ async def blog_stats(admin=Depends(get_current_admin)):
         "available_cities": len(ALL_CITIES),
         "available_roles": len(ROLES),
         "page_types": PAGE_TYPES,
+        "industries": INDUSTRIES,
+        "technologies": TECHNOLOGIES,
     }
 
 
@@ -653,23 +1110,31 @@ async def start_generation(request: Request, admin=Depends(get_current_admin)):
     page_type = body.get("page_type")
     cities = body.get("cities", [])
     roles = body.get("roles", [])
+    extras = body.get("extras", {})  # Optional: {industries: [], technologies: []}
 
     if not page_type or page_type not in PAGE_TYPES:
         raise HTTPException(status_code=400, detail=f"page_type must be one of: {PAGE_TYPES}")
     if not cities:
         raise HTTPException(status_code=400, detail="At least one city is required")
-    if not roles:
+
+    dim_type = MULTI_DIM_PAGE_TYPES.get(page_type)
+
+    # Roles not required for city-only or technology page types
+    if dim_type not in ("city_only", "technology") and not roles:
         raise HTTPException(status_code=400, detail="At least one role is required")
 
     # Validate cities and roles
     invalid_cities = [c for c in cities if c not in ALL_CITIES]
     if invalid_cities:
         raise HTTPException(status_code=400, detail=f"Invalid cities: {invalid_cities}")
-    invalid_roles = [r for r in roles if r not in ROLES]
-    if invalid_roles:
-        raise HTTPException(status_code=400, detail=f"Invalid roles: {invalid_roles}")
+    if roles:
+        invalid_roles = [r for r in roles if r not in ROLES]
+        if invalid_roles:
+            raise HTTPException(status_code=400, detail=f"Invalid roles: {invalid_roles}")
 
-    total = len(cities) * len(roles)
+    # Calculate total based on page type
+    combos = _generate_combinations(page_type, cities, roles, extras)
+    total = len(combos)
     job_id = str(uuid.uuid4())
 
     job_doc = {
@@ -677,6 +1142,7 @@ async def start_generation(request: Request, admin=Depends(get_current_admin)):
         "page_type": page_type,
         "cities": cities,
         "roles": roles,
+        "extras": extras,
         "total": total,
         "completed": 0,
         "failed": 0,
