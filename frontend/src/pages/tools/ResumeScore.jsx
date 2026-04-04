@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { BarChart3, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { useState, useRef } from 'react';
+import { BarChart3, AlertCircle, CheckCircle2, Upload, X, FileText } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 import ToolLayout from './ToolLayout';
 
@@ -20,7 +20,6 @@ function analyze(text) {
   const lines = text.split('\n').filter(l => l.trim());
   const lower = text.toLowerCase();
 
-  // Length score (0-15): optimal 400-800 words
   let lengthScore;
   if (words.length >= 400 && words.length <= 800) lengthScore = 15;
   else if (words.length >= 200 && words.length < 400) lengthScore = Math.round((words.length / 400) * 15);
@@ -28,27 +27,22 @@ function analyze(text) {
   else if (words.length < 200) lengthScore = Math.round((words.length / 400) * 15);
   else lengthScore = 5;
 
-  // Action verbs (0-20)
   const foundVerbs = new Set();
   ACTION_VERBS.forEach(v => { if (lower.includes(v)) foundVerbs.add(v); });
   const verbScore = Math.min(20, Math.round((foundVerbs.size / 8) * 20));
 
-  // Quantified achievements (0-20): numbers, percentages, dollar amounts
   const quantMatches = text.match(/\$[\d,.]+|\d+%|\d{2,}[\s,]*(users|customers|clients|projects|people|team|employees|members|revenue|sales|increase|decrease|reduction|improvement)/gi) || [];
   const numMatches = text.match(/\b\d+\b/g) || [];
   const quantCount = quantMatches.length + Math.floor(numMatches.length / 3);
   const achieveScore = Math.min(20, Math.round((quantCount / 5) * 20));
 
-  // Section headers (0-15)
   const foundSections = SECTION_KEYWORDS.filter(s => lower.includes(s));
   const sectionScore = Math.min(15, Math.round((foundSections.length / 5) * 15));
 
-  // Keywords/buzzwords (0-15)
   const buzzwords = ['team', 'leadership', 'communication', 'project', 'client', 'strategic', 'budget', 'stakeholder', 'deadline', 'cross-functional', 'agile', 'data-driven', 'results'];
   const foundBuzz = buzzwords.filter(b => lower.includes(b));
   const keywordScore = Math.min(15, Math.round((foundBuzz.length / 5) * 15));
 
-  // Formatting (0-15)
   let formatScore = 0;
   const hasBullets = lines.some(l => /^[\s]*[-•*]/.test(l));
   if (hasBullets) formatScore += 5;
@@ -94,9 +88,76 @@ function generateTips({ lengthScore, verbScore, achieveScore, sectionScore, keyw
   return tips;
 }
 
+async function extractTextFromFile(file) {
+  const ext = file.name.split('.').pop().toLowerCase();
+
+  if (ext === 'txt') {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = () => reject(new Error('Failed to read file'));
+      reader.readAsText(file);
+    });
+  }
+
+  if (ext === 'pdf') {
+    const pdfjsLib = await import('pdfjs-dist/build/pdf.mjs');
+    pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.mjs`;
+    const arrayBuffer = await file.arrayBuffer();
+    const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+    let fullText = '';
+    for (let i = 1; i <= pdf.numPages; i++) {
+      const page = await pdf.getPage(i);
+      const content = await page.getTextContent();
+      fullText += content.items.map(item => item.str).join(' ') + '\n';
+    }
+    return fullText;
+  }
+
+  if (ext === 'docx' || ext === 'doc') {
+    const mammoth = await import('mammoth');
+    const arrayBuffer = await file.arrayBuffer();
+    const result = await mammoth.extractRawText({ arrayBuffer });
+    return result.value;
+  }
+
+  throw new Error('Unsupported file type. Please upload a PDF, DOCX, or TXT file.');
+}
+
 export default function ResumeScore() {
   const [text, setText] = useState('');
   const [result, setResult] = useState(null);
+  const [fileName, setFileName] = useState('');
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState('');
+  const fileInputRef = useRef(null);
+
+  const handleFileUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setUploading(true);
+    setUploadError('');
+    setResult(null);
+
+    try {
+      const extractedText = await extractTextFromFile(file);
+      setText(extractedText);
+      setFileName(file.name);
+    } catch (err) {
+      setUploadError(err.message || 'Failed to extract text from file.');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const clearFile = () => {
+    setFileName('');
+    setText('');
+    setUploadError('');
+    setResult(null);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
 
   const handleAnalyze = (e) => {
     e.preventDefault();
@@ -111,20 +172,57 @@ export default function ResumeScore() {
   };
 
   return (
-    <ToolLayout title="Resume Score Checker" description="Paste your resume and get an instant score with actionable tips to improve it.">
+    <ToolLayout title="Resume Score Checker" description="Upload your resume or paste the text to get an instant score with actionable tips to improve it.">
       <form onSubmit={handleAnalyze} className="glass-card rounded-2xl p-6 space-y-4">
+        {/* File upload */}
         <div>
-          <label className="block text-sm font-medium mb-1">Paste Your Resume Text</label>
+          <label className="block text-sm font-medium mb-2">Upload Your Resume</label>
+          {!fileName ? (
+            <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-border rounded-xl cursor-pointer hover:border-primary/50 transition-colors">
+              <Upload className="w-8 h-8 text-muted-foreground mb-2" />
+              <span className="text-sm text-muted-foreground">
+                {uploading ? 'Extracting text...' : 'Drop your resume here or click to upload'}
+              </span>
+              <span className="text-xs text-muted-foreground mt-1">PDF, DOCX, or TXT</span>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".pdf,.doc,.docx,.txt"
+                onChange={handleFileUpload}
+                className="hidden"
+                disabled={uploading}
+              />
+            </label>
+          ) : (
+            <div className="flex items-center gap-3 p-3 border border-border rounded-xl bg-primary/5">
+              <FileText className="w-5 h-5 text-primary shrink-0" />
+              <span className="text-sm font-medium truncate flex-1">{fileName}</span>
+              <button type="button" onClick={clearFile} className="text-muted-foreground hover:text-foreground">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          )}
+          {uploadError && <p className="text-sm text-red-400 mt-1">{uploadError}</p>}
+        </div>
+
+        <div className="flex items-center gap-3 text-muted-foreground text-xs">
+          <div className="flex-1 h-px bg-border" />
+          <span>or paste your resume text</span>
+          <div className="flex-1 h-px bg-border" />
+        </div>
+
+        {/* Text paste */}
+        <div>
           <textarea
-            className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm min-h-[250px] font-mono"
+            className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm min-h-[200px] font-mono"
             placeholder="Paste the full text of your resume here..."
             value={text}
-            onChange={e => setText(e.target.value)}
-            required
+            onChange={e => { setText(e.target.value); setFileName(''); }}
           />
           <p className="text-xs text-muted-foreground mt-1">{text.split(/\s+/).filter(Boolean).length} words</p>
         </div>
-        <Button type="submit" className="w-full">
+
+        <Button type="submit" className="w-full" disabled={!text.trim() || uploading}>
           <BarChart3 className="w-4 h-4 mr-2" /> Analyze Resume
         </Button>
       </form>

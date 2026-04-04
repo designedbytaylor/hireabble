@@ -59,7 +59,17 @@ const SalaryCalculator = React.lazy(() => import("./pages/tools/SalaryCalculator
 const InterviewPrep = React.lazy(() => import("./pages/tools/InterviewPrep"));
 const JobTracker = React.lazy(() => import("./pages/tools/JobTracker"));
 const SkillsGap = React.lazy(() => import("./pages/tools/SkillsGap"));
-const LinkedInHeadline = React.lazy(() => import("./pages/tools/LinkedInHeadline"));
+const TypingTuneUp = React.lazy(() => import("./pages/tools/TypingTuneUp"));
+const JobAnalyzer = React.lazy(() => import("./pages/tools/JobAnalyzer"));
+const CareerGapExplainer = React.lazy(() => import("./pages/tools/CareerGapExplainer"));
+const ReferenceRequest = React.lazy(() => import("./pages/tools/ReferenceRequest"));
+const BenefitsCalculator = React.lazy(() => import("./pages/tools/BenefitsCalculator"));
+const RejectionResponse = React.lazy(() => import("./pages/tools/RejectionResponse"));
+const JobTitleTranslator = React.lazy(() => import("./pages/tools/JobTitleTranslator"));
+const InterviewScorecard = React.lazy(() => import("./pages/tools/InterviewScorecard"));
+const EquityCalculator = React.lazy(() => import("./pages/tools/EquityCalculator"));
+const InterviewPlanner = React.lazy(() => import("./pages/tools/InterviewPlanner"));
+const WorkStyleQuiz = React.lazy(() => import("./pages/tools/WorkStyleQuiz"));
 const JobDescriptionGenerator = React.lazy(() => import("./pages/tools/JobDescriptionGenerator"));
 const HiringCostCalculator = React.lazy(() => import("./pages/tools/HiringCostCalculator"));
 const OfferLetter = React.lazy(() => import("./pages/tools/OfferLetter"));
@@ -496,11 +506,21 @@ function AppRoutes() {
       <Route path="/tools/interview-prep" element={<InterviewPrep />} />
       <Route path="/tools/job-tracker" element={<JobTracker />} />
       <Route path="/tools/skills-gap" element={<SkillsGap />} />
-      <Route path="/tools/linkedin-headline" element={<LinkedInHeadline />} />
       <Route path="/tools/job-description-generator" element={<JobDescriptionGenerator />} />
       <Route path="/tools/hiring-cost-calculator" element={<HiringCostCalculator />} />
       <Route path="/tools/offer-letter" element={<OfferLetter />} />
       <Route path="/tools/employer-brand-score" element={<EmployerBrandScore />} />
+      <Route path="/tools/typing-tune-up" element={<TypingTuneUp />} />
+      <Route path="/tools/job-analyzer" element={<JobAnalyzer />} />
+      <Route path="/tools/career-gap-explainer" element={<CareerGapExplainer />} />
+      <Route path="/tools/reference-request" element={<ReferenceRequest />} />
+      <Route path="/tools/benefits-calculator" element={<BenefitsCalculator />} />
+      <Route path="/tools/after-rejection" element={<RejectionResponse />} />
+      <Route path="/tools/job-title-translator" element={<JobTitleTranslator />} />
+      <Route path="/tools/interview-scorecard" element={<InterviewScorecard />} />
+      <Route path="/tools/equity-calculator" element={<EquityCalculator />} />
+      <Route path="/tools/interview-planner" element={<InterviewPlanner />} />
+      <Route path="/tools/work-style-quiz" element={<WorkStyleQuiz />} />
 
       {/* Admin impersonation — no PublicRoute wrapper so it always works */}
       <Route path="/impersonate" element={<Impersonate />} />
