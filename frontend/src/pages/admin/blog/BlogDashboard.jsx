@@ -71,6 +71,7 @@ export default function BlogDashboard({ stats, jobs, cancelJob }) {
                   </div>
                   <div className="flex items-center gap-3 text-xs text-gray-400 mb-2">
                     <span>{job.completed}/{job.total} completed</span>
+                    {job.skipped > 0 && <span className="text-gray-500">{job.skipped} skipped</span>}
                     {job.failed > 0 && <span className="text-red-400">{job.failed} failed</span>}
                     <span>{pct}%</span>
                   </div>

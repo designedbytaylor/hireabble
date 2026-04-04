@@ -3,6 +3,8 @@ Allow: /
 Allow: /browse
 Allow: /tools
 Allow: /tools/
+Allow: /blog
+Allow: /blog/
 Allow: /terms
 Allow: /privacy
 Allow: /cookie-policy

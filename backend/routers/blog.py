@@ -9,6 +9,7 @@ from typing import Optional, List
 from datetime import datetime, timezone
 import uuid
 import asyncio
+import random
 import re
 import os
 
@@ -89,6 +90,55 @@ SALARY_DATA_CAD = {
 # Track running generation jobs for cancellation
 _running_jobs: dict[str, bool] = {}
 
+# ==================== PROMPT VARIETY ====================
+
+VOICE_VARIATIONS = [
+    "Write as an experienced career coach talking to a friend.",
+    "Write from the perspective of a hiring manager who's reviewed thousands of applications.",
+    "Write as a local recruiter who knows the {city} market inside out.",
+    "Write as a career journalist covering the job market.",
+    "Write as someone who's worked as a {role} and switched careers, giving honest insider advice.",
+]
+
+STRUCTURE_VARIATIONS = [
+    "Start with a compelling question, then dive into the data.",
+    "Lead with the most surprising statistic, then explain why it matters.",
+    "Tell a brief story about someone in this exact situation, then transition to practical advice.",
+    "Start with a quick summary of key numbers, then go deeper into each one.",
+    "Open with a common misconception about this topic, then set the record straight.",
+]
+
+ANGLE_VARIATIONS = {
+    "jobs_in_city": [
+        "Focus on the hidden job market and networking strategies specific to {city}.",
+        "Emphasize remote vs. in-office trends for {role} positions in {city}.",
+        "Highlight the fastest-growing companies hiring {role}s in {city} right now.",
+        "Compare the {role} job market in {city} to similar-sized cities.",
+        "Focus on what makes {city} uniquely attractive for {role} professionals.",
+    ],
+    "salary_guide": [
+        "Emphasize negotiation strategies that work specifically in {city}'s market.",
+        "Focus on the total compensation picture beyond base salary.",
+        "Highlight how {role} salaries in {city} have changed over the past few years.",
+        "Compare what startups vs. established companies pay for {role}s in {city}.",
+        "Focus on the cost-of-living-adjusted value of {role} salaries in {city}.",
+    ],
+    "career_guide": [
+        "Focus on non-traditional paths into the {role} career.",
+        "Emphasize the most in-demand specializations within {role} in {city}.",
+        "Highlight mentorship and community resources in {city} for aspiring {role}s.",
+        "Focus on the step-by-step certification and licensing process.",
+        "Emphasize real career progression timelines and what to expect each year.",
+    ],
+    "interview_prep": [
+        "Focus on behavioral questions and the STAR method with {role}-specific examples.",
+        "Emphasize technical skills assessment and how to demonstrate competence.",
+        "Highlight cultural fit questions and what {city} employers value most.",
+        "Focus on questions candidates should ask the interviewer.",
+        "Emphasize common mistakes {role} candidates make in interviews and how to avoid them.",
+    ],
+}
+
 
 # ==================== HELPERS ====================
 
@@ -118,22 +168,33 @@ def _slugify(title: str) -> str:
 
 
 def _build_prompt(page_type: str, city: str, role: str) -> tuple[str, str]:
-    """Build Claude prompt and title for a given page type, city, and role."""
+    """Build Claude prompt and title for a given page type, city, and role.
+
+    Each call randomly selects a voice, structure, and angle variation
+    so that posts for the same page_type don't all sound identical.
+    """
     salary = _get_salary_range(role, city)
     country = _get_country(city)
     currency = salary["currency"]
 
+    # Randomly select variety elements
+    voice = random.choice(VOICE_VARIATIONS).format(city=city, role=role)
+    structure = random.choice(STRUCTURE_VARIATIONS)
+    angle = random.choice(ANGLE_VARIATIONS.get(page_type, [""])).format(city=city, role=role)
+
     style_instructions = (
-        "Write in a natural, conversational human voice. "
+        f"{voice} "
+        f"{structure} "
         "Use contractions (you'll, it's, don't, we've). "
         "Vary sentence length — mix short punchy sentences with longer flowing ones. "
-        "Write like an experienced career coach talking to a friend, not a corporate blog. "
         "Format with markdown H2/H3 headings and bullet lists. "
         "Target 800-1200 words. "
         "Include a 'Key Takeaways' section at the end with 4-6 bullet points. "
         "NEVER use these phrases: 'In today's fast-paced world', 'It's important to note', "
-        "'In conclusion', 'Let's dive in', 'without further ado', 'game-changer'. "
-        "Reference the specific city with local context where relevant."
+        "'In conclusion', 'Let's dive in', 'without further ado', 'game-changer', "
+        "'navigating the landscape', 'look no further', 'comprehensive guide'. "
+        "Reference the specific city with local context where relevant. "
+        f"{angle}"
     )
 
     if page_type == "jobs_in_city":
@@ -242,6 +303,7 @@ async def run_generation_job(job_id: str):
 
         completed = 0
         failed = 0
+        skipped = 0
 
         for city in cities:
             for role in roles:
@@ -253,6 +315,7 @@ async def run_generation_job(job_id: str):
                             "status": "cancelled",
                             "completed": completed,
                             "failed": failed,
+                            "skipped": skipped,
                             "error_log": error_log,
                             "completed_at": datetime.now(timezone.utc).isoformat(),
                         }}
@@ -260,14 +323,26 @@ async def run_generation_job(job_id: str):
                     logger.info(f"Blog generation job {job_id} cancelled")
                     return
 
+                # Duplicate prevention: skip if this city+role+page_type already exists
+                existing_post = await db.blog_posts.find_one({
+                    "city": city, "role": role, "page_type": page_type
+                })
+                if existing_post:
+                    skipped += 1
+                    await db.blog_jobs.update_one(
+                        {"id": job_id},
+                        {"$set": {"completed": completed, "failed": failed, "skipped": skipped}}
+                    )
+                    continue
+
                 try:
                     title, prompt = _build_prompt(page_type, city, role)
                     content = await _call_claude(prompt)
                     slug = _slugify(title)
 
                     # Check for duplicate slug, append uuid fragment if needed
-                    existing = await db.blog_posts.find_one({"slug": slug})
-                    if existing:
+                    existing_slug = await db.blog_posts.find_one({"slug": slug})
+                    if existing_slug:
                         slug = f"{slug}-{uuid.uuid4().hex[:6]}"
 
                     # Extract first paragraph as excerpt
@@ -307,7 +382,7 @@ async def run_generation_job(job_id: str):
                 # Update job progress
                 await db.blog_jobs.update_one(
                     {"id": job_id},
-                    {"$set": {"completed": completed, "failed": failed, "error_log": error_log}}
+                    {"$set": {"completed": completed, "failed": failed, "skipped": skipped, "error_log": error_log}}
                 )
 
                 # Rate limit between API calls
@@ -321,11 +396,12 @@ async def run_generation_job(job_id: str):
                 "status": final_status,
                 "completed": completed,
                 "failed": failed,
+                "skipped": skipped,
                 "error_log": error_log,
                 "completed_at": datetime.now(timezone.utc).isoformat(),
             }}
         )
-        logger.info(f"Blog generation job {job_id} finished: {completed} completed, {failed} failed")
+        logger.info(f"Blog generation job {job_id} finished: {completed} completed, {failed} failed, {skipped} skipped")
 
     except Exception as e:
         logger.error(f"Blog generation job {job_id} crashed: {e}")
@@ -485,6 +561,7 @@ async def start_generation(request: Request, admin=Depends(get_current_admin)):
         "total": total,
         "completed": 0,
         "failed": 0,
+        "skipped": 0,
         "status": "pending",
         "started_at": None,
         "completed_at": None,
@@ -553,3 +630,69 @@ async def bulk_publish(request: Request, admin=Depends(get_current_admin)):
     )
 
     return {"published_count": result.modified_count, "post_ids": post_ids}
+
+
+# ==================== PUBLIC BLOG ENDPOINTS ====================
+
+@router.get("/blog/posts")
+@limiter.limit("30/minute")
+async def public_list_posts(
+    request: Request,
+    page: int = 1,
+    limit: int = 12,
+    page_type: Optional[str] = None,
+    city: Optional[str] = None,
+    role: Optional[str] = None,
+):
+    """Public: list published blog posts with pagination and filters."""
+    query = {"status": "published"}
+    if page_type:
+        query["page_type"] = page_type
+    if city:
+        query["city"] = city
+    if role:
+        query["role"] = role
+
+    limit = min(limit, 50)  # Cap at 50 per page
+    skip = (page - 1) * limit
+    total = await db.blog_posts.count_documents(query)
+    posts = await db.blog_posts.find(
+        query,
+        {"_id": 0, "content": 0, "generation_job_id": 0}  # Exclude full content from list
+    ).sort("published_at", -1).skip(skip).limit(limit).to_list(length=limit)
+
+    return {
+        "posts": posts,
+        "total": total,
+        "page": page,
+        "pages": (total + limit - 1) // limit if limit > 0 else 0,
+    }
+
+
+@router.get("/blog/posts/{slug}")
+@limiter.limit("60/minute")
+async def public_get_post(slug: str, request: Request):
+    """Public: get a single published blog post by slug."""
+    post = await db.blog_posts.find_one(
+        {"slug": slug, "status": "published"},
+        {"_id": 0, "generation_job_id": 0}
+    )
+    if not post:
+        raise HTTPException(status_code=404, detail="Post not found")
+
+    # Fetch related posts (same city or same role, max 3)
+    related_query = {
+        "status": "published",
+        "slug": {"$ne": slug},
+        "$or": [
+            {"city": post.get("city"), "page_type": post.get("page_type")},
+            {"role": post.get("role"), "page_type": post.get("page_type")},
+        ]
+    }
+    related = await db.blog_posts.find(
+        related_query,
+        {"_id": 0, "content": 0, "generation_job_id": 0}
+    ).limit(3).to_list(length=3)
+
+    post["related_posts"] = related
+    return post
