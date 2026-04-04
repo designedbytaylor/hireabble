@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import axios from 'axios';
 import { useAdminAuth } from '../../../context/AdminAuthContext';
 import { toast } from 'sonner';
@@ -7,7 +7,7 @@ const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
 export default function useBlogApi() {
   const { token } = useAdminAuth();
-  const headers = { Authorization: `Bearer ${token}` };
+  const headers = useMemo(() => ({ Authorization: `Bearer ${token}` }), [token]);
 
   // Dashboard state
   const [stats, setStats] = useState({ total: 0, published: 0, draft: 0, failed: 0, running_jobs: 0 });
@@ -40,7 +40,7 @@ export default function useBlogApi() {
     } catch (err) {
       console.error('Failed to fetch stats', err);
     }
-  }, [token]);
+  }, [headers]);
 
   const fetchJobs = useCallback(async () => {
     try {
@@ -51,7 +51,7 @@ export default function useBlogApi() {
       console.error('Failed to fetch jobs', err);
       return [];
     }
-  }, [token]);
+  }, [headers]);
 
   const fetchPosts = useCallback(async () => {
     setLoading(true);
@@ -69,7 +69,7 @@ export default function useBlogApi() {
     } finally {
       setLoading(false);
     }
-  }, [token, currentPage, searchQuery, statusFilter, typeFilter]);
+  }, [headers, currentPage, searchQuery, statusFilter, typeFilter]);
 
   // ─── ACTIONS ──────────────────────────────────────────────────────────────
 
