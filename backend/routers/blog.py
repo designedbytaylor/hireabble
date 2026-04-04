@@ -439,6 +439,7 @@ def _build_prompt(page_type: str, city: str, role: str, extra: dict = None) -> t
         "NEVER use these phrases: 'In today's fast-paced world', 'It's important to note', "
         "'In conclusion', 'Let's dive in', 'without further ado', 'game-changer', "
         "'navigating the landscape', 'look no further', 'comprehensive guide'. "
+        "NEVER use the word 'swipe' in any context. "
         "Reference the specific city with local context where relevant. "
         f"{angle}"
     )
@@ -451,7 +452,7 @@ def _build_prompt(page_type: str, city: str, role: str, extra: dict = None) -> t
             f"and practical tips for job seekers. "
             f"Include salary expectations: junior {salary['junior']} {currency}, "
             f"mid-level {salary['mid']} {currency}, senior {salary['senior']} {currency}. "
-            f"Mention how platforms like Hireabble can streamline the job search with swipe-based matching. "
+            f"Mention how Hireabble can streamline the job search with smart job matching. "
             f"{style_instructions}"
         )
     elif page_type == "salary_guide":
@@ -476,7 +477,7 @@ def _build_prompt(page_type: str, city: str, role: str, extra: dict = None) -> t
             f"and expected salary progression: junior {salary['junior']} {currency}, "
             f"mid-level {salary['mid']} {currency}, senior {salary['senior']} {currency}. "
             f"Include networking tips and local professional associations. "
-            f"Mention how Hireabble connects job seekers with employers through swipe-based matching. "
+            f"Mention how Hireabble connects job seekers with employers through smart matching. "
             f"{style_instructions}"
         )
     elif page_type == "interview_prep":
@@ -500,7 +501,7 @@ def _build_prompt(page_type: str, city: str, role: str, extra: dict = None) -> t
             f"how to quantify achievements, and common resume mistakes. "
             f"Reference the salary range (mid-level {salary['mid']} {currency}) so readers "
             f"understand the caliber of resume needed. "
-            f"Mention how Hireabble's swipe-based job matching removes some resume friction. "
+            f"Mention how Hireabble's smart job matching removes some resume friction. "
             f"{style_instructions}"
         )
     elif page_type == "cover_letter_guide":
@@ -666,7 +667,7 @@ def _build_prompt(page_type: str, city: str, role: str, extra: dict = None) -> t
             f"interview process, benefits, and growth opportunities. "
             f"Include a mix of large corporations, mid-size companies, and fast-growing startups. "
             f"Salary context: {role}s in {city} earn {salary['junior']}-{salary['senior']} {currency}. "
-            f"Mention how Hireabble's swipe-based matching can connect you with these employers. "
+            f"Mention how Hireabble's smart matching can connect you with these employers. "
             f"{style_instructions}"
         )
     elif page_type == "visa_immigration":
