@@ -3,9 +3,12 @@ import { DollarSign } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { Button } from '../../components/ui/button';
 import ToolLayout from './ToolLayout';
-import { CANADIAN_CITIES, ROLES, getAllLevels, getTopCities } from '../../data/salaryData';
+import { CITIES, ROLES, getAllLevels, getTopCities, getCurrency } from '../../data/salaryData';
 
 const fmt = (n) => `$${(n / 1000).toFixed(0)}k`;
+
+const canadianCities = CITIES.filter(c => c.country === 'Canada');
+const usCities = CITIES.filter(c => c.country === 'United States');
 
 const CustomTooltip = ({ active, payload, label }) => {
   if (!active || !payload?.length) return null;
@@ -26,8 +29,10 @@ export default function SalaryCalculator() {
   const calculate = (e) => {
     e.preventDefault();
     const levels = getAllLevels(role, city);
-    const topCities = getTopCities(role, level);
-    setResult({ levels, topCities, role, city, level });
+    const currency = getCurrency(city);
+    const country = CITIES.find(c => c.name === city)?.country;
+    const topCities = getTopCities(role, level, 5, country);
+    setResult({ levels, topCities, role, city, level, currency, country });
   };
 
   const selectClass = "w-full rounded-lg border border-border bg-background px-3 py-2 text-sm";
@@ -45,7 +50,7 @@ export default function SalaryCalculator() {
   })) || [];
 
   return (
-    <ToolLayout title="Salary Calculator" description="Compare salaries across Canadian cities and experience levels for 30+ roles.">
+    <ToolLayout title="Salary Calculator" description="Compare salaries across 40 Canadian and US cities for 30+ roles. Updated for 2025-2026 market rates.">
       <form onSubmit={calculate} className="glass-card rounded-2xl p-6 space-y-4">
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div>
@@ -59,7 +64,12 @@ export default function SalaryCalculator() {
             <label className="block text-sm font-medium mb-1">City</label>
             <select className={selectClass} value={city} onChange={e => setCity(e.target.value)} required>
               <option value="">Select a city...</option>
-              {CANADIAN_CITIES.map(c => <option key={c} value={c}>{c}</option>)}
+              <optgroup label="Canada (CAD)">
+                {canadianCities.map(c => <option key={c.name} value={c.name}>{c.name}</option>)}
+              </optgroup>
+              <optgroup label="United States (USD)">
+                {usCities.map(c => <option key={c.name} value={c.name}>{c.name}</option>)}
+              </optgroup>
             </select>
           </div>
           <div>
@@ -78,18 +88,16 @@ export default function SalaryCalculator() {
 
       {result && result.levels[result.level] && (
         <div className="mt-6 space-y-6">
-          {/* Main result */}
           <div className="glass-card rounded-2xl p-6 text-center">
             <p className="text-muted-foreground text-sm">{result.role} in {result.city}</p>
             <p className="text-4xl font-bold font-['Outfit'] text-primary mt-2">
               {fmt(result.levels[result.level][0])} — {fmt(result.levels[result.level][1])}
             </p>
             <p className="text-muted-foreground text-sm mt-1">
-              {result.level === 'junior' ? 'Junior' : result.level === 'mid' ? 'Mid-Level' : 'Senior'} range (annual, CAD)
+              {result.level === 'junior' ? 'Junior' : result.level === 'mid' ? 'Mid-Level' : 'Senior'} range (annual, {result.currency})
             </p>
           </div>
 
-          {/* By experience level */}
           <div className="glass-card rounded-2xl p-6">
             <h3 className="font-semibold font-['Outfit'] mb-4">Salary by Experience Level</h3>
             <ResponsiveContainer width="100%" height={220}>
@@ -106,10 +114,11 @@ export default function SalaryCalculator() {
             </ResponsiveContainer>
           </div>
 
-          {/* Top cities */}
           {cityData.length > 0 && (
             <div className="glass-card rounded-2xl p-6">
-              <h3 className="font-semibold font-['Outfit'] mb-4">Top Paying Cities for {result.role}</h3>
+              <h3 className="font-semibold font-['Outfit'] mb-4">
+                Top Paying {result.country === 'United States' ? 'US' : 'Canadian'} Cities for {result.role}
+              </h3>
               <ResponsiveContainer width="100%" height={220}>
                 <BarChart data={cityData} barCategoryGap="25%">
                   <XAxis dataKey="name" tick={{ fill: 'hsl(215, 20%, 55%)', fontSize: 11 }} axisLine={false} tickLine={false} />
@@ -122,7 +131,7 @@ export default function SalaryCalculator() {
           )}
 
           <p className="text-xs text-muted-foreground text-center">
-            Estimates based on publicly available Canadian labour market data. Actual salaries may vary based on company, benefits, and individual qualifications.
+            Estimates based on 2025-2026 market data from Statistics Canada, Bureau of Labor Statistics, and public salary surveys. Actual compensation varies by company, experience, and negotiation.
           </p>
         </div>
       )}

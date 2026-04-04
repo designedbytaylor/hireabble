@@ -1,12 +1,13 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, Share2, Check, Link2 } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 import useDocumentTitle from '../../hooks/useDocumentTitle';
 import { useAuth } from '../../context/AuthContext';
 
-export default function ToolLayout({ title, description, children }) {
+export default function ToolLayout({ title, description, children, seoContent }) {
   const { user } = useAuth();
+  const [shared, setShared] = useState(false);
   useDocumentTitle(title);
 
   useEffect(() => {
@@ -19,10 +20,37 @@ export default function ToolLayout({ title, description, children }) {
       tag.content = description;
       document.head.appendChild(tag);
     }
+
+    // OG tags
+    const setMeta = (property, content) => {
+      let el = document.querySelector(`meta[property="${property}"]`);
+      if (!el) { el = document.createElement('meta'); el.setAttribute('property', property); document.head.appendChild(el); }
+      el.setAttribute('content', content);
+    };
+    setMeta('og:title', `${title} | Hireabble`);
+    setMeta('og:description', description);
+    setMeta('og:url', window.location.href);
+    setMeta('og:type', 'website');
+
     return () => {
       if (prev && meta) meta.setAttribute('content', prev);
     };
-  }, [description]);
+  }, [description, title]);
+
+  const handleShare = async () => {
+    const shareData = { title: `${title} — Hireabble`, text: description, url: window.location.href };
+    try {
+      if (navigator.share) {
+        await navigator.share(shareData);
+      } else {
+        await navigator.clipboard.writeText(window.location.href);
+        setShared(true);
+        setTimeout(() => setShared(false), 2000);
+      }
+    } catch {
+      // User cancelled share
+    }
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -38,6 +66,9 @@ export default function ToolLayout({ title, description, children }) {
                 <ArrowLeft className="w-4 h-4" /> All Tools
               </Button>
             </Link>
+            <Button variant="ghost" size="sm" onClick={handleShare} className="gap-1">
+              {shared ? <><Check className="w-4 h-4" /> Copied</> : <><Share2 className="w-4 h-4" /> Share</>}
+            </Button>
             {user ? (
               <Link to={user.role === 'seeker' ? '/dashboard' : '/recruiter'}>
                 <Button size="sm" className="bg-gradient-to-r from-primary to-secondary text-white">
@@ -66,6 +97,14 @@ export default function ToolLayout({ title, description, children }) {
 
       <div className="max-w-4xl mx-auto px-4 py-8 pb-24">
         {children}
+
+        {seoContent && (
+          <div className="mt-12 border-t border-border/50 pt-8 no-print">
+            <div className="max-w-2xl space-y-3 text-sm text-muted-foreground leading-relaxed">
+              {seoContent}
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="fixed bottom-0 inset-x-0 bg-background/90 backdrop-blur-sm border-t border-border/50 py-3 px-4 no-print">

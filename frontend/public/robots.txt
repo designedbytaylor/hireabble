@@ -1,6 +1,8 @@
 User-agent: *
 Allow: /
 Allow: /browse
+Allow: /tools
+Allow: /tools/
 Allow: /terms
 Allow: /privacy
 Allow: /cookie-policy
