@@ -13,6 +13,12 @@ const PAGE_TYPE_LABELS = {
   salary_guide: 'Salary Guide',
   career_guide: 'Career Guide',
   interview_prep: 'Interview Prep',
+  resume_tips: 'Resume Tips',
+  cover_letter_guide: 'Cover Letter',
+  cost_of_living: 'Cost of Living',
+  skills_guide: 'Skills Guide',
+  day_in_life: 'Day in the Life',
+  salary_negotiation: 'Negotiation',
 };
 
 const PAGE_TYPE_COLORS = {
@@ -20,6 +26,12 @@ const PAGE_TYPE_COLORS = {
   salary_guide: 'bg-green-500/20 text-green-400',
   career_guide: 'bg-purple-500/20 text-purple-400',
   interview_prep: 'bg-orange-500/20 text-orange-400',
+  resume_tips: 'bg-cyan-500/20 text-cyan-400',
+  cover_letter_guide: 'bg-pink-500/20 text-pink-400',
+  cost_of_living: 'bg-yellow-500/20 text-yellow-400',
+  skills_guide: 'bg-indigo-500/20 text-indigo-400',
+  day_in_life: 'bg-rose-500/20 text-rose-400',
+  salary_negotiation: 'bg-emerald-500/20 text-emerald-400',
 };
 
 function markdownToHtml(md) {
