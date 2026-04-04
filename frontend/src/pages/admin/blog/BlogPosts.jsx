@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import {
-  Search, Edit3, Globe, Trash2, Loader2, ChevronLeft, ChevronRight,
+  Search, Edit3, Globe, Trash2, Loader2, ChevronLeft, ChevronRight, ExternalLink,
 } from 'lucide-react';
 import { PAGE_TYPES, PAGE_TYPE_MAP } from './blogConstants';
 import { StatusBadge } from './BlogDashboard';
@@ -148,7 +148,17 @@ export default function BlogPosts({
                         >
                           <Edit3 className="w-4 h-4" />
                         </button>
-                        {post.status !== 'published' && (
+                        {post.status === 'published' ? (
+                          <a
+                            href={`/blog/${post.slug}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="p-1.5 rounded hover:bg-gray-700 text-gray-400 hover:text-green-400"
+                            title="View on site"
+                          >
+                            <ExternalLink className="w-4 h-4" />
+                          </a>
+                        ) : (
                           <button
                             onClick={() => onPublish(post.id)}
                             className="p-1.5 rounded hover:bg-gray-700 text-gray-400 hover:text-green-400"
