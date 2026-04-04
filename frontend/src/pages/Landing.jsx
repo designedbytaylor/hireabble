@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import useDocumentTitle from '../hooks/useDocumentTitle';
+import { isNative } from '../utils/capacitor';
 export default function Landing() {
   useDocumentTitle('Home');
   return (
@@ -58,6 +59,21 @@ export default function Landing() {
               Browse Jobs
             </button>
           </Link>
+          {!isNative && (
+            <div className="flex gap-3">
+              <Link to="/tools" className="flex-1">
+                <button className="w-full py-3 rounded-full text-white/80 font-medium text-base hover:text-white active:scale-[0.98] transition-all border border-white/15">
+                  Free Tools
+                </button>
+              </Link>
+              <Link to="/blog" className="flex-1">
+                <button className="w-full py-3 rounded-full text-white/80 font-medium text-base hover:text-white active:scale-[0.98] transition-all border border-white/15">
+                  Blog
+                </button>
+              </Link>
+            </div>
+          )}
+
           <Link to="/login" className="block">
             <button
               className="w-full py-3 rounded-full text-white/80 font-medium text-base hover:text-white active:scale-[0.98] transition-all"

@@ -62,6 +62,10 @@ const SkillsGap = React.lazy(() => import("./pages/tools/SkillsGap"));
 const TypingTuneUp = React.lazy(() => import("./pages/tools/TypingTuneUp"));
 const JobAnalyzer = React.lazy(() => import("./pages/tools/JobAnalyzer"));
 const CareerGapExplainer = React.lazy(() => import("./pages/tools/CareerGapExplainer"));
+
+// Blog pages — public, no auth required
+const BlogIndex = React.lazy(() => import("./pages/BlogIndex"));
+const BlogPost = React.lazy(() => import("./pages/BlogPost"));
 const ReferenceRequest = React.lazy(() => import("./pages/tools/ReferenceRequest"));
 const BenefitsCalculator = React.lazy(() => import("./pages/tools/BenefitsCalculator"));
 const RejectionResponse = React.lazy(() => import("./pages/tools/RejectionResponse"));
@@ -497,6 +501,10 @@ function AppRoutes() {
       <Route path="/privacy" element={<PrivacyPolicy />} />
       <Route path="/cookie-policy" element={<CookiePolicy />} />
       <Route path="/community-guidelines" element={<CommunityGuidelines />} />
+
+      {/* Public blog — no auth required */}
+      <Route path="/blog" element={<BlogIndex />} />
+      <Route path="/blog/:slug" element={<BlogPost />} />
 
       {/* Free marketing tools — public, no auth required */}
       <Route path="/tools" element={<ToolsIndex />} />
