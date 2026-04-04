@@ -16,21 +16,23 @@ export default function AdminBlog() {
   const [tab, setTab] = useState('dashboard');
   const api = useBlogApi();
 
+  const { fetchStats, fetchJobs, fetchPosts, startPolling } = api;
+
   // Fetch data when tab changes
   useEffect(() => {
     if (tab === 'dashboard') {
-      api.fetchStats();
-      api.fetchJobs();
+      fetchStats();
+      fetchJobs();
     } else if (tab === 'posts') {
-      api.fetchPosts();
+      fetchPosts();
     }
-  }, [tab]);
+  }, [tab, fetchStats, fetchJobs, fetchPosts]);
 
   // Polling for running jobs on dashboard tab
   useEffect(() => {
     if (tab !== 'dashboard') return;
-    return api.startPolling();
-  }, [tab, api.startPolling]);
+    return startPolling();
+  }, [tab, startPolling]);
 
   const handleGenerate = async (params) => {
     const success = await api.handleGenerate(params);
