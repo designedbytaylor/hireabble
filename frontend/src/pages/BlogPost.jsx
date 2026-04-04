@@ -292,7 +292,7 @@ export default function BlogPost() {
               : 'Find Your Next Opportunity'}
           </h3>
           <p className="text-muted-foreground mb-4">
-            Hireabble makes job searching easy with swipe-based matching. See relevant jobs in seconds.
+            Hireabble makes job searching easy with smart matching. See relevant jobs in seconds.
           </p>
           <Link to="/register/seeker">
             <Button className="bg-gradient-to-r from-primary to-secondary text-white px-8">
