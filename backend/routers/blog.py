@@ -928,13 +928,13 @@ async def run_generation_job(job_id: str):
                     "city": city,
                     "role": role,
                     "country": _get_country(city),
-                    "status": "draft",
+                    "status": "published",
                     "meta_title": title,
                     "meta_description": excerpt,
                     "word_count": word_count,
                     "created_at": datetime.now(timezone.utc).isoformat(),
                     "updated_at": datetime.now(timezone.utc).isoformat(),
-                    "published_at": None,
+                    "published_at": datetime.now(timezone.utc).isoformat(),
                     "generation_job_id": job_id,
                 }
                 # Add extra dimension fields to the document
