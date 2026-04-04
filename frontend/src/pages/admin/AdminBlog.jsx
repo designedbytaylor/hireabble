@@ -77,7 +77,7 @@ export default function AdminBlog() {
 
         {/* Tab Content */}
         {tab === 'dashboard' && (
-          <BlogDashboard stats={api.stats} jobs={api.jobs} cancelJob={api.cancelJob} />
+          <BlogDashboard stats={api.stats} jobs={api.jobs} cancelJob={api.cancelJob} undoJob={api.undoJob} />
         )}
         {tab === 'generate' && (
           <BlogGenerate onGenerate={handleGenerate} generating={api.generating} />

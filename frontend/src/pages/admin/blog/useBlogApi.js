@@ -104,6 +104,18 @@ export default function useBlogApi() {
     }
   };
 
+  const undoJob = async (jobId) => {
+    if (!window.confirm('This will delete ALL posts from this job. Are you sure?')) return;
+    try {
+      const res = await axios.post(`${API}/admin/blog/jobs/${jobId}/undo`, {}, { headers });
+      toast.success(`Deleted ${res.data.deleted_posts} posts and removed job`);
+      fetchJobs();
+      fetchStats();
+    } catch (err) {
+      toast.error('Failed to undo job');
+    }
+  };
+
   const publishPost = async (postId) => {
     try {
       await axios.post(`${API}/admin/blog/posts/${postId}/publish`, {}, { headers });
@@ -208,7 +220,7 @@ export default function useBlogApi() {
 
   return {
     // Dashboard
-    stats, jobs, fetchStats, fetchJobs, cancelJob, startPolling,
+    stats, jobs, fetchStats, fetchJobs, cancelJob, undoJob, startPolling,
     // Generate
     generating, handleGenerate,
     // Posts

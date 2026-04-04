@@ -1181,7 +1181,37 @@ async def cancel_generation_job(job_id: str, admin=Depends(get_current_admin)):
     # Signal the background task to stop
     _running_jobs[job_id] = False
 
+    # Update status immediately so UI reflects it
+    await db.blog_jobs.update_one(
+        {"id": job_id},
+        {"$set": {"status": "cancelled", "completed_at": datetime.now(timezone.utc).isoformat()}}
+    )
+
     return {"cancelled": True, "job_id": job_id}
+
+
+@router.post("/admin/blog/jobs/{job_id}/undo")
+async def undo_generation_job(job_id: str, admin=Depends(get_current_admin)):
+    """Delete all blog posts created by a generation job."""
+    job = await db.blog_jobs.find_one({"id": job_id})
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    # If job is still running, cancel it first
+    if job["status"] in ("pending", "running"):
+        _running_jobs[job_id] = False
+        await db.blog_jobs.update_one(
+            {"id": job_id},
+            {"$set": {"status": "cancelled", "completed_at": datetime.now(timezone.utc).isoformat()}}
+        )
+
+    # Delete all posts from this job
+    result = await db.blog_posts.delete_many({"generation_job_id": job_id})
+
+    # Delete the job record itself
+    await db.blog_jobs.delete_one({"id": job_id})
+
+    return {"deleted_posts": result.deleted_count, "job_id": job_id}
 
 
 @router.post("/admin/blog/posts/{post_id}/publish")

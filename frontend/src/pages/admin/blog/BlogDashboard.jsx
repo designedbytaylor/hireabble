@@ -1,5 +1,5 @@
 import {
-  FileText, CheckCircle, XCircle, Clock, Square, Loader2,
+  FileText, CheckCircle, XCircle, Clock, Square, Loader2, Undo2,
 } from 'lucide-react';
 import { PAGE_TYPE_MAP } from './blogConstants';
 
@@ -23,7 +23,7 @@ function StatusBadge({ status }) {
 
 export { StatusBadge };
 
-export default function BlogDashboard({ stats, jobs, cancelJob }) {
+export default function BlogDashboard({ stats, jobs, cancelJob, undoJob }) {
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -51,6 +51,7 @@ export default function BlogDashboard({ stats, jobs, cancelJob }) {
           <div className="space-y-4">
             {jobs.map(job => {
               const pct = job.total > 0 ? Math.round((job.completed / job.total) * 100) : 0;
+              const isActive = job.status === 'running' || job.status === 'pending';
               return (
                 <div key={job.id} className="bg-gray-800 rounded-lg p-4">
                   <div className="flex items-center justify-between mb-2">
@@ -60,14 +61,23 @@ export default function BlogDashboard({ stats, jobs, cancelJob }) {
                       </span>
                       <StatusBadge status={job.status} />
                     </div>
-                    {job.status === 'running' && (
+                    <div className="flex items-center gap-2">
+                      {isActive && (
+                        <button
+                          onClick={() => cancelJob(job.id)}
+                          className="bg-red-600/20 hover:bg-red-600/30 text-red-400 px-3 py-1 rounded-lg text-xs font-medium flex items-center gap-1"
+                        >
+                          <Square className="w-3 h-3" /> Cancel
+                        </button>
+                      )}
                       <button
-                        onClick={() => cancelJob(job.id)}
-                        className="bg-red-600/20 hover:bg-red-600/30 text-red-400 px-3 py-1 rounded-lg text-xs font-medium flex items-center gap-1"
+                        onClick={() => undoJob(job.id)}
+                        className="bg-orange-600/20 hover:bg-orange-600/30 text-orange-400 px-3 py-1 rounded-lg text-xs font-medium flex items-center gap-1"
+                        title="Delete all posts from this job"
                       >
-                        <Square className="w-3 h-3" /> Cancel
+                        <Undo2 className="w-3 h-3" /> Undo
                       </button>
-                    )}
+                    </div>
                   </div>
                   <div className="flex items-center gap-3 text-xs text-gray-400 mb-2">
                     <span>{job.completed}/{job.total} completed</span>
@@ -77,7 +87,7 @@ export default function BlogDashboard({ stats, jobs, cancelJob }) {
                   </div>
                   <div className="w-full bg-gray-700 rounded-full h-2">
                     <div
-                      className={`h-2 rounded-full transition-all ${job.status === 'running' ? 'bg-indigo-500' : job.status === 'completed' ? 'bg-green-500' : 'bg-red-500'}`}
+                      className={`h-2 rounded-full transition-all ${isActive ? 'bg-indigo-500' : job.status === 'completed' ? 'bg-green-500' : 'bg-red-500'}`}
                       style={{ width: `${pct}%` }}
                     />
                   </div>
