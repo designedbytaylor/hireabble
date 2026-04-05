@@ -183,8 +183,8 @@ SALARY_DATA_CAD = {
     "Paramedic":               {"junior": (50000, 62000),  "mid": (64000, 78000),   "senior": (80000, 100000)},
 }
 
-# Track running generation jobs for cancellation
-_running_jobs: dict[str, bool] = {}
+# Track running generation jobs: "running" | "paused" | "cancel"
+_running_jobs: dict[str, str] = {}
 
 # ==================== PROMPT VARIETY ====================
 
@@ -844,7 +844,7 @@ def _build_dedup_query(page_type: str, city: str, role: str, extra: dict = None)
 
 async def run_generation_job(job_id: str):
     """Background task that generates blog posts for a job."""
-    _running_jobs[job_id] = True
+    _running_jobs[job_id] = "running"
     try:
         job = await db.blog_jobs.find_one({"id": job_id})
         if not job:
@@ -875,8 +875,9 @@ async def run_generation_job(job_id: str):
         skipped = 0
 
         for city, role, extra in combos:
-            # Check for cancellation
-            if not _running_jobs.get(job_id, False):
+            # Check for cancellation or pause
+            job_state = _running_jobs.get(job_id, "cancel")
+            if job_state == "cancel":
                 await db.blog_jobs.update_one(
                     {"id": job_id},
                     {"$set": {
@@ -889,6 +890,23 @@ async def run_generation_job(job_id: str):
                     }}
                 )
                 logger.info(f"Blog generation job {job_id} cancelled")
+                return
+
+            # Wait while paused
+            while _running_jobs.get(job_id) == "paused":
+                await asyncio.sleep(2)
+
+            # Re-check after unpause in case it was cancelled while paused
+            if _running_jobs.get(job_id, "cancel") == "cancel":
+                await db.blog_jobs.update_one(
+                    {"id": job_id},
+                    {"$set": {
+                        "status": "cancelled",
+                        "completed": completed, "failed": failed, "skipped": skipped,
+                        "error_log": error_log,
+                        "completed_at": datetime.now(timezone.utc).isoformat(),
+                    }}
+                )
                 return
 
             # Duplicate prevention
@@ -1162,10 +1180,17 @@ async def start_generation(request: Request, admin=Depends(get_current_admin)):
 
 
 @router.get("/admin/blog/jobs")
-async def list_generation_jobs(admin=Depends(get_current_admin)):
-    """List all generation jobs, most recent first."""
-    jobs = await db.blog_jobs.find({}, {"_id": 0}).sort("started_at", -1).to_list(length=100)
-    return {"jobs": jobs}
+async def list_generation_jobs(page: int = 1, limit: int = 10, admin=Depends(get_current_admin)):
+    """List generation jobs with pagination, most recent first."""
+    skip = (page - 1) * limit
+    total = await db.blog_jobs.count_documents({})
+    jobs = await db.blog_jobs.find({}, {"_id": 0}).sort("started_at", -1).skip(skip).limit(limit).to_list(length=limit)
+    return {
+        "jobs": jobs,
+        "total": total,
+        "page": page,
+        "pages": (total + limit - 1) // limit if limit > 0 else 0,
+    }
 
 
 @router.post("/admin/blog/jobs/{job_id}/cancel")
@@ -1175,11 +1200,11 @@ async def cancel_generation_job(job_id: str, admin=Depends(get_current_admin)):
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
 
-    if job["status"] not in ("pending", "running"):
+    if job["status"] not in ("pending", "running", "paused"):
         raise HTTPException(status_code=400, detail=f"Cannot cancel job with status '{job['status']}'")
 
     # Signal the background task to stop
-    _running_jobs[job_id] = False
+    _running_jobs[job_id] = "cancel"
 
     # Update status immediately so UI reflects it
     await db.blog_jobs.update_one(
@@ -1190,6 +1215,25 @@ async def cancel_generation_job(job_id: str, admin=Depends(get_current_admin)):
     return {"cancelled": True, "job_id": job_id}
 
 
+@router.post("/admin/blog/jobs/{job_id}/pause")
+async def pause_generation_job(job_id: str, admin=Depends(get_current_admin)):
+    """Pause or resume a running generation job."""
+    job = await db.blog_jobs.find_one({"id": job_id})
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    if job["status"] == "running":
+        _running_jobs[job_id] = "paused"
+        await db.blog_jobs.update_one({"id": job_id}, {"$set": {"status": "paused"}})
+        return {"status": "paused", "job_id": job_id}
+    elif job["status"] == "paused":
+        _running_jobs[job_id] = "running"
+        await db.blog_jobs.update_one({"id": job_id}, {"$set": {"status": "running"}})
+        return {"status": "running", "job_id": job_id}
+    else:
+        raise HTTPException(status_code=400, detail=f"Cannot pause/resume job with status '{job['status']}'")
+
+
 @router.post("/admin/blog/jobs/{job_id}/undo")
 async def undo_generation_job(job_id: str, admin=Depends(get_current_admin)):
     """Delete all blog posts created by a generation job."""
@@ -1197,9 +1241,9 @@ async def undo_generation_job(job_id: str, admin=Depends(get_current_admin)):
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
 
-    # If job is still running, cancel it first
-    if job["status"] in ("pending", "running"):
-        _running_jobs[job_id] = False
+    # If job is still active, cancel it first
+    if job["status"] in ("pending", "running", "paused"):
+        _running_jobs[job_id] = "cancel"
         await db.blog_jobs.update_one(
             {"id": job_id},
             {"$set": {"status": "cancelled", "completed_at": datetime.now(timezone.utc).isoformat()}}

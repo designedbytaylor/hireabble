@@ -16,7 +16,7 @@ export default function AdminBlog() {
   const [tab, setTab] = useState('dashboard');
   const api = useBlogApi();
 
-  const { fetchStats, fetchJobs, fetchPosts, startPolling } = api;
+  const { fetchStats, fetchJobs, fetchPosts, startPolling, jobsPage } = api;
 
   // Fetch data when tab changes
   useEffect(() => {
@@ -26,7 +26,7 @@ export default function AdminBlog() {
     } else if (tab === 'posts') {
       fetchPosts();
     }
-  }, [tab, fetchStats, fetchJobs, fetchPosts]);
+  }, [tab, fetchStats, fetchJobs, fetchPosts, jobsPage]);
 
   // Polling for running jobs on dashboard tab
   useEffect(() => {
@@ -77,7 +77,16 @@ export default function AdminBlog() {
 
         {/* Tab Content */}
         {tab === 'dashboard' && (
-          <BlogDashboard stats={api.stats} jobs={api.jobs} cancelJob={api.cancelJob} undoJob={api.undoJob} />
+          <BlogDashboard
+            stats={api.stats}
+            jobs={api.jobs}
+            cancelJob={api.cancelJob}
+            pauseJob={api.pauseJob}
+            undoJob={api.undoJob}
+            jobsPage={api.jobsPage}
+            jobsTotalPages={api.jobsTotalPages}
+            setJobsPage={api.setJobsPage}
+          />
         )}
         {tab === 'generate' && (
           <BlogGenerate onGenerate={handleGenerate} generating={api.generating} />

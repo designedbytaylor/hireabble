@@ -1,5 +1,6 @@
 import {
-  FileText, CheckCircle, XCircle, Clock, Square, Loader2, Undo2,
+  FileText, CheckCircle, XCircle, Clock, Square, Loader2, Undo2, Pause, Play,
+  ChevronLeft, ChevronRight,
 } from 'lucide-react';
 import { PAGE_TYPE_MAP } from './blogConstants';
 
@@ -13,6 +14,7 @@ function StatusBadge({ status }) {
     cancelled: 'bg-gray-500/20 text-gray-400',
     completed_with_errors: 'bg-yellow-500/20 text-yellow-400',
     pending: 'bg-gray-500/20 text-gray-400',
+    paused: 'bg-yellow-500/20 text-yellow-400',
   };
   return (
     <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${styles[status] || 'bg-gray-700 text-gray-400'}`}>
@@ -23,7 +25,10 @@ function StatusBadge({ status }) {
 
 export { StatusBadge };
 
-export default function BlogDashboard({ stats, jobs, cancelJob, undoJob }) {
+export default function BlogDashboard({
+  stats, jobs, cancelJob, pauseJob, undoJob,
+  jobsPage, jobsTotalPages, setJobsPage,
+}) {
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -52,6 +57,7 @@ export default function BlogDashboard({ stats, jobs, cancelJob, undoJob }) {
             {jobs.map(job => {
               const pct = job.total > 0 ? Math.round((job.completed / job.total) * 100) : 0;
               const isActive = job.status === 'running' || job.status === 'pending';
+              const isPaused = job.status === 'paused';
               return (
                 <div key={job.id} className="bg-gray-800 rounded-lg p-4">
                   <div className="flex items-center justify-between mb-2">
@@ -62,7 +68,15 @@ export default function BlogDashboard({ stats, jobs, cancelJob, undoJob }) {
                       <StatusBadge status={job.status} />
                     </div>
                     <div className="flex items-center gap-2">
-                      {isActive && (
+                      {(isActive || isPaused) && (
+                        <button
+                          onClick={() => pauseJob(job.id)}
+                          className="bg-yellow-600/20 hover:bg-yellow-600/30 text-yellow-400 px-3 py-1 rounded-lg text-xs font-medium flex items-center gap-1"
+                        >
+                          {isPaused ? <><Play className="w-3 h-3" /> Resume</> : <><Pause className="w-3 h-3" /> Pause</>}
+                        </button>
+                      )}
+                      {(isActive || isPaused) && (
                         <button
                           onClick={() => cancelJob(job.id)}
                           className="bg-red-600/20 hover:bg-red-600/30 text-red-400 px-3 py-1 rounded-lg text-xs font-medium flex items-center gap-1"
@@ -87,13 +101,36 @@ export default function BlogDashboard({ stats, jobs, cancelJob, undoJob }) {
                   </div>
                   <div className="w-full bg-gray-700 rounded-full h-2">
                     <div
-                      className={`h-2 rounded-full transition-all ${isActive ? 'bg-indigo-500' : job.status === 'completed' ? 'bg-green-500' : 'bg-red-500'}`}
+                      className={`h-2 rounded-full transition-all ${isActive ? 'bg-indigo-500' : isPaused ? 'bg-yellow-500' : job.status === 'completed' ? 'bg-green-500' : 'bg-red-500'}`}
                       style={{ width: `${pct}%` }}
                     />
                   </div>
                 </div>
               );
             })}
+          </div>
+        )}
+
+        {/* Jobs Pagination */}
+        {jobsTotalPages > 1 && (
+          <div className="flex items-center justify-center gap-3 mt-4 pt-4 border-t border-gray-700">
+            <button
+              onClick={() => setJobsPage(p => Math.max(1, p - 1))}
+              disabled={jobsPage === 1}
+              className="bg-gray-700 hover:bg-gray-600 disabled:opacity-50 text-gray-300 p-1.5 rounded-lg"
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+            <span className="text-sm text-gray-400">
+              Page {jobsPage} of {jobsTotalPages}
+            </span>
+            <button
+              onClick={() => setJobsPage(p => Math.min(jobsTotalPages, p + 1))}
+              disabled={jobsPage === jobsTotalPages}
+              className="bg-gray-700 hover:bg-gray-600 disabled:opacity-50 text-gray-300 p-1.5 rounded-lg"
+            >
+              <ChevronRight className="w-4 h-4" />
+            </button>
           </div>
         )}
       </div>
