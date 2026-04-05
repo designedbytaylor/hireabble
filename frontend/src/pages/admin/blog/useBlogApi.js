@@ -12,6 +12,8 @@ export default function useBlogApi() {
   // Dashboard state
   const [stats, setStats] = useState({ total: 0, published: 0, draft: 0, failed: 0, running_jobs: 0 });
   const [jobs, setJobs] = useState([]);
+  const [jobsPage, setJobsPage] = useState(1);
+  const [jobsTotalPages, setJobsTotalPages] = useState(1);
 
   // Posts state
   const [posts, setPosts] = useState([]);
@@ -42,16 +44,18 @@ export default function useBlogApi() {
     }
   }, [headers]);
 
-  const fetchJobs = useCallback(async () => {
+  const fetchJobs = useCallback(async (page) => {
     try {
-      const { data } = await axios.get(`${API}/admin/blog/jobs`, { headers });
+      const p = page || jobsPage;
+      const { data } = await axios.get(`${API}/admin/blog/jobs`, { headers, params: { page: p, limit: 10 } });
       setJobs(data.jobs || []);
+      setJobsTotalPages(data.pages || 1);
       return data.jobs || [];
     } catch (err) {
       console.error('Failed to fetch jobs', err);
       return [];
     }
-  }, [headers]);
+  }, [headers, jobsPage]);
 
   const fetchPosts = useCallback(async () => {
     setLoading(true);
@@ -101,6 +105,16 @@ export default function useBlogApi() {
       fetchStats();
     } catch (err) {
       toast.error('Failed to cancel job');
+    }
+  };
+
+  const pauseJob = async (jobId) => {
+    try {
+      const { data } = await axios.post(`${API}/admin/blog/jobs/${jobId}/pause`, {}, { headers });
+      toast.success(data.status === 'paused' ? 'Job paused' : 'Job resumed');
+      fetchJobs();
+    } catch (err) {
+      toast.error('Failed to pause/resume job');
     }
   };
 
@@ -200,15 +214,15 @@ export default function useBlogApi() {
   // ─── POLLING ──────────────────────────────────────────────────────────────
 
   const startPolling = useCallback(() => {
-    const hasRunning = jobs.some(j => j.status === 'running');
-    if (!hasRunning) {
+    const hasActive = jobs.some(j => j.status === 'running' || j.status === 'paused');
+    if (!hasActive) {
       if (pollRef.current) clearInterval(pollRef.current);
       return;
     }
     pollRef.current = setInterval(async () => {
       const updated = await fetchJobs();
       fetchStats();
-      if (!updated.some(j => j.status === 'running')) {
+      if (!updated.some(j => j.status === 'running' || j.status === 'paused')) {
         clearInterval(pollRef.current);
       }
     }, 3000);
@@ -220,7 +234,8 @@ export default function useBlogApi() {
 
   return {
     // Dashboard
-    stats, jobs, fetchStats, fetchJobs, cancelJob, undoJob, startPolling,
+    stats, jobs, jobsPage, jobsTotalPages, setJobsPage,
+    fetchStats, fetchJobs, cancelJob, pauseJob, undoJob, startPolling,
     // Generate
     generating, handleGenerate,
     // Posts

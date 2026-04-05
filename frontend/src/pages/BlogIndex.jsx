@@ -193,23 +193,15 @@ export default function BlogIndex() {
 
       {/* Filters */}
       <div className="max-w-6xl mx-auto px-4 py-4">
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="flex gap-2">
-            {PAGE_TYPES.map(pt => (
-              <button
-                key={pt.value}
-                onClick={() => setTypeFilter(pt.value)}
-                className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
-                  typeFilter === pt.value
-                    ? 'bg-primary text-primary-foreground'
-                    : 'bg-muted/50 text-muted-foreground hover:bg-muted'
-                }`}
-              >
-                {pt.label}
-              </button>
-            ))}
-          </div>
-        </div>
+        <select
+          value={typeFilter}
+          onChange={e => setTypeFilter(e.target.value)}
+          className="bg-card border border-border rounded-lg px-4 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
+        >
+          {PAGE_TYPES.map(pt => (
+            <option key={pt.value} value={pt.value}>{pt.label}</option>
+          ))}
+        </select>
       </div>
 
       {/* Posts Grid */}
