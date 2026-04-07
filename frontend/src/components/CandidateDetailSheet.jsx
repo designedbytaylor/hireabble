@@ -2,12 +2,15 @@ import { useRef, useState, useEffect } from 'react';
 import { motion, useMotionValue, useTransform } from 'framer-motion';
 import {
   Briefcase, MapPin, GraduationCap, Clock, Building2,
-  Sparkles, MessageSquare, BadgeCheck, Video, Brain, Lock, Loader2
+  Sparkles, MessageSquare, BadgeCheck, Video, Brain, Lock, Loader2,
+  Flag, ShieldBan,
 } from 'lucide-react';
 import { getPhotoUrl, handleImgError } from '../utils/helpers';
 import { useAuth } from '../context/AuthContext';
 import axios from 'axios';
 import SkillBadges from './SkillBadges';
+import ReportDialog from './ReportDialog';
+import BlockDialog from './BlockDialog';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -18,6 +21,8 @@ export function CandidateDetailSheet({ item, mode, onClose }) {
   const [canDragDown, setCanDragDown] = useState(true);
   const [aiInsights, setAiInsights] = useState(null);
   const [aiLoading, setAiLoading] = useState(false);
+  const [reportOpen, setReportOpen] = useState(false);
+  const [blockOpen, setBlockOpen] = useState(false);
   const { user, token } = useAuth();
 
   const isEnterprise = user?.subscription?.status === 'active'
@@ -339,8 +344,40 @@ export function CandidateDetailSheet({ item, mode, onClose }) {
               Applied {new Date(item.created_at).toLocaleDateString()}
             </div>
           )}
+
+          {/* Safety actions (Apple Guideline 1.2 UGC safety) */}
+          <div className="flex justify-center gap-2 mt-6 pt-4 border-t border-border">
+            <button
+              onClick={() => setReportOpen(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+              aria-label="Report user"
+            >
+              <Flag className="w-3.5 h-3.5" /> Report
+            </button>
+            <button
+              onClick={() => setBlockOpen(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+              aria-label="Block user"
+            >
+              <ShieldBan className="w-3.5 h-3.5" /> Block
+            </button>
+          </div>
         </div>
       </motion.div>
+
+      <ReportDialog
+        open={reportOpen}
+        onOpenChange={setReportOpen}
+        reportedType="user"
+        reportedId={seekerId}
+      />
+      <BlockDialog
+        open={blockOpen}
+        onOpenChange={setBlockOpen}
+        blockedUserId={seekerId}
+        blockedUserName={name}
+        onBlockSuccess={onClose}
+      />
     </motion.div>
   );
 }

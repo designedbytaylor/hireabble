@@ -3,8 +3,10 @@ import { useNavigate } from 'react-router-dom';
 import {
   Sparkles, MessageCircle, Briefcase, Building2, Calendar, ChevronRight, CheckCircle,
   X, MapPin, GraduationCap, Clock, User, Mail, ArrowLeft, Star, FileText, Award, Download,
-  Zap, Timer, Crown,
+  Zap, Timer, Crown, Flag, ShieldBan,
 } from 'lucide-react';
+import ReportDialog from '../components/ReportDialog';
+import BlockDialog from '../components/BlockDialog';
 import { Badge } from '../components/ui/badge';
 import { Button } from '../components/ui/button';
 import axios from 'axios';
@@ -69,6 +71,8 @@ export default function Matches() {
   // Profile view state
   const [viewingProfile, setViewingProfile] = useState(null);
   const [profileLoading, setProfileLoading] = useState(false);
+  const [reportOpen, setReportOpen] = useState(false);
+  const [blockOpen, setBlockOpen] = useState(false);
   const tokenRef = useRef(token);
   tokenRef.current = token;
 
@@ -262,7 +266,39 @@ export default function Matches() {
                   </Button>
                 )}
               </div>
+
+              {/* Safety actions — report/block (Apple Guideline 1.2 UGC safety) */}
+              <div className="flex justify-center gap-2 mt-4 pt-4 border-t border-border">
+                <button
+                  onClick={() => setReportOpen(true)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+                  aria-label="Report user"
+                >
+                  <Flag className="w-3.5 h-3.5" /> Report
+                </button>
+                <button
+                  onClick={() => setBlockOpen(true)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+                  aria-label="Block user"
+                >
+                  <ShieldBan className="w-3.5 h-3.5" /> Block
+                </button>
+              </div>
             </div>
+
+            <ReportDialog
+              open={reportOpen}
+              onOpenChange={setReportOpen}
+              reportedType="user"
+              reportedId={p.id || (isRecruiterViewing ? m.seeker_id : m.recruiter_id)}
+            />
+            <BlockDialog
+              open={blockOpen}
+              onOpenChange={setBlockOpen}
+              blockedUserId={p.id || (isRecruiterViewing ? m.seeker_id : m.recruiter_id)}
+              blockedUserName={p.name || p.company}
+              onBlockSuccess={() => { setViewingProfile(null); }}
+            />
 
             {/* Job Details (for seeker viewing) */}
             {!isRecruiterViewing && j && (

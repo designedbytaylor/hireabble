@@ -40,6 +40,9 @@ db = client[os.environ['DB_NAME']]
 JWT_SECRET = os.environ.get('JWT_SECRET')
 if not JWT_SECRET:
     raise RuntimeError("JWT_SECRET environment variable is required. Set it to a strong random string.")
+# Separate secret for admin tokens so a leaked user JWT can't be used to forge an admin one.
+# Falls back to JWT_SECRET if not set (backwards-compatible) — strongly recommended in production.
+JWT_SECRET_ADMIN = os.environ.get('JWT_SECRET_ADMIN') or JWT_SECRET
 JWT_ALGORITHM = "HS256"
 JWT_EXPIRATION_HOURS = 24
 
@@ -130,7 +133,10 @@ def create_token(user_id: str, role: str, remember_me: bool = False) -> str:
         "iat": now,
         "exp": now + timedelta(hours=exp_hours)
     }
-    return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
+    # Admin tokens are signed with a separate secret so a compromised user
+    # token cannot be used to forge an admin token.
+    secret = JWT_SECRET_ADMIN if role == "admin" else JWT_SECRET
+    return jwt.encode(payload, secret, algorithm=JWT_ALGORITHM)
 
 async def blacklist_token(jti: str, exp_seconds: int = 86400):
     """Add a token JTI to the blacklist. Auto-expires via TTL index."""
@@ -631,7 +637,14 @@ async def get_current_admin(credentials: HTTPAuthorizationCredentials = Depends(
     """Authenticate admin users from the admin_users collection."""
     try:
         token = credentials.credentials
-        payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+        # Prefer admin secret, fall back to user secret for backwards-compatibility
+        # with tokens issued before JWT_SECRET_ADMIN was introduced.
+        try:
+            payload = jwt.decode(token, JWT_SECRET_ADMIN, algorithms=[JWT_ALGORITHM])
+        except jwt.InvalidTokenError:
+            if JWT_SECRET_ADMIN == JWT_SECRET:
+                raise
+            payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
         user_id = payload.get("user_id")
         role = payload.get("role")
         if not user_id or role != "admin":

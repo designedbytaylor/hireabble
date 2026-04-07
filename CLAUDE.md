@@ -2,8 +2,9 @@
 
 ## Project Overview
 - **Frontend**: React (CRA) at `frontend/`
-- **Backend**: Node/Express at `backend/`
+- **Backend**: FastAPI (Python) at `backend/` (routers under `backend/routers/`)
 - **PWA**: Service worker at `frontend/public/service-worker.js`
+- **Native shell**: Capacitor (iOS + Android) wrapping the web app
 
 ## Fix Log
 

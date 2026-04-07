@@ -999,6 +999,16 @@ async def create_checkout_session(
     current_user: dict = Depends(get_current_user)
 ):
     """Create a Stripe Checkout session for consumables or subscriptions (web only - iOS must use Apple IAP)"""
+    # Apple Guideline 3.1.1 — reject Stripe checkout from iOS native builds.
+    # Native iOS clients MUST purchase through StoreKit.
+    platform_header = (request.headers.get("x-platform") or "").lower()
+    user_agent = (request.headers.get("user-agent") or "").lower()
+    if platform_header in ("ios-native", "ios", "capacitor-ios") or "hireabble-ios" in user_agent:
+        raise HTTPException(
+            status_code=403,
+            detail="In-app purchases on iOS must be made through the App Store.",
+        )
+
     if not STRIPE_AVAILABLE:
         raise HTTPException(status_code=503, detail="Payment processing is not configured. Set STRIPE_SECRET_KEY.")
 
