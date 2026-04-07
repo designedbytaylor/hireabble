@@ -56,7 +56,7 @@ from database import db, manager, UPLOADS_DIR, logger, JWT_SECRET, JWT_ALGORITHM
 from content_filter import check_text, is_severe
 
 # Import routers
-from routers import auth, jobs, applications, matches, notifications, uploads, stats, admin, interviews, payments, support, users, skills, blog
+from routers import auth, jobs, applications, matches, notifications, uploads, stats, admin, interviews, payments, support, users, skills, blog, analytics
 
 # Rate limiter — uses remote IP address by default
 limiter = Limiter(key_func=get_remote_address, default_limits=["120/minute"])
@@ -237,6 +237,7 @@ app.include_router(support.router, prefix="/api")
 app.include_router(users.router, prefix="/api")
 app.include_router(skills.router, prefix="/api")
 app.include_router(blog.router, prefix="/api")
+app.include_router(analytics.router, prefix="/api")
 
 # ==================== WEBSOCKET ====================
 
@@ -567,6 +568,11 @@ async def startup():
     await ensure_index(db.profile_views, "seeker_id")
     await ensure_index(db.profile_views, [("viewer_id", 1), ("seeker_id", 1), ("date", 1)])
 
+    # Page views (traffic analytics)
+    await ensure_index(db.page_views, [("created_at", -1)])
+    await ensure_index(db.page_views, "visitor_id")
+    await ensure_index(db.page_views, "path")
+
     # ==================== TTL INDEXES (auto-cleanup) ====================
     try:
         await db.user_2fa_codes.create_index("created_at", expireAfterSeconds=900)
@@ -574,6 +580,7 @@ async def startup():
         await db.profile_views.create_index("created_at", expireAfterSeconds=7776000)  # 90 days
         await db.email_verification_tokens.create_index("created_at", expireAfterSeconds=86400)
         await db.conversation_starters_cache.create_index("created_at", expireAfterSeconds=604800)  # 7 days
+        await db.page_views.create_index("created_at", expireAfterSeconds=15552000)  # 180 days
     except Exception:
         pass  # TTL indexes may already exist
 
