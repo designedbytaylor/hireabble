@@ -62,9 +62,20 @@ const PAGE_TYPE_COLORS = {
   annual_job_market: 'bg-rose-500/20 text-rose-300',
 };
 
+function escapeHtml(s) {
+  return String(s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 function markdownToHtml(md) {
   if (!md) return '';
-  let html = md
+  // Escape HTML first to prevent XSS from stored blog content (admin UGC).
+  // All markdown transforms below only produce a known, fixed set of tags.
+  let html = escapeHtml(md)
     // Normalize line endings
     .replace(/\r\n?/g, '\n')
     // Headers (must be before bold processing)

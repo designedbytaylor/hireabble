@@ -102,7 +102,7 @@ app.add_middleware(
     allow_origin_regex=r"https://(hireabble[a-z0-9-]*\.vercel\.app|hireabble[a-z0-9-]*\.up\.railway\.app|(www\.)?hireabble\.com)",
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allow_headers=["Authorization", "Content-Type", "Cache-Control"],
+    allow_headers=["Authorization", "Content-Type", "Cache-Control", "X-Platform"],
 )
 
 
@@ -176,6 +176,7 @@ async def add_security_headers(request: Request, call_next):
         "img-src 'self' data: blob: https:; "
         "connect-src 'self' https: wss:; "
         "frame-src 'self' https://accounts.google.com https://appleid.apple.com; "
+        "frame-ancestors 'none'; "
         "object-src 'none'; "
         "base-uri 'self'"
     )

@@ -618,30 +618,31 @@ async def reset_password(body: ResetPasswordRequest, request: Request):
 # ==================== CHANGE PASSWORD ====================
 
 @router.post("/change-password")
-async def change_password(request: ChangePasswordRequest, current_user: dict = Depends(get_current_user)):
+@limiter.limit("5/hour")
+async def change_password(request: Request, payload: ChangePasswordRequest, current_user: dict = Depends(get_current_user)):
     """Change password for logged-in user"""
     # Get user with password
     user = await db.users.find_one({"id": current_user["id"]})
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
-    
+
     # Verify current password
-    if not verify_password(request.current_password, user["password"]):
+    if not verify_password(payload.current_password, user["password"]):
         raise HTTPException(status_code=400, detail="Current password is incorrect")
-    
+
     # Validate new password
-    if len(request.new_password) < 8:
+    if len(payload.new_password) < 8:
         raise HTTPException(status_code=400, detail="New password must be at least 8 characters")
     import re as _re
-    if not _re.search(r'[A-Z]', request.new_password):
+    if not _re.search(r'[A-Z]', payload.new_password):
         raise HTTPException(status_code=400, detail="Password must contain at least one uppercase letter")
-    if not _re.search(r'[0-9]', request.new_password):
+    if not _re.search(r'[0-9]', payload.new_password):
         raise HTTPException(status_code=400, detail="Password must contain at least one number")
-    if not _re.search(r'[^A-Za-z0-9]', request.new_password):
+    if not _re.search(r'[^A-Za-z0-9]', payload.new_password):
         raise HTTPException(status_code=400, detail="Password must contain at least one special character")
-    
+
     # Update password and record change timestamp for token invalidation
-    hashed_password = hash_password(request.new_password)
+    hashed_password = hash_password(payload.new_password)
     await db.users.update_one(
         {"id": current_user["id"]},
         {"$set": {"password": hashed_password, "password_changed_at": datetime.now(timezone.utc).isoformat()}}
@@ -1565,7 +1566,8 @@ async def apple_oauth(body: dict, request: Request):
 # ==================== ACCOUNT DELETION ====================
 
 @router.delete("/account")
-async def delete_account(current_user: dict = Depends(get_current_user)):
+@limiter.limit("3/hour")
+async def delete_account(request: Request, current_user: dict = Depends(get_current_user)):
     """Permanently delete user account and all associated data."""
     user_id = current_user["id"]
     user_role = current_user.get("role", "seeker")

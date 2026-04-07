@@ -2222,13 +2222,21 @@ export default function Profile() {
             {exportLoading ? 'Exporting...' : 'Download My Data'}
           </Button>
 
-          {/* Delete Account */}
-          <button
-            onClick={() => setShowDeleteConfirm(true)}
-            className="w-full mt-6 text-center text-sm text-muted-foreground hover:text-destructive transition-colors"
-          >
-            Delete Account
-          </button>
+          {/* Danger Zone — Delete Account (Apple Guideline 5.1.1(v) requires in-app deletion) */}
+          <div className="mt-8 p-4 rounded-2xl border border-destructive/30 bg-destructive/5">
+            <h3 className="text-sm font-bold text-destructive font-['Outfit'] mb-1">Danger Zone</h3>
+            <p className="text-xs text-muted-foreground mb-3">
+              Permanently delete your Hireabble account and all associated data. This cannot be undone.
+            </p>
+            <Button
+              variant="outline"
+              onClick={() => setShowDeleteConfirm(true)}
+              className="w-full h-11 rounded-xl border-destructive/50 text-destructive hover:bg-destructive/10 font-semibold"
+              data-testid="delete-account-btn"
+            >
+              Delete My Account
+            </Button>
+          </div>
 
           <ConfirmDialog
             open={showDeleteConfirm}

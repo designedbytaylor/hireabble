@@ -1,8 +1,26 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import * as Sentry from "@sentry/react";
+import axios from "axios";
+import { Capacitor } from "@capacitor/core";
 import "@/index.css";
 import App from "@/App";
+
+// Tag every request with the client platform so the backend can enforce
+// platform-specific rules (e.g. reject Stripe checkout on iOS native per
+// Apple Guideline 3.1.1).
+try {
+  const _platform = Capacitor.getPlatform(); // 'ios' | 'android' | 'web'
+  const _native = Capacitor.isNativePlatform();
+  axios.defaults.headers.common["X-Platform"] =
+    _native && _platform === "ios"
+      ? "ios-native"
+      : _native && _platform === "android"
+      ? "android-native"
+      : "web";
+} catch {
+  axios.defaults.headers.common["X-Platform"] = "web";
+}
 
 if (process.env.REACT_APP_SENTRY_DSN) {
   Sentry.init({
