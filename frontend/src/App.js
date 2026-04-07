@@ -13,6 +13,7 @@ import Login from "./pages/Login";
 import Register from "./pages/Register";
 
 const ImpersonationBanner = React.lazy(() => import("./components/ImpersonationBanner"));
+const PageViewTracker = React.lazy(() => import("./components/PageViewTracker"));
 const OfflineIndicator = React.lazy(() => import("./components/OfflineIndicator"));
 
 // Lazy load everything else — each becomes its own JS chunk
@@ -115,6 +116,7 @@ const AdminMarketing = React.lazy(() => import("./pages/admin/AdminMarketing"));
 const AdminLaunchChecklist = React.lazy(() => import("./pages/admin/AdminLaunchChecklist"));
 const AdminFiles = React.lazy(() => import("./pages/admin/AdminFiles"));
 const AdminBlog = React.lazy(() => import("./pages/admin/AdminBlog"));
+const AdminTraffic = React.lazy(() => import("./pages/admin/AdminTraffic"));
 const Support = React.lazy(() => import("./pages/Support"));
 
 const NotFound = () => (
@@ -291,6 +293,7 @@ function AppRoutes() {
   return (
     <>
     <Suspense fallback={null}><ImpersonationBanner /></Suspense>
+    <Suspense fallback={null}><PageViewTracker /></Suspense>
     <Suspense fallback={<PageSpinner />}>
     <Routes>
       <Route path="/" element={<PublicRoute><Landing /></PublicRoute>} />
@@ -555,6 +558,7 @@ function AppRoutes() {
         <Route path="marketing" element={<AdminMarketing />} />
         <Route path="files" element={<AdminFiles />} />
         <Route path="blog" element={<AdminBlog />} />
+        <Route path="traffic" element={<AdminTraffic />} />
         <Route path="launch" element={<AdminLaunchChecklist />} />
         <Route path="settings" element={<AdminSettings />} />
       </Route>
