@@ -114,21 +114,10 @@ export default function AdminTesting() {
   };
 
   const handleImpersonate = async (user) => {
-    // Require a reason (audited server-side). Min 10 chars.
-    const reason = window.prompt(
-      `Enter the reason for impersonating ${user.email || user.name}. This is logged and the user will be notified.`,
-      ''
-    );
-    if (reason == null) return; // cancelled
-    if (reason.trim().length < 10) {
-      toast.error('Reason must be at least 10 characters.');
-      return;
-    }
-
     setLoading(prev => ({ ...prev, impersonate: user.id }));
 
     try {
-      const res = await axios.post(`${API}/admin/impersonate/${user.id}`, { reason: reason.trim() }, {
+      const res = await axios.post(`${API}/admin/impersonate/${user.id}`, {}, {
         headers: { Authorization: `Bearer ${token}` },
       });
       const impersonateToken = res.data.token;
