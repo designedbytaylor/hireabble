@@ -2583,6 +2583,96 @@ async def update_app_store_settings(
     return {"message": "App store settings updated", "settings": {k: current.get(k, "") for k in APP_STORE_SETTINGS_FIELDS}}
 
 
+# ==================== MATCH SOUND ====================
+
+MATCH_SOUND_KEY = "match_sound"
+ALLOWED_AUDIO_TYPES = {"audio/mpeg", "audio/wav", "audio/x-wav", "audio/mp4", "audio/x-m4a", "audio/aac"}
+MAX_SOUND_SIZE = 500 * 1024  # 500KB
+
+
+@router.post("/admin/match-sound")
+async def upload_match_sound(
+    file: UploadFile = File(...),
+    admin=Depends(get_current_admin),
+):
+    """Upload a custom match sound (.mp3, .wav, .m4a). Max 500KB."""
+    contents = await file.read()
+    if len(contents) > MAX_SOUND_SIZE:
+        raise HTTPException(status_code=400, detail="File size exceeds 500KB limit")
+
+    content_type = file.content_type or ""
+    if content_type not in ALLOWED_AUDIO_TYPES:
+        raise HTTPException(status_code=400, detail=f"Invalid audio format. Allowed: mp3, wav, m4a")
+
+    from pathlib import Path as _Path
+    original_name = file.filename or "match_sound"
+    ext = _Path(original_name).suffix or ".mp3"
+    stored_name = f"match_sound_{uuid.uuid4().hex[:8]}{ext}"
+
+    uploads_dir = _Path(os.environ.get("UPLOADS_PATH", "uploads")) / "sounds"
+    uploads_dir.mkdir(parents=True, exist_ok=True)
+
+    # Delete the old sound file if it exists
+    old_doc = await db.site_settings.find_one({"key": MATCH_SOUND_KEY})
+    if old_doc and old_doc.get("value", {}).get("stored_name"):
+        old_file = uploads_dir / old_doc["value"]["stored_name"]
+        if old_file.exists():
+            old_file.unlink()
+
+    (uploads_dir / stored_name).write_bytes(contents)
+
+    sound_doc = {
+        "filename": original_name,
+        "stored_name": stored_name,
+        "url": f"/uploads/sounds/{stored_name}",
+        "size": len(contents),
+        "content_type": content_type,
+        "uploaded_at": datetime.now(timezone.utc).isoformat(),
+        "uploaded_by": admin.get("name", "Admin"),
+    }
+
+    await db.site_settings.update_one(
+        {"key": MATCH_SOUND_KEY},
+        {"$set": {"key": MATCH_SOUND_KEY, "value": sound_doc, "updated_at": datetime.now(timezone.utc)}},
+        upsert=True,
+    )
+
+    return sound_doc
+
+
+@router.get("/admin/match-sound")
+async def get_match_sound(admin=Depends(get_current_admin)):
+    """Get the current custom match sound info."""
+    doc = await db.site_settings.find_one({"key": MATCH_SOUND_KEY})
+    if not doc or not doc.get("value"):
+        return {"url": None, "filename": None}
+    return doc["value"]
+
+
+@router.delete("/admin/match-sound")
+async def delete_match_sound(admin=Depends(get_current_admin)):
+    """Delete the custom match sound and revert to the default."""
+    doc = await db.site_settings.find_one({"key": MATCH_SOUND_KEY})
+    if doc and doc.get("value", {}).get("stored_name"):
+        from pathlib import Path as _Path
+        uploads_dir = _Path(os.environ.get("UPLOADS_PATH", "uploads")) / "sounds"
+        old_file = uploads_dir / doc["value"]["stored_name"]
+        if old_file.exists():
+            old_file.unlink()
+
+    await db.site_settings.delete_one({"key": MATCH_SOUND_KEY})
+    return {"message": "Custom match sound removed. Default sound will be used."}
+
+
+@router.get("/settings/match-sound")
+async def get_public_match_sound():
+    """Public endpoint: get the match sound URL (no auth required)."""
+    doc = await db.site_settings.find_one({"key": MATCH_SOUND_KEY})
+    if doc and doc.get("value", {}).get("url"):
+        return {"url": doc["value"]["url"]}
+    return {"url": None}
+
+
 # ==================== PRICING MANAGEMENT ====================
 
 PRICING_OVERRIDES_KEY = "pricing_overrides"

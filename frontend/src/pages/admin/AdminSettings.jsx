@@ -1,10 +1,10 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import axios from 'axios';
 import { useAdminAuth } from '../../context/AdminAuthContext';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import { Badge } from '../../components/ui/badge';
-import { Plus, X, Settings, Lock, Eye, EyeOff, Smartphone, Apple, Save, Mail, Shield } from 'lucide-react';
+import { Plus, X, Settings, Lock, Eye, EyeOff, Smartphone, Apple, Save, Mail, Shield, Volume2, Upload, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
@@ -30,6 +30,55 @@ export default function AdminSettings() {
   const [showSecret, setShowSecret] = useState(false);
   const [twoFactorEnabled, setTwoFactorEnabled] = useState(false);
   const [toggling2FA, setToggling2FA] = useState(false);
+  const [matchSound, setMatchSound] = useState(null);
+  const [uploadingSound, setUploadingSound] = useState(false);
+  const soundFileRef = useRef(null);
+
+  const fetchMatchSound = useCallback(async () => {
+    try {
+      const res = await axios.get(`${API}/admin/match-sound`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setMatchSound(res.data.url ? res.data : null);
+    } catch {
+      // No custom sound set — that's OK
+    }
+  }, [token]);
+
+  const uploadMatchSound = async (file) => {
+    if (!file) return;
+    if (file.size > 500 * 1024) {
+      toast.error('Sound file must be under 500KB');
+      return;
+    }
+    setUploadingSound(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      const res = await axios.post(`${API}/admin/match-sound`, formData, {
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'multipart/form-data' },
+      });
+      setMatchSound(res.data);
+      toast.success('Match sound uploaded');
+    } catch (e) {
+      toast.error(e.response?.data?.detail || 'Failed to upload sound');
+    } finally {
+      setUploadingSound(false);
+      if (soundFileRef.current) soundFileRef.current.value = '';
+    }
+  };
+
+  const deleteMatchSound = async () => {
+    try {
+      await axios.delete(`${API}/admin/match-sound`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setMatchSound(null);
+      toast.success('Custom sound removed. Default sound will be used.');
+    } catch (e) {
+      toast.error(e.response?.data?.detail || 'Failed to remove sound');
+    }
+  };
 
   const fetchAppStoreSettings = useCallback(async () => {
     try {
@@ -99,7 +148,7 @@ export default function AdminSettings() {
     }
   };
 
-  useEffect(() => { fetchWords(); fetchAppStoreSettings(); fetch2FASettings(); }, [fetchWords, fetchAppStoreSettings, fetch2FASettings]);
+  useEffect(() => { fetchWords(); fetchAppStoreSettings(); fetch2FASettings(); fetchMatchSound(); }, [fetchWords, fetchAppStoreSettings, fetch2FASettings, fetchMatchSound]);
 
   const addWord = async () => {
     if (!newWord.trim()) return;
@@ -293,6 +342,66 @@ export default function AdminSettings() {
             <Save className="w-4 h-4 mr-1" />
             {savingAppStore ? 'Saving...' : 'Save App Store Settings'}
           </Button>
+        </div>
+      </div>
+
+      {/* Match Sound */}
+      <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6 mb-8">
+        <div className="flex items-center gap-2 mb-4">
+          <Volume2 className="w-5 h-5 text-purple-400" />
+          <h2 className="text-lg font-semibold text-white">Match Sound</h2>
+        </div>
+        <p className="text-gray-400 text-sm mb-4">
+          Upload a custom sound that plays when users get a match. Recommended: short chime, 0.5–2 seconds, MP3/WAV/M4A, max 500KB.
+        </p>
+
+        <div className="space-y-4 max-w-lg">
+          {/* Current sound status & preview */}
+          <div className="flex items-center gap-3 p-3 rounded-xl bg-gray-800 border border-gray-700">
+            <div className={`w-3 h-3 rounded-full ${matchSound ? 'bg-purple-400' : 'bg-gray-500'}`} />
+            <span className="text-sm text-gray-300 flex-1">
+              {matchSound ? `Custom sound: ${matchSound.filename}` : 'Using default match sound'}
+            </span>
+          </div>
+
+          {/* Audio preview */}
+          {matchSound?.url && (
+            <audio
+              controls
+              src={`${process.env.REACT_APP_BACKEND_URL}${matchSound.url}`}
+              className="w-full h-10 rounded-lg"
+              preload="metadata"
+            />
+          )}
+
+          {/* Upload & Remove */}
+          <div className="flex gap-3">
+            <input
+              ref={soundFileRef}
+              type="file"
+              accept=".mp3,.wav,.m4a,audio/mpeg,audio/wav,audio/x-m4a"
+              onChange={(e) => uploadMatchSound(e.target.files[0])}
+              className="hidden"
+            />
+            <Button
+              onClick={() => soundFileRef.current?.click()}
+              disabled={uploadingSound}
+              className="bg-purple-600 hover:bg-purple-700 disabled:opacity-50"
+            >
+              <Upload className="w-4 h-4 mr-1" />
+              {uploadingSound ? 'Uploading...' : 'Upload Sound'}
+            </Button>
+            {matchSound && (
+              <Button
+                variant="outline"
+                onClick={deleteMatchSound}
+                className="border-gray-600 text-gray-300 hover:bg-gray-800 hover:text-red-400"
+              >
+                <Trash2 className="w-4 h-4 mr-1" />
+                Remove
+              </Button>
+            )}
+          </div>
         </div>
       </div>
 

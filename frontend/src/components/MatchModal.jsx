@@ -1,8 +1,19 @@
+import { useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Rocket, MessageCircle, Star, User, XCircle } from 'lucide-react';
 import { Button } from './ui/button';
+import haptic from '../utils/haptics';
+import audioService from '../utils/audio';
 
 export default function MatchModal({ match, onClose, onMessage, userRole = 'seeker', ranking, onShortlist, onReject }) {
+  // Fire haptic + sound on mount — co-locates multimodal feedback with the visual celebration
+  useEffect(() => {
+    if (match) {
+      haptic.match();
+      audioService.play('match');
+    }
+  }, [match]);
+
   if (!match) return null;
 
   const isSeeker = userRole === 'seeker';
@@ -196,15 +207,26 @@ export default function MatchModal({ match, onClose, onMessage, userRole = 'seek
             <X className="w-5 h-5 text-muted-foreground" />
           </button>
 
-          {/* Rocket Animation */}
-          <motion.div
-            initial={{ scale: 0 }}
-            animate={{ scale: [0, 1.2, 1] }}
-            transition={{ duration: 0.5, delay: 0.2 }}
-            className="w-20 h-20 rounded-full bg-gradient-to-br from-primary to-secondary flex items-center justify-center mx-auto mb-6"
-          >
-            <Rocket className="w-10 h-10 text-white" />
-          </motion.div>
+          {/* Rocket Animation with pulse rings */}
+          <div className="relative w-20 h-20 mx-auto mb-6">
+            {[0, 1].map(i => (
+              <motion.div
+                key={i}
+                className="absolute inset-0 rounded-full border-2 border-primary/40"
+                initial={{ scale: 1, opacity: 0.6 }}
+                animate={{ scale: 3, opacity: 0 }}
+                transition={{ duration: 1.5, delay: 0.4 + i * 0.4, repeat: Infinity, repeatDelay: 1 }}
+              />
+            ))}
+            <motion.div
+              initial={{ scale: 0 }}
+              animate={{ scale: [0, 1.2, 1] }}
+              transition={{ duration: 0.5, delay: 0.2 }}
+              className="relative w-20 h-20 rounded-full bg-gradient-to-br from-primary to-secondary flex items-center justify-center"
+            >
+              <Rocket className="w-10 h-10 text-white" />
+            </motion.div>
+          </div>
 
           {/* Title */}
           <motion.h2

@@ -17,6 +17,7 @@ import { toast } from 'sonner';
 import { SkeletonPageBackground, SkeletonListItem } from '../components/skeletons';
 import { Skeleton } from '../components/ui/skeleton';
 import useDocumentTitle from '../hooks/useDocumentTitle';
+import PageTransition from '../components/PageTransition';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -516,7 +517,7 @@ export default function Matches() {
 
   // ==================== MATCHES LIST ====================
   return (
-    <div className="min-h-screen bg-background pb-24">
+    <PageTransition className="min-h-screen bg-background pb-24">
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
         <div className="absolute top-0 left-1/4 w-64 h-64 sm:w-96 sm:h-96 bg-primary/10 rounded-full blur-3xl" />
         <div className="absolute bottom-0 right-1/4 w-64 h-64 sm:w-96 sm:h-96 bg-secondary/10 rounded-full blur-3xl" />
@@ -664,6 +665,6 @@ export default function Matches() {
           <div className="w-10 h-10 border-2 border-primary border-t-transparent rounded-full animate-spin" />
         </div>
       )}
-    </div>
+    </PageTransition>
   );
 }

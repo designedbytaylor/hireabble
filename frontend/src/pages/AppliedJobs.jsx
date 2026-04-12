@@ -13,6 +13,7 @@ import Navigation from '../components/Navigation';
 import { SkeletonPageBackground, SkeletonListItem, SkeletonFilterTabs } from '../components/skeletons';
 import { Skeleton } from '../components/ui/skeleton';
 import useDocumentTitle from '../hooks/useDocumentTitle';
+import PageTransition from '../components/PageTransition';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -315,7 +316,7 @@ export default function AppliedJobs() {
   }
 
   return (
-    <div className="min-h-screen bg-background pb-24">
+    <PageTransition className="min-h-screen bg-background pb-24">
       {/* Background */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
         <div className="absolute top-0 left-1/4 w-64 h-64 sm:w-96 sm:h-96 bg-primary/10 rounded-full blur-3xl" />
@@ -695,6 +696,6 @@ export default function AppliedJobs() {
       )}
 
       <Navigation />
-    </div>
+    </PageTransition>
   );
 }

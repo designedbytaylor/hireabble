@@ -1,8 +1,10 @@
 import { useState, useEffect, useCallback, memo, useMemo } from 'react';
 import { Link, useLocation } from 'react-router-dom';
+import { motion, AnimatePresence } from 'framer-motion';
 import { Heart, User, Briefcase, MessageCircle, Bookmark, Sparkles, Search, GitBranch } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import axios from 'axios';
+import haptic from '../utils/haptics';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -123,30 +125,47 @@ export default memo(function Navigation() {
               role="menuitem"
               aria-label={item.badge > 0 ? `${item.label} (${item.badge} unread)` : item.label}
               aria-current={isActive ? 'page' : undefined}
-              className={`flex flex-col items-center gap-1 transition-all relative ${
+              className={`flex flex-col items-center gap-1 transition-colors relative ${
                 isActive
                   ? 'text-primary'
                   : 'text-muted-foreground hover:text-foreground'
               }`}
               data-testid={`nav-${item.label.toLowerCase()}`}
+              onClick={() => haptic.selection()}
               onMouseEnter={() => prefetchRoute(item.path, token)}
               onTouchStart={() => prefetchRoute(item.path, token)}
             >
-              <div className={`p-2 rounded-xl transition-all relative ${
-                isActive ? 'bg-primary/20 neon-glow' : 'hover:bg-accent'
-              }`}>
-                {item.isLogo ? (
-                  <svg viewBox="0 0 512 512" className="w-5 h-5" fill="currentColor">
-                    <path d="M290 56L168 272h96L216 456l176-240h-108L290 56z"/>
-                  </svg>
-                ) : (
-                  <Icon className="w-5 h-5" />
+              <div className="p-2 rounded-xl relative">
+                {/* Sliding active indicator */}
+                {isActive && (
+                  <motion.div
+                    layoutId="nav-indicator"
+                    className="absolute inset-0 rounded-xl bg-primary/20 neon-glow"
+                    transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+                  />
                 )}
-                {item.badge > 0 && (
-                  <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center px-1">
-                    {item.badge > 99 ? '99+' : item.badge}
-                  </span>
-                )}
+                <span className="relative z-10">
+                  {item.isLogo ? (
+                    <svg viewBox="0 0 512 512" className="w-5 h-5" fill="currentColor">
+                      <path d="M290 56L168 272h96L216 456l176-240h-108L290 56z"/>
+                    </svg>
+                  ) : (
+                    <Icon className="w-5 h-5" />
+                  )}
+                </span>
+                <AnimatePresence>
+                  {item.badge > 0 && (
+                    <motion.span
+                      initial={{ scale: 0 }}
+                      animate={{ scale: 1 }}
+                      exit={{ scale: 0 }}
+                      transition={{ type: 'spring', stiffness: 500, damping: 25 }}
+                      className="absolute -top-1 -right-1 min-w-[18px] h-[18px] rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center px-1"
+                    >
+                      {item.badge > 99 ? '99+' : item.badge}
+                    </motion.span>
+                  )}
+                </AnimatePresence>
               </div>
               <span className="text-xs font-medium hidden md:block">{item.label}</span>
             </Link>
