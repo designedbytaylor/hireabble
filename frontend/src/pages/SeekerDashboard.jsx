@@ -34,6 +34,8 @@ import { SkeletonPageBackground, SkeletonStatCard, SkeletonSwipeCard, SkeletonAc
 import { Skeleton } from '../components/ui/skeleton';
 import LocationAutocomplete from '../components/LocationAutocomplete';
 import useDocumentTitle from '../hooks/useDocumentTitle';
+import haptic from '../utils/haptics';
+import audioService from '../utils/audio';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -371,6 +373,8 @@ export default function SeekerDashboard() {
       );
       if (hasActiveFilters) fetchJobs(filters);
     });
+    // Preload match sound for instant playback
+    audioService.preloadMatchSound();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -680,6 +684,11 @@ export default function SeekerDashboard() {
     swipedIdsRef.current.add(job.id);
     // Persist to localStorage immediately — survives F5
     saveSwipedIds(swipedIdsRef.current, uidRef.current);
+
+    // Haptic feedback — fire immediately at drag release
+    if (action === 'apply') haptic.swipeRight();
+    else if (action === 'reject') haptic.swipeLeft();
+    else if (action === 'superlike') haptic.swipeUp();
 
     // Advance index IMMEDIATELY — next card is already visible in the stack
     const nextIndex = currentIndex + 1;
@@ -1158,12 +1167,15 @@ export default function SeekerDashboard() {
 
               {/* Action Buttons */}
               <div className="flex justify-center items-center gap-4 pt-4 pb-1 shrink-0">
-                <button
-                  onClick={handleUndo}
+                <motion.button
+                  whileTap={{ scale: 0.9 }}
+                  whileHover={canUndo ? { scale: 1.1 } : undefined}
+                  transition={{ type: 'spring', stiffness: 400, damping: 15 }}
+                  onClick={() => { haptic.buttonTap(); handleUndo(); }}
                   disabled={undoing}
-                  className={`w-12 h-12 rounded-full flex items-center justify-center transition-all duration-300 ${
+                  className={`w-12 h-12 rounded-full flex items-center justify-center transition-colors duration-300 ${
                     canUndo
-                      ? 'bg-amber-500/10 border border-amber-500/30 hover:scale-110 text-amber-500'
+                      ? 'bg-amber-500/10 border border-amber-500/30 text-amber-500'
                       : 'bg-muted/10 border border-muted/20 text-muted-foreground opacity-50'
                   }`}
                   title={canUndo ? 'Undo last swipe' : 'Upgrade to undo'}
@@ -1171,29 +1183,35 @@ export default function SeekerDashboard() {
                   data-testid="undo-btn"
                 >
                   <Undo2 className="w-5 h-5" />
-                </button>
-                <button
-                  onClick={() => handleSwipe('pass', { x: -1500, y: 0 })}
-                  className="w-16 h-16 rounded-full bg-destructive/10 border border-destructive/30 flex items-center justify-center hover:scale-110 hover:neon-glow-red transition-all duration-300"
+                </motion.button>
+                <motion.button
+                  whileTap={{ scale: 0.9 }}
+                  whileHover={{ scale: 1.1 }}
+                  transition={{ type: 'spring', stiffness: 400, damping: 15 }}
+                  onClick={() => { haptic.buttonTap(); handleSwipe('pass', { x: -1500, y: 0 }); }}
+                  className="w-16 h-16 rounded-full bg-destructive/10 border border-destructive/30 flex items-center justify-center hover:neon-glow-red transition-colors duration-300"
                   data-testid="pass-btn"
                   aria-label="Pass on this job"
                 >
                   <X className="w-7 h-7 text-destructive" />
-                </button>
+                </motion.button>
                 <div className="relative">
-                  <button
-                    onClick={() => handleSwipe('superlike', { x: 0, y: -1500 })}
+                  <motion.button
+                    whileTap={{ scale: 0.9 }}
+                    whileHover={superLikesRemaining > 0 ? { scale: 1.1 } : undefined}
+                    transition={{ type: 'spring', stiffness: 400, damping: 15 }}
+                    onClick={() => { haptic.buttonTap(); handleSwipe('superlike', { x: 0, y: -1500 }); }}
                     disabled={superLikesRemaining <= 0}
-                    className={`w-20 h-20 rounded-full bg-secondary/10 border border-secondary/30 flex items-center justify-center transition-all duration-300 ${
+                    className={`w-20 h-20 rounded-full bg-secondary/10 border border-secondary/30 flex items-center justify-center transition-colors duration-300 ${
                       superLikesRemaining > 0
-                        ? 'hover:scale-110 hover:neon-glow-pink'
+                        ? 'hover:neon-glow-pink'
                         : 'opacity-50 cursor-not-allowed'
                     }`}
                     data-testid="superlike-btn"
                     aria-label={`Priority Apply to this job (${superLikesRemaining} remaining)`}
                   >
                     <Rocket className={`w-9 h-9 ${superLikesRemaining > 0 ? 'text-secondary' : 'text-muted-foreground'}`} />
-                  </button>
+                  </motion.button>
                   {/* Priority Apply Counter Badge */}
                   <span className={`absolute -top-1 -right-1 w-6 h-6 rounded-full text-xs font-bold flex items-center justify-center ${
                     superLikesRemaining > 0
@@ -1203,22 +1221,28 @@ export default function SeekerDashboard() {
                     {superLikesRemaining != null ? superLikesRemaining : '–'}
                   </span>
                 </div>
-                <button
-                  onClick={() => handleSwipe('like', { x: 1500, y: 0 })}
-                  className="w-16 h-16 rounded-full bg-success/10 border border-success/30 flex items-center justify-center hover:scale-110 hover:neon-glow-green transition-all duration-300"
+                <motion.button
+                  whileTap={{ scale: 0.9 }}
+                  whileHover={{ scale: 1.1 }}
+                  transition={{ type: 'spring', stiffness: 400, damping: 15 }}
+                  onClick={() => { haptic.buttonTap(); handleSwipe('like', { x: 1500, y: 0 }); }}
+                  className="w-16 h-16 rounded-full bg-success/10 border border-success/30 flex items-center justify-center hover:neon-glow-green transition-colors duration-300"
                   data-testid="like-btn"
                   aria-label="Apply to this job"
                 >
                   <CheckCircle className="w-7 h-7 text-green-500" />
-                </button>
-                <button
-                  onClick={() => currentJob && saveAndAdvance(currentJob.id)}
-                  className="w-12 h-12 rounded-full flex items-center justify-center transition-all duration-300 bg-muted/10 border border-muted/20 text-muted-foreground hover:scale-110 hover:border-primary/40 hover:text-primary"
+                </motion.button>
+                <motion.button
+                  whileTap={{ scale: 0.9 }}
+                  whileHover={{ scale: 1.1 }}
+                  transition={{ type: 'spring', stiffness: 400, damping: 15 }}
+                  onClick={() => { haptic.buttonTap(); currentJob && saveAndAdvance(currentJob.id); }}
+                  className="w-12 h-12 rounded-full flex items-center justify-center transition-colors duration-300 bg-muted/10 border border-muted/20 text-muted-foreground hover:border-primary/40 hover:text-primary"
                   title="Save for later"
                   aria-label="Save this job for later"
                 >
                   <Bookmark className="w-5 h-5" />
-                </button>
+                </motion.button>
               </div>
               {/* Priority Apply Note (Premium) */}
               {premiumFeatures.superlike_notes && superLikesRemaining > 0 && (
@@ -1251,9 +1275,14 @@ export default function SeekerDashboard() {
             </>
           ) : (
             <div className="flex-1 rounded-3xl glass-card flex flex-col items-center justify-center p-8 text-center">
-              <div className="w-20 h-20 rounded-full bg-primary/20 flex items-center justify-center mb-6">
+              <motion.div
+                initial={{ scale: 0, rotate: -10 }}
+                animate={{ scale: 1, rotate: 0 }}
+                transition={{ type: 'spring', stiffness: 260, damping: 20, delay: 0.1 }}
+                className="w-20 h-20 rounded-full bg-primary/20 flex items-center justify-center mb-6 animate-float"
+              >
                 <Briefcase className="w-10 h-10 text-primary" />
-              </div>
+              </motion.div>
               <h2 className="text-2xl font-bold font-['Outfit'] mb-3">No More Jobs</h2>
               <p className="text-muted-foreground mb-6">
                 {activeFiltersCount > 0 

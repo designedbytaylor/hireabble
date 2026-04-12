@@ -20,6 +20,8 @@ import { requestNativeReview, dismissRatingPrompt, shouldPromptRating } from '..
 import { SkeletonPageBackground, SkeletonStatCard, SkeletonSwipeCard, SkeletonActionButtons } from '../components/skeletons';
 import { Skeleton } from '../components/ui/skeleton';
 import useDocumentTitle from '../hooks/useDocumentTitle';
+import haptic from '../utils/haptics';
+import audioService from '../utils/audio';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -81,6 +83,8 @@ export default function RecruiterSwipe() {
     if (!isPaymentReturn) fetchData(); // skip on Stripe return — payment verify handles it
     axios.get(`${API}/stats/streak`, { headers: { Authorization: `Bearer ${token}` } })
       .then(res => setStreak(res.data)).catch(() => {});
+    // Preload match sound for instant playback
+    audioService.preloadMatchSound();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -253,6 +257,11 @@ export default function RecruiterSwipe() {
     // Prevent double-swiping
     if (swipedIdsRef.current.has(item.id)) return;
     swipedIdsRef.current.add(item.id);
+
+    // Haptic feedback — fire immediately at drag release
+    if (action === 'accept') haptic.swipeRight();
+    else if (action === 'reject') haptic.swipeLeft();
+    else if (action === 'superlike') haptic.swipeUp();
 
     // Advance index IMMEDIATELY — next card is already visible in the stack
     setCurrentIndex(prev => prev + 1);
@@ -617,30 +626,37 @@ export default function RecruiterSwipe() {
 
               {/* Action Buttons */}
               <div className="flex justify-center items-center gap-5 py-3 shrink-0">
-                <button
-                  onClick={() => handleSwipe('reject', { x: -1500, y: 0 })}
-                  className="w-16 h-16 rounded-full bg-destructive/10 border border-destructive/30 flex items-center justify-center hover:scale-110 hover:neon-glow-red transition-all duration-300"
+                <motion.button
+                  whileTap={{ scale: 0.9 }}
+                  whileHover={{ scale: 1.1 }}
+                  transition={{ type: 'spring', stiffness: 400, damping: 15 }}
+                  onClick={() => { haptic.buttonTap(); handleSwipe('reject', { x: -1500, y: 0 }); }}
+                  className="w-16 h-16 rounded-full bg-destructive/10 border border-destructive/30 flex items-center justify-center hover:neon-glow-red transition-colors duration-300"
                   data-testid="reject-btn"
                   aria-label="Pass on this candidate"
                 >
                   <X className="w-7 h-7 text-destructive" />
-                </button>
+                </motion.button>
 
                 <div className="relative">
-                  <button
+                  <motion.button
+                    whileTap={{ scale: 0.9 }}
+                    whileHover={{ scale: 1.1 }}
+                    transition={{ type: 'spring', stiffness: 400, damping: 15 }}
                     onClick={() => {
+                      haptic.buttonTap();
                       if (superSwipesRemaining && superSwipesRemaining.remaining <= 0) {
                         setShowUpgradeModal(true);
                         return;
                       }
                       handleSwipe('superlike', { x: 0, y: -1500 });
                     }}
-                    className="w-14 h-14 rounded-full bg-secondary/10 border border-secondary/30 flex items-center justify-center hover:scale-110 transition-all duration-300"
+                    className="w-14 h-14 rounded-full bg-secondary/10 border border-secondary/30 flex items-center justify-center transition-colors duration-300"
                     data-testid="superswipe-btn"
                     aria-label="Priority Pick this candidate"
                   >
                     <Rocket className="w-6 h-6 text-secondary" />
-                  </button>
+                  </motion.button>
                   {superSwipesRemaining && (
                     <span className="absolute -top-1 -right-1 w-6 h-6 rounded-full bg-secondary text-xs font-bold flex items-center justify-center text-white">
                       {superSwipesRemaining.remaining}
@@ -649,24 +665,30 @@ export default function RecruiterSwipe() {
                 </div>
 
                 {mode === 'discover' && isEnterprise && (
-                  <button
-                    onClick={() => setShowPreMatchMsg(true)}
-                    className="w-12 h-12 rounded-full bg-blue-500/10 border border-blue-500/30 flex items-center justify-center hover:scale-110 transition-all duration-300"
+                  <motion.button
+                    whileTap={{ scale: 0.9 }}
+                    whileHover={{ scale: 1.1 }}
+                    transition={{ type: 'spring', stiffness: 400, damping: 15 }}
+                    onClick={() => { haptic.buttonTap(); setShowPreMatchMsg(true); }}
+                    className="w-12 h-12 rounded-full bg-blue-500/10 border border-blue-500/30 flex items-center justify-center transition-colors duration-300"
                     aria-label="Message candidate"
                     title="Message candidate"
                   >
                     <MessageSquare className="w-5 h-5 text-blue-400" />
-                  </button>
+                  </motion.button>
                 )}
 
-                <button
-                  onClick={() => handleSwipe('accept', { x: 1500, y: 0 })}
-                  className="w-16 h-16 rounded-full bg-success/10 border border-success/30 flex items-center justify-center hover:scale-110 hover:neon-glow-green transition-all duration-300"
+                <motion.button
+                  whileTap={{ scale: 0.9 }}
+                  whileHover={{ scale: 1.1 }}
+                  transition={{ type: 'spring', stiffness: 400, damping: 15 }}
+                  onClick={() => { haptic.buttonTap(); handleSwipe('accept', { x: 1500, y: 0 }); }}
+                  className="w-16 h-16 rounded-full bg-success/10 border border-success/30 flex items-center justify-center hover:neon-glow-green transition-colors duration-300"
                   data-testid="accept-btn"
                   aria-label="Accept this candidate"
                 >
                   <CheckCircle className="w-7 h-7 text-green-500" />
-                </button>
+                </motion.button>
               </div>
             </>
           ) : discoverLoading && mode === 'discover' ? (
@@ -676,13 +698,18 @@ export default function RecruiterSwipe() {
             </div>
           ) : (
             <div className="flex-1 rounded-3xl glass-card flex flex-col items-center justify-center p-8 text-center">
-              <div className="w-20 h-20 rounded-full bg-primary/20 flex items-center justify-center mb-6">
+              <motion.div
+                initial={{ scale: 0, rotate: -10 }}
+                animate={{ scale: 1, rotate: 0 }}
+                transition={{ type: 'spring', stiffness: 260, damping: 20, delay: 0.1 }}
+                className="w-20 h-20 rounded-full bg-primary/20 flex items-center justify-center mb-6 animate-float"
+              >
                 {mode === 'applicants' ? (
                   <Users className="w-10 h-10 text-primary" />
                 ) : (
                   <Search className="w-10 h-10 text-primary" />
                 )}
-              </div>
+              </motion.div>
               <h2 className="text-2xl font-bold font-['Outfit'] mb-3">
                 {mode === 'applicants' ? 'All Caught Up!' : 'No More Candidates'}
               </h2>

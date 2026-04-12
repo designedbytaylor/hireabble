@@ -19,6 +19,7 @@ import PhotoCropModal from '../components/PhotoCropModal';
 import LocationAutocomplete from '../components/LocationAutocomplete';
 import useDocumentTitle from '../hooks/useDocumentTitle';
 import { isIOS, isAndroid } from '../utils/capacitor';
+import PageTransition from '../components/PageTransition';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
@@ -778,7 +779,7 @@ export default function Profile() {
   };
 
   return (
-    <div className="min-h-screen bg-background pb-24">
+    <PageTransition className="min-h-screen bg-background pb-24">
       {/* Background Effects */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
         <div className="absolute top-0 left-1/4 w-64 h-64 sm:w-96 sm:h-96 bg-primary/10 rounded-full blur-3xl" />
@@ -2278,6 +2279,6 @@ export default function Profile() {
           onCancel={() => setCropLogoSrc(null)}
         />
       )}
-    </div>
+    </PageTransition>
   );
 }
