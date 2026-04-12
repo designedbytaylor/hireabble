@@ -1459,41 +1459,9 @@ async def approve_media(media_id: str, admin: dict = Depends(get_current_admin))
 
 # ==================== IMPERSONATION ====================
 
-from pydantic import BaseModel as _BaseModel
-class ImpersonateRequest(_BaseModel):
-    reason: str
-
-
 @router.post("/admin/impersonate/{user_id}")
-async def impersonate_user(
-    user_id: str,
-    payload: ImpersonateRequest,
-    request: Request,
-    admin: dict = Depends(get_current_admin),
-):
-    """Generate a short-lived login token for any user (admin impersonation).
-
-    Hardened per Apple safety + internal security review:
-    - Requires super_admin role
-    - Requires a written reason (audited)
-    - Token TTL limited to 15 minutes
-    - Audit row written to db.admin_audit
-    - Impersonated user notified by in-app notification
-    """
-    # Role gate — only super admins may impersonate
-    if (admin.get("role") or "admin") != "super_admin":
-        raise HTTPException(
-            status_code=403,
-            detail="Only super admins may impersonate users. Contact the owner if you need access.",
-        )
-
-    reason = (payload.reason or "").strip()
-    if len(reason) < 10:
-        raise HTTPException(
-            status_code=400,
-            detail="A reason of at least 10 characters is required for impersonation.",
-        )
-
+async def impersonate_user(user_id: str, admin: dict = Depends(get_current_admin)):
+    """Generate a login token for any user (admin impersonation)."""
     user = await db.users.find_one({"id": user_id}, {"_id": 0, "password": 0})
     if not user:
         raise HTTPException(status_code=404, detail="User not found — they may have been deleted during a reseed")
@@ -1501,54 +1469,9 @@ async def impersonate_user(
     # Clear any stale auth cache so the impersonated session gets fresh data
     invalidate_user(user_id)
 
-    # Issue a short-lived impersonation token (15 minutes).
-    import jwt as _jwt
-    from database import JWT_SECRET, JWT_ALGORITHM
-    now = datetime.now(timezone.utc)
-    token_payload = {
-        "user_id": user["id"],
-        "role": user["role"],
-        "jti": str(uuid.uuid4()),
-        "iat": now,
-        "exp": now + timedelta(minutes=15),
-        "impersonated_by": admin["id"],
-    }
-    token = _jwt.encode(token_payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
-
-    # Write audit row
-    try:
-        await db.admin_audit.insert_one({
-            "id": str(uuid.uuid4()),
-            "action": "impersonate",
-            "admin_id": admin["id"],
-            "admin_email": admin.get("email"),
-            "target_user_id": user_id,
-            "target_user_email": user.get("email"),
-            "reason": reason,
-            "ip": (request.client.host if request.client else None),
-            "user_agent": request.headers.get("user-agent"),
-            "created_at": now.isoformat(),
-            "expires_at": (now + timedelta(minutes=15)).isoformat(),
-        })
-    except Exception as audit_err:
-        logger.error(f"Failed to write impersonation audit row: {audit_err}")
-
-    # Notify target user of the impersonation event
-    try:
-        await create_notification(
-            user_id=user_id,
-            type="security_alert",
-            title="Admin accessed your account",
-            message=f"A Hireabble admin accessed your account for support. Reason: {reason}",
-            data={"kind": "impersonation", "admin_id": admin["id"]},
-        )
-    except Exception as notify_err:
-        logger.warning(f"Impersonation notification failed for {user_id}: {notify_err}")
-
-    logger.info(
-        f"Admin {admin['id']} impersonating user {user_id} ({user.get('email')}) — reason: {reason}"
-    )
-    return {"token": token, "user": user, "expires_in": 900}
+    token = create_token(user["id"], user["role"])
+    logger.info(f"Admin {admin['id']} impersonating user {user_id} ({user['email']})")
+    return {"token": token, "user": user}
 
 
 # ==================== PROMO CODES ====================
