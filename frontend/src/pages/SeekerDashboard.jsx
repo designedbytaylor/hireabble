@@ -28,7 +28,7 @@ import {
 } from '../components/ui/select';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
-import { getPhotoUrl, handleImgError, handleBgImgError } from '../utils/helpers';
+import { getPhotoUrl, handleImgError, handleBgImgError, isCssGradient } from '../utils/helpers';
 import UpgradeModal from '../components/UpgradeModal';
 import { SkeletonPageBackground, SkeletonStatCard, SkeletonSwipeCard, SkeletonActionButtons } from '../components/skeletons';
 import { Skeleton } from '../components/ui/skeleton';
@@ -653,7 +653,7 @@ export default function SeekerDashboard() {
   useEffect(() => {
     const upcoming = jobs.slice(currentIndex, currentIndex + 5);
     upcoming.forEach((job) => {
-      [job.background_image, job.company_logo, job.listing_photo].filter(Boolean).forEach(url => {
+      [job.background_image, job.company_logo, job.listing_photo].filter(url => url && !isCssGradient(url)).forEach(url => {
         if (!preloadedUrls.current.has(url)) {
           preloadedUrls.current.add(url);
           const img = new Image();
@@ -1774,12 +1774,19 @@ const formatSalary = (min, max) => {
   return `Up to ${format(max)}`;
 };
 
+function JobBackgroundImage({ backgroundImage }) {
+  if (isCssGradient(backgroundImage)) {
+    return <div className="w-full h-full" style={{ background: backgroundImage }} />;
+  }
+  return <img src={backgroundImage} alt="" className="w-full h-full object-cover" onError={handleBgImgError} />;
+}
+
 // Static card for the background stack — memoized to avoid re-renders on every swipe
 const StaticJobCard = memo(function StaticJobCard({ job }) {
   return (
     <div className="w-full h-full rounded-3xl overflow-hidden relative gradient-border">
       <div className="absolute inset-0">
-        <img src={job.background_image} alt="" className="w-full h-full object-cover" loading="lazy" onError={handleBgImgError} />
+        <JobBackgroundImage backgroundImage={job.background_image} />
         <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/60 to-black/30" />
       </div>
       {job.is_boosted && (
@@ -1843,7 +1850,7 @@ function ExitingCard({ card }) {
     >
       <div className="w-full h-full rounded-3xl overflow-hidden relative gradient-border">
         <div className="absolute inset-0">
-          <img src={card.job.background_image} alt="" className="w-full h-full object-cover" onError={handleBgImgError} />
+          <JobBackgroundImage backgroundImage={card.job.background_image} />
           <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/60 to-black/30" />
         </div>
         {/* Stamp overlay */}
@@ -1889,7 +1896,7 @@ function EnteringCard({ card }) {
     >
       <div className="w-full h-full rounded-3xl overflow-hidden relative gradient-border shadow-2xl">
         <div className="absolute inset-0">
-          <img src={job.background_image} alt="" className="w-full h-full object-cover" onError={handleBgImgError} />
+          <JobBackgroundImage backgroundImage={job.background_image} />
           <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/60 to-black/30" />
         </div>
         <div className="absolute inset-0 flex flex-col justify-end p-6 z-10">
@@ -2013,7 +2020,7 @@ function SwipeCard({ job, onSwipe, expanded, setExpanded }) {
           {job.culture_media?.length > 0 ? (
             <CultureMediaCarousel media={job.culture_media} />
           ) : (
-            <img src={job.background_image} alt="" className="w-full h-full object-cover" onError={handleBgImgError} />
+            <JobBackgroundImage backgroundImage={job.background_image} />
           )}
           <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/60 to-black/30" />
         </div>

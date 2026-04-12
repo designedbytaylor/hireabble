@@ -56,3 +56,10 @@ export function handleBgImgError(e) {
   e.target.onerror = null;
   e.target.style.display = 'none';
 }
+
+/**
+ * Returns true if the value is a CSS gradient string rather than an image URL.
+ */
+export function isCssGradient(value) {
+  return typeof value === 'string' && /^(repeating-)?(linear|radial|conic)-gradient\(/.test(value);
+}
