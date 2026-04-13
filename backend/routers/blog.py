@@ -186,6 +186,20 @@ SALARY_DATA_CAD = {
 # Track running generation jobs: "running" | "paused" | "cancel"
 _running_jobs: dict[str, str] = {}
 
+# ==================== SYSTEM PROMPT ====================
+
+BLOG_SYSTEM_PROMPT = (
+    "You are a professional blog writer for Hireabble, a job matching platform. "
+    "CRITICAL RULES:\n"
+    "- NEVER invent fake people, personas, names, or characters. No 'Meet Sarah, a software engineer...' or 'John spent 10 years...'\n"
+    "- NEVER fabricate quotes or testimonials from made-up individuals.\n"
+    "- NEVER create fake expert attributions like 'According to career coach Jane Smith...'\n"
+    "- NEVER invent fake statistics, studies, or survey results. Only reference general, well-known industry trends.\n"
+    "- Use 'you' to address the reader directly instead of inventing characters.\n"
+    "- If illustrating a scenario, use generic phrasing like 'imagine you're...' or 'a mid-level developer might...' — never name the person.\n"
+    "- Attribution is always to 'Hireabble Research Team', never to a fictional author.\n"
+)
+
 # ==================== PROMPT VARIETY ====================
 
 VOICE_VARIATIONS = [
@@ -193,13 +207,13 @@ VOICE_VARIATIONS = [
     "Write from the perspective of a hiring manager who's reviewed thousands of applications.",
     "Write as a local recruiter who knows the {city} market inside out.",
     "Write as a career journalist covering the job market.",
-    "Write as someone who's worked as a {role} and switched careers, giving honest insider advice.",
+    "Write with insider knowledge of the {role} profession, giving honest practical advice.",
 ]
 
 STRUCTURE_VARIATIONS = [
     "Start with a compelling question, then dive into the data.",
     "Lead with the most surprising statistic, then explain why it matters.",
-    "Tell a brief story about someone in this exact situation, then transition to practical advice.",
+    "Paint a relatable scenario the reader might face, then transition to practical advice.",
     "Start with a quick summary of key numbers, then go deeper into each one.",
     "Open with a common misconception about this topic, then set the record straight.",
 ]
@@ -440,6 +454,9 @@ def _build_prompt(page_type: str, city: str, role: str, extra: dict = None) -> t
         "'In conclusion', 'Let's dive in', 'without further ado', 'game-changer', "
         "'navigating the landscape', 'look no further', 'comprehensive guide'. "
         "NEVER use the word 'swipe' in any context. "
+        "NEVER invent fictional people, names, or personas. "
+        "NEVER fabricate quotes or testimonials. "
+        "Use 'you' to address the reader — do not create characters. "
         "Reference the specific city with local context where relevant. "
         f"{angle}"
     )
@@ -762,6 +779,7 @@ async def _call_claude(prompt: str) -> str:
                 client.messages.create,
                 model=model,
                 max_tokens=2000,
+                system=BLOG_SYSTEM_PROMPT,
                 messages=[{"role": "user", "content": prompt}],
             )
             return response.content[0].text
