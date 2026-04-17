@@ -81,9 +81,11 @@
   },
   "scripts": {
     "start": "craco start",
+    "prebuild": "node scripts/generate-sitemap.js",
     "build": "craco build",
     "test": "craco test",
-    "analyze": "source-map-explorer 'build/static/js/*.js'"
+    "analyze": "source-map-explorer 'build/static/js/*.js'",
+    "sitemap": "node scripts/generate-sitemap.js"
   },
   "browserslist": {
     "production": [
