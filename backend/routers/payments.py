@@ -1003,6 +1003,10 @@ async def create_checkout_session(
         if current_user.get("role") != "recruiter":
             raise HTTPException(status_code=403, detail="Only recruiters can purchase super swipes")
 
+    if data.product_id == "recruiter_single_post":
+        if current_user.get("role") != "recruiter":
+            raise HTTPException(status_code=403, detail="Only recruiters can buy single-post credits")
+
     try:
         session = stripe.checkout.Session.create(
             payment_method_types=["card"],
