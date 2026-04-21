@@ -114,6 +114,7 @@ const AdminRevenue = React.lazy(() => import("./pages/admin/AdminRevenue"));
 const AdminPricing = React.lazy(() => import("./pages/admin/AdminPricing"));
 const AdminMarketing = React.lazy(() => import("./pages/admin/AdminMarketing"));
 const AdminLaunchChecklist = React.lazy(() => import("./pages/admin/AdminLaunchChecklist"));
+const AdminMarketingChecklist = React.lazy(() => import("./pages/admin/AdminMarketingChecklist"));
 const AdminFiles = React.lazy(() => import("./pages/admin/AdminFiles"));
 const AdminBlog = React.lazy(() => import("./pages/admin/AdminBlog"));
 const AdminTraffic = React.lazy(() => import("./pages/admin/AdminTraffic"));
@@ -560,6 +561,7 @@ function AppRoutes() {
         <Route path="blog" element={<AdminBlog />} />
         <Route path="traffic" element={<AdminTraffic />} />
         <Route path="launch" element={<AdminLaunchChecklist />} />
+        <Route path="marketing-checklist" element={<AdminMarketingChecklist />} />
         <Route path="settings" element={<AdminSettings />} />
       </Route>
 
