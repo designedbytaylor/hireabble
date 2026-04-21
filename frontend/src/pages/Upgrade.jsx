@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
-import { ArrowLeft, Check, Star, Zap, Crown, Sparkles, Shield, Tag, ChevronDown } from 'lucide-react';
+import { ArrowLeft, Check, Star, Zap, Crown, Shield, Tag, ChevronDown } from 'lucide-react';
 import { motion } from 'framer-motion';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';

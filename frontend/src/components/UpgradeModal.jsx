@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { X, Check, Star, Zap, Crown, Sparkles, Lock, ChevronRight } from 'lucide-react';
+import { X, Check, Zap, Crown, Lock, ChevronRight } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';

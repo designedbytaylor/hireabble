@@ -28,8 +28,9 @@ router = APIRouter(tags=["Applications"])
 DAILY_SUPERLIKE_LIMIT = 3
 
 def _get_seeker_daily_superlike_limit(user: dict) -> int:
-    """Hireabble is free for seekers — generous daily Priority Apply quota for all."""
-    return 999
+    """Priority Apply daily cap. Seekers are free forever — this is just an
+    abuse-prevention cap, not a monetization lever."""
+    return DAILY_SUPERLIKE_LIMIT
 
 # ==================== EMAIL TEMPLATES ====================
 
@@ -864,9 +865,6 @@ async def undo_last_swipe(current_user: dict = Depends(get_current_user)):
 
     uid = current_user["id"]
 
-    # Check subscription tier
-    sub = current_user.get("subscription") or {}
-    now = datetime.now(timezone.utc).isoformat()
     # Hireabble is free for seekers — undo always available.
     is_paid = True
 
@@ -1113,8 +1111,6 @@ async def get_my_applications(current_user: dict = Depends(get_current_user)):
         raise HTTPException(status_code=403, detail="Only seekers can view their applications")
 
     # Check if seeker has premium read receipts
-    sub = current_user.get("subscription") or {}
-    now_iso = datetime.now(timezone.utc).isoformat()
     # Hireabble is free for seekers — read receipts available to all.
     has_read_receipts = True
 
@@ -1604,8 +1600,6 @@ async def get_profile_viewers(current_user: dict = Depends(get_current_user)):
         raise HTTPException(status_code=403, detail="Only seekers can view this")
 
     # Check subscription
-    sub = current_user.get("subscription") or {}
-    now = datetime.now(timezone.utc).isoformat()
     # Hireabble is free for seekers — full access to this feature.
     has_access = True
 
@@ -1770,10 +1764,9 @@ async def activate_profile_boost(current_user: dict = Depends(get_current_user))
     if current_user["role"] != "seeker":
         raise HTTPException(status_code=403, detail="Only seekers can boost their profile")
 
-    sub = current_user.get("subscription") or {}
     now = datetime.now(timezone.utc)
     now_iso = now.isoformat()
-    # Hireabble is free for seekers — no subscription gate.
+    # Hireabble is free for seekers — no subscription gate on profile boost.
 
     # Check weekly boost limit
     week_start = (now - timedelta(days=now.weekday())).replace(hour=0, minute=0, second=0, microsecond=0).isoformat()
