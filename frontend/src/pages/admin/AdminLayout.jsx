@@ -20,6 +20,7 @@ const allNavItems = [
   { icon: DollarSign, label: 'Revenue', path: '/admin/revenue', roles: ['admin'] },
   { icon: DollarSign, label: 'Pricing', path: '/admin/pricing', roles: ['admin'] },
   { icon: Megaphone, label: 'Marketing', path: '/admin/marketing', roles: ['admin'] },
+  { icon: Megaphone, label: 'Ad Campaigns', path: '/admin/marketing-checklist', roles: ['admin'] },
   { icon: FileText, label: 'Blog/SEO', path: '/admin/blog', roles: ['admin'] },
   { icon: FolderOpen, label: 'Files', path: '/admin/files', roles: ['admin'] },
   { icon: ClipboardCheck, label: 'Launch', path: '/admin/launch', roles: ['admin'] },
