@@ -43,6 +43,32 @@ import ShareJobModal from '../components/ShareJobModal';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
+const BENEFIT_OPTIONS = [
+  'Flexible hours',
+  'Weekends only',
+  'Evenings only',
+  'No nights',
+  'Set schedule',
+  'Pick your shifts',
+  'Tips',
+  'Weekly pay',
+  'Daily pay',
+  'Sign-on bonus',
+  'Performance bonuses',
+  'Free meals',
+  'Free drinks',
+  'Employee discount',
+  'Free uniform',
+  'Training provided',
+  'No experience needed',
+  'Tuition reimbursement',
+  'Growth opportunities',
+  'Health insurance',
+  'Paid time off',
+  '401(k)',
+  'Parental leave',
+];
+
 export default function RecruiterDashboard() {
   useDocumentTitle('Dashboard');
   const navigate = useNavigate();
@@ -1628,14 +1654,17 @@ function JobFormDialog({ open, onClose, onSuccess, token, company, job = null, i
     company: company || '',
     description: '',
     requirements: '',
+    pay_type: 'hourly',
     salary_min: '',
     salary_max: '',
+    tips_eligible: false,
+    benefits: [],
     location: user?.company_address || user?.location || '',
-    job_type: 'remote',
-    experience_level: 'mid',
+    job_type: 'onsite',
+    experience_level: 'entry',
     location_restriction: 'any',
     category: user?.company_industry || '',
-    employment_type: 'full-time',
+    employment_type: 'part-time',
     work_style: null,
   });
 
@@ -1648,14 +1677,17 @@ function JobFormDialog({ open, onClose, onSuccess, token, company, job = null, i
         company: job.company || company || '',
         description: job.description || '',
         requirements: job.requirements?.join(', ') || '',
+        pay_type: job.pay_type || 'hourly',
         salary_min: job.salary_min?.toString() || '',
         salary_max: job.salary_max?.toString() || '',
+        tips_eligible: !!job.tips_eligible,
+        benefits: Array.isArray(job.benefits) ? job.benefits : [],
         location: job.location || '',
-        job_type: job.job_type || 'remote',
-        experience_level: job.experience_level || 'mid',
+        job_type: job.job_type || 'onsite',
+        experience_level: job.experience_level || 'entry',
         location_restriction: job.location_restriction || 'any',
         category: job.category || '',
-        employment_type: job.employment_type || 'full-time',
+        employment_type: job.employment_type || 'part-time',
         work_style: job.work_style || null,
       });
       if (job.work_style) setShowWorkStyle(true);
@@ -1674,14 +1706,17 @@ function JobFormDialog({ open, onClose, onSuccess, token, company, job = null, i
         company: company || '',
         description: '',
         requirements: '',
+        pay_type: 'hourly',
         salary_min: '',
         salary_max: '',
+        tips_eligible: false,
+        benefits: [],
         location: user?.company_address || user?.location || '',
-        job_type: 'remote',
-        experience_level: 'mid',
+        job_type: 'onsite',
+        experience_level: 'entry',
         location_restriction: 'any',
         category: user?.company_industry || '',
-        employment_type: 'full-time',
+        employment_type: 'part-time',
         work_style: null,
       });
       setShowWorkStyle(false);
@@ -1720,8 +1755,11 @@ function JobFormDialog({ open, onClose, onSuccess, token, company, job = null, i
         company: parsed.company || prev.company,
         description: parsed.description || prev.description,
         requirements: parsed.requirements?.join(', ') || prev.requirements,
+        pay_type: parsed.pay_type || prev.pay_type,
         salary_min: parsed.salary_min?.toString() || prev.salary_min,
         salary_max: parsed.salary_max?.toString() || prev.salary_max,
+        tips_eligible: typeof parsed.tips_eligible === 'boolean' ? parsed.tips_eligible : prev.tips_eligible,
+        benefits: Array.isArray(parsed.benefits) && parsed.benefits.length > 0 ? parsed.benefits : prev.benefits,
         location: parsed.location || prev.location,
         job_type: parsed.job_type || prev.job_type,
         experience_level: parsed.experience_level || prev.experience_level,
@@ -1792,6 +1830,9 @@ function JobFormDialog({ open, onClose, onSuccess, token, company, job = null, i
         requirements: formData.requirements.split(',').map(r => r.trim()).filter(Boolean),
         salary_min: formData.salary_min ? parseInt(formData.salary_min) : null,
         salary_max: formData.salary_max ? parseInt(formData.salary_max) : null,
+        pay_type: formData.pay_type || 'hourly',
+        tips_eligible: !!formData.tips_eligible,
+        benefits: Array.isArray(formData.benefits) ? formData.benefits : [],
         location_restriction: formData.location_restriction || 'any',
         listing_photo: listingPhoto,
         ...(jobLocationCoords ? { location_lat: jobLocationCoords.lat, location_lng: jobLocationCoords.lng } : {}),
@@ -2000,28 +2041,98 @@ function JobFormDialog({ open, onClose, onSuccess, token, company, job = null, i
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>Min Salary ($)</Label>
-              <Input
-                type="number"
-                placeholder="80000"
-                value={formData.salary_min}
-                onChange={(e) => setFormData({ ...formData, salary_min: e.target.value })}
-                className="h-11 rounded-xl bg-background"
-                data-testid="job-salary-min-input"
-              />
+          <div className="space-y-3">
+            <Label>Pay</Label>
+            <div className="flex gap-2 p-1 rounded-xl bg-background border border-border">
+              {[
+                { id: 'hourly', label: 'Hourly' },
+                { id: 'salary', label: 'Annual salary' },
+              ].map(opt => (
+                <button
+                  type="button"
+                  key={opt.id}
+                  onClick={() => setFormData({ ...formData, pay_type: opt.id })}
+                  className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-all ${
+                    formData.pay_type === opt.id
+                      ? 'bg-gradient-to-r from-primary to-secondary text-white'
+                      : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                  data-testid={`pay-type-${opt.id}`}
+                >
+                  {opt.label}
+                </button>
+              ))}
             </div>
-            <div className="space-y-2">
-              <Label>Max Salary ($)</Label>
-              <Input
-                type="number"
-                placeholder="120000"
-                value={formData.salary_max}
-                onChange={(e) => setFormData({ ...formData, salary_max: e.target.value })}
-                className="h-11 rounded-xl bg-background"
-                data-testid="job-salary-max-input"
-              />
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">
+                  {formData.pay_type === 'hourly' ? 'Min ($/hr)' : 'Min Salary ($/yr)'}
+                </Label>
+                <Input
+                  type="number"
+                  placeholder={formData.pay_type === 'hourly' ? '18' : '80000'}
+                  value={formData.salary_min}
+                  onChange={(e) => setFormData({ ...formData, salary_min: e.target.value })}
+                  className="h-11 rounded-xl bg-background"
+                  data-testid="job-salary-min-input"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">
+                  {formData.pay_type === 'hourly' ? 'Max ($/hr)' : 'Max Salary ($/yr)'}
+                </Label>
+                <Input
+                  type="number"
+                  placeholder={formData.pay_type === 'hourly' ? '22' : '120000'}
+                  value={formData.salary_max}
+                  onChange={(e) => setFormData({ ...formData, salary_max: e.target.value })}
+                  className="h-11 rounded-xl bg-background"
+                  data-testid="job-salary-max-input"
+                />
+              </div>
+            </div>
+            {formData.pay_type === 'hourly' && (
+              <label className="flex items-center gap-2 cursor-pointer select-none pt-1">
+                <input
+                  type="checkbox"
+                  checked={!!formData.tips_eligible}
+                  onChange={(e) => setFormData({ ...formData, tips_eligible: e.target.checked })}
+                  className="w-4 h-4 rounded border-border"
+                  data-testid="tips-eligible-checkbox"
+                />
+                <span className="text-sm text-foreground">Tips eligible</span>
+                <span className="text-xs text-muted-foreground">(server, barista, delivery, etc.)</span>
+              </label>
+            )}
+          </div>
+
+          <div className="space-y-2">
+            <Label>Benefits & perks</Label>
+            <p className="text-xs text-muted-foreground">Tap to toggle. Help your listing stand out.</p>
+            <div className="flex flex-wrap gap-2">
+              {BENEFIT_OPTIONS.map(b => {
+                const selected = formData.benefits.includes(b);
+                return (
+                  <button
+                    type="button"
+                    key={b}
+                    onClick={() => setFormData(prev => ({
+                      ...prev,
+                      benefits: selected
+                        ? prev.benefits.filter(x => x !== b)
+                        : [...prev.benefits, b],
+                    }))}
+                    className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-all ${
+                      selected
+                        ? 'bg-primary/20 text-primary border-primary/40'
+                        : 'bg-background text-muted-foreground border-border hover:border-primary/30'
+                    }`}
+                    data-testid={`benefit-${b}`}
+                  >
+                    {b}
+                  </button>
+                );
+              })}
             </div>
           </div>
 

@@ -261,10 +261,11 @@ async def create_job(job: JobCreate, request: Request, current_user: dict = Depe
     if tier_id == "recruiter_enterprise":
         daily_limit = -1  # unlimited
     elif tier_id == "recruiter_pro":
-        daily_limit = 10
+        daily_limit = 5
     else:
-        daily_limit = 3  # free tier
+        daily_limit = 1  # free tier — one job at a time
 
+    consumed_single_post = False
     if daily_limit != -1:
         start_of_day = now_utc.replace(hour=0, minute=0, second=0, microsecond=0).isoformat()
         today_count = await db.jobs.count_documents({
@@ -272,11 +273,25 @@ async def create_job(job: JobCreate, request: Request, current_user: dict = Depe
             "created_at": {"$gte": start_of_day},
         })
         if today_count >= daily_limit:
-            tier_label = "Pro" if tier_id == "recruiter_pro" else "free"
-            raise HTTPException(
-                status_code=429,
-                detail=f"Daily job posting limit reached ({daily_limit}/day on {tier_label} plan). Upgrade for more posts."
+            # Try to consume a pay-as-you-go single-post credit before rejecting.
+            user_doc = await db.users.find_one(
+                {"id": current_user["id"]},
+                {"_id": 0, "single_post_credits": 1}
             )
+            credits = (user_doc or {}).get("single_post_credits", 0)
+            if credits > 0:
+                result = await db.users.update_one(
+                    {"id": current_user["id"], "single_post_credits": {"$gt": 0}},
+                    {"$inc": {"single_post_credits": -1}}
+                )
+                if result.modified_count == 1:
+                    consumed_single_post = True
+            if not consumed_single_post:
+                tier_label = "Pro" if tier_id == "recruiter_pro" else "free"
+                raise HTTPException(
+                    status_code=429,
+                    detail=f"Daily job posting limit reached ({daily_limit}/day on {tier_label} plan). Upgrade or buy a single-post credit."
+                )
 
     job_id = str(uuid.uuid4())
 
@@ -309,6 +324,9 @@ async def create_job(job: JobCreate, request: Request, current_user: dict = Depe
         "requirements": job.requirements,
         "salary_min": job.salary_min,
         "salary_max": job.salary_max,
+        "pay_type": job.pay_type or "salary",
+        "tips_eligible": bool(job.tips_eligible),
+        "benefits": job.benefits or [],
         "location": job.location,
         "job_type": job.job_type,
         "experience_level": job.experience_level,
@@ -604,7 +622,8 @@ async def update_job(job_id: str, updates: dict, current_user: dict = Depends(ge
         raise HTTPException(status_code=404, detail="Job not found or not authorized")
     
     allowed_fields = ["title", "company", "description", "requirements",
-                      "salary_min", "salary_max", "location", "job_type",
+                      "salary_min", "salary_max", "pay_type", "tips_eligible", "benefits",
+                      "location", "job_type",
                       "experience_level", "is_active", "location_restriction", "category", "employment_type",
                       "listing_photo", "work_style"]
     update_data = {k: v for k, v in updates.items() if k in allowed_fields}
@@ -948,13 +967,16 @@ async def parse_job_screenshots(
   "company": "Company Name",
   "description": "Full job description text",
   "requirements": ["requirement 1", "requirement 2"],
-  "salary_min": 80000,
-  "salary_max": 120000,
+  "pay_type": "hourly",
+  "salary_min": 18,
+  "salary_max": 22,
+  "tips_eligible": true,
+  "benefits": ["Flexible hours", "Free meals"],
   "location": "City, State",
-  "job_type": "remote",
-  "experience_level": "mid",
-  "employment_type": "full-time",
-  "category": "technology"
+  "job_type": "onsite",
+  "experience_level": "entry",
+  "employment_type": "part-time",
+  "category": "other"
 }
 
 Rules:
@@ -962,7 +984,10 @@ Rules:
 - "experience_level": one of "entry", "mid", "senior", "lead". Infer from title/requirements.
 - "employment_type": one of "full-time", "part-time", "contract", "internship". Default "full-time".
 - "category": one of "technology", "design", "marketing", "sales", "finance", "healthcare", "engineering", "education", "other".
-- "salary_min"/"salary_max": integers (annual USD). Convert hourly rates to annual (×2080). Use null if not found.
+- "pay_type": "hourly" if the listing quotes an hourly wage, "salary" if it quotes annual pay. Default "salary".
+- "salary_min"/"salary_max": integers. If pay_type is "hourly", store the hourly dollar amount (e.g. 18, 22). If "salary", store the annual amount (e.g. 80000). Use null if not found.
+- "tips_eligible": true if the role earns tips (server, bartender, barista, delivery, etc), false otherwise.
+- "benefits": array of perks like "Flexible hours", "Free meals", "Weekly pay", "Employee discount", "Health insurance". Empty array if none mentioned.
 - "requirements": array of individual skills/qualifications extracted from the listing.
 - "description": the full job description. Combine text across multiple screenshots if needed.
 - Use null for any field you cannot determine.
@@ -979,8 +1004,11 @@ Rules:
             "company": parsed.get("company"),
             "description": parsed.get("description"),
             "requirements": parsed.get("requirements", [])[:30],
+            "pay_type": parsed.get("pay_type") if parsed.get("pay_type") in ("hourly", "salary") else "salary",
             "salary_min": parsed.get("salary_min"),
             "salary_max": parsed.get("salary_max"),
+            "tips_eligible": bool(parsed.get("tips_eligible")),
+            "benefits": (parsed.get("benefits") or [])[:15],
             "location": parsed.get("location"),
             "job_type": parsed.get("job_type", "onsite"),
             "experience_level": parsed.get("experience_level", "mid"),

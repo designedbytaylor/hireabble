@@ -71,95 +71,26 @@ PRODUCTS = {
     "super_swipes_30": {"name": "30 Candidate Invites", "price": 5499, "count": 30,
                         "apple_product_id": "com.hireabble.recruiter.superswipes.30",
                         "google_product_id": "com.hireabble.recruiter.superswipes.30"},
-    # Seeker Priority Applies (Consumable IAP)
-    "seeker_superlikes_5": {"name": "5 Priority Applies", "price": 499, "count": 5,
-                            "apple_product_id": "com.hireabble.seeker.superlikes.5",
-                            "google_product_id": "com.hireabble.seeker.superlikes.5"},
-    "seeker_superlikes_15": {"name": "15 Priority Applies", "price": 999, "count": 15,
-                             "apple_product_id": "com.hireabble.seeker.superlikes.15",
-                             "google_product_id": "com.hireabble.seeker.superlikes.15"},
-    "seeker_superlikes_30": {"name": "30 Priority Applies", "price": 1499, "count": 30,
-                             "apple_product_id": "com.hireabble.seeker.superlikes.30",
-                             "google_product_id": "com.hireabble.seeker.superlikes.30"},
+    # Recruiter Single Post (Consumable IAP) — pay-as-you-go for small businesses
+    # who don't want a subscription. Grants one job post above the daily free limit.
+    "recruiter_single_post": {"name": "Single Job Post", "price": 2000, "count": 1,
+                              "apple_product_id": "com.hireabble.recruiter.singlepost",
+                              "google_product_id": "com.hireabble.recruiter.singlepost"},
 }
 
 # ==================== SUBSCRIPTION TIER DEFINITIONS ====================
 
 SUBSCRIPTION_TIERS = {
-    # Seeker tiers
-    "seeker_plus": {
-        "name": "Plus",
-        "role": "seeker",
-        "tier_level": 1,
-        "prices": {
-            "weekly": 399,    # $3.99/week
-            "monthly": 1499,  # $14.99/month
-            "6month": 5999,   # $9.99/month billed as $59.99
-        },
-        "apple_product_ids": {
-            "weekly": "com.hireabble.seeker.plus.weekly",
-            "monthly": "com.hireabble.seeker.plus.monthly",
-            "6month": "com.hireabble.seeker.plus.6month",
-        },
-        "google_product_ids": {
-            "weekly": "com.hireabble.seeker.plus.weekly",
-            "monthly": "com.hireabble.seeker.plus.monthly",
-            "6month": "com.hireabble.seeker.plus.6month",
-        },
-        "features": [
-            "10 Priority Applies per day (vs 3)",
-            "See who viewed your profile",
-            "Insights & analytics dashboard",
-            "Unlimited undo swipes (free: 1/day)",
-            "Priority application badge",
-            "Advanced job filters",
-            "1 weekly profile boost",
-        ],
-        "limits": {"daily_super_likes": 10, "can_see_viewers": True, "can_undo": True,
-                   "advanced_filters": True, "weekly_boosts": 1},
-    },
-    "seeker_premium": {
-        "name": "Premium",
-        "role": "seeker",
-        "tier_level": 2,
-        "prices": {
-            "weekly": 999,    # $9.99/week
-            "monthly": 2999,  # $29.99/month
-            "6month": 11999,  # $19.99/month billed as $119.99
-        },
-        "apple_product_ids": {
-            "weekly": "com.hireabble.seeker.premium.weekly",
-            "monthly": "com.hireabble.seeker.premium.monthly",
-            "6month": "com.hireabble.seeker.premium.6month",
-        },
-        "google_product_ids": {
-            "weekly": "com.hireabble.seeker.premium.weekly",
-            "monthly": "com.hireabble.seeker.premium.monthly",
-            "6month": "com.hireabble.seeker.premium.6month",
-        },
-        "features": [
-            "Unlimited Priority Applies",
-            "Everything in Plus",
-            "Attach a note to Priority Applies",
-            "Featured profile in search results",
-            "Application read receipts",
-            "Application insights (see how you rank)",
-            "3 daily Top Picks",
-        ],
-        "limits": {"daily_super_likes": -1, "can_see_viewers": True, "can_undo": True,
-                   "advanced_filters": True, "weekly_boosts": 1,
-                   "superlike_notes": True, "featured_profile": True, "read_receipts": True,
-                   "application_insights": True, "daily_top_picks": 3},
-    },
-    # Recruiter tiers
+    # Seekers are 100% free — no paid tiers.
+    # Recruiter tiers (small-business pricing)
     "recruiter_pro": {
         "name": "Pro",
         "role": "recruiter",
         "tier_level": 1,
         "prices": {
-            "weekly": 2499,   # $24.99/week
-            "monthly": 7999,  # $79.99/month
-            "6month": 39999,  # $66.67/month billed as $399.99
+            "weekly": 1499,   # $14.99/week
+            "monthly": 4900,  # $49/month
+            "6month": 24900,  # $41.50/month billed as $249/6mo
         },
         "apple_product_ids": {
             "weekly": "com.hireabble.recruiter.pro.weekly",
@@ -172,24 +103,24 @@ SUBSCRIPTION_TIERS = {
             "6month": "com.hireabble.recruiter.pro.6month",
         },
         "features": [
-            "10 Candidate Invites per day (vs 3)",
-            "See full applicant list (unblurred)",
+            "5 active job posts (vs 1 free)",
+            "Full applicant resumes (unblurred)",
+            "Unlimited messages with applicants",
             "1 free Boost per month",
-            "Priority in candidate feeds",
-            "Advanced candidate filters",
             "Analytics dashboard",
+            "Priority in candidate feeds",
         ],
         "limits": {"daily_super_swipes": 10, "can_see_all_applicants": True, "free_monthly_boost": 1,
-                   "priority_listing": True, "advanced_filters": True, "daily_job_posts": 10},
+                   "priority_listing": True, "advanced_filters": True, "daily_job_posts": 5},
     },
     "recruiter_enterprise": {
-        "name": "Enterprise",
+        "name": "Premium",
         "role": "recruiter",
         "tier_level": 2,
         "prices": {
-            "weekly": 4499,   # $44.99/week
-            "monthly": 14999, # $149.99/month
-            "6month": 74999,  # $125.00/month billed as $749.99
+            "weekly": 2999,   # $29.99/week
+            "monthly": 9900,  # $99/month
+            "6month": 49900,  # $83.16/month billed as $499/6mo
         },
         "apple_product_ids": {
             "weekly": "com.hireabble.recruiter.enterprise.weekly",
@@ -202,16 +133,13 @@ SUBSCRIPTION_TIERS = {
             "6month": "com.hireabble.recruiter.enterprise.6month",
         },
         "features": [
-            "Unlimited Candidate Invites",
-            "See full applicant list (unblurred)",
+            "Unlimited job posts",
+            "Featured listings (top of feed)",
+            "AI candidate screening",
             "3 free Boosts per month",
-            "Priority in candidate feeds",
-            "Advanced candidate filters",
             "Message candidates before connecting",
-            "AI-powered candidate insights",
-            "Featured job listings",
-            "Unlimited job posts per day",
-            "Analytics dashboard",
+            "Priority support",
+            "Everything in Pro",
         ],
         "limits": {"daily_super_swipes": -1, "can_see_all_applicants": True, "free_monthly_boost": 3,
                    "priority_listing": True, "advanced_filters": True,
@@ -321,11 +249,11 @@ async def get_products(country: str = "", current_user: dict = Depends(get_curre
             {"id": k, **{kk: vv for kk, vv in _apply_product_overrides(k, v, overrides).items()}}
             for k, v in PRODUCTS.items() if k.startswith("super_swipes_")
         ]
-    else:
-        result["super_likes"] = [
+        result["single_posts"] = [
             {"id": k, **{kk: vv for kk, vv in _apply_product_overrides(k, v, overrides).items()}}
-            for k, v in PRODUCTS.items() if k.startswith("seeker_superlikes_")
+            for k, v in PRODUCTS.items() if k == "recruiter_single_post"
         ]
+    # Seekers have no paid products — everything is free.
 
     return result
 
@@ -1417,8 +1345,24 @@ async def fulfill_purchase(metadata: dict, source: str = "unknown", apple_transa
         await activate_boost(user_id, job_id, product)
     elif product_id.startswith("super_swipes_"):
         await add_super_swipes(user_id, product, role="recruiter")
-    elif product_id.startswith("seeker_superlikes_"):
-        await add_super_swipes(user_id, product, role="seeker")
+    elif product_id == "recruiter_single_post":
+        await add_single_post_credit(user_id)
+
+
+async def add_single_post_credit(user_id: str):
+    """Grant one pay-as-you-go job post credit. Consumed when the recruiter
+    posts a job that would otherwise exceed their daily free limit."""
+    await db.users.update_one(
+        {"id": user_id},
+        {"$inc": {"single_post_credits": 1}}
+    )
+    invalidate_user(user_id)
+    await create_notification(
+        user_id=user_id,
+        notif_type="payment",
+        title="Single Post Credit Added",
+        message="You can now post one extra job. Use it whenever you're ready.",
+    )
 
 
 # ==================== BOOSTS ====================

@@ -467,6 +467,9 @@ class JobCreate(BaseModel):
     requirements: List[str] = []
     salary_min: Optional[int] = None
     salary_max: Optional[int] = None
+    pay_type: Optional[str] = "salary"  # 'hourly' or 'salary' — controls how salary_min/max are interpreted and displayed
+    tips_eligible: Optional[bool] = False  # restaurant/service jobs that earn tips
+    benefits: List[str] = []  # e.g., ["Flexible hours", "Free meals", "Weekly pay"]
     location: str
     job_type: str  # 'remote', 'onsite', 'hybrid'
     experience_level: str  # 'entry', 'mid', 'senior', 'lead'
@@ -488,6 +491,9 @@ class JobResponse(BaseModel):
     requirements: List[str] = []
     salary_min: Optional[int] = None
     salary_max: Optional[int] = None
+    pay_type: Optional[str] = "salary"
+    tips_eligible: Optional[bool] = False
+    benefits: List[str] = []
     location: str
     job_type: str
     experience_level: str

@@ -10,10 +10,8 @@ import { toast } from 'sonner';
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
 const TIER_OPTIONS = [
-  { id: 'seeker_plus', name: 'Seeker Plus' },
-  { id: 'seeker_premium', name: 'Seeker Premium' },
   { id: 'recruiter_pro', name: 'Recruiter Pro' },
-  { id: 'recruiter_enterprise', name: 'Recruiter Enterprise' },
+  { id: 'recruiter_enterprise', name: 'Recruiter Premium' },
 ];
 
 export default function AdminPromos() {

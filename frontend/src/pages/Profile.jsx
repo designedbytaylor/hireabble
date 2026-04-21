@@ -795,13 +795,13 @@ export default function Profile() {
       {/* Profile Card */}
       <main className="relative z-10 px-6 md:px-8">
         <div className="max-w-lg mx-auto">
-          {/* Upgrade Banner - hide if subscribed or still loading subscription status */}
-          {subscription !== undefined && !subscription?.subscribed && (
+          {/* Upgrade Banner — recruiters only; Hireabble is free for seekers */}
+          {user?.role === 'recruiter' && subscription !== undefined && !subscription?.subscribed && (
             <div className="mb-6">
               <UpgradePrompt
-                title={user?.role === 'recruiter' ? 'Upgrade to Pro' : 'Upgrade to Plus'}
-                subtitle="Unlock premium features and stand out from the crowd"
-                tierHint={user?.role === 'recruiter' ? 'recruiter_pro' : 'seeker_plus'}
+                title="Upgrade to Pro"
+                subtitle="More posts, full applicant resumes, and unlimited messages"
+                tierHint="recruiter_pro"
                 onSubscribed={fetchSubscription}
               />
             </div>

@@ -33,22 +33,6 @@ function isAndroidNativeApp() {
 const DURATION_LABELS = { weekly: 'Weekly', monthly: 'Monthly', '6month': '6 Months' };
 
 const TIER_STYLES = {
-  seeker_plus: {
-    gradient: 'from-blue-500 to-cyan-400',
-    bg: 'bg-blue-500/10',
-    border: 'border-blue-500/30',
-    text: 'text-blue-400',
-    icon: Star,
-    ring: 'ring-blue-500/30',
-  },
-  seeker_premium: {
-    gradient: 'from-amber-500 to-yellow-400',
-    bg: 'bg-amber-500/10',
-    border: 'border-amber-500/30',
-    text: 'text-amber-400',
-    icon: Crown,
-    ring: 'ring-amber-500/30',
-  },
   recruiter_pro: {
     gradient: 'from-blue-500 to-cyan-400',
     bg: 'bg-blue-500/10',
@@ -68,8 +52,18 @@ const TIER_STYLES = {
 };
 
 const FREE_FEATURES = {
-  seeker: ['3 Priority Applies per day', 'Smart job recommendations', 'Apply to jobs', 'Chat with connections'],
-  recruiter: ['3 Candidate Invites per day', 'Post job listings', 'View basic applicant info', 'Chat with connections'],
+  seeker: [
+    'Unlimited swipes & applications',
+    'Chat with every connection',
+    'Smart job recommendations',
+    'Always free, forever',
+  ],
+  recruiter: [
+    '1 active job post',
+    'View applicant names & photos',
+    'Chat with connections',
+    'Pay $20 to post one extra job anytime',
+  ],
 };
 
 function formatPrice(cents) {
@@ -225,9 +219,13 @@ export default function Upgrade() {
       });
       const data = res.data;
       if (isSeeker) {
-        setAddOns(data.super_likes || []);
+        setAddOns([]);
       } else {
-        setAddOns([...(data.super_swipes || []), ...(data.boosts || [])]);
+        setAddOns([
+          ...(data.single_posts || []),
+          ...(data.super_swipes || []),
+          ...(data.boosts || []),
+        ]);
       }
     } catch (err) {
 
@@ -374,31 +372,37 @@ export default function Upgrade() {
             <ArrowLeft className="w-5 h-5" />
           </button>
           <div>
-            <h1 className="text-2xl font-bold font-['Outfit']">Upgrade</h1>
-            <p className="text-muted-foreground text-sm">Choose the plan that's right for you</p>
+            <h1 className="text-2xl font-bold font-['Outfit']">{isSeeker ? 'Your plan' : 'Upgrade'}</h1>
+            <p className="text-muted-foreground text-sm">
+              {isSeeker
+                ? 'Hireabble is 100% free for job seekers — always.'
+                : "Choose the plan that's right for you"}
+            </p>
           </div>
         </div>
 
-        {/* Duration toggle */}
-        <div className="flex gap-2 p-1 rounded-2xl bg-card border border-border max-w-sm mx-auto">
-          {[
-            { id: 'weekly', label: 'Weekly' },
-            { id: 'monthly', label: 'Monthly' },
-            { id: '6month', label: '6 Months' },
-          ].map((d) => (
-            <button
-              key={d.id}
-              onClick={() => setSelectedDuration(d.id)}
-              className={`flex-1 py-2.5 px-3 rounded-xl text-sm font-medium transition-all ${
-                selectedDuration === d.id
-                  ? 'bg-gradient-to-r from-primary to-secondary text-white'
-                  : 'text-muted-foreground hover:text-foreground'
-              }`}
-            >
-              {d.label}
-            </button>
-          ))}
-        </div>
+        {/* Duration toggle — recruiters only (seekers have no paid tiers) */}
+        {!isSeeker && (
+          <div className="flex gap-2 p-1 rounded-2xl bg-card border border-border max-w-sm mx-auto">
+            {[
+              { id: 'weekly', label: 'Weekly' },
+              { id: 'monthly', label: 'Monthly' },
+              { id: '6month', label: '6 Months' },
+            ].map((d) => (
+              <button
+                key={d.id}
+                onClick={() => setSelectedDuration(d.id)}
+                className={`flex-1 py-2.5 px-3 rounded-xl text-sm font-medium transition-all ${
+                  selectedDuration === d.id
+                    ? 'bg-gradient-to-r from-primary to-secondary text-white'
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                {d.label}
+              </button>
+            ))}
+          </div>
+        )}
       </header>
 
       <main className="relative z-10 px-6 max-w-lg mx-auto space-y-4">
@@ -436,7 +440,7 @@ export default function Upgrade() {
 
         {/* Paid tier cards */}
         {tiers.map((tier, idx) => {
-          const style = TIER_STYLES[tier.id] || TIER_STYLES.seeker_plus;
+          const style = TIER_STYLES[tier.id] || TIER_STYLES.recruiter_pro;
           const TierIcon = style.icon;
           const isCurrent = currentTier === tier.id && currentDuration === selectedDuration;
           const isHighlighted = preselect === tier.id || (!preselect && tier.tier_level === 2);
