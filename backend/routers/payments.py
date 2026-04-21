@@ -231,6 +231,39 @@ class GooglePlayPurchaseValidation(BaseModel):
     job_id: Optional[str] = None    # For boosts
 
 
+# ==================== ROLE-BASED ACCESS CONTROL ====================
+# Every product we sell belongs to a single role. Enforce at every entry
+# point — Stripe Checkout, Apple IAP verify, and Google Play verify — so a
+# seeker can't fulfill a recruiter-only product by hitting the endpoints
+# directly.
+
+_RECRUITER_PRODUCT_ID = {"recruiter_single_post"}
+_RECRUITER_PRODUCT_PREFIXES = ("boost_", "super_swipes_")
+
+
+def _product_required_role(product_id: str):
+    """Return the role required to purchase/fulfill a consumable product, or None
+    if the product id is unknown (caller should reject separately)."""
+    if not product_id:
+        return None
+    if product_id in _RECRUITER_PRODUCT_ID or product_id.startswith(_RECRUITER_PRODUCT_PREFIXES):
+        return "recruiter"
+    return None
+
+
+def _enforce_product_role(user_role: str, product_id: str = None, tier_id: str = None):
+    """Raise 403 if the user's role doesn't match the product or tier being
+    fulfilled. Safe to call with just one of product_id / tier_id."""
+    if product_id:
+        required = _product_required_role(product_id)
+        if required and user_role != required:
+            raise HTTPException(status_code=403, detail="This product is not available for your role")
+    if tier_id:
+        tier = SUBSCRIPTION_TIERS.get(tier_id)
+        if tier and tier["role"] != user_role:
+            raise HTTPException(status_code=403, detail="This subscription tier is not available for your role")
+
+
 # ==================== PRODUCTS & PRICING ====================
 
 @router.get("/products")
@@ -575,6 +608,16 @@ async def verify_apple_receipt(
     if not found_transaction:
         raise HTTPException(status_code=400, detail="Product not found in receipt")
 
+    # Role-based access control: reject before locking/fulfilling so a seeker
+    # can't fulfill a recruiter-only product via the verify endpoint.
+    user_role = current_user.get("role", "seeker")
+    if is_subscription:
+        _enforce_product_role(user_role, tier_id=subscription_info[0])
+    else:
+        # Resolve to our internal product id, then enforce.
+        internal_pid = data.product_id if data.product_id in PRODUCTS else APPLE_TO_PRODUCT.get(data.product_id)
+        _enforce_product_role(user_role, product_id=internal_pid)
+
     apple_txn_id = found_transaction.get("transaction_id", data.transaction_id or str(uuid.uuid4()))
 
     # Atomically check-and-insert to prevent race conditions (TOCTOU)
@@ -762,6 +805,15 @@ async def verify_google_purchase(
 
     # Determine if this is a subscription or one-time product
     is_subscription = data.tier_id and data.tier_id in SUBSCRIPTION_TIERS
+
+    # Role-based access control: reject before hitting Google Play or fulfilling
+    # so a seeker can't purchase a recruiter-only product via the verify endpoint.
+    user_role = current_user.get("role", "seeker")
+    if is_subscription:
+        _enforce_product_role(user_role, tier_id=data.tier_id)
+    else:
+        internal_pid = data.product_id if data.product_id in PRODUCTS else GOOGLE_TO_PRODUCT.get(data.product_id)
+        _enforce_product_role(user_role, product_id=internal_pid)
 
     try:
         service = _get_google_play_service()
@@ -989,23 +1041,16 @@ async def create_checkout_session(
     if not product:
         raise HTTPException(status_code=400, detail="Invalid product")
 
-    # Validate role/ownership
+    # Validate role: single enforcement point for all consumables.
+    _enforce_product_role(current_user.get("role", "seeker"), product_id=data.product_id)
+
+    # Boost-specific ownership check (must own the job you're boosting).
     if data.product_id.startswith("boost_"):
-        if current_user.get("role") != "recruiter":
-            raise HTTPException(status_code=403, detail="Only recruiters can boost jobs")
         if not data.job_id:
             raise HTTPException(status_code=400, detail="job_id is required for boosts")
         job = await db.jobs.find_one({"id": data.job_id, "recruiter_id": current_user["id"]})
         if not job:
             raise HTTPException(status_code=404, detail="Job not found")
-
-    if data.product_id.startswith("super_swipes_"):
-        if current_user.get("role") != "recruiter":
-            raise HTTPException(status_code=403, detail="Only recruiters can purchase super swipes")
-
-    if data.product_id == "recruiter_single_post":
-        if current_user.get("role") != "recruiter":
-            raise HTTPException(status_code=403, detail="Only recruiters can buy single-post credits")
 
     try:
         session = stripe.checkout.Session.create(

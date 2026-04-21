@@ -31,8 +31,9 @@ router = APIRouter(tags=["Stats & Utilities"])
 DAILY_SUPERLIKE_LIMIT = 3
 
 def _get_seeker_daily_superlike_limit(user: dict) -> int:
-    """Hireabble is free for seekers — generous daily Priority Apply quota for all."""
-    return 999
+    """Priority Apply daily cap. Seekers are free forever — this is just an
+    abuse-prevention cap, not a monetization lever."""
+    return DAILY_SUPERLIKE_LIMIT
 
 @router.get("/dashboard")
 async def get_seeker_dashboard(current_user: dict = Depends(get_current_user)):
@@ -147,7 +148,6 @@ async def get_seeker_dashboard(current_user: dict = Depends(get_current_user)):
 
     # Hireabble is fully free for seekers — they get unlimited undo and all
     # formerly-premium analytics features without a subscription.
-    sub = (user_data or {}).get("subscription") or current_user.get("subscription") or {}
     can_undo = True
     is_plus_or_premium = True
     is_premium = True
