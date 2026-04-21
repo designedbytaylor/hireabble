@@ -1557,12 +1557,12 @@ export default function SeekerDashboard() {
         />
       )}
 
+      {/* Seekers don't have paid tiers; modal kept mounted as a no-op for legacy triggers. */}
       <UpgradeModal
-        open={showUpgradeModal}
+        open={false}
         onClose={() => setShowUpgradeModal(false)}
         onSubscribed={fetchDashboard}
         trigger={upgradeTrigger}
-        highlightTier="seeker_plus"
       />
 
       {/* Streak Detail Sheet */}
@@ -1726,10 +1726,15 @@ function JobDetailSheet({ job, onClose }) {
 
           {/* Tags */}
           <div className="flex flex-wrap gap-2 mb-5">
-            {formatSalary(job.salary_min, job.salary_max) && (
+            {formatSalary(job.salary_min, job.salary_max, job.pay_type) && (
               <span className="px-3 py-1.5 rounded-full bg-primary/20 text-primary text-sm flex items-center gap-1">
                 <DollarSign className="w-3.5 h-3.5" />
-                {formatSalary(job.salary_min, job.salary_max)}
+                {formatSalary(job.salary_min, job.salary_max, job.pay_type)}
+              </span>
+            )}
+            {job.tips_eligible && (
+              <span className="px-3 py-1.5 rounded-full bg-success/20 text-success text-sm flex items-center gap-1">
+                + tips
               </span>
             )}
             <span className="px-3 py-1.5 rounded-full bg-secondary/20 text-secondary text-sm flex items-center gap-1">
@@ -1795,8 +1800,13 @@ function JobDetailSheet({ job, onClose }) {
   );
 }
 
-const formatSalary = (min, max) => {
+const formatSalary = (min, max, payType = 'salary') => {
   if (!min && !max) return null;
+  if (payType === 'hourly') {
+    const fmt = (n) => `$${n}`;
+    const range = (min && max) ? `${fmt(min)}–${fmt(max)}` : (min ? `${fmt(min)}+` : `Up to ${fmt(max)}`);
+    return `${range}/hr`;
+  }
   const format = (n) => n >= 1000 ? `$${Math.round(n/1000)}k` : `$${n}`;
   if (min && max) return `${format(min)} - ${format(max)}`;
   if (min) return `${format(min)}+`;
@@ -1841,10 +1851,15 @@ const StaticJobCard = memo(function StaticJobCard({ job }) {
         </div>
         <h2 className="text-2xl md:text-3xl font-bold font-['Outfit'] mb-3">{job.title}</h2>
         <div className="flex flex-wrap gap-2 mb-4">
-          {formatSalary(job.salary_min, job.salary_max) && (
+          {formatSalary(job.salary_min, job.salary_max, job.pay_type) && (
             <span className="px-3 py-1.5 rounded-full bg-primary/20 text-primary text-sm flex items-center gap-1">
               <DollarSign className="w-3.5 h-3.5" />
-              {formatSalary(job.salary_min, job.salary_max)}
+              {formatSalary(job.salary_min, job.salary_max, job.pay_type)}
+            </span>
+          )}
+          {job.tips_eligible && (
+            <span className="px-3 py-1.5 rounded-full bg-success/20 text-success text-sm flex items-center gap-1">
+              + tips
             </span>
           )}
           <span className="px-3 py-1.5 rounded-full bg-secondary/20 text-secondary text-sm flex items-center gap-1">

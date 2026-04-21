@@ -28,16 +28,8 @@ router = APIRouter(tags=["Applications"])
 DAILY_SUPERLIKE_LIMIT = 3
 
 def _get_seeker_daily_superlike_limit(user: dict) -> int:
-    """Return the daily super like limit based on seeker subscription tier."""
-    sub = user.get("subscription", {})
-    now = datetime.now(timezone.utc).isoformat()
-    if sub.get("status") == "active" and sub.get("period_end", "") >= now:
-        tier = sub.get("tier_id", "")
-        if tier == "seeker_premium":
-            return 999  # effectively unlimited
-        elif tier == "seeker_plus":
-            return 10
-    return DAILY_SUPERLIKE_LIMIT
+    """Hireabble is free for seekers — generous daily Priority Apply quota for all."""
+    return 999
 
 # ==================== EMAIL TEMPLATES ====================
 
@@ -228,12 +220,9 @@ async def browse_candidates(
         seeker["best_match_job"] = best_job.get("title") if best_job else None
         seeker["best_match_job_id"] = best_job.get("id") if best_job else None
 
-        # Featured profile boost for premium seekers
-        sub = seeker.get("subscription") or {}
-        if (sub.get("status") == "active" and sub.get("period_end", "") >= now
-                and sub.get("tier_id") == "seeker_premium"):
-            seeker["is_featured"] = True
-            seeker["match_score"] = min(100, best_score + 15)
+        # Hireabble is free for seekers — featured profile boost for everyone.
+        seeker["is_featured"] = True
+        seeker["match_score"] = min(100, best_score + 15)
 
         # Profile boost (active 30-min boost from subscription perk)
         boost_until = seeker.get("profile_boost_until", "")
@@ -814,10 +803,8 @@ async def swipe(request: Request, action: SwipeAction, current_user: dict = Depe
 
     # Attach note to Super Like (Premium seekers only, max 140 chars)
     if is_superlike and action.note:
-        sub = current_user.get("subscription") or {}
-        if (sub.get("status") == "active" and sub.get("period_end", "") >= now
-                and sub.get("tier_id") == "seeker_premium"):
-            application_doc["superlike_note"] = action.note[:140]
+        # Hireabble is free for seekers — Priority Apply notes available to all.
+        application_doc["superlike_note"] = action.note[:140]
 
     try:
         await db.applications.insert_one(application_doc)
@@ -880,11 +867,8 @@ async def undo_last_swipe(current_user: dict = Depends(get_current_user)):
     # Check subscription tier
     sub = current_user.get("subscription") or {}
     now = datetime.now(timezone.utc).isoformat()
-    is_paid = (
-        sub.get("status") == "active"
-        and sub.get("period_end", "") >= now
-        and sub.get("tier_id", "") in ("seeker_plus", "seeker_premium")
-    )
+    # Hireabble is free for seekers — undo always available.
+    is_paid = True
 
     # Free tier gets 1 undo per day; paid tiers get unlimited
     if not is_paid:
@@ -1131,11 +1115,8 @@ async def get_my_applications(current_user: dict = Depends(get_current_user)):
     # Check if seeker has premium read receipts
     sub = current_user.get("subscription") or {}
     now_iso = datetime.now(timezone.utc).isoformat()
-    has_read_receipts = (
-        sub.get("status") == "active"
-        and sub.get("period_end", "") >= now_iso
-        and sub.get("tier_id") == "seeker_premium"
-    )
+    # Hireabble is free for seekers — read receipts available to all.
+    has_read_receipts = True
 
     applications = await db.applications.find(
         {"seeker_id": current_user["id"], "action": {"$in": ["like", "superlike"]}},
@@ -1625,11 +1606,8 @@ async def get_profile_viewers(current_user: dict = Depends(get_current_user)):
     # Check subscription
     sub = current_user.get("subscription") or {}
     now = datetime.now(timezone.utc).isoformat()
-    has_access = (
-        sub.get("status") == "active"
-        and sub.get("period_end", "") >= now
-        and sub.get("tier_id", "") in ("seeker_plus", "seeker_premium")
-    )
+    # Hireabble is free for seekers — full access to this feature.
+    has_access = True
 
     # Always return the count (tease for free users), but only return details for subscribers
     views = await db.profile_views.find(
@@ -1711,11 +1689,8 @@ async def get_application_insights(application_id: str, current_user: dict = Dep
     if current_user["role"] != "seeker":
         raise HTTPException(status_code=403, detail="Only seekers can view application insights")
 
-    sub = current_user.get("subscription") or {}
-    now = datetime.now(timezone.utc).isoformat()
-    if not (sub.get("status") == "active" and sub.get("period_end", "") >= now
-            and sub.get("tier_id") == "seeker_premium"):
-        raise HTTPException(status_code=403, detail="Premium subscription required for application insights")
+    # Hireabble is free for seekers — application insights available to all.
+    pass
 
     app = await db.applications.find_one({"id": application_id, "seeker_id": current_user["id"]})
     if not app:
@@ -1798,9 +1773,7 @@ async def activate_profile_boost(current_user: dict = Depends(get_current_user))
     sub = current_user.get("subscription") or {}
     now = datetime.now(timezone.utc)
     now_iso = now.isoformat()
-    if not (sub.get("status") == "active" and sub.get("period_end", "") >= now_iso
-            and sub.get("tier_id", "") in ("seeker_plus", "seeker_premium")):
-        raise HTTPException(status_code=403, detail="Plus or Premium subscription required")
+    # Hireabble is free for seekers — no subscription gate.
 
     # Check weekly boost limit
     week_start = (now - timedelta(days=now.weekday())).replace(hour=0, minute=0, second=0, microsecond=0).isoformat()
@@ -1843,11 +1816,8 @@ async def get_top_picks(current_user: dict = Depends(get_current_user)):
     if current_user["role"] != "seeker":
         raise HTTPException(status_code=403, detail="Only seekers can view top picks")
 
-    sub = current_user.get("subscription") or {}
-    now = datetime.now(timezone.utc).isoformat()
-    if not (sub.get("status") == "active" and sub.get("period_end", "") >= now
-            and sub.get("tier_id") == "seeker_premium"):
-        raise HTTPException(status_code=403, detail="Premium subscription required for Top Picks")
+    # Hireabble is free for seekers — Top Picks available to all.
+    pass
 
     uid = current_user["id"]
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")

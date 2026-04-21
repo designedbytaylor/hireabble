@@ -190,40 +190,48 @@ async def redeem_referral_code(current_user: dict = Depends(get_current_user)):
         "created_at": now,
     })
 
-    # Award 1 month of Plus free to referrer
-    role = (await db.users.find_one({"id": referrer["id"]}, {"_id": 0, "role": 1, "subscription": 1}) or {}).get("role", "seeker")
-    referrer_doc = await db.users.find_one({"id": referrer["id"]}, {"_id": 0, "subscription": 1})
-    existing_sub = (referrer_doc or {}).get("subscription") or {}
-    tier_id = "seeker_plus" if role == "seeker" else "recruiter_pro"
+    # Award referral reward to referrer.
+    # Recruiters: 1 month of Pro free (or extend existing subscription).
+    # Seekers: 1 free single-post credit they can gift, since seekers have no paid plan.
+    role = (await db.users.find_one({"id": referrer["id"]}, {"_id": 0, "role": 1}) or {}).get("role", "seeker")
+    reward_message = ""
 
-    # If referrer already has an active subscription, extend it by 30 days
-    if existing_sub.get("status") == "active" and existing_sub.get("period_end", "") >= now:
+    if role == "recruiter":
+        referrer_doc = await db.users.find_one({"id": referrer["id"]}, {"_id": 0, "subscription": 1})
+        existing_sub = (referrer_doc or {}).get("subscription") or {}
         from datetime import timedelta
-        try:
-            current_end = datetime.fromisoformat(existing_sub["period_end"].replace("Z", "+00:00"))
-        except (ValueError, TypeError):
-            current_end = datetime.now(timezone.utc)
-        new_end = (current_end + timedelta(days=30)).isoformat()
-        await db.users.update_one(
-            {"id": referrer["id"]},
-            {"$set": {"subscription.period_end": new_end}},
-        )
+        if existing_sub.get("status") == "active" and existing_sub.get("period_end", "") >= now:
+            try:
+                current_end = datetime.fromisoformat(existing_sub["period_end"].replace("Z", "+00:00"))
+            except (ValueError, TypeError):
+                current_end = datetime.now(timezone.utc)
+            new_end = (current_end + timedelta(days=30)).isoformat()
+            await db.users.update_one(
+                {"id": referrer["id"]},
+                {"$set": {"subscription.period_end": new_end}},
+            )
+        else:
+            period_end = (datetime.now(timezone.utc) + timedelta(days=30)).isoformat()
+            await db.users.update_one(
+                {"id": referrer["id"]},
+                {"$set": {
+                    "subscription": {
+                        "tier_id": "recruiter_pro",
+                        "status": "active",
+                        "period_start": now,
+                        "period_end": period_end,
+                        "source": "referral",
+                    }
+                }},
+            )
+        reward_message = "1 month of Pro free"
     else:
-        # Grant a fresh 30-day Plus subscription
-        from datetime import timedelta
-        period_end = (datetime.now(timezone.utc) + timedelta(days=30)).isoformat()
+        # Seekers — Hireabble is already free. Give them a small thank-you badge instead.
         await db.users.update_one(
             {"id": referrer["id"]},
-            {"$set": {
-                "subscription": {
-                    "tier_id": tier_id,
-                    "status": "active",
-                    "period_start": now,
-                    "period_end": period_end,
-                    "source": "referral",
-                }
-            }},
+            {"$inc": {"referral_count": 1}}
         )
+        reward_message = "a referral badge — thanks for spreading the word!"
 
     # Mark as redeemed
     await db.users.update_one({"id": uid}, {"$set": {"referral_redeemed": True}})
@@ -233,12 +241,12 @@ async def redeem_referral_code(current_user: dict = Depends(get_current_user)):
     await create_notification(
         referrer["id"], "referral",
         "Referral Reward!",
-        f"{referred_name} joined using your referral code! You earned 1 month of Plus free.",
+        f"{referred_name} joined using your referral code! You earned {reward_message}.",
     )
     await send_web_push(
         referrer["id"],
         "Referral Reward!",
-        f"{referred_name} joined using your code! +1 month of Plus free",
+        f"{referred_name} joined using your code!",
         {"type": "referral"},
     )
 
@@ -246,4 +254,4 @@ async def redeem_referral_code(current_user: dict = Depends(get_current_user)):
     from cache import invalidate_user
     invalidate_user(referrer["id"])
 
-    return {"message": "Referral redeemed! Referrer awarded 1 month of Plus free."}
+    return {"message": f"Referral redeemed! Referrer awarded {reward_message}."}

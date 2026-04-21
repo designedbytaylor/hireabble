@@ -575,12 +575,18 @@ async def extend_match(match_id: str, request: Request, current_user: dict = Dep
     if match["seeker_id"] != current_user["id"] and match["recruiter_id"] != current_user["id"]:
         raise HTTPException(status_code=403, detail="Not authorized")
 
+    # Seekers extend connections free (Hireabble is free for seekers).
+    # Recruiters need an active Pro/Premium subscription to extend.
     sub = current_user.get("subscription", {})
     now_str = datetime.now(timezone.utc).isoformat()
-    is_premium = (sub.get("status") == "active" and sub.get("period_end", "") >= now_str
-                  and sub.get("tier_id") in ("seeker_plus", "seeker_premium", "recruiter_pro", "recruiter_enterprise"))
-    if not is_premium:
-        raise HTTPException(status_code=403, detail="Premium subscription required to extend matches")
+    is_seeker = current_user.get("role") == "seeker"
+    is_paid_recruiter = (
+        sub.get("status") == "active"
+        and sub.get("period_end", "") >= now_str
+        and sub.get("tier_id") in ("recruiter_pro", "recruiter_enterprise")
+    )
+    if not (is_seeker or is_paid_recruiter):
+        raise HTTPException(status_code=403, detail="Pro or Premium subscription required to extend connections")
 
     if not match.get("expires_at"):
         raise HTTPException(status_code=400, detail="Match does not have an expiration")

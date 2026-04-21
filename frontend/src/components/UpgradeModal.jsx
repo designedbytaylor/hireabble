@@ -8,24 +8,8 @@ import { isIOS, isAndroid } from '../utils/capacitor';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
-// Tier color schemes
+// Tier color schemes — recruiter-only since seekers don't have paid tiers
 const TIER_COLORS = {
-  seeker_plus: {
-    gradient: 'from-blue-500 to-cyan-400',
-    bg: 'bg-blue-500/10',
-    border: 'border-blue-500/30',
-    text: 'text-blue-400',
-    icon: Star,
-    badge: 'Plus',
-  },
-  seeker_premium: {
-    gradient: 'from-amber-500 to-yellow-400',
-    bg: 'bg-amber-500/10',
-    border: 'border-amber-500/30',
-    text: 'text-amber-400',
-    icon: Crown,
-    badge: 'Premium',
-  },
   recruiter_pro: {
     gradient: 'from-blue-500 to-cyan-400',
     bg: 'bg-blue-500/10',
@@ -40,9 +24,11 @@ const TIER_COLORS = {
     border: 'border-amber-500/30',
     text: 'text-amber-400',
     icon: Crown,
-    badge: 'Enterprise',
+    badge: 'Premium',
   },
 };
+
+const FALLBACK_TIER_COLORS = TIER_COLORS.recruiter_pro;
 
 const DURATION_LABELS = {
   weekly: 'Weekly',
@@ -153,7 +139,7 @@ export default function UpgradeModal({ open, onClose, onSubscribed, trigger, hig
   if (!open) return null;
 
   const activeTier = tiers.find((t) => t.id === selectedTier);
-  const colors = TIER_COLORS[selectedTier] || TIER_COLORS.seeker_plus;
+  const colors = TIER_COLORS[selectedTier] || FALLBACK_TIER_COLORS;
   const TierIcon = colors.icon;
 
   return (
@@ -227,7 +213,7 @@ export default function UpgradeModal({ open, onClose, onSubscribed, trigger, hig
             {tiers.length > 1 && (
               <div className="flex gap-2 px-4 -mt-5 relative z-10">
                 {tiers.map((tier) => {
-                  const tc = TIER_COLORS[tier.id] || TIER_COLORS.seeker_plus;
+                  const tc = TIER_COLORS[tier.id] || FALLBACK_TIER_COLORS;
                   const isSelected = selectedTier === tier.id;
                   const isCurrent = currentTier === tier.id;
                   return (
@@ -342,7 +328,7 @@ export default function UpgradeModal({ open, onClose, onSubscribed, trigger, hig
 export function UpgradePrompt({ title, subtitle, tierHint, trigger, className = '', onSubscribed }) {
   const [showModal, setShowModal] = useState(false);
 
-  const colors = TIER_COLORS[tierHint] || TIER_COLORS.seeker_plus;
+  const colors = TIER_COLORS[tierHint] || FALLBACK_TIER_COLORS;
   const TierIcon = colors.icon;
 
   return (

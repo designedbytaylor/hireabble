@@ -96,7 +96,8 @@ export default function SeekerAnalytics() {
     );
   }
 
-  const isLocked = data?.locked;
+  // Hireabble is free for seekers — analytics are always unlocked.
+  const isLocked = false;
 
   return (
     <div className="min-h-screen bg-background pb-24">

@@ -31,16 +31,8 @@ router = APIRouter(tags=["Stats & Utilities"])
 DAILY_SUPERLIKE_LIMIT = 3
 
 def _get_seeker_daily_superlike_limit(user: dict) -> int:
-    """Return the daily super like limit based on seeker subscription tier."""
-    sub = user.get("subscription", {})
-    now = datetime.now(timezone.utc).isoformat()
-    if sub.get("status") == "active" and sub.get("period_end", "") >= now:
-        tier = sub.get("tier_id", "")
-        if tier == "seeker_premium":
-            return 999
-        elif tier == "seeker_plus":
-            return 10
-    return DAILY_SUPERLIKE_LIMIT
+    """Hireabble is free for seekers — generous daily Priority Apply quota for all."""
+    return 999
 
 @router.get("/dashboard")
 async def get_seeker_dashboard(current_user: dict = Depends(get_current_user)):
@@ -153,34 +145,12 @@ async def get_seeker_dashboard(current_user: dict = Depends(get_current_user)):
     daily_limit = _get_seeker_daily_superlike_limit(user_data or {})
     free_remaining = max(0, daily_limit - superlikes_today)
 
-    # Check if user can undo: paid tiers get unlimited, free tier gets 1/day
+    # Hireabble is fully free for seekers — they get unlimited undo and all
+    # formerly-premium analytics features without a subscription.
     sub = (user_data or {}).get("subscription") or current_user.get("subscription") or {}
-    is_paid_undo = (
-        sub.get("status") == "active"
-        and sub.get("period_end", "") >= now
-        and sub.get("tier_id", "") in ("seeker_plus", "seeker_premium")
-    )
-    if is_paid_undo:
-        can_undo = True
-    else:
-        today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0).isoformat()
-        undos_today = await db.undo_log.count_documents({
-            "user_id": current_user["id"],
-            "created_at": {"$gte": today_start},
-        })
-        can_undo = undos_today < 1
-
-    # Check subscription for premium features
-    is_plus_or_premium = (
-        sub.get("status") == "active"
-        and sub.get("period_end", "") >= now
-        and sub.get("tier_id", "") in ("seeker_plus", "seeker_premium")
-    )
-    is_premium = (
-        sub.get("status") == "active"
-        and sub.get("period_end", "") >= now
-        and sub.get("tier_id") == "seeker_premium"
-    )
+    can_undo = True
+    is_plus_or_premium = True
+    is_premium = True
 
     # Premium feature flags
     premium_features = {
@@ -783,14 +753,8 @@ async def seeker_analytics(current_user: dict = Depends(get_current_user)):
     seven_days_ago = (now - timedelta(days=7)).isoformat()
     thirty_days_ago = (now - timedelta(days=30)).isoformat()
 
-    # Subscription check — free users get teaser data only
-    sub = current_user.get("subscription") or {}
-    now_iso = now.isoformat()
-    has_access = (
-        sub.get("status") == "active"
-        and sub.get("period_end", "") >= now_iso
-        and sub.get("tier_id", "") in ("seeker_plus", "seeker_premium")
-    )
+    # Hireabble is free for seekers — analytics are unlocked for everyone.
+    has_access = True
 
     # Profile views this week (shown to everyone as teaser)
     profile_views_weekly = await db.profile_views.count_documents({
